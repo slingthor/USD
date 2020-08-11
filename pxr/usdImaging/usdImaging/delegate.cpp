@@ -125,6 +125,7 @@ UsdImagingDelegate::UsdImagingDelegate(
     , _purposeCache() // note that purpose is uniform, so no GetTime()
     , _drawModeCache(GetTime())
     , _inheritedPrimvarCache()
+    , _pointInstancerIndicesCache(GetTime())
     , _displayRender(true)
     , _displayProxy(true)
     , _displayGuides(true)
@@ -760,6 +761,8 @@ UsdImagingDelegate::SetTime(UsdTimeCode time)
     _time = time;
     _xformCache.SetTime(_time);
     _visCache.SetTime(_time);
+    _pointInstancerIndicesCache.SetTime(_time);
+
     // No need to set time on the look binding cache here, since we know we're
     // only querying relationships.
 
@@ -883,6 +886,7 @@ UsdImagingDelegate::ApplyPendingUpdates()
     _drawModeCache.Clear();
     _coordSysBindingCache.Clear();
     _inheritedPrimvarCache.Clear();
+    _pointInstancerIndicesCache.Clear();
 
     UsdImagingDelegate::_Worker worker(this);
     UsdImagingIndexProxy indexProxy(this, &worker);
@@ -1218,7 +1222,7 @@ UsdImagingDelegate::_RefreshUsdObject(SdfPath const& usdPath,
         // This is very conservative but it is correct.
         if (attrName == UsdGeomTokens->modelDrawMode ||
             attrName == UsdGeomTokens->modelApplyDrawMode ||
-            TfStringStartsWith(attrName, UsdShadeTokens->materialBinding)) {
+            UsdShadeMaterialBindingAPI::CanContainPropertyName(attrName)) {
             _ResyncUsdPrim(usdPrimPath, proxy, true);
             return;
         }
@@ -1235,7 +1239,7 @@ UsdImagingDelegate::_RefreshUsdObject(SdfPath const& usdPath,
             // Because these are inherited attributes, we must update all
             // children.
             _GatherDependencies(usdPrimPath, &affectedCachePaths);
-        } else if (UsdGeomPrimvar::IsPrimvarRelatedPropertyName(attrName)) {
+        } else if (UsdGeomPrimvarsAPI::CanContainPropertyName(attrName)) {
             // Primvars can be inherited, so we need to invalidate everything
             // downstream.  Technically, only constant primvars on non-leaf
             // prims are inherited, but we can't check the interpolation mode
@@ -1243,7 +1247,7 @@ UsdImagingDelegate::_RefreshUsdObject(SdfPath const& usdPath,
             // _GatherDependencies on a leaf prim won't invoke any extra work
             // vs the equal_range below...
             _GatherDependencies(usdPrimPath, &affectedCachePaths);
-        } else if (TfStringStartsWith(attrName, UsdTokens->collection)) {
+        } else if (UsdCollectionAPI::CanContainPropertyName(attrName)) {
             // XXX Performance: Collections used for material bindings
             // can refer to prims at arbitrary locations in the scene.
             // Accordingly, we conservatively invalidate everything.
@@ -1259,7 +1263,7 @@ UsdImagingDelegate::_RefreshUsdObject(SdfPath const& usdPath,
             TF_FOR_ALL(it, _hdPrimInfoMap) {
                 affectedCachePaths.push_back(it->first);
             }
-        } else if (TfStringStartsWith(attrName, UsdShadeTokens->coordSys)) {
+        } else if (UsdShadeCoordSysAPI::CanContainPropertyName(attrName)) {
             TF_DEBUG(USDIMAGING_CHANGES).Msg("[Refresh Object]: "
                 "HdCoordSys bindings affected for %s\n", usdPath.GetText());
             // Coordinate system bindings apply to all descendent gprims.
@@ -1338,6 +1342,7 @@ UsdImagingDelegate::_RefreshUsdObject(SdfPath const& usdPath,
             } else if (dirtyBits != HdChangeTracker::AllDirty) {
                 // Update Variability
                 _timeVaryingPrimCacheValid = false;
+                primInfo->timeVaryingBits = HdChangeTracker::Clean;
                 adapter->TrackVariability(primInfo->usdPrim, affectedCachePath,
                                           &primInfo->timeVaryingBits);
 
@@ -2135,6 +2140,14 @@ UsdImagingDelegate::PopulateSelection(
     SdfPathVector affectedCachePaths;
     _GatherDependencies(rootPath, &affectedCachePaths);
 
+    std::sort(affectedCachePaths.begin(), affectedCachePaths.end());
+    auto last = std::unique(affectedCachePaths.begin(),
+                            affectedCachePaths.end(),
+                            [](SdfPath const &l, SdfPath const &r) {
+                                return r.HasPrefix(l);
+                            });
+    affectedCachePaths.erase(last, affectedCachePaths.end());
+
     // Loop through gathered prims and add them to the selection set
     bool added = false;
     for (size_t i = 0; i < affectedCachePaths.size(); ++i) {
@@ -2580,59 +2593,6 @@ UsdImagingDelegate::GetMaterialResource(SdfPath const &materialId)
     return vtMatResource;
 }
 
-HdTextureResource::ID
-UsdImagingDelegate::GetTextureResourceID(SdfPath const &textureId)
-{
-    SdfPath cachePath = ConvertIndexPathToCachePath(textureId);
-    _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
-    if (primInfo) {
-        return primInfo->adapter
-            ->GetTextureResourceID(primInfo->usdPrim, cachePath, _time,
-                                   (size_t) &GetRenderIndex() );
-    }
-
-    return HdTextureResource::ID(-1);
-}
-
-HdTextureResourceSharedPtr
-UsdImagingDelegate::GetTextureResource(SdfPath const &textureId)
-{
-    // PERFORMANCE: We should schedule this to be updated during Sync, rather
-    // than pulling values on demand.
-
-    // Check if we can find primInfo for the path directly.
-    // This only works if a prim was inserted for this path.
-    SdfPath cachePath = ConvertIndexPathToCachePath(textureId);
-    _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
-
-    if (!primInfo) {
-        // For texture nodes we may have only inserted an Sprim for the material
-        // not for the texture itself. There is only primInfo for the material.
-        //
-        // UsdShade has the rule that a UsdShade node must be nested inside the
-        // UsdMaterial scope. We traverse the parent paths to find the material.
-        //
-        // Example for texture prim:
-        //    /Materials/Woody/BootMaterial/UsdShadeNodeGraph/Tex
-        // We want to find Sprim:
-        //    /Materials/Woody/BootMaterial
-
-        // While-loop to account for nesting of UsdNodeGraphs and DrawMode
-        // adapter with prototypes.
-        SdfPath parentPath = cachePath;
-        while (!primInfo && !parentPath.IsRootPrimPath()) {
-            parentPath = parentPath.GetParentPath();
-            primInfo = _GetHdPrimInfo(parentPath);
-        }
-    }
-
-    if (TF_VERIFY(primInfo, "%s", textureId.GetText())) {
-        return primInfo->adapter
-            ->GetTextureResource(primInfo->usdPrim, cachePath, _time);
-    }
-    return nullptr;
-}
-
 VtValue
 UsdImagingDelegate::GetLightParamValue(SdfPath const &id,
                                        TfToken const &paramName)
@@ -2674,28 +2634,7 @@ UsdImagingDelegate::GetLightParamValue(SdfPath const &id,
         return _GetUsdPrimAttribute(cachePath, paramName);
     }
 
-    // Special handling of non-attribute parameters and textureResources
-    if (paramName == HdLightTokens->textureResource) {
-        // This can be moved to a separate function as we add support for
-        // other light types that use textures in multiple ways
-        
-        // if we were able to get the texture file attribute from the prim
-        if (UsdAttribute textureFileAttr = prim.GetAttribute(
-                                                HdLightTokens->textureFile)) {
-
-            _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
-            if (TF_VERIFY(primInfo)) {
-                SdfPath textureFilePath = ConvertIndexPathToCachePath(
-                                                textureFileAttr.GetPath());
-
-                // return the laoded texture
-                return VtValue(primInfo->adapter->GetTextureResource(
-                                                primInfo->usdPrim,
-                                                textureFilePath, _time));
-            }
-        }
-        return VtValue();
-    } else if (paramName == HdTokens->transform) {
+    if (paramName == HdTokens->transform) {
         _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
         if (TF_VERIFY(primInfo)) {
             return VtValue(primInfo->adapter->GetTransform(primInfo->usdPrim,

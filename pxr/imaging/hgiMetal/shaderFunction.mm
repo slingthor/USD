@@ -293,54 +293,58 @@ HgiMetalShaderFunction::HgiMetalShaderFunction(
     : HgiShaderFunction(desc)
     , _shaderId(nil)
 {
-    id<MTLDevice> device = hgi->GetPrimaryDevice();
+    if (desc.shaderCode) {
+        id<MTLDevice> device = hgi->GetPrimaryDevice();
 
-    std::string source = _GetHeader(device) + desc.shaderCode;
+        std::string source = _GetHeader(device) + desc.shaderCode;
 
-    MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
-    options.fastMathEnabled = YES;
-    options.languageVersion = MTLLanguageVersion2_1;
-    options.preprocessorMacros = @{
-        @"ARCH_GFX_METAL":@1,
-    };
-    
-    NSError *error = NULL;
-    id<MTLLibrary> library =
-        [hgi->GetPrimaryDevice() newLibraryWithSource:@(source.c_str())
-                                              options:options
-                                                error:&error];
+        MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
+        options.fastMathEnabled = YES;
+        options.languageVersion = MTLLanguageVersion2_1;
+        options.preprocessorMacros = @{
+            @"ARCH_GFX_METAL":@1,
+        };
+        
+        NSError *error = NULL;
+        id<MTLLibrary> library =
+            [hgi->GetPrimaryDevice() newLibraryWithSource:@(source.c_str())
+                                                  options:options
+                                                    error:&error];
 
-    NSString *entryPoint = nullptr;
-    switch (_descriptor.shaderStage) {
-        case HgiShaderStageVertex:
-            entryPoint = @"vertexEntryPoint";
-            break;
-        case HgiShaderStageFragment:
-            entryPoint = @"fragmentEntryPoint";
-            break;
-        case HgiShaderStageCompute:
-            entryPoint = @"computeEntryPoint";
-            break;
-        case HgiShaderStageTessellationControl:
-        case HgiShaderStageTessellationEval:
-        case HgiShaderStageGeometry:
-            TF_CODING_ERROR("Todo: Unsupported shader stage");
-            break;
+        NSString *entryPoint = nullptr;
+        switch (_descriptor.shaderStage) {
+            case HgiShaderStageVertex:
+                entryPoint = @"vertexEntryPoint";
+                break;
+            case HgiShaderStageFragment:
+                entryPoint = @"fragmentEntryPoint";
+                break;
+            case HgiShaderStageCompute:
+                entryPoint = @"computeEntryPoint";
+                break;
+            case HgiShaderStageTessellationControl:
+            case HgiShaderStageTessellationEval:
+            case HgiShaderStageGeometry:
+                TF_CODING_ERROR("Todo: Unsupported shader stage");
+                break;
+        }
+        
+        // Load the function into the library
+        _shaderId = [library newFunctionWithName:entryPoint];
+        if (!_shaderId) {
+            NSString *err = [error localizedDescription];
+            TF_WARN("Failed to compile shader: \n%s",
+                    [err UTF8String]);
+            TF_WARN("%s", source.c_str());
+        }
+        else {
+            HGIMETAL_DEBUG_LABEL(_shaderId, _descriptor.debugName.c_str());
+        }
+        
+        [library release];
     }
-    
-    // Load the function into the library
-    _shaderId = [library newFunctionWithName:entryPoint];
-    if (!_shaderId) {
-        NSString *err = [error localizedDescription];
-        TF_WARN("Failed to compile shader: \n%s",
-                [err UTF8String]);
-        TF_WARN("%s", source.c_str());
-    }
-    else {
-        HGIMETAL_DEBUG_LABEL(_shaderId, _descriptor.debugName.c_str());
-    }
 
-    [library release];
+    _descriptor.shaderCode = nullptr;
 }
 
 HgiMetalShaderFunction::~HgiMetalShaderFunction()
@@ -359,6 +363,12 @@ std::string const&
 HgiMetalShaderFunction::GetCompileErrors()
 {
     return _errors;
+}
+
+size_t
+HgiMetalShaderFunction::GetByteSizeOfResource() const
+{
+    return 0;
 }
 
 uint64_t

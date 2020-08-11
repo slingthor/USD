@@ -78,9 +78,11 @@ enum HgiTextureType
 ///
 /// <ul>
 /// <li>HgiTextureUsageBitsColorTarget:
-///   The texture is an color attachment rendered into via a render pass.</li>
+///   The texture is a color attachment rendered into via a render pass.</li>
 /// <li>HgiTextureUsageBitsDepthTarget:
-///   The texture is an depth attachment rendered into via a render pass.</li>
+///   The texture is a depth attachment rendered into via a render pass.</li>
+/// <li>HgiTextureUsageBitsStencilTarget:
+///   The texture is a stencil attachment rendered into via a render pass.</li>
 /// <li>HgiTextureUsageBitsShaderRead:
 ///   The texture is sampled from in a shader (image load / sampling)</li>
 /// <li>HgiTextureUsageBitsShaderWrite:
@@ -93,12 +95,13 @@ enum HgiTextureType
 ///
 enum HgiTextureUsageBits : HgiBits
 {
-    HgiTextureUsageBitsColorTarget = 1 << 0,
-    HgiTextureUsageBitsDepthTarget = 1 << 1,
-    HgiTextureUsageBitsShaderRead  = 1 << 2,
-    HgiTextureUsageBitsShaderWrite = 1 << 3,
+    HgiTextureUsageBitsColorTarget   = 1 << 0,
+    HgiTextureUsageBitsDepthTarget   = 1 << 1,
+    HgiTextureUsageBitsStencilTarget = 1 << 2,
+    HgiTextureUsageBitsShaderRead    = 1 << 3,
+    HgiTextureUsageBitsShaderWrite   = 1 << 4,
 
-    HgiTextureUsageCustomBitsBegin = 1 << 4,
+    HgiTextureUsageCustomBitsBegin = 1 << 5,
 };
 
 using HgiTextureUsage = HgiBits;
@@ -274,25 +277,6 @@ enum HgiShaderStageBits : HgiBits
 };
 using HgiShaderStage = HgiBits;
 
-/// \enum HgiPipelineType
-///
-/// Describes the intended bind point for this pipeline.
-///
-/// <ul>
-/// <li>HgiPipelineTypeGraphics:
-///   The pipeline is meant to be bound to the graphics pipeline.</li>
-/// <li>HgiPipelineTypeCompute:
-///   The pipeline is meant to be bound to the compute pipeline.</li>
-/// </ul>
-///
-enum HgiPipelineType
-{
-    HgiPipelineTypeGraphics = 0,
-    HgiPipelineTypeCompute,
-
-    HgiPipelineTypeCount
-};
-
 /// \enum HgiBindResourceType
 ///
 /// Describes the type of the resource to be bound.
@@ -301,9 +285,6 @@ enum HgiPipelineType
 /// <li>HgiBindResourceTypeSampler:
 ///   Sampler.
 ///   Glsl example: uniform sampler samplerOnly</li>
-/// <li>HgiBindResourceTypeCombinedImageSampler:
-///   Image and sampler combined in one.
-///   Glsl example: uniform sampler2D combined</li>
 /// <li>HgiBindResourceTypeSamplerImage:
 ///   Image for use with sampling ops.
 ///   Glsl example: uniform texture2D textureOnly
@@ -319,7 +300,6 @@ enum HgiPipelineType
 enum HgiBindResourceType
 {
     HgiBindResourceTypeSampler = 0,
-    HgiBindResourceTypeCombinedImageSampler,
     HgiBindResourceTypeSamplerImage,
     HgiBindResourceTypeStorageImage,
     HgiBindResourceTypeUniformBuffer,
@@ -456,6 +436,51 @@ enum HgiCompareFunction
     HgiCompareFunctionAlways,
 
     HgiCompareFunctionCount
+};
+
+/// \enum HgiComponentSwizzle
+///
+/// Swizzle for a component.
+///
+enum HgiComponentSwizzle
+{
+    HgiComponentSwizzleZero = 0,
+    HgiComponentSwizzleOne,
+    HgiComponentSwizzleR,
+    HgiComponentSwizzleG,
+    HgiComponentSwizzleB,
+    HgiComponentSwizzleA,
+
+    HgiComponentSwizzleCount
+};
+
+/// \enum HgiPrimitiveType
+///
+/// What the stream of vertices being rendered represents
+///
+/// <ul>
+/// <li>HgiPrimitiveTypePointList:
+///   Rasterize a point at each vertex.</li>
+/// <li>HgiPrimitiveTypeLineList:
+///   Rasterize a line between each separate pair of vertices.</li>
+/// <li>HgiPrimitiveTypeLineStrip:
+///   Rasterize a line between each pair of adjacent vertices.</li>
+/// <li>HgiPrimitiveTypeTriangleList:
+///   Rasterize a triangle for every separate set of three vertices.</li>
+/// <li>HgiPrimitiveTypePatchList:
+///   A user-defined number of vertices, which is tessellated into
+///   points, lines, or triangles.</li>
+/// </ul>
+///
+enum HgiPrimitiveType
+{
+    HgiPrimitiveTypePointList = 0,
+    HgiPrimitiveTypeLineList,
+    HgiPrimitiveTypeLineStrip,
+    HgiPrimitiveTypeTriangleList,
+    HgiPrimitiveTypePatchList,
+
+    HgiPrimitiveTypeCount
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

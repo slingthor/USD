@@ -64,7 +64,7 @@ public:
 
 protected:
     MTLF_API
-    MtlfPtexTexture(const TfToken &imageFilePath);
+    MtlfPtexTexture(const TfToken &imageFilePath, const bool premultiplyAlpha);
     
     friend class MtlfResourceFactory;
 

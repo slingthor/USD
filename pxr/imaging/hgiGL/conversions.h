@@ -47,7 +47,7 @@ public:
         HgiFormat inFormat,
         GLenum *outFormat,
         GLenum *outType,
-        GLenum *outInternalFormat);
+        GLenum *outInternalFormat = nullptr);
 
     HGIGL_API
     static GLenum GetFormatType(HgiFormat inFormat);
@@ -83,6 +83,12 @@ public:
     static GLenum GetMinFilter(
         HgiSamplerFilter minFilter, 
         HgiMipFilter mipFilter);
+
+    HGIGL_API
+    static GLenum GetComponentSwizzle(HgiComponentSwizzle);
+
+    HGIGL_API
+    static GLenum GetPrimitiveType(HgiPrimitiveType pt);
 };
 
 

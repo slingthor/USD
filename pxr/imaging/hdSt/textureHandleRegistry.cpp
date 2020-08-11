@@ -136,22 +136,14 @@ private:
     Map _map;
 };
 
-HdSt_TextureHandleRegistry::HdSt_TextureHandleRegistry()
-    : _samplerGarbageCollectionNeeded(false)
+HdSt_TextureHandleRegistry::HdSt_TextureHandleRegistry(Hgi * const hgi)
+    : _samplerObjectRegistry(std::make_unique<HdSt_SamplerObjectRegistry>(hgi))
+    , _textureObjectRegistry(std::make_unique<HdSt_TextureObjectRegistry>(hgi))
     , _textureToHandlesMap(std::make_unique<_TextureToHandlesMap>())
-    , _samplerObjectRegistry(std::make_unique<HdSt_SamplerObjectRegistry>())
-    , _textureObjectRegistry(std::make_unique<HdSt_TextureObjectRegistry>())
 {
 }
 
 HdSt_TextureHandleRegistry::~HdSt_TextureHandleRegistry() = default;
-
-void
-HdSt_TextureHandleRegistry::SetHgi(Hgi * const hgi)
-{
-    _textureObjectRegistry->SetHgi(hgi);
-    _samplerObjectRegistry->SetHgi(hgi);
-}
 
 HdStTextureHandleSharedPtr
 HdSt_TextureHandleRegistry::AllocateTextureHandle(
@@ -189,7 +181,7 @@ HdSt_TextureHandleRegistry::AllocateTextureHandle(
 void
 HdSt_TextureHandleRegistry::MarkSamplerGarbageCollectionNeeded()
 {
-    _samplerGarbageCollectionNeeded = true;
+    _samplerObjectRegistry->MarkGarbageCollectionNeeded();
 }
 
 void
@@ -390,10 +382,7 @@ HdSt_TextureHandleRegistry::Commit()
 
     // Updating the samplers in the above _Commit() could have
     // freed some, so we do sampler garbage collection last.
-    if (_samplerGarbageCollectionNeeded) {
-        _samplerObjectRegistry->GarbageCollect();
-        _samplerGarbageCollectionNeeded = false;
-    }
+    _samplerObjectRegistry->GarbageCollect();
 
     return result;
 }

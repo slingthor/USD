@@ -61,6 +61,8 @@
 #include "pxr/imaging/garch/simpleLightingContext.h"
 #include "pxr/imaging/garch/simpleMaterial.h"
 
+#include "pxr/imaging/hgi/hgi.h"
+
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/usd/timeCode.h"
 
@@ -93,13 +95,6 @@ class UsdImagingGLEngine
 {
 public:
 
-    enum RenderAPI {
-        Unset = -1,
-        OpenGL,
-        Metal,
-        NumRenderers
-    };
-
     // ---------------------------------------------------------------------
     /// \name Global State
     /// @{
@@ -124,12 +119,10 @@ public:
     /// in during construction. This can be helpful if you application creates
     /// multiple UsdImagingGLEngine that wish to use the same HdDriver / Hgi.
     USDIMAGINGGL_API
-    UsdImagingGLEngine(const RenderAPI api,
-	                   const HdDriver& driver = HdDriver());
+    UsdImagingGLEngine(const HdDriver& driver = HdDriver());
 
     USDIMAGINGGL_API
-    UsdImagingGLEngine(const RenderAPI api,
-                       const SdfPath& rootPath,
+    UsdImagingGLEngine(const SdfPath& rootPath,
                        const SdfPathVector& excludedPaths,
                        const SdfPathVector& invisedPaths=SdfPathVector(),
                        const SdfPath& sceneDelegateID =
@@ -364,6 +357,10 @@ public:
     bool SetRendererAov(TfToken const& id,
                         TfToken const& interopDst);
 
+    /// Returns an AOV texture handle for the given token.
+    USDIMAGINGGL_API
+    HgiTextureHandle GetAovTexture(TfToken const& name) const;
+
     /// Returns the list of renderer settings.
     USDIMAGINGGL_API
     UsdImagingGLRendererSettingsList GetRendererSettingsList() const;
@@ -430,6 +427,10 @@ public:
 
     /// @}
 
+    /// Returns true if the platform is color correction capable.
+    USDIMAGINGGL_API
+    static bool IsColorCorrectionCapable();
+
     // ---------------------------------------------------------------------
     /// \name Render Statistics
     /// @{
@@ -444,14 +445,23 @@ public:
     VtDictionary GetRenderStats() const;
 
     /// @}
+
+    // ---------------------------------------------------------------------
+    /// \name HGI
+    /// @{
+    // ---------------------------------------------------------------------
+
+    /// Returns the HGI interface.
+    ///
+    USDIMAGINGGL_API
+    Hgi* GetHgi();
+
+    /// @}
     
     USDIMAGINGGL_API
     HdStResourceFactoryInterface *GetResourceFactory() {
         return _resourceFactory;
     }
-    
-    USDIMAGINGGL_API
-    HgiTextureHandle GetPresentationTexture(TfToken const &name) const;
     
     struct ResourceFactoryGuard {
         ResourceFactoryGuard(HdStResourceFactoryInterface *resourceFactory);
@@ -459,7 +469,6 @@ public:
         
         static std::recursive_mutex contextLock;
     };
-
 protected:
 
     /// Open some protected methods for whitebox testing.
@@ -517,30 +526,32 @@ protected:
     UsdImagingDelegate *_GetSceneDelegate() const;
 
     USDIMAGINGGL_API
+    HdEngine *_GetHdEngine();
+
+    USDIMAGINGGL_API
+    HdxTaskController *_GetTaskController() const;
+
+    USDIMAGINGGL_API
+    bool _IsUsingLegacyImpl() const;
+
+    USDIMAGINGGL_API
     HdSelectionSharedPtr _GetSelection() const;
 
-    // _hgi is first field so that it is guaranteed to
-    // be destructed last and thus available while any other
-    // Hydra objects have a pointer to Hgi.
+// private:
+    // Note that any of the fields below might become private
+    // in the future and subclasses should use the above getters
+    // to access them instead.
+
     HgiUniquePtr _hgi;
     // Similar for HdDriver.
     HdDriver _hgiDriver;
-    HdEngine *_engine;
-    HdStResourceFactoryInterface *_resourceFactory;
 
-    // ... and the other Hydra resources
+    HdStResourceFactoryInterface *_resourceFactory;
     HdPluginRenderDelegateUniqueHandle _renderDelegate;
     std::unique_ptr<HdRenderIndex> _renderIndex;
 
     SdfPath const _sceneDelegateId;
 
-private:
-    // Note that the order of construction/destruction matters,
-    // thus the switches between protected and private are necessary
-    // until we have created getters for _taskController, ... as well.
-    std::unique_ptr<UsdImagingDelegate> _sceneDelegate;
-
-protected:
     std::unique_ptr<HdxTaskController> _taskController;
 
     HdxSelectionTrackerSharedPtr _selTracker;
@@ -557,8 +568,6 @@ protected:
     SdfPathVector _invisedPrimPaths;
     bool _isPopulated;
 
-    RenderAPI _renderAPI;
-    
     // An implementation of much of the engine functionality that doesn't
     // invoke any of the advanced Hydra features.  It is kept around for 
     // backwards compatibility and may one day be deprecated.  Most of the 
@@ -569,6 +578,14 @@ protected:
 #else
     void* _legacyImpl;
 #endif
+    void _DestroyHydraObjects();
+
+    std::unique_ptr<UsdImagingDelegate> _sceneDelegate;
+    std::unique_ptr<HdEngine> _engine;
+    
+    // For the static method, IsColorCorrectionCapable(), we have to cache the
+    // caps from the resourceFactory.
+    static bool _floatingPointBuffersEnabled;
 };
 
 

@@ -624,6 +624,7 @@ Garch_StbImage::Write(StorageSpec const & storageIn,
 
     StorageSpec quantizedSpec;
     std::unique_ptr<uint8_t[]> quantizedData;
+
     if (storageIn.type == GL_FLOAT && fileExtension != "hdr") {
         quantizedSpec = _Quantize<float>(storageIn, quantizedData);
     }

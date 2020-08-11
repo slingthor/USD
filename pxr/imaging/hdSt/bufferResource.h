@@ -21,80 +21,102 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef HDST_BUFFER_RESOURCE_H
-#define HDST_BUFFER_RESOURCE_H
+#ifndef PXR_IMAGING_HD_ST_BUFFER_RESOURCE_H
+#define PXR_IMAGING_HD_ST_BUFFER_RESOURCE_H
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/bufferResource.h"
-#include "pxr/imaging/garch/texture.h"
+
+#include "pxr/imaging/hgi/buffer.h"
 
 #include "pxr/base/tf/token.h"
 
-#include <boost/shared_ptr.hpp>
 #include <cstddef>
+#include <memory>
 #include <utility>
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-class HdStBufferResource;
-
 using HdStBufferResourceSharedPtr =
-    std::shared_ptr<HdStBufferResource>;
+    std::shared_ptr<class HdStBufferResource>;
 
-typedef std::vector<
-    std::pair<TfToken, HdBufferResourceSharedPtr> > HdStBufferResourceNamedList;
-
-typedef std::pair<TfToken, HdBufferResourceSharedPtr>
-    HdStBufferResourceNamedPair;
-typedef std::vector<HdStBufferResourceNamedPair>
-    HdStBufferResourceNamedList;
-
+using HdStBufferResourceNamedPair =
+    std::pair<TfToken, HdStBufferResourceSharedPtr>;
+using HdStBufferResourceNamedList =
+    std::vector<HdStBufferResourceNamedPair>;
 
 /// \class HdStBufferResource
 ///
 /// A specific type of HdBufferResource (GPU resource) representing an 
 /// OpenGL buffer object.
 ///
-class HdStBufferResource : public HdBufferResource {
+class HdStBufferResource final : public HdBufferResource
+{
 public:
-    
     HDST_API
-    virtual ~HdStBufferResource();
+    HdStBufferResource(TfToken const &role,
+                         HdTupleType tupleType,
+                         int offset,
+                         int stride);
+    HDST_API
+    ~HdStBufferResource();
 
     /// Sets the OpenGL name/identifier for this resource and its size.
     /// also caches the gpu address of the buffer.
     HDST_API
-    virtual void SetAllocation(HdResourceGPUHandle id, size_t size) = 0;
-
-    /// Returns the OpenGL id for this GPU resource
-    HDST_API
-    virtual HdResourceGPUHandle GetId() const override = 0;
+    void SetAllocation(HgiBufferHandle const& id, size_t size);
     
+    // APPLE METAL: Multibuffering support.
+    void SetAllocations(HgiBufferHandle const& id0,
+                        HgiBufferHandle const& id1,
+                        HgiBufferHandle const& id2,
+                        size_t size);
+
+    /// Returns the Hgi id for this GPU resource
+    HgiBufferHandle& GetId() { return _ids[_activeBuffer]; }
+    
+    // APPLE METAL: Multibuffering support.
+    /// Returns the Metal object at the triple buffer index for this GPU resource
+    HgiBufferHandle& GetId(int32_t const index) {
+        return _ids[index];
+    }
+    
+    // APPLE METAL: Multibuffering support.
+    HDST_API
+    virtual void CopyData(class HgiBlitCmds* blitCmds,
+                          size_t vboOffset,
+                          size_t dataSize,
+                          void const *data);
+    
+    // APPLE METAL: Multibuffering support.
+    HDST_API
+    virtual VtValue ReadBuffer(class Hgi* hgi,
+                               HdTupleType tupleType,
+                               int vboOffset,
+                               int stride,
+                               int numElements);
+
     /// Returns the gpu address (if available. otherwise returns 0).
-    HDST_API
-    virtual uint64_t GetGPUAddress() const override = 0;
+    uint64_t GetGPUAddress() const {
+        return _gpuAddr[_activeBuffer];
+    }
     
-    /// Returns the cpu address (if available. otherwise returns 0).
-    HDST_API
-    virtual uint8_t const* GetBufferContents() const override = 0;
+    // APPLE METAL: Multibuffering support.
+    static constexpr int32_t MULTIBUFFERING = 3;
 
-    /// Returns the texture buffer view
-    HDST_API
-    virtual GarchTextureGPUHandle GetTextureBuffer() override = 0;
-
-protected:
-    HDST_API
-    HdStBufferResource(TfToken const &role,
-                       HdTupleType tupleType,
-                       int offset,
-                       int stride);
+private:
+    // APPLE METAL: Multibuffering support.
+    uint64_t _gpuAddr[MULTIBUFFERING];
+    HgiBufferHandle _ids[MULTIBUFFERING];
+    int32_t _lastFrameModified;
+    int32_t _activeBuffer;
+    bool _firstFrameBeingFilled;
 };
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // HDST_BUFFER_RESOURCE_H
+#endif // PXR_IMAGING_HD_ST_BUFFER_RESOURCE_GL_H

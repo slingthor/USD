@@ -24,6 +24,9 @@
 /// \file garch/udimTexture.cpp
 #include "pxr/imaging/garch/udimTexture.h"
 
+#include "pxr/base/gf/math.h"
+#include "pxr/base/gf/vec3i.h"
+
 #include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
@@ -41,13 +44,13 @@ GarchUdimTexture::_MipDescArray GarchUdimTexture::_GetMipLevels(const TfToken& f
     ret.reserve(maxMipReads);
     unsigned int prevWidth = std::numeric_limits<unsigned int>::max();
     unsigned int prevHeight = std::numeric_limits<unsigned int>::max();
-    for (int mip = 0; mip < maxMipReads; ++mip) {
+    for (unsigned int mip = 0; mip < maxMipReads; ++mip) {
         GarchImageSharedPtr image = GarchImage::OpenForReading(filePath, 0, mip);
         if (image == nullptr) {
             break;
         }
-        const unsigned int currHeight = image->GetWidth();
-        const unsigned int currWidth = image->GetHeight();
+        const unsigned int currHeight = std::max(1, image->GetWidth());
+        const unsigned int currWidth = std::max(1, image->GetHeight());
         if (currWidth < prevWidth &&
             currHeight < prevHeight) {
             prevWidth = currWidth;
@@ -71,8 +74,10 @@ TF_REGISTRY_FUNCTION(TfType)
 GarchUdimTexture::GarchUdimTexture(
     TfToken const& imageFilePath,
     GarchImage::ImageOriginLocation originLocation,
-    std::vector<std::tuple<int, TfToken>>&& tiles)
-    : GarchTexture(originLocation), _tiles(std::move(tiles))
+    std::vector<std::tuple<int, TfToken>>&& tiles,
+    bool const premultiplyAlpha)
+    : GarchTexture(originLocation), _tiles(std::move(tiles)),
+	  _premultiplyAlpha(premultiplyAlpha)
 {
 }
 
@@ -84,9 +89,10 @@ GarchUdimTextureRefPtr
 GarchUdimTexture::New(
     TfToken const& imageFilePath,
     GarchImage::ImageOriginLocation originLocation,
-    std::vector<std::tuple<int, TfToken>>&& tiles)
+    std::vector<std::tuple<int, TfToken>>&& tiles,
+    bool const premultiplyAlpha)
 {
-    return GarchResourceFactory::GetInstance()->NewUdimTexture(imageFilePath, originLocation, std::move(tiles));
+    return GarchResourceFactory::GetInstance()->NewUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha);
 }
 
 GarchTexture::BindingVector
@@ -141,6 +147,106 @@ GarchUdimTexture::_OnMemoryRequestedDirty()
     _loaded = false;
 }
 
+// XXX: This code is duplicated in hdSt/textureObject.cpp, but will hopefully
+// be removed from this file when Storm begins using Hgi for UDIM textures
+namespace {
+enum _ColorSpaceTransform
+{
+     _SRGBToLinear,
+     _LinearToSRGB
+};
+
+// Convert a [0, 1] value between color spaces
+template<_ColorSpaceTransform colorSpaceTransform>
+static
+float _ConvertColorSpace(const float in)
+{
+    TRACE_FUNCTION();
+
+    float out = in;
+    if (colorSpaceTransform == _SRGBToLinear) {
+        if (in <= 0.04045) {
+            out = in / 12.92;
+        } else {
+            out = pow((in + 0.055) / 1.055, 2.4);
+        }
+    } else if (colorSpaceTransform == _LinearToSRGB) {
+        if (in <= 0.0031308) {
+            out = 12.92 * in;
+        } else {
+            out = 1.055 * pow(in, 1.0 / 2.4) - 0.055;
+        }
+    }
+
+    return GfClamp(out, 0.f, 1.f);
+}
+
+// Pre-multiply alpha function to be used for integral types
+template<typename T, bool isSRGB>
+static
+void
+_PremultiplyAlpha(
+    T * const data,
+    const GfVec3i &dimensions)
+{
+    TRACE_FUNCTION();
+
+    static_assert(std::numeric_limits<T>::is_integer, "Requires integral type");
+
+    const size_t num = dimensions[0] * dimensions[1] * dimensions[2];
+
+    // Perform all operations using floats.
+    const float max = static_cast<float>(std::numeric_limits<T>::max());
+
+    for (size_t i = 0; i < num; i++) {
+        const float alpha = static_cast<float>(data[4 * i + 3]) / max;
+
+        for (size_t j = 0; j < 3; j++) {
+            float p = static_cast<float>(data[4 * i + j]);
+
+            if (isSRGB) {
+                // Convert value from sRGB to linear.
+                p = max * _ConvertColorSpace<_SRGBToLinear>(p / max);
+            }  
+            
+            // Pre-multiply RGB values with alpha in linear space.
+            p *= alpha;
+
+            if (isSRGB) {
+                // Convert value from linear to sRGB.
+                p = max * _ConvertColorSpace<_LinearToSRGB>(p / max);
+            } 
+
+            // Add 0.5 when converting float to integral type.
+            data[4 * i + j] = p + 0.5f;  
+        }
+    }
+}
+
+// Pre-multiply alpha function to be used for floating point types
+template<typename T>
+static
+void _PremultiplyAlphaFloat(
+    T * const data,
+    const GfVec3i &dimensions)
+{
+    TRACE_FUNCTION();
+
+    static_assert(GfIsFloatingPoint<T>::value, "Requires floating point type");
+
+    const size_t num = dimensions[0] * dimensions[1] * dimensions[2];
+
+    for (size_t i = 0; i < num; i++) {
+        const float alpha = data[4 * i + 3];
+
+        // Pre-multiply RGB values with alpha.
+        for (size_t j = 0; j < 3; j++) {
+            data[4 * i + j] = data[4 * i + j] * alpha;
+        }
+    }
+}
+}
+
 void
 GarchUdimTexture::_ReadImage()
 {
@@ -177,14 +283,33 @@ GarchUdimTexture::_ReadImage()
         return;
     }
     
+    GLenum internalFormat = GL_RGBA8;
     unsigned int sizePerElem = 1;
     if (type == GL_FLOAT) {
+        constexpr GLenum internalFormats[] =
+            { GL_R32F, GL_RG32F, GL_RGB32F, GL_RGBA32F };
+        internalFormat = internalFormats[numChannels - 1];
         sizePerElem = 4;
     } else if (type == GL_UNSIGNED_SHORT) {
+        constexpr GLenum internalFormats[] =
+            { GL_R16, GL_RG16, GL_RGB16, GL_RGBA16 };
+        internalFormat = internalFormats[numChannels - 1];
         sizePerElem = 2;
     } else if (type == GL_HALF_FLOAT_ARB) {
+        constexpr GLenum internalFormats[] =
+            { GL_R16F, GL_RG16F, GL_RGB16F, GL_RGBA16F };
+        internalFormat = internalFormats[numChannels - 1];
         sizePerElem = 2;
     } else if (type == GL_UNSIGNED_BYTE) {
+        constexpr GLenum internalFormats[] =
+            { GL_R8, GL_RG8, GL_RGB8, GL_RGBA8 };
+        constexpr GLenum internalFormatsSRGB[] =
+            { GL_R8, GL_RG8, GL_SRGB8, GL_SRGB8_ALPHA8 };    
+        if (firstImageMips[0].image->IsColorSpaceSRGB()) {
+            internalFormat = internalFormatsSRGB[numChannels - 1];
+        } else {
+            internalFormat = internalFormats[numChannels - 1];
+        }
         sizePerElem = 1;
     }
     
@@ -285,13 +410,50 @@ GarchUdimTexture::_ReadImage()
                 spec.format = _format;
                 spec.type = type;
                 spec.flipped = true;
-                spec.data = mipData[mip].data()
-                + (tileId * numBytesPerLayer);
+                spec.data = mipData[mip].data() + (tileId * numBytesPerLayer);
                 const auto it = std::find_if(images.rbegin(), images.rend(),
                                              [&mipSize](_MipDesc const& i)
                                              { return mipSize.width <= i.size.width &&
                                                  mipSize.height <= i.size.height;});
                 (it == images.rend() ? images.front() : *it).image->Read(spec);
+                if (_premultiplyAlpha && (numChannels == 4)) {
+                    const bool isSRGB = (internalFormat == GL_SRGB8_ALPHA8);
+
+                    switch (type) {
+                    case GL_UNSIGNED_BYTE:
+                        if (isSRGB) {
+                            _PremultiplyAlpha<unsigned char, /*isSRGB=*/ true>(
+                                reinterpret_cast<unsigned char *>(spec.data), 
+                                GfVec3i(mipSize.width, mipSize.height, 1));
+                        } else {
+                            _PremultiplyAlpha<unsigned char, /*isSRGB=*/ false>(
+                                reinterpret_cast<unsigned char *>(spec.data), 
+                                GfVec3i(mipSize.width, mipSize.height, 1));   
+                        }
+                        break;
+                    case GL_UNSIGNED_SHORT:
+                        if (isSRGB) {
+                            _PremultiplyAlpha<unsigned short, /*isSRGB=*/ true>(
+                                reinterpret_cast<unsigned short *>(spec.data), 
+                                GfVec3i(mipSize.width, mipSize.height, 1));
+                        } else {
+                            _PremultiplyAlpha<unsigned short, /*isSRGB=*/false>(
+                                reinterpret_cast<unsigned short *>(spec.data), 
+                                GfVec3i(mipSize.width, mipSize.height, 1));
+                        }
+                        break;
+                    case GL_HALF_FLOAT_ARB:
+                        _PremultiplyAlphaFloat<GfHalf>(
+                            reinterpret_cast<GfHalf *>(spec.data), 
+                            GfVec3i(mipSize.width, mipSize.height, 1));
+                        break;  
+                    case GL_FLOAT:
+                        _PremultiplyAlphaFloat<float>(
+                            reinterpret_cast<float *>(spec.data), 
+                            GfVec3i(mipSize.width, mipSize.height, 1));
+                        break;       
+                    }
+                }
             }
         }
     }, 1);

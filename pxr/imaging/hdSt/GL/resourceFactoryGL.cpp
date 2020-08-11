@@ -25,26 +25,18 @@
 //
 #include "pxr/imaging/hdSt/GL/resourceFactoryGL.h"
 
-#include "pxr/imaging/hdSt/GL/bufferRelocatorGL.h"
-#include "pxr/imaging/hdSt/GL/bufferResourceGL.h"
+#include "pxr/imaging/hdSt/bufferResource.h"
+#include "pxr/imaging/hdSt/dispatchBuffer.h"
 #include "pxr/imaging/hdSt/GL/codeGenGLSL.h"
-#include "pxr/imaging/hdSt/GL/dispatchBufferGL.h"
 #include "pxr/imaging/hdSt/GL/domeLightComputationsGL.h"
 #include "pxr/imaging/hdSt/GL/drawTargetTextureResourceGL.h"
 #include "pxr/imaging/hdSt/GL/extCompGpuComputationGL.h"
-#include "pxr/imaging/hdSt/GL/flatNormalsGL.h"
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
+#include "pxr/imaging/hdSt/GL/glslProgramGL.h"
 #include "pxr/imaging/hdSt/GL/indirectDrawBatchGL.h"
-#include "pxr/imaging/hdSt/GL/interleavedMemoryBufferGL.h"
-#include "pxr/imaging/hdSt/GL/persistentBufferGL.h"
 #include "pxr/imaging/hdSt/GL/renderPassStateGL.h"
 #include "pxr/imaging/hdSt/GL/renderPassShaderGL.h"
 #include "pxr/imaging/hdSt/GL/resourceBinderGL.h"
-#include "pxr/imaging/hdSt/GL/quadrangulateGL.h"
-#include "pxr/imaging/hdSt/GL/smoothNormalsGL.h"
 #include "pxr/imaging/hdSt/GL/textureResourceGL.h"
-#include "pxr/imaging/hdSt/GL/vboMemoryBufferGL.h"
-#include "pxr/imaging/hdSt/GL/vboSimpleMemoryBufferGL.h"
 
 #include <boost/smart_ptr.hpp>
 
@@ -73,65 +65,10 @@ HdSt_CodeGen *HdStResourceFactoryGL::NewCodeGen(
     return new HdSt_CodeGenGLSL(shaders);
 }
 
-HdStDispatchBufferSharedPtr HdStResourceFactoryGL::NewDispatchBuffer(
-    TfToken const &role, int count,
-    unsigned int commandNumUints) const
-{
-    return std::make_shared<HdStDispatchBufferGL>(role, count, commandNumUints);
-}
-
-HdStBufferRelocator *HdStResourceFactoryGL::NewBufferRelocator(
-    HdResourceGPUHandle srcBuffer,
-    HdResourceGPUHandle dstBuffer) const
-{
-    return new HdStBufferRelocatorGL(srcBuffer, dstBuffer);
-}
-
-HdStBufferResource *HdStResourceFactoryGL::NewBufferResource(
-    TfToken const &role,
-    HdTupleType tupleType,
-    int offset,
-    int stride) const
-{
-    return new HdStBufferResourceGL(role, tupleType, offset, stride);
-}
-
 HdStTextureResourceSharedPtr
 HdStResourceFactoryGL::NewDrawTargetTextureResource() const
 {
     return HdStTextureResourceSharedPtr(new HdSt_DrawTargetTextureResourceGL());
-}
-
-HdSt_FlatNormalsComputationGPU*
-HdStResourceFactoryGL::NewFlatNormalsComputationGPU(
-    HdBufferArrayRangeSharedPtr const &topologyRange,
-    HdBufferArrayRangeSharedPtr const &vertexRange,
-    int numFaces, TfToken const &srcName, TfToken const &dstName,
-    HdType srcDataType, bool packed) const
-{
-    return new HdSt_FlatNormalsComputationGL(
-        topologyRange, vertexRange, numFaces, srcName, dstName, srcDataType,
-        packed);
-}
-
-HdBufferArraySharedPtr
-HdStResourceFactoryGL::NewStripedInterleavedBuffer(
-    TfToken const &role,
-    HdBufferSpecVector const &bufferSpecs,
-    HdBufferArrayUsageHint usageHint,
-    int bufferOffsetAlignment,
-    int structAlignment,
-    size_t maxSize,
-    TfToken const &garbageCollectionPerfToken) const
-{
-    return std::make_shared<
-    HdStStripedInterleavedBufferGL>(role,
-                                    bufferSpecs,
-                                    usageHint,
-                                    bufferOffsetAlignment,
-                                    structAlignment,
-                                    maxSize,
-                                    garbageCollectionPerfToken);
 }
 
 HdSt_DrawBatchSharedPtr HdStResourceFactoryGL::NewIndirectDrawBatch(
@@ -139,26 +76,6 @@ HdSt_DrawBatchSharedPtr HdStResourceFactoryGL::NewIndirectDrawBatch(
 {
     return HdSt_DrawBatchSharedPtr(
         new HdSt_IndirectDrawBatchGL(drawItemInstance));
-}
-
-HdStPersistentBufferSharedPtr HdStResourceFactoryGL::NewPersistentBuffer(
-    TfToken const &role, size_t dataSize, void* data) const
-{
-    return std::make_shared<HdStPersistentBufferGL>(role, dataSize, data);
-}
-
-/// Create a GPU quadrangulation computation
-HdSt_QuadrangulateComputationGPU *
-HdStResourceFactoryGL::NewQuadrangulateComputationGPU(
-    HdSt_MeshTopology *topology,
-    TfToken const &sourceName,
-    HdType dataType,
-    SdfPath const &id) const
-{
-    return new HdSt_QuadrangulateComputationGPUGL(topology,
-                                                  sourceName,
-                                                  dataType,
-                                                  id);
 }
 
 HdStRenderPassState *HdStResourceFactoryGL::NewRenderPassState() const
@@ -175,17 +92,6 @@ HdStRenderPassState *HdStResourceFactoryGL::NewRenderPassState(
 HdSt_ResourceBinder *HdStResourceFactoryGL::NewResourceBinder() const
 {
     return new HdSt_ResourceBinderGL();
-}
-
-/// Creates a new smooth normals GPU computation
-HdSt_SmoothNormalsComputationGPU *
-HdStResourceFactoryGL::NewSmoothNormalsComputationGPU(
-    Hd_VertexAdjacency const *adjacency,
-    TfToken const &srcName, TfToken const &dstName,
-    HdType srcDataType, bool packed) const
-{
-    return new HdSt_SmoothNormalsComputationGL(
-        adjacency, srcName, dstName, srcDataType, packed);
 }
 
 HdStSimpleTextureResource *
@@ -211,28 +117,10 @@ HdStResourceFactoryGL::NewSimpleTextureResource(
         memoryRequest);
 }
 
-HdBufferArraySharedPtr HdStResourceFactoryGL::NewVBOMemoryBuffer(
-    TfToken const &role,
-    HdBufferSpecVector const &bufferSpecs,
-    HdBufferArrayUsageHint usageHint) const
-{
-    return std::make_shared<HdStVBOMemoryBufferGL>(
-                                role, bufferSpecs, usageHint);
-}
-
-HdBufferArraySharedPtr HdStResourceFactoryGL::NewVBOSimpleMemoryBuffer(
-    TfToken const &role,
-    HdBufferSpecVector const &bufferSpecs,
-    HdBufferArrayUsageHint usageHint) const
-{
-    return std::make_shared<HdStVBOSimpleMemoryBufferGL>(
-                                role, bufferSpecs, usageHint);
-}
-
-HdStProgram *HdStResourceFactoryGL::NewProgram(
+HdStGLSLProgram *HdStResourceFactoryGL::NewProgram(
     TfToken const &role, HdStResourceRegistry *const registry) const
 {
-    return new HdStGLSLProgram(role, registry);
+    return new HdStglslProgramGLSL(role, registry);
 }
 
 HdStExtCompGpuComputation *

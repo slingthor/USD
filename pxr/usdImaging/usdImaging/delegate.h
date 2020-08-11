@@ -31,7 +31,7 @@
 #include "pxr/usdImaging/usdImaging/version.h"
 #include "pxr/usdImaging/usdImaging/collectionCache.h"
 #include "pxr/usdImaging/usdImaging/valueCache.h"
-#include "pxr/usdImaging/usdImaging/inheritedCache.h"
+#include "pxr/usdImaging/usdImaging/resolvedAttributeCache.h"
 #include "pxr/usdImaging/usdImaging/instancerContext.h"
 
 #include "pxr/imaging/cameraUtil/conformWindow.h"
@@ -367,12 +367,6 @@ public:
     USDIMAGING_API 
     virtual VtValue GetMaterialResource(SdfPath const &materialId) override;
 
-    // Texture Support
-    USDIMAGING_API
-    HdTextureResource::ID GetTextureResourceID(SdfPath const &id) override;
-    USDIMAGING_API
-    virtual HdTextureResourceSharedPtr GetTextureResource(SdfPath const &id) override;
-
     // Light Support
     USDIMAGING_API
     virtual VtValue GetLightParamValue(SdfPath const &id, 
@@ -477,6 +471,17 @@ public:
     /// Populate HdxSelection for given \p path (root) and \p instanceIndex.
     /// If indexPath is an instancer and instanceIndex is ALL_INSTANCES (-1),
     /// all instances will be selected.
+    ///
+    /// Note: if usdPath points to a gprim, "instanceIndex" (if provided)
+    /// is assumed to be the hydra-computed instance index returned from
+    /// picking code.
+    ///
+    /// If usdPath points to a point instancer, "instanceIndex" is assumed to
+    /// be the instance of the point instancer to selection highlight (e.g.
+    /// instance N of the protoIndices array).  This would correspond to
+    /// returning one of the tuples from GetScenePrimPath's "instancerContext".
+    ///
+    /// In any other case, the interpretation of instanceIndex is undefined.
     static constexpr int ALL_INSTANCES = -1;
     USDIMAGING_API
     bool PopulateSelection(HdSelection::HighlightMode const& highlightMode,
@@ -714,6 +719,7 @@ private:
     UsdImaging_DrawModeCache _drawModeCache;
     UsdImaging_CollectionCache _collectionCache;
     UsdImaging_InheritedPrimvarCache _inheritedPrimvarCache;
+    UsdImaging_PointInstancerIndicesCache _pointInstancerIndicesCache;
 
     // Pickability
     PickabilityMap _pickablesMap;

@@ -34,7 +34,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 struct HgiGraphicsCmdsDesc;
-
+class HgiGLDevice;
 
 /// \class HgiGLGraphicsCmds
 ///
@@ -46,14 +46,9 @@ public:
     HGIGL_API
     ~HgiGLGraphicsCmds() override;
 
-    /// End recording of commands.
-    /// This performs multisample resolve when needed.
-    HGIGL_API
-    void EndRecording();
-
     /// XXX This function is exposed temporarily for Hgi transition.
     /// It allows code that is not yet converted to Hgi (e.g. HdSt) to insert
-    /// its opengl calls into the ops-stack of HgiGL to esnure that all commands
+    /// its opengl calls into the ops-stack of HgiGL to ensure that all commands
     /// execute in the correct order. Once HdSt has transition fully to Hgi we
     /// should remove this function.
     HGIGL_API
@@ -72,11 +67,19 @@ public:
     void SetScissor(GfVec4i const& sc) override;
 
     HGIGL_API
-    void BindPipeline(HgiPipelineHandle pipeline) override;
+    void BindPipeline(HgiGraphicsPipelineHandle pipeline) override;
 
     HGIGL_API
     void BindResources(HgiResourceBindingsHandle resources) override;
 
+    HGIGL_API
+    void SetConstantValues(
+        HgiGraphicsPipelineHandle pipeline,
+        HgiShaderStage stages,
+        uint32_t bindIndex,
+        uint32_t byteSize,
+        const void* data) override;
+    
     HGIGL_API
     void BindVertexBuffers(
         uint32_t firstBinding,
@@ -92,10 +95,6 @@ public:
         uint32_t vertexOffset,
         uint32_t instanceCount) override;
 
-    /// Return the list of recorded functions (cmds / ops).
-    HGIGL_API
-    HgiGLOpsVector const& GetOps() const;
-
 protected:
     friend class HgiGL;
 
@@ -104,14 +103,22 @@ protected:
         HgiGLDevice* device,
         HgiGraphicsCmdsDesc const& desc);
 
+    HGIGL_API
+    bool _Submit(Hgi* hgi) override;
+
 private:
     HgiGLGraphicsCmds() = delete;
     HgiGLGraphicsCmds & operator=(const HgiGLGraphicsCmds&) = delete;
     HgiGLGraphicsCmds(const HgiGLGraphicsCmds&) = delete;
 
+    /// This performs multisample resolve when needed at the end of recording.
+    void _AddResolveToOps(HgiGLDevice* device);
+
     bool _recording;
     HgiGraphicsCmdsDesc _descriptor;
+    HgiPrimitiveType _primitiveType;
     HgiGLOpsVector _ops;
+    int _pushStack;
 
     // Cmds is used only one frame so storing multi-frame state on will not
     // survive.

@@ -151,7 +151,6 @@ PXR_NAMESPACE_OPEN_SCOPE
     (garbageCollectedUbo)                       \
     (garbageCollectedVbo)                       \
     (glBufferSubData)                           \
-    (glCopyBufferSubData)                       \
     (gpuMemoryUsed)                             \
     (instBasisCurvesTopology)                   \
     (instBasisCurvesTopologyRange)              \

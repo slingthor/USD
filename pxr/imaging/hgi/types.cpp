@@ -35,6 +35,7 @@ size_t HgiGetComponentCount(const HgiFormat f)
     case HgiFormatFloat16:
     case HgiFormatFloat32:
     case HgiFormatInt32:
+    case HgiFormatFloat32UInt8: // treat as a single component
         return 1;
     case HgiFormatUNorm8Vec2:
     case HgiFormatSNorm8Vec2:
@@ -55,6 +56,8 @@ size_t HgiGetComponentCount(const HgiFormat f)
     case HgiFormatFloat16Vec4:
     case HgiFormatFloat32Vec4:
     case HgiFormatInt32Vec4:
+    case HgiFormatBC7UNorm8Vec4:
+    case HgiFormatBC7UNorm8Vec4srgb:
     case HgiFormatUNorm8Vec4srgb:
         return 4;
     case HgiFormatCount:
@@ -95,6 +98,7 @@ size_t HgiDataSizeOfFormat(const HgiFormat f)
         return 4;
     case HgiFormatFloat32Vec2:
     case HgiFormatInt32Vec2:
+    case HgiFormatFloat32UInt8: // XXX: implementation dependent
         return 8;
     case HgiFormatFloat32Vec3:
     case HgiFormatInt32Vec3:
@@ -104,6 +108,8 @@ size_t HgiDataSizeOfFormat(const HgiFormat f)
         return 16;
     case HgiFormatBC6FloatVec3:
     case HgiFormatBC6UFloatVec3:
+    case HgiFormatBC7UNorm8Vec4:
+    case HgiFormatBC7UNorm8Vec4srgb:
         return 1;
     case HgiFormatCount:
     case HgiFormatInvalid:
@@ -119,6 +125,8 @@ bool HgiIsCompressed(const HgiFormat f)
     switch(f) {
     case HgiFormatBC6FloatVec3:
     case HgiFormatBC6UFloatVec3:
+    case HgiFormatBC7UNorm8Vec4:
+    case HgiFormatBC7UNorm8Vec4srgb:
         return true;
     default:
         return false;

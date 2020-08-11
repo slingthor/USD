@@ -25,7 +25,6 @@
 #define HDST_INDIRECT_DRAW_BATCH_METAL_H
 
 #include "pxr/imaging/hdSt/indirectDrawBatch.h"
-#include "pxr/imaging/hdSt/Metal/persistentBufferMetal.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -41,7 +40,8 @@ class HdSt_IndirectDrawBatchMetal : public HdSt_IndirectDrawBatch {
 public:
     HDST_API
     virtual ~HdSt_IndirectDrawBatchMetal();
-    
+
+protected:
     /// Prepare draw commands and apply view frustum culling for this batch.
     HDST_API
     virtual void _PrepareDraw(bool gpuCulling, bool freezeCulling) override;
@@ -56,17 +56,16 @@ public:
     HDST_API
     virtual void _GPUFrustumInstanceCullingExecute(
                        HdStResourceRegistrySharedPtr const &resourceRegistry,
-                       HdStProgramSharedPtr const &program,
+                       HdStGLSLProgramSharedPtr const &program,
                        HdSt_ResourceBinder const &binder,
                        HdBufferResourceSharedPtr cullCommandBuffer) override;
     
     HDST_API
     virtual void _GPUFrustumNonInstanceCullingExecute(
                       HdStResourceRegistrySharedPtr const &resourceRegistry,
-                      HdStProgramSharedPtr const &program,
+                      HdStGLSLProgramSharedPtr const &program,
                       HdSt_ResourceBinder const &binder) override;
 
-protected:
     HDST_API
     HdSt_IndirectDrawBatchMetal(HdStDrawItemInstance * drawItemInstance);
 
@@ -76,7 +75,7 @@ protected:
         virtual ~_CullingProgramMetal() {}
         
     protected:
-        virtual bool _Link(HdStProgramSharedPtr const & program) override;
+        virtual bool _Link(HdStGLSLProgramSharedPtr const & program) override;
         
         friend class HdSt_IndirectDrawBatch::_CullingProgram;
     };
@@ -91,7 +90,7 @@ private:
     
     void _EndGPUCountVisibleInstances(GLsync resultSync, size_t * result);
     
-    HdStPersistentBufferMetalSharedPtr _resultBuffer;
+    HdStPersistentBufferSharedPtr _resultBuffer;
 };
 
 

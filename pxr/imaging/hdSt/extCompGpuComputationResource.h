@@ -38,7 +38,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 using HdStExtCompGpuComputationResourceSharedPtr =
     std::shared_ptr<class HdStExtCompGpuComputationResource>;
-using HdStProgramSharedPtr= std::shared_ptr<class HdStProgram>;
+using HdStGLSLProgramSharedPtr= std::shared_ptr<class HdStGLSLProgram>;
 using HdBufferArrayRangeSharedPtrVector =
     std::vector<HdBufferArrayRangeSharedPtr>;
 
@@ -93,11 +93,11 @@ public:
         return _inputs;
     }
 
-    /// Gets the GPU HdStGLSLProgram to run to execute the computation.
+    /// Gets the GPU HdStglslProgramGLSL to run to execute the computation.
     /// This may have been shared with many other instances in the same
     /// registry.
     /// The program is only valid for execution after Resolve has been called.
-    HdStProgramSharedPtr const &GetProgram() const {
+    HdStGLSLProgramSharedPtr const &GetProgram() const {
         return _computeProgram;
     }
 
@@ -121,7 +121,7 @@ private:
     
     size_t                                _shaderSourceHash;
     HdBufferArrayRangeSharedPtrVector     _inputs;
-    HdStProgramSharedPtr                  _computeProgram;
+    HdStGLSLProgramSharedPtr                  _computeProgram;
     HdSt_ResourceBinderSharedPtr          _resourceBinder;
     
     HdStExtCompGpuComputationResource()                = delete;

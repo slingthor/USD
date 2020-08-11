@@ -22,18 +22,19 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-
-#include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/resourceFactory.h"
-
 #include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdSt/copyComputation.h"
+#include "pxr/imaging/hdSt/bufferArrayRange.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hd/bufferArrayRange.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/types.h"
+
+#include "pxr/imaging/hgi/blitCmds.h"
+#include "pxr/imaging/hgi/blitCmdsOps.h"
 
 #include "pxr/imaging/hf/perfLog.h"
 
@@ -48,22 +49,18 @@ HdStCopyComputationGPU::HdStCopyComputationGPU(
 
 void
 HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
-                              HdResourceRegistry *resourceRegistry)
+                                HdResourceRegistry *resourceRegistry)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    if (!glBufferSubData) {
-        return;
-    }
+    HdStBufferArrayRangeSharedPtr srcRange =
+        std::static_pointer_cast<HdStBufferArrayRange> (_src);
+    HdStBufferArrayRangeSharedPtr dstRange =
+        std::static_pointer_cast<HdStBufferArrayRange> (range_);
 
-    HdBufferArrayRangeSharedPtr srcRange =
-        std::static_pointer_cast<HdBufferArrayRange> (_src);
-    HdBufferArrayRangeSharedPtr dstRange =
-        std::static_pointer_cast<HdBufferArrayRange> (range_);
-
-    HdBufferResourceSharedPtr srcRes = srcRange->GetResource(_name);
-    HdBufferResourceSharedPtr dstRes = dstRange->GetResource(_name);
+    HdStBufferResourceSharedPtr srcRes = srcRange->GetResource(_name);
+    HdStBufferResourceSharedPtr dstRes = dstRange->GetResource(_name);
 
     if (!TF_VERIFY(srcRes)) {
         return;
@@ -91,8 +88,6 @@ HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
     GLintptr writeOffset = dstRange->GetByteOffset(_name) + dstRes->GetOffset();
     GLsizeiptr copySize = srcResSize;
 
-    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-
     // Unfortunately at the time the copy computation is added, we don't
     // know if the source buffer has 0 length.  So we can get here with
     // a zero sized copy.
@@ -102,34 +97,28 @@ HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
         // be allocated, so the check for resource allocation has been moved
         // until after the copy size check.
 
-        // Create a virtual copy method on the ArrayRange object to do the below block
-        TF_FATAL_CODING_ERROR("Not Implemented");
-        {/*
-        	GLint srcId = srcRes->GetId();
-        	GLint dstId = dstRes->GetId();
+        GLint srcId = srcRes->GetId()->GetRawResource();
+        GLint dstId = dstRes->GetId()->GetRawResource();
 
-            if (!TF_VERIFY(srcId)) {
-                return;
-            }
-            if (!TF_VERIFY(dstId)) {
-                return;
-            }
-
-            HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
-
-            if (caps.directStateAccessEnabled) {
-                glCopyBufferSubData((GLint)srcId, (GLint)dstId,
-                                            readOffset, writeOffset, copySize);
-            } else {
-                glBindBuffer(GL_COPY_READ_BUFFER, (GLint)srcId);
-                glBindBuffer(GL_COPY_WRITE_BUFFER, (GLint)dstId);
-                glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER,
-                                    readOffset, writeOffset, copySize);
-
-                glBindBuffer(GL_COPY_READ_BUFFER, 0);
-                glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
-            }*/
+        if (!TF_VERIFY(srcId)) {
+            return;
         }
+        if (!TF_VERIFY(dstId)) {
+            return;
+        }
+
+        HD_PERF_COUNTER_INCR(HdStPerfTokens->copyBufferGpuToGpu);
+
+        HdStResourceRegistry* hdStResourceRegistry =
+            static_cast<HdStResourceRegistry*>(resourceRegistry);
+
+        HgiBufferGpuToGpuOp blitOp;
+        blitOp.gpuSourceBuffer = srcRes->GetId();
+        blitOp.gpuDestinationBuffer = dstRes->GetId();
+        blitOp.sourceByteOffset = readOffset;
+        blitOp.byteSize = copySize;
+        blitOp.destinationByteOffset = writeOffset;
+        hdStResourceRegistry->GetBlitCmds()->CopyBufferGpuToGpu(blitOp);
     }
 
     GLF_POST_PENDING_GL_ERRORS();
@@ -144,8 +133,8 @@ HdStCopyComputationGPU::GetNumOutputElements() const
 void
 HdStCopyComputationGPU::GetBufferSpecs(HdBufferSpecVector *specs) const
 {
-    HdBufferArrayRangeSharedPtr srcRange =
-        std::static_pointer_cast<HdBufferArrayRange> (_src);
+    HdStBufferArrayRangeSharedPtr srcRange =
+        std::static_pointer_cast<HdStBufferArrayRange> (_src);
 
     specs->emplace_back(_name, srcRange->GetResource(_name)->GetTupleType());
 }

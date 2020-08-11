@@ -34,6 +34,7 @@ import datetime
 import distutils
 import fnmatch
 import glob
+import locale
 import multiprocessing
 import os
 import platform
@@ -97,12 +98,15 @@ def iOS():
 def Python3():
     return sys.version_info.major == 3
 
+def GetLocale():
+    return sys.stdout.encoding or locale.getdefaultlocale()[1] or "UTF-8"
+
 def GetCommandOutput(command):
     """Executes the specified command and returns output or None."""
     try:
         return subprocess.check_output(
             shlex.split(command), 
-            stderr=subprocess.STDOUT).decode('utf-8').strip()
+            stderr=subprocess.STDOUT).decode(GetLocale(), 'replace').strip()
     except subprocess.CalledProcessError:
         pass
     return None
@@ -272,9 +276,8 @@ def Run(cmd, logCommandOutput = True):
         if logCommandOutput:
             p = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, 
                                  stderr=subprocess.STDOUT)
-            encoding = sys.stdout.encoding or "UTF-8"
             while True:
-                l = p.stdout.readline().decode(encoding)
+                l = p.stdout.readline().decode(GetLocale(), 'replace')
                 if l:
                     logfile.write(l)
                     PrintCommandOutput(l)
@@ -409,16 +412,17 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
     if targetMacOS or targetIOS:
         extraArgs.append('-DCMAKE_IGNORE_PATH="/usr/lib;/usr/local/lib;/lib" ')
 
-    if context.buildUniversal and SupportsMacOSUniversalBinaries():
-        extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
-        extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64')
-    else:
-        extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=YES')
-        MacArch = GetCommandOutput('arch').strip()
-        if MacArch == "i386" or MacArch == "x86_64":
-            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64')
+    if targetMacOS:
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
+            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64')
         else:
-            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64')
+            extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=YES')
+            MacArch = GetCommandOutput('arch').strip()
+            if MacArch == "i386" or MacArch == "x86_64":
+                extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64')
+            else:
+                extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64')
 
     if targetIOS:
         # Add the default iOS toolchain file if one isn't aready specified
@@ -1020,7 +1024,7 @@ def InstallBoost(context, force, buildArgs):
     except:
         versionHeader = os.path.join(context.instDir, BOOST_VERSION_FILE)
         if os.path.isfile(versionHeader):
-            try: os.path.remove(versionHeader)
+            try: os.remove(versionHeader)
             except: pass
         raise
     return p
@@ -1654,6 +1658,14 @@ def InstallPtex_Windows(context, force, buildArgs):
                   [("add_definitions(-DPTEX_STATIC)", 
                     "# add_definitions(-DPTEX_STATIC)")])
 
+        # Patch Ptex::String to export symbol for operator<< 
+        # This is required for newer versions of OIIO, which make use of the
+        # this operator on Windows platform specifically.
+        PatchFile('src\\ptex\\Ptexture.h',
+                  [("std::ostream& operator << (std::ostream& stream, const Ptex::String& str);",
+                    "PTEXAPI std::ostream& operator << (std::ostream& stream, const Ptex::String& str);")])
+
+
         RunCMake(context, force, buildArgs)
         return os.getcwd()
 
@@ -1746,7 +1758,7 @@ OPENVDB = Dependency("OpenVDB", InstallOpenVDB, "include/openvdb/openvdb.h")
 ############################################################
 # OpenImageIO
 
-OIIO_URL = "https://github.com/OpenImageIO/oiio/archive/Release-1.8.9.zip"
+OIIO_URL = "https://github.com/OpenImageIO/oiio/archive/Release-2.1.16.0.zip"
 
 def InstallOpenImageIO(context, force, buildArgs):
     if context.static_dependencies_macOS:
@@ -1835,20 +1847,21 @@ def InstallOpenColorIO(context, force, buildArgs):
                      '-DOCIO_STATIC_JNIGLUE=OFF',
                      '-DOCIO_USE_SSE=OFF']
 
-        if context.buildUniversal and SupportsMacOSUniversalBinaries():
-            arch = "x86_64;arm64"
-        else:
-            arch = GetMacArch()
+        if MacOS():
+            if context.buildUniversal and SupportsMacOSUniversalBinaries():
+                arch = "x86_64;arm64"
+            else:
+                arch = GetMacArch()
 
-        PatchFile("CMakeLists.txt",
-                [('CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}',
-                  'CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}\n' +
-                  '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
-                  ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch)),
-                 ('CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}',
-                  'CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}\n' +
-                  '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
-                  ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch))])
+            PatchFile("CMakeLists.txt",
+                    [('CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}',
+                    'CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}\n' +
+                    '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
+                    ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch)),
+                    ('CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}',
+                    'CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}\n' +
+                    '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
+                    ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch))])
             
         # The OCIO build treats all warnings as errors but several come up
         # on various platforms, including:
@@ -1966,6 +1979,7 @@ def InstallOpenSubdiv(context, force, buildArgs):
                              .format(buildDirmacOS=buildDirmacOS, variant="Debug" if context.buildDebug else "Release"))
             extraArgs.append('-DCMAKE_TOOLCHAIN_FILE={srcOSDDir}/cmake/iOSToolchain.cmake'
                              .format(srcOSDDir=srcOSDDir))
+            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64')
 
             os.environ['SDKROOT'] = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
 
@@ -2046,6 +2060,10 @@ HDF5_URL = "https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.0
 
 def InstallHDF5(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(HDF5_URL, context, force)):
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            PatchFile("config/cmake_ext_mod/ConfigureChecks.cmake", 
+                    [("if (ARCH_LENGTH GREATER 1)", "if (FALSE)")])
+
         RunCMake(context, force,
                  ['-DBUILD_TESTING=OFF',
                   '-DHDF5_BUILD_TOOLS=OFF',
@@ -2103,12 +2121,12 @@ def InstallDraco(context, force, buildArgs):
         RunCMake(context, force, cmakeOptions)
         return os.getcwd()
 
-DRACO = Dependency("Draco", InstallDraco, "include/Draco/src/draco/compression/decode.h")
+DRACO = Dependency("Draco", InstallDraco, "include/draco/compression/decode.h")
 
 ############################################################
 # MaterialX
 
-MATERIALX_URL = "https://github.com/materialx/MaterialX/archive/v1.36.0.zip"
+MATERIALX_URL = "https://github.com/materialx/MaterialX/archive/v1.37.1.zip"
 
 def InstallMaterialX(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(MATERIALX_URL, context, force)):

@@ -85,7 +85,8 @@ public:
 
     /// Creates a new instance.
     GARCH_API
-    static GarchPtexTextureRefPtr New(const TfToken &imageFilePath);
+    static GarchPtexTextureRefPtr New(const TfToken &imageFilePath,
+									  const bool premultiplyAlpha=false);
 
     /// GarchTexture overrides
     GARCH_API
@@ -119,7 +120,7 @@ public:
 
 protected:
     GARCH_API
-    GarchPtexTexture(const TfToken &imageFilePath);
+    GarchPtexTexture(const TfToken &imageFilePath, const bool premultiplyAlpha);
 
     GARCH_API
     virtual void _ReadTexture() override;
@@ -141,6 +142,8 @@ protected:
     static int _gutterWidth, _pageMargin;
 
     const TfToken	_imageFilePath;
+
+    const bool _premultiplyAlpha;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

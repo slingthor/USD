@@ -33,19 +33,21 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+
 class Hd_VertexAdjacency;
-
-using HdStProgramSharedPtr =
-    std::shared_ptr<class HdStProgram>;
-using HdBufferResourceSharedPtr =
-    std::shared_ptr<class HdBufferResource>;
-
 
 /// smooth normal computation GPU
 ///
 ///
 class HdSt_SmoothNormalsComputationGPU : public HdComputation {
 public:
+    /// Constructor
+    HDST_API
+    HdSt_SmoothNormalsComputationGPU(Hd_VertexAdjacency const *adjacency,
+                                 TfToken const &srcName,
+                                 TfToken const &dstName,
+                                 HdType srcDataType,
+                                 bool packed);
 
     HDST_API
     virtual void GetBufferSpecs(HdBufferSpecVector *specs) const override;
@@ -58,33 +60,7 @@ public:
     /// since it belongs the same range as src buffer.
     virtual int GetNumOutputElements() const override { return 0; }
 
-protected:
-    HDST_API
-    HdSt_SmoothNormalsComputationGPU(Hd_VertexAdjacency const *adjacency,
-                                     TfToken const &srcName,
-                                     TfToken const &dstName,
-                                     HdType srcDataType,
-                                     bool packed);
-
-    // prepare uniform buffer for GPU computation
-    struct Uniform {
-        int vertexOffset;
-        int adjacencyOffset;
-        int pointsOffset;
-        int pointsStride;
-        int normalsOffset;
-        int normalsStride;
-        int invocationOffset;
-    };
-
-    HDST_API
-    virtual void _Execute(HdStProgramSharedPtr computeProgram,
-                          Uniform const &uniform,
-                          HdBufferResourceSharedPtr points,
-                          HdBufferResourceSharedPtr normals,
-                          HdBufferResourceSharedPtr adjacency,
-                          int numPoints) = 0;
-
+private:
     Hd_VertexAdjacency const *_adjacency;
     TfToken _srcName;
     TfToken _dstName;

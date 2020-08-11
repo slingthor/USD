@@ -149,7 +149,7 @@ UsdImagingGprimAdapter::_AddRprim(TfToken const& primType,
     // also, get rid of the proxyPrim dependency.
     // XXX: We should get rid of proxyPrim entirely.
     if (instancerContext != nullptr) {
-        index->_RemovePrimInfoDependency(cachePath);
+        index->RemovePrimInfoDependency(cachePath);
         index->AddDependency(cachePath, usdPrim);
     }
 
@@ -246,6 +246,31 @@ UsdImagingGprimAdapter::TrackVariability(UsdPrim const& prim,
                timeVaryingBits,
                true);
 
+    // Discover time-varying points.
+    _IsVarying(prim,
+               UsdGeomTokens->velocities,
+               HdChangeTracker::DirtyPoints,
+               UsdImagingTokens->usdVaryingPrimvar,
+               timeVaryingBits,
+               false) ||
+        _IsVarying(prim,
+                   UsdGeomTokens->accelerations,
+                   HdChangeTracker::DirtyPoints,
+                   UsdImagingTokens->usdVaryingPrimvar,
+                   timeVaryingBits,
+                   false);
+    // XXX: "points" is handled by derived classes.
+
+    // Discover time-varying double-sidedness.
+    _IsVarying(prim,
+               UsdGeomTokens->doubleSided,
+               HdChangeTracker::DirtyDoubleSided,
+               UsdImagingTokens->usdVaryingTopology,
+               timeVaryingBits,
+               false);
+
+    // XXX: We need to populate purpose here, since it's fetched by hydra
+    // before we call UpdateForTime().
     valueCache->GetPurpose(cachePath) = GetPurpose(prim, instancerContext);
 }
 
@@ -441,6 +466,7 @@ UsdImagingGprimAdapter::ProcessPropertyChange(UsdPrim const& prim,
 {
     if (propertyName == UsdGeomTokens->visibility)
         return HdChangeTracker::DirtyVisibility;
+
     else if (propertyName == UsdGeomTokens->purpose)
         return HdChangeTracker::DirtyRenderTag;
 
@@ -453,21 +479,25 @@ UsdImagingGprimAdapter::ProcessPropertyChange(UsdPrim const& prim,
     else if (propertyName == UsdGeomTokens->doubleSided) 
         return HdChangeTracker::DirtyDoubleSided;
 
-    else if (TfStringStartsWith(propertyName.GetString(),
-                               UsdShadeTokens->materialBinding.GetString()) ||
-             TfStringStartsWith(propertyName.GetString(),
-                                UsdTokens->collection.GetString())) {
-        return HdChangeTracker::DirtyMaterialId;
+    else if (propertyName == UsdGeomTokens->velocities ||
+             propertyName == UsdGeomTokens->accelerations)
+        // XXX: "points" is handled by derived classes.
+        return HdChangeTracker::DirtyPoints;
+
+    else if (UsdShadeMaterialBindingAPI::CanContainPropertyName(propertyName) ||
+            UsdCollectionAPI::CanContainPropertyName(propertyName)) {
+        return HdChangeTracker::DirtyMaterialId |
+               HdChangeTracker::DirtyPrimvar;
     }
     
     // Note: This doesn't handle "built-in" attributes that are treated as
     // primvars. That responsibility falls on the child adapter.
-    if (UsdGeomPrimvar::IsPrimvarRelatedPropertyName(propertyName)) {
+    if (UsdGeomPrimvarsAPI::CanContainPropertyName(propertyName)) {
         return UsdImagingPrimAdapter::_ProcessPrefixedPrimvarPropertyChange(
                 prim, cachePath, propertyName);
     }
 
-    return HdChangeTracker::AllDirty;
+    return HdChangeTracker::Clean;
 }
 
 void

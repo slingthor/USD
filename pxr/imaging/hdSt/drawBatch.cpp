@@ -30,7 +30,7 @@
 #include "pxr/imaging/hdSt/glslfxShader.h"
 #include "pxr/imaging/hdSt/lightingShader.h"
 #include "pxr/imaging/hdSt/package.h"
-#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
@@ -327,15 +327,15 @@ HdSt_DrawBatch::_DrawingProgram::CompileShader(
                                      instanceDraw,
                                      customBindings);
 
-    HdStProgram::ID hash = codeGen->ComputeHash();
+    HdStGLSLProgram::ID hash = codeGen->ComputeHash();
 
     {
         // ask registry to see if there's already compiled program
-        HdInstance<HdStProgramSharedPtr> programInstance =
-                                resourceRegistry->RegisterProgram(hash);
+        HdInstance<HdStGLSLProgramSharedPtr> programInstance =
+                                resourceRegistry->RegisterGLSLProgram(hash);
 
         if (programInstance.IsFirstInstance()) {
-            HdStProgramSharedPtr program = codeGen->Compile(
+            HdStGLSLProgramSharedPtr program = codeGen->Compile(
                 resourceRegistry.get());
             if (program && _Link(program)) {
                 // store the program into the program registry.
@@ -372,7 +372,7 @@ HdSt_DrawBatch::_DrawingProgram::_GetCustomBindings(
 /* virtual */
 bool
 HdSt_DrawBatch::_DrawingProgram::_Link(
-        HdStProgramSharedPtr const & program)
+        HdStGLSLProgramSharedPtr const & program)
 {
     if (!TF_VERIFY(program)) return false;
 

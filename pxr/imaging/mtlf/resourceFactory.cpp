@@ -101,18 +101,20 @@ GarchBaseTexture *MtlfResourceFactory::NewBaseTexture() const
 
 #ifdef PXR_PTEX_SUPPORT_ENABLED
 GarchPtexTextureRefPtr MtlfResourceFactory::NewPtexTexture(
-                            const TfToken &imageFilePath) const
+                            const TfToken &imageFilePath,
+                            const bool premultiplyAlpha) const
 {
-    return TfCreateRefPtr(new MtlfPtexTexture(imageFilePath));
+    return TfCreateRefPtr(new MtlfPtexTexture(imageFilePath, premultiplyAlpha));
 }
 #endif
 
 GarchUdimTextureRefPtr MtlfResourceFactory::NewUdimTexture(
                             TfToken const& imageFilePath,
                             GarchImage::ImageOriginLocation originLocation,
-                            std::vector<std::tuple<int, TfToken>>&& tiles) const
+                            std::vector<std::tuple<int, TfToken>>&& tiles,
+                            bool premultiplyAlpha) const
 {
-    return TfCreateRefPtr(new MtlfUdimTexture(imageFilePath, originLocation, std::move(tiles)));
+    return TfCreateRefPtr(new MtlfUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha));
 }
 
 

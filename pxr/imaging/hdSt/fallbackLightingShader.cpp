@@ -80,7 +80,7 @@ HdSt_FallbackLightingShader::SetCamera(GfMatrix4d const &worldToViewMatrix,
 }
 
 void
-HdSt_FallbackLightingShader::BindResources(HdStProgram const &program,
+HdSt_FallbackLightingShader::BindResources(HdStGLSLProgram const &program,
                                            HdSt_ResourceBinder const &binder,
                                            HdRenderPassState const &state)
 {
@@ -88,7 +88,7 @@ HdSt_FallbackLightingShader::BindResources(HdStProgram const &program,
 }
 
 void
-HdSt_FallbackLightingShader::UnbindResources(HdStProgram const &program,
+HdSt_FallbackLightingShader::UnbindResources(HdStGLSLProgram const &program,
                                              HdSt_ResourceBinder const &binder,
                                              HdRenderPassState const &state)
 {

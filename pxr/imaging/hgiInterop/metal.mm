@@ -160,6 +160,8 @@ HgiInteropMetal::_CreateShaderContext(
     shader.samplerColorLoc = glGetUniformLocation(program, "interopTexture");
     shader.samplerDepthLoc = glGetUniformLocation(program, "depthTexture");
     shader.blitTexSizeUniform = glGetUniformLocation(program, "texSize");
+    shader.blitDepthScaleOffsetUniform =
+        glGetUniformLocation(program, "depthScaleOffset");
 
     shader.vao = 0;
     glGenVertexArrays(1, &shader.vao);
@@ -292,6 +294,7 @@ HgiInteropMetal::HgiInteropMetal(Hgi* hgi)
         // a GL_TEXTURE_RECTANGLE are in pixels,
         // rather than the usual normalised 0..1 range.
         "uniform vec2 texSize;\n"
+        "uniform vec2 depthScaleOffset;\n"
         "\n"
         "void main(void)\n"
         "{\n"
@@ -308,7 +311,7 @@ HgiInteropMetal::HgiInteropMetal(Hgi* hgi)
         "#else\n"
         "    gl_FragColor = texture2DRect(interopTexture, uv.st);\n"
         "#endif\n"
-        "    gl_FragDepth = depth;\n"
+        "    gl_FragDepth = (depthScaleOffset.y + depth) * depthScaleOffset.x;\n"
         "}\n";
 
     GLuint fsColor = _compileShader(fragmentShaderColor, GL_FRAGMENT_SHADER);
@@ -761,7 +764,13 @@ HgiInteropMetal::_RestoreOpenGlState()
     if (!_restoreVao) {
         for (int i = 0; i < 2; i++) {
             VertexAttribState &state(_restoreVertexAttribState[i]);
-            
+            if (state.enabled) {
+                glVertexAttribPointer(state.bufferBinding, state.size,
+                    state.type, state.normalized, state.stride, state.pointer);
+                glEnableVertexAttribArray(state.bufferBinding);
+            } else {
+                glDisableVertexAttribArray(state.bufferBinding);
+            }
         }
     }
     
@@ -776,13 +785,17 @@ HgiInteropMetal::_RestoreOpenGlState()
 }
 
 void
-HgiInteropMetal::_BlitToOpenGL(bool flipY, int shaderIndex)
+HgiInteropMetal::_BlitToOpenGL(GfVec4i const &compRegion,
+                               bool flipY, int shaderIndex)
 {
     // Clear GL error state
     _ProcessGLErrors(true);
 
     _CaptureOpenGlState();
     
+    // XXX: This doesn't support "optional" depth. Enabling depth writes without
+    // a depth aov to xfer would mean that the bound depth buffer is overwritten
+    // with the fullscreen tri's depth (i.e., the near plane).
     glDepthFunc(GL_LEQUAL);
     glDepthMask(GL_TRUE);
     glEnable(GL_DEPTH_TEST);
@@ -791,7 +804,10 @@ HgiInteropMetal::_BlitToOpenGL(bool flipY, int shaderIndex)
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     glEnable(GL_BLEND);
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
+    glBlendFuncSeparate(/*srcColor*/GL_ONE,
+                        /*dstColor*/GL_ONE_MINUS_SRC_ALPHA,
+                        /*srcAlpha*/GL_ONE,
+                        /*dstAlpha*/GL_ONE);
     glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
     
     ShaderContext &shader = _shaderProgramContext[shaderIndex];
@@ -830,10 +846,19 @@ HgiInteropMetal::_BlitToOpenGL(bool flipY, int shaderIndex)
                 _mtlAliasedColorTexture.width,
                 _mtlAliasedColorTexture.height);
     
+    // Region of the framebuffer over which to composite.
+    glViewport(compRegion[0], compRegion[1], compRegion[2], compRegion[3]);
+
     if (flipY) {
+        if (shader.blitDepthScaleOffsetUniform != -1) {
+            glUniform2f(shader.blitDepthScaleOffsetUniform, 1.0f, 0.0f);
+        }
         glDrawArrays(GL_TRIANGLES, 6, 12);
     }
     else {
+        if (shader.blitDepthScaleOffsetUniform != -1) {
+            glUniform2f(shader.blitDepthScaleOffsetUniform, 0.5f, 1.0f);
+        }
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }
 
@@ -842,12 +867,13 @@ HgiInteropMetal::_BlitToOpenGL(bool flipY, int shaderIndex)
 }
 
 void
-HgiInteropMetal::CopyToInterop(
+HgiInteropMetal::CompositeToInterop(
     HgiTextureHandle const &color,
-    HgiTextureHandle const &depth)
+    HgiTextureHandle const &depth,
+    GfVec4i const &compRegion)
 {
     if (!ARCH_UNLIKELY(color)) {
-        TF_WARN("No valid color texture provided");
+        TF_CODING_ERROR("No valid color texture provided");
         return;
     }
 
@@ -961,7 +987,7 @@ HgiInteropMetal::CopyToInterop(
         HgiMetal::CommitCommandBuffer_WaitUntilScheduled);
 
     if (glShaderIndex != -1) {
-        _BlitToOpenGL(flipImage, glShaderIndex);
+        _BlitToOpenGL(compRegion, flipImage, glShaderIndex);
 
         _ProcessGLErrors();
     }

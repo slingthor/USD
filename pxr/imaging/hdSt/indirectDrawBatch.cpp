@@ -28,6 +28,7 @@
 
 #include "pxr/imaging/hio/glslfx.h"
 
+#include "pxr/imaging/hdSt/bufferArrayRange.h"
 #include "pxr/imaging/hdSt/commandBuffer.h"
 #include "pxr/imaging/hdSt/cullingShaderKey.h"
 #include "pxr/imaging/hdSt/debugCodes.h"
@@ -40,8 +41,6 @@
 #include "pxr/imaging/hdSt/shaderKey.h"
 
 #include "pxr/imaging/hd/binding.h"
-#include "pxr/imaging/hd/bufferArrayRange.h"
-
 #include "pxr/imaging/hd/debugCodes.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
@@ -83,10 +82,7 @@ HdSt_IndirectDrawBatch::HdSt_IndirectDrawBatch(
 {
 }
 
-HdSt_IndirectDrawBatch::~HdSt_IndirectDrawBatch()
-{
-}
-
+/*virtual*/
 void
 HdSt_IndirectDrawBatch::_Init(HdStDrawItemInstance * drawItemInstance)
 {
@@ -98,7 +94,7 @@ HdSt_IndirectDrawBatch::_Init(HdStDrawItemInstance * drawItemInstance)
         GarchResourceFactory::GetInstance()->GetContextCaps();
     
     // remember buffer arrays version for dispatch buffer updating
-    HdDrawItem const* drawItem = drawItemInstance->GetDrawItem();
+    HdStDrawItem const* drawItem = drawItemInstance->GetDrawItem();
     _bufferArraysHash = drawItem->GetBufferArraysHash();
     
     // determine gpu culling program by the first drawitem
@@ -145,6 +141,10 @@ HdSt_IndirectDrawBatch::_GetCullingProgram(
     return *_cullingProgram;
 }
 
+HdSt_IndirectDrawBatch::~HdSt_IndirectDrawBatch()
+{
+}
+
 void
 HdSt_IndirectDrawBatch::SetEnableTinyPrimCulling(bool tinyPrimCulling)
 {
@@ -155,17 +155,18 @@ HdSt_IndirectDrawBatch::SetEnableTinyPrimCulling(bool tinyPrimCulling)
 }
 
 static int
-_GetElementOffset(HdBufferArrayRangeSharedPtr const& range)
+_GetElementOffset(HdStBufferArrayRangeSharedPtr const& range)
 {
     return range? range->GetElementOffset() : 0;
 }
+
 void
 HdSt_IndirectDrawBatch::_CompileBatch(
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
-    
+
     int drawCount = _drawItemInstances.size();
     if (_drawItemInstances.empty()) return;
 
@@ -177,12 +178,12 @@ HdSt_IndirectDrawBatch::_CompileBatch(
         GLuint instanceCount;
         GLuint first;
         GLuint baseInstance;
-        
+
         // XXX: This is just padding to avoid configuration changes during
         // transform feedback, which are not accounted for during shader
         // caching. We should find a better solution.
         GLuint __reserved_0;
-        
+
         GLuint modelDC;
         GLuint constantDC;
         GLuint elementDC;
@@ -193,7 +194,7 @@ HdSt_IndirectDrawBatch::_CompileBatch(
         GLuint vertexDC;
         GLuint topologyVisibilityDC;
     };
-    
+
     // DrawArrays + Instance culling : 17 integers (+ numInstanceLevels)
     struct _DrawArraysInstanceCullCommand {
         GLuint count;
@@ -232,7 +233,7 @@ HdSt_IndirectDrawBatch::_CompileBatch(
         GLuint vertexDC;
         GLuint topologyVisibilityDC;
     };
-    
+
     // DrawElements + Instance culling : 18 integers (+ numInstanceLevels)
     struct _DrawElementsInstanceCullCommand {
         GLuint count;
@@ -258,14 +259,14 @@ HdSt_IndirectDrawBatch::_CompileBatch(
     // Count the number of visible items. We may actually draw fewer
     // items than this when GPU frustum culling is active
     _numVisibleItems = 0;
-    
+
     // elements to be drawn (early out for empty batch)
     _numTotalElements = 0;
     _numTotalVertices = 0;
-    
+
     size_t instancerNumLevels
         = _drawItemInstances[0]->GetDrawItem()->GetInstancePrimvarNumLevels();
-    
+
     // how many integers in the dispatch struct
     int commandNumUints = _useDrawArrays
         ? (_useGpuInstanceCulling
@@ -276,109 +277,109 @@ HdSt_IndirectDrawBatch::_CompileBatch(
            : sizeof(_DrawElementsCommand)/sizeof(GLuint));
     // followed by instanceDC[numlevels]
     commandNumUints += instancerNumLevels;
-    
+
     TF_DEBUG(HD_MDI).Msg("\nCompile MDI Batch\n");
     TF_DEBUG(HD_MDI).Msg(" - num uints: %d\n", commandNumUints);
     TF_DEBUG(HD_MDI).Msg(" - useDrawArrays: %d\n", _useDrawArrays);
     TF_DEBUG(HD_MDI).Msg(" - useGpuInstanceCulling: %d\n",
-                         _useGpuInstanceCulling);
-    
+                                                    _useGpuInstanceCulling);
+
     size_t numDrawItemInstances = _drawItemInstances.size();
     TF_DEBUG(HD_MDI).Msg(" - num draw items: %zu\n", numDrawItemInstances);
-    
+
     // Note: GL specifies baseVertex as 'int' and other as 'uint' in
     // drawcommand struct, but we never set negative baseVertex in our
     // usecases for bufferArray so we use uint for all fields here.
     _drawCommandBuffer.resize(numDrawItemInstances * commandNumUints);
     std::vector<GLuint>::iterator cmdIt = _drawCommandBuffer.begin();
-    
+
     TF_DEBUG(HD_MDI).Msg(" - Processing Items:\n");
     for (size_t item = 0; item < numDrawItemInstances; ++item) {
         HdStDrawItemInstance const * instance = _drawItemInstances[item];
         HdStDrawItem const * drawItem = _drawItemInstances[item]->GetDrawItem();
-        
+
         //
         // index buffer data
         //
         HdBufferArrayRangeSharedPtr const &
             indexBar_ = drawItem->GetTopologyRange();
-        HdBufferArrayRangeSharedPtr indexBar =
-            std::static_pointer_cast<HdBufferArrayRange>(indexBar_);
+        HdStBufferArrayRangeSharedPtr indexBar =
+            std::static_pointer_cast<HdStBufferArrayRange>(indexBar_);
 
         //
         // topology visiibility buffer data
         //
         HdBufferArrayRangeSharedPtr const &
             topVisBar_ = drawItem->GetTopologyVisibilityRange();
-        HdBufferArrayRangeSharedPtr topVisBar =
-            std::static_pointer_cast<HdBufferArrayRange>(topVisBar_);
+        HdStBufferArrayRangeSharedPtr topVisBar =
+            std::static_pointer_cast<HdStBufferArrayRange>(topVisBar_);
 
         //
         // element (per-face) buffer data
         //
         HdBufferArrayRangeSharedPtr const &
             elementBar_ = drawItem->GetElementPrimvarRange();
-        HdBufferArrayRangeSharedPtr elementBar =
-            std::static_pointer_cast<HdBufferArrayRange>(elementBar_);
-        
+        HdStBufferArrayRangeSharedPtr elementBar =
+            std::static_pointer_cast<HdStBufferArrayRange>(elementBar_);
+
         //
         // vertex attrib buffer data
         //
         HdBufferArrayRangeSharedPtr const &
             vertexBar_ = drawItem->GetVertexPrimvarRange();
-        HdBufferArrayRangeSharedPtr vertexBar =
-            std::static_pointer_cast<HdBufferArrayRange>(vertexBar_);
-        
+        HdStBufferArrayRangeSharedPtr vertexBar =
+            std::static_pointer_cast<HdStBufferArrayRange>(vertexBar_);
+
         //
         // constant buffer data
         //
         HdBufferArrayRangeSharedPtr const &
             constantBar_ = drawItem->GetConstantPrimvarRange();
-        HdBufferArrayRangeSharedPtr constantBar =
-            std::static_pointer_cast<HdBufferArrayRange>(constantBar_);
-        
+        HdStBufferArrayRangeSharedPtr constantBar =
+            std::static_pointer_cast<HdStBufferArrayRange>(constantBar_);
+
         //
         // face varying buffer data
         //
         HdBufferArrayRangeSharedPtr const &
             fvarBar_ = drawItem->GetFaceVaryingPrimvarRange();
-        HdBufferArrayRangeSharedPtr fvarBar =
-            std::static_pointer_cast<HdBufferArrayRange>(fvarBar_);
-        
+        HdStBufferArrayRangeSharedPtr fvarBar =
+            std::static_pointer_cast<HdStBufferArrayRange>(fvarBar_);
+
         //
         // instance buffer data
         //
         int instanceIndexWidth = instancerNumLevels + 1;
-        std::vector<HdBufferArrayRangeSharedPtr> instanceBars(instancerNumLevels);
-        for (int i = 0; i < instancerNumLevels; ++i) {
+        std::vector<HdStBufferArrayRangeSharedPtr> instanceBars(instancerNumLevels);
+        for (size_t i = 0; i < instancerNumLevels; ++i) {
             HdBufferArrayRangeSharedPtr const &
                 ins_ = drawItem->GetInstancePrimvarRange(i);
-            HdBufferArrayRangeSharedPtr ins =
-                std::static_pointer_cast<HdBufferArrayRange>(ins_);
-            
+            HdStBufferArrayRangeSharedPtr ins =
+                std::static_pointer_cast<HdStBufferArrayRange>(ins_);
+
             instanceBars[i] = ins;
         }
-        
+
         //
         // instance indices
         //
         HdBufferArrayRangeSharedPtr const &
             instanceIndexBar_ = drawItem->GetInstanceIndexRange();
-        HdBufferArrayRangeSharedPtr instanceIndexBar =
-            std::static_pointer_cast<HdBufferArrayRange>(instanceIndexBar_);
-        
+        HdStBufferArrayRangeSharedPtr instanceIndexBar =
+            std::static_pointer_cast<HdStBufferArrayRange>(instanceIndexBar_);
+
         //
         // shader parameter
         //
         HdBufferArrayRangeSharedPtr const &
             shaderBar_ = drawItem->GetMaterialShader()->GetShaderData();
-        HdBufferArrayRangeSharedPtr shaderBar =
-            std::static_pointer_cast<HdBufferArrayRange>(shaderBar_);
-        
+        HdStBufferArrayRangeSharedPtr shaderBar =
+            std::static_pointer_cast<HdStBufferArrayRange>(shaderBar_);
+
         // 3 for triangles, 4 for quads, n for patches
         GLuint numIndicesPerPrimitive
             = drawItem->GetGeometricShader()->GetPrimitiveIndexSize();
-        
+
         //
         // Get parameters from our buffer range objects to
         // allow drawing to access the correct elements from
@@ -395,7 +396,7 @@ HdSt_IndirectDrawBatch::_CompileBatch(
         // skip the drawitem to prevent drawing uninitialized vertices.
         if (vertexCount == 0) numElements = 0;
         GLuint baseInstance      = (GLuint)item;
-        
+
         // drawing coordinates.
         GLuint modelDC         = 0; // reserved for future extension
         GLuint constantDC      = _GetElementOffset(constantBar);
@@ -496,7 +497,7 @@ HdSt_IndirectDrawBatch::_CompileBatch(
             GLuint instanceDC = _GetElementOffset(instanceBars[i]);
             *cmdIt++ = instanceDC;
         }
-        
+
         if (TfDebug::IsEnabled(HD_MDI)) {
             std::vector<GLuint>::iterator cmdIt2 = cmdIt - commandNumUints;
             std::cout << "   - ";
@@ -506,19 +507,19 @@ HdSt_IndirectDrawBatch::_CompileBatch(
             }
             std::cout << std::endl;
         }
-        
+
         _numVisibleItems += instanceCount;
         _numTotalElements += numElements;
         _numTotalVertices += vertexCount;
     }
-    
+
     TF_DEBUG(HD_MDI).Msg(" - Num Visible: %zu\n", _numVisibleItems);
     TF_DEBUG(HD_MDI).Msg(" - Total Elements: %zu\n", _numTotalElements);
     TF_DEBUG(HD_MDI).Msg(" - Total Verts: %zu\n", _numTotalVertices);
-    
+
     // make sure we filled all
     TF_VERIFY(cmdIt == _drawCommandBuffer.end());
-    
+
     // allocate draw dispatch buffer
     _dispatchBuffer =
         resourceRegistry->RegisterDispatchBuffer(HdStIndirectDrawTokens->drawIndirect,
@@ -627,10 +628,10 @@ HdSt_IndirectDrawBatch::_CompileBatch(
             }
         }
     }
-    
+
     // copy data
     _dispatchBuffer->CopyData(_drawCommandBuffer);
-    
+
     if (_useGpuCulling) {
         // Make a duplicate of the draw dispatch buffer to use as an input
         // for GPU frustum culling (a single buffer cannot be bound for
@@ -764,11 +765,11 @@ HdSt_IndirectDrawBatch::_CompileBatch(
                     offsetof(_DrawElementsCommand, instanceCount));
             }
         }
-        
+
         // copy data
         _dispatchBufferCullInput->CopyData(_drawCommandBuffer);
     }
-    
+
     // cache the location of instanceCount, to be used at
     // DrawItemInstanceChanged().
     if (_useDrawArrays) {
@@ -798,57 +799,57 @@ bool
 HdSt_IndirectDrawBatch::Validate(bool deepValidation)
 {
     if (!TF_VERIFY(!_drawItemInstances.empty())) return false;
-    
+
     // check the hash to see they've been reallocated/migrated or not.
     // note that we just need to compare the hash of the first item,
     // since drawitems are aggregated and ensure that they are sharing
     // same buffer arrays.
-    
+
     HdStDrawItem const* batchItem = _drawItemInstances.front()->GetDrawItem();
-    
+
     size_t bufferArraysHash = batchItem->GetBufferArraysHash();
-    
+
     if (_bufferArraysHash != bufferArraysHash) {
         _bufferArraysHash = bufferArraysHash;
         _dispatchBuffer.reset();
         return false;
     }
-    
+
     // Deep validation is needed when a drawItem changes its buffer spec,
     // surface shader or geometric shader.
     if (deepValidation) {
         // look through all draw items to be still compatible
-        
+
         size_t numDrawItemInstances = _drawItemInstances.size();
         for (size_t item = 0; item < numDrawItemInstances; ++item) {
             HdStDrawItem const * drawItem
                 = _drawItemInstances[item]->GetDrawItem();
-            
+
             if (!TF_VERIFY(drawItem->GetGeometricShader())) {
                 return false;
             }
-            
+
             if (!_IsAggregated(batchItem, drawItem)) {
                 return false;
             }
         }
-        
+
     }
-    
+
     return true;
 }
 
 void
 HdSt_IndirectDrawBatch::_ValidateCompatibility(
-            HdBufferArrayRangeSharedPtr const& constantBar,
-            HdBufferArrayRangeSharedPtr const& indexBar,
-            HdBufferArrayRangeSharedPtr const& topologyVisibilityBar,
-            HdBufferArrayRangeSharedPtr const& elementBar,
-            HdBufferArrayRangeSharedPtr const& fvarBar,
-            HdBufferArrayRangeSharedPtr const& vertexBar,
+            HdStBufferArrayRangeSharedPtr const& constantBar,
+            HdStBufferArrayRangeSharedPtr const& indexBar,
+            HdStBufferArrayRangeSharedPtr const& topologyVisibilityBar,
+            HdStBufferArrayRangeSharedPtr const& elementBar,
+            HdStBufferArrayRangeSharedPtr const& fvarBar,
+            HdStBufferArrayRangeSharedPtr const& vertexBar,
             int instancerNumLevels,
-            HdBufferArrayRangeSharedPtr const& instanceIndexBar,
-            std::vector<HdBufferArrayRangeSharedPtr> const& instanceBars) const
+            HdStBufferArrayRangeSharedPtr const& instanceIndexBar,
+            std::vector<HdStBufferArrayRangeSharedPtr> const& instanceBars) const
 {
     HdStDrawItem const* failed = nullptr;
 
@@ -882,17 +883,17 @@ HdSt_IndirectDrawBatch::_ValidateCompatibility(
         if (!TF_VERIFY(instancerNumLevels == (int)instanceBars.size()))
                         { failed = itm; break; }
 
-        std::vector<HdBufferArrayRangeSharedPtr> itmInstanceBars(
+        std::vector<HdStBufferArrayRangeSharedPtr> itmInstanceBars(
                                                             instancerNumLevels);
         if (instanceIndexBar) {
             for (int i = 0; i < instancerNumLevels; ++i) {
-                if (itmInstanceBars[i] && !TF_VERIFY(itmInstanceBars[i]
-                                                     ->IsAggregatedWith(itm->GetInstancePrimvarRange(i)),
-                                                     "%d", i)) { failed = itm; break; }
+                if (itmInstanceBars[i] && !TF_VERIFY(itmInstanceBars[i] 
+                            ->IsAggregatedWith(itm->GetInstancePrimvarRange(i)),
+                        "%d", i)) { failed = itm; break; }
             }
         }
     }
-    
+
     if (failed) {
         std::cout << failed->GetRprimID() << std::endl;
     }
@@ -900,8 +901,8 @@ HdSt_IndirectDrawBatch::_ValidateCompatibility(
 
 void
 HdSt_IndirectDrawBatch::PrepareDraw(
-      HdStRenderPassStateSharedPtr const &renderPassState,
-      HdStResourceRegistrySharedPtr const &resourceRegistry)
+    HdStRenderPassStateSharedPtr const &renderPassState,
+    HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     HD_TRACE_FUNCTION();
 
@@ -921,16 +922,16 @@ HdSt_IndirectDrawBatch::PrepareDraw(
 
     // Bypass freezeCulling if the command buffer is dirty.
     bool freezeCulling = TfDebug::IsEnabled(HD_FREEZE_CULL_FRUSTUM)
-    && !_drawCommandBufferDirty;
-    
+                                && !_drawCommandBufferDirty;
+
     bool gpuCulling = _useGpuCulling;
-    
+
     if (gpuCulling && !_useGpuInstanceCulling) {
         // disable GPU culling when instancing enabled and
         // not using instance culling.
         if (batchItem->GetInstanceIndexRange()) gpuCulling = false;
     }
-    
+
     // Do we have to update our dispatch buffer because drawitem instance
     // data has changed?
     // On the first time through, after batches have just been compiled,
@@ -938,17 +939,17 @@ HdSt_IndirectDrawBatch::PrepareDraw(
     // uploaded the buffer.
     if (_drawCommandBufferDirty) {
         _dispatchBuffer->CopyData(_drawCommandBuffer);
-        
+
         if (gpuCulling) {
             _dispatchBufferCullInput->CopyData(_drawCommandBuffer);
         }
         _drawCommandBufferDirty = false;
     }
-    
+
     //
     // cull
     //
-    
+
     if (gpuCulling && !freezeCulling) {
         if (_useGpuInstanceCulling) {
             _GPUFrustumInstanceCulling(
@@ -991,11 +992,11 @@ HdSt_IndirectDrawBatch::ExecuteDraw(
     _DrawingProgram & program = _GetDrawingProgram(renderPassState,
                                                    /*indirect=*/true,
                                                    resourceRegistry);
-    HdStProgramSharedPtr const &hdStProgram(program.GetProgram());
-    if (!TF_VERIFY(hdStProgram)) return;
-    if (!TF_VERIFY(hdStProgram->Validate())) return;
+    HdStGLSLProgramSharedPtr const &HdStGLSLProgram(program.GetProgram());
+    if (!TF_VERIFY(HdStGLSLProgram)) return;
+    if (!TF_VERIFY(HdStGLSLProgram->Validate())) return;
     
-    hdStProgram->SetProgram("DrawingProgram");
+    HdStGLSLProgram->SetProgram("DrawingProgram");
     
     const HdSt_ResourceBinder &binder = program.GetBinder();
     const HdStShaderCodeSharedPtrVector &shaders = program.GetComposedShaders();
@@ -1003,68 +1004,68 @@ HdSt_IndirectDrawBatch::ExecuteDraw(
     // XXX: for surfaces shader, we need to iterate all drawItems to
     //      make textures resident, instead of just the first batchItem
     TF_FOR_ALL(it, shaders) {
-        (*it)->BindResources(*hdStProgram, binder, *renderPassState);
+        (*it)->BindResources(*HdStGLSLProgram, binder, *renderPassState);
     }
 
     // constant buffer bind
     HdBufferArrayRangeSharedPtr constantBar_ = batchItem->GetConstantPrimvarRange();
-    HdBufferArrayRangeSharedPtr constantBar =
-        std::static_pointer_cast<HdBufferArrayRange>(constantBar_);
+    HdStBufferArrayRangeSharedPtr constantBar =
+        std::static_pointer_cast<HdStBufferArrayRange>(constantBar_);
     binder.BindConstantBuffer(constantBar);
-    
+
     // index buffer bind
     HdBufferArrayRangeSharedPtr indexBar_ = batchItem->GetTopologyRange();
-    HdBufferArrayRangeSharedPtr indexBar =
-        std::static_pointer_cast<HdBufferArrayRange>(indexBar_);
+    HdStBufferArrayRangeSharedPtr indexBar =
+        std::static_pointer_cast<HdStBufferArrayRange>(indexBar_);
     binder.BindBufferArray(indexBar);
 
     // topology visibility buffer bind
     HdBufferArrayRangeSharedPtr topVisBar_ =
         batchItem->GetTopologyVisibilityRange();
-    HdBufferArrayRangeSharedPtr topVisBar =
-        std::static_pointer_cast<HdBufferArrayRange>(topVisBar_);
+    HdStBufferArrayRangeSharedPtr topVisBar =
+        std::static_pointer_cast<HdStBufferArrayRange>(topVisBar_);
     binder.BindInterleavedBuffer(topVisBar, HdTokens->topologyVisibility);
 
     // element buffer bind
     HdBufferArrayRangeSharedPtr elementBar_ = batchItem->GetElementPrimvarRange();
-    HdBufferArrayRangeSharedPtr elementBar =
-        std::static_pointer_cast<HdBufferArrayRange>(elementBar_);
+    HdStBufferArrayRangeSharedPtr elementBar =
+        std::static_pointer_cast<HdStBufferArrayRange>(elementBar_);
     binder.BindBufferArray(elementBar);
-    
+
     // fvar buffer bind
     HdBufferArrayRangeSharedPtr fvarBar_ = batchItem->GetFaceVaryingPrimvarRange();
-    HdBufferArrayRangeSharedPtr fvarBar =
-        std::static_pointer_cast<HdBufferArrayRange>(fvarBar_);
+    HdStBufferArrayRangeSharedPtr fvarBar =
+        std::static_pointer_cast<HdStBufferArrayRange>(fvarBar_);
     binder.BindBufferArray(fvarBar);
-    
+
     // vertex buffer bind
     HdBufferArrayRangeSharedPtr vertexBar_ = batchItem->GetVertexPrimvarRange();
-    HdBufferArrayRangeSharedPtr vertexBar =
-        std::static_pointer_cast<HdBufferArrayRange>(vertexBar_);
+    HdStBufferArrayRangeSharedPtr vertexBar =
+        std::static_pointer_cast<HdStBufferArrayRange>(vertexBar_);
     binder.BindBufferArray(vertexBar);
-    
+
     // instance buffer bind
     int instancerNumLevels = batchItem->GetInstancePrimvarNumLevels();
-    std::vector<HdBufferArrayRangeSharedPtr> instanceBars(instancerNumLevels);
-    
+    std::vector<HdStBufferArrayRangeSharedPtr> instanceBars(instancerNumLevels);
+
     // instance index indirection
     HdBufferArrayRangeSharedPtr instanceIndexBar_ = batchItem->GetInstanceIndexRange();
-    HdBufferArrayRangeSharedPtr instanceIndexBar =
-        std::static_pointer_cast<HdBufferArrayRange>(instanceIndexBar_);
+    HdStBufferArrayRangeSharedPtr instanceIndexBar =
+        std::static_pointer_cast<HdStBufferArrayRange>(instanceIndexBar_);
     if (instanceIndexBar) {
         // note that while instanceIndexBar is mandatory for instancing but
         // instanceBar can technically be empty (it doesn't make sense though)
         // testHdInstance --noprimvars covers that case.
         for (int i = 0; i < instancerNumLevels; ++i) {
             HdBufferArrayRangeSharedPtr ins_ = batchItem->GetInstancePrimvarRange(i);
-            HdBufferArrayRangeSharedPtr ins =
-                std::static_pointer_cast<HdBufferArrayRange>(ins_);
+            HdStBufferArrayRangeSharedPtr ins =
+                std::static_pointer_cast<HdStBufferArrayRange>(ins_);
             instanceBars[i] = ins;
             binder.BindInstanceBufferArray(instanceBars[i], i);
         }
         binder.BindBufferArray(instanceIndexBar);
     }
-    
+
     if (false && ARCH_UNLIKELY(TfDebug::IsEnabled(HD_SAFE_MODE))) {
         _ValidateCompatibility(constantBar,
                                indexBar,
@@ -1076,26 +1077,26 @@ HdSt_IndirectDrawBatch::ExecuteDraw(
                                instanceIndexBar,
                                instanceBars);
     }
-    
+
     // shader buffer bind
-    HdBufferArrayRangeSharedPtr shaderBar;
+    HdStBufferArrayRangeSharedPtr shaderBar;
     TF_FOR_ALL(shader, shaders) {
         HdBufferArrayRangeSharedPtr shaderBar_ = (*shader)->GetShaderData();
-        shaderBar = std::static_pointer_cast<HdBufferArrayRange>(shaderBar_);
+        shaderBar = std::static_pointer_cast<HdStBufferArrayRange>(shaderBar_);
         if (shaderBar) {
-            binder.BindBuffer(HdTokens->materialParams,
-                              std::dynamic_pointer_cast<HdStBufferResource>(shaderBar->GetResource()));
+            binder.BindBuffer(HdTokens->materialParams, 
+                              shaderBar->GetResource());
         }
     }
-    
+
     // drawindirect command, drawing coord, instanceIndexBase bind
-    HdBufferArrayRangeSharedPtr dispatchBar =
-    _dispatchBuffer->GetBufferArrayRange();
+    HdStBufferArrayRangeSharedPtr dispatchBar =
+        _dispatchBuffer->GetBufferArrayRange();
     binder.BindBufferArray(dispatchBar);
     
     // update geometric shader states
     program.GetGeometricShader()->BindResources(
-        *hdStProgram, binder, *renderPassState);
+        *HdStGLSLProgram, binder, *renderPassState);
     
     GLuint batchCount = _dispatchBuffer->GetCount();
     
@@ -1117,8 +1118,8 @@ HdSt_IndirectDrawBatch::ExecuteDraw(
     binder.UnbindBufferArray(vertexBar);
     binder.UnbindBufferArray(dispatchBar);
     if(shaderBar) {
-        binder.UnbindBuffer(HdTokens->materialParams,
-                            std::dynamic_pointer_cast<HdStBufferResource>(shaderBar->GetResource()));
+        binder.UnbindBuffer(HdTokens->materialParams, 
+                            shaderBar->GetResource());
     }
     
     if (instanceIndexBar) {
@@ -1129,11 +1130,11 @@ HdSt_IndirectDrawBatch::ExecuteDraw(
     }
     
     TF_FOR_ALL(it, shaders) {
-        (*it)->UnbindResources(*hdStProgram, binder, *renderPassState);
+        (*it)->UnbindResources(*HdStGLSLProgram, binder, *renderPassState);
     }
-    program.GetGeometricShader()->UnbindResources(*hdStProgram, binder, *renderPassState);
+    program.GetGeometricShader()->UnbindResources(*HdStGLSLProgram, binder, *renderPassState);
     
-    hdStProgram->UnsetProgram();
+    HdStGLSLProgram->UnsetProgram();
 }
 
 void
@@ -1144,29 +1145,29 @@ HdSt_IndirectDrawBatch::_GPUFrustumInstanceCulling(
 {
     HdBufferArrayRangeSharedPtr constantBar_ =
         batchItem->GetConstantPrimvarRange();
-    HdBufferArrayRangeSharedPtr constantBar =
-        std::static_pointer_cast<HdBufferArrayRange>(constantBar_);
+    HdStBufferArrayRangeSharedPtr constantBar =
+        std::static_pointer_cast<HdStBufferArrayRange>(constantBar_);
     int instancerNumLevels = batchItem->GetInstancePrimvarNumLevels();
-    std::vector<HdBufferArrayRangeSharedPtr> instanceBars(instancerNumLevels);
+    std::vector<HdStBufferArrayRangeSharedPtr> instanceBars(instancerNumLevels);
     for (int i = 0; i < instancerNumLevels; ++i) {
         HdBufferArrayRangeSharedPtr ins_ = batchItem->GetInstancePrimvarRange(i);
-        
-        HdBufferArrayRangeSharedPtr ins =
-            std::static_pointer_cast<HdBufferArrayRange>(ins_);
-        
+
+        HdStBufferArrayRangeSharedPtr ins =
+            std::static_pointer_cast<HdStBufferArrayRange>(ins_);
+
         instanceBars[i] = ins;
     }
     HdBufferArrayRangeSharedPtr instanceIndexBar_ =
         batchItem->GetInstanceIndexRange();
-    HdBufferArrayRangeSharedPtr instanceIndexBar =
-        std::static_pointer_cast<HdBufferArrayRange>(instanceIndexBar_);
-    
-    HdBufferArrayRangeSharedPtr cullDispatchBar =
+    HdStBufferArrayRangeSharedPtr instanceIndexBar =
+        std::static_pointer_cast<HdStBufferArrayRange>(instanceIndexBar_);
+
+    HdStBufferArrayRangeSharedPtr cullDispatchBar =
         _dispatchBufferCullInput->GetBufferArrayRange();
     
     _CullingProgram &cullingProgram = _GetCullingProgram(resourceRegistry);
     
-    HdStProgramSharedPtr const &
+    HdStGLSLProgramSharedPtr const &
         program = cullingProgram.GetProgram();
     
     if (!TF_VERIFY(program)) return;
@@ -1215,7 +1216,7 @@ HdSt_IndirectDrawBatch::_GPUFrustumInstanceCulling(
     bool validProgram = true;
     
     // XXX: should we cache cull command offset?
-    HdBufferResourceSharedPtr cullCommandBuffer =
+    HdStBufferResourceSharedPtr cullCommandBuffer =
         _dispatchBufferCullInput->GetResource(HdTokens->drawDispatch);
     if (!TF_VERIFY(cullCommandBuffer)) {
         validProgram = false;
@@ -1256,15 +1257,15 @@ HdSt_IndirectDrawBatch::_GPUFrustumNonInstanceCulling(
 {
     HdBufferArrayRangeSharedPtr constantBar_ =
         batchItem->GetConstantPrimvarRange();
-    HdBufferArrayRangeSharedPtr constantBar =
-        std::static_pointer_cast<HdBufferArrayRange>(constantBar_);
-    
-    HdBufferArrayRangeSharedPtr cullDispatchBar =
+    HdStBufferArrayRangeSharedPtr constantBar =
+        std::static_pointer_cast<HdStBufferArrayRange>(constantBar_);
+
+    HdStBufferArrayRangeSharedPtr cullDispatchBar =
         _dispatchBufferCullInput->GetBufferArrayRange();
-    
+
     _CullingProgram &cullingProgram = _GetCullingProgram(resourceRegistry);
     
-    HdStProgramSharedPtr const &
+    HdStGLSLProgramSharedPtr const &
     program = cullingProgram.GetProgram();
     if (!TF_VERIFY(program)) return;
     if (!TF_VERIFY(program->Validate())) return;
@@ -1325,22 +1326,22 @@ HdSt_IndirectDrawBatch::DrawItemInstanceChanged(HdStDrawItemInstance const* inst
             _drawCommandBuffer.begin()
             + batchIndex * commandNumUints
             + _cullInstanceCountOffset;
-        
+
         HdBufferArrayRangeSharedPtr const &instanceIndexBar_ =
             instance->GetDrawItem()->GetInstanceIndexRange();
-        HdBufferArrayRangeSharedPtr instanceIndexBar =
-            std::static_pointer_cast<HdBufferArrayRange>(instanceIndexBar_);
-        
+        HdStBufferArrayRangeSharedPtr instanceIndexBar =
+            std::static_pointer_cast<HdStBufferArrayRange>(instanceIndexBar_);
+
         int newInstanceCount = instanceIndexBar
-            ? instanceIndexBar->GetNumElements() : 1;
-            newInstanceCount = instance->IsVisible()
-            ? (newInstanceCount/std::max(1, instanceIndexWidth))
-            : 0;
-        
+                             ? instanceIndexBar->GetNumElements() : 1;
+        newInstanceCount = instance->IsVisible()
+                         ? (newInstanceCount/std::max(1, instanceIndexWidth))
+                         : 0;
+
         TF_DEBUG(HD_MDI).Msg("\nInstance Count changed: %d -> %d\n",
-                             *instanceCountIt,
-                             newInstanceCount);
-        
+                *instanceCountIt, 
+                newInstanceCount);
+
         // Update instance count and overall count of visible items.
         if (static_cast<size_t>(newInstanceCount) != (*instanceCountIt)) {
             _numVisibleItems += (newInstanceCount - (*instanceCountIt));

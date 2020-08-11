@@ -324,14 +324,16 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
         for (_DrawTargetEntry const &entry : drawTargetEntries) {
             if (HdStDrawTarget * const drawTarget = entry.drawTarget) {
                 if (drawTarget->IsEnabled()) {
-                    HdxDrawTargetRenderPassUniquePtr pass =
+                    HdxDrawTargetRenderPassUniquePtr drawTargetPass =
                         std::make_unique<HdxDrawTargetRenderPass>(&renderIndex);
 
-                    pass->SetDrawTarget(drawTarget->GetGarchDrawTarget());
-                    pass->SetRenderPassState(drawTarget->GetRenderPassState());
-                    pass->SetHasDependentDrawTargets(
+                    drawTargetPass->SetDrawTarget(
+                        drawTarget->GetGarchDrawTarget());
+                    drawTargetPass->SetDrawTargetRenderPassState(
+                        drawTarget->GetDrawTargetRenderPassState());
+                    drawTargetPass->SetHasDependentDrawTargets(
                         entry.hasDependentDrawTargets);
-                    _renderPasses.push_back(std::move(pass));
+                    _renderPasses.push_back(std::move(drawTargetPass));
 
                     _renderPassesInfo.push_back(
                         { HdStRenderPassStateSharedPtr(
@@ -380,14 +382,15 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
          renderPassIdx < numRenderPasses;
          ++renderPassIdx) {
 
-        _RenderPassInfo &renderPassInfo =  _renderPassesInfo[renderPassIdx];
+        const _RenderPassInfo &renderPassInfo =
+            _renderPassesInfo[renderPassIdx];
         HdxDrawTargetRenderPass * const renderPass = 
             _renderPasses[renderPassIdx].get();
-        HdStRenderPassStateSharedPtr &renderPassState = 
+        HdStRenderPassStateSharedPtr const &renderPassState = 
             renderPassInfo.renderPassState;
         HdStDrawTarget * const drawTarget = renderPassInfo.target;
         const HdStDrawTargetRenderPassState * const drawTargetRenderPassState =
-            drawTarget->GetRenderPassState();
+            drawTarget->GetDrawTargetRenderPassState();
         const SdfPath &cameraId = drawTargetRenderPassState->GetCamera();
 
         // XXX: Need to detect when camera changes and only update if
@@ -415,8 +418,10 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
         renderPassState->SetAlphaThreshold(_alphaThreshold);
         renderPassState->SetCullStyle(_cullStyle);
         renderPassState->SetDepthFunc(depthFunc);
+        renderPassState->SetAovBindings(
+            drawTargetRenderPassState->GetAovBindings());
 
-        HdStSimpleLightingShaderSharedPtr &simpleLightingShader
+        HdStSimpleLightingShaderSharedPtr const& simpleLightingShader
             = _renderPassesInfo[renderPassIdx].simpleLightingShader;
         GarchSimpleLightingContextRefPtr const& simpleLightingContext =
             simpleLightingShader->GetLightingContext();
@@ -474,82 +479,12 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
     *dirtyBits = HdChangeTracker::Clean;
 }
 
-HgiGraphicsCmdsDesc
-HdxDrawTargetTask::MakeGraphicsCmdsDesc(HdStDrawTarget * const drawTarget,
-    const bool clear)
-{
-    static const HgiTextureHandle empty;
-
-    HgiGraphicsCmdsDesc desc;
-
-    for (const HdStDrawTarget::AttachmentData & data :
-             drawTarget->GetAttachments()) {
-
-        const bool isMultisampled = bool(data.textureMSAA);
-        // Render into MSAA texture if MSAA is used, otherwise
-        // render directly into target texture.
-        const HdStDynamicUvTextureObjectSharedPtr & textureObject =
-            isMultisampled ? data.textureMSAA : data.texture;
-        const HgiTextureHandle & texture =
-            textureObject->GetTexture();
-        // Only give the resolved texture when using MSAA.
-        const HgiTextureHandle resolveTexture =
-            isMultisampled ? data.texture->GetTexture() : empty;
-        
-        const GfVec3i &dimensions = texture->GetDescriptor().dimensions;
-        desc.width = dimensions[0];
-        desc.height = dimensions[1];
-        
-        HgiAttachmentDesc attachmentDesc;
-        attachmentDesc.loadOp =
-            clear ? HgiAttachmentLoadOpClear
-                  : HgiAttachmentLoadOpLoad;
-        attachmentDesc.storeOp =
-            isMultisampled ? HgiAttachmentStoreOpDontCare
-                           : HgiAttachmentStoreOpStore;
-        attachmentDesc.clearValue = data.clearValue;
-        attachmentDesc.blendEnabled = false;
-        if (data.name == HdStDrawTargetTokens->depth.GetString()) {
-            desc.depthAttachmentDesc = std::move(attachmentDesc);
-            desc.depthTexture = texture;
-            desc.depthResolveTexture = resolveTexture;
-        } else {
-            desc.colorAttachmentDescs.push_back(std::move(attachmentDesc));
-            desc.colorTextures.push_back(texture);
-            if (resolveTexture) {
-                desc.colorResolveTextures.push_back(resolveTexture);
-            }
-        }
-    }
-
-    return desc;
-}
-
 void
 HdxDrawTargetTask::Prepare(HdTaskContext* ctx,
                            HdRenderIndex* renderIndex)
 {
-    const size_t numRenderPasses = _renderPassesInfo.size();
-    for (size_t renderPassIdx = 0;
-         renderPassIdx < numRenderPasses;
-         ++renderPassIdx) {
-
-        HdxDrawTargetRenderPass * const renderPass =
-            _renderPasses[renderPassIdx].get();
+    for (const HdxDrawTargetRenderPassUniquePtr & renderPass : _renderPasses) {
         renderPass->Prepare();
-
-        if (HdStDrawTarget::GetUseStormTextureSystem()) {
-            const _RenderPassInfo &info = _renderPassesInfo[renderPassIdx];
-
-            // (Re-)Allocate the GPU textures for attachments (if, e.g., not
-            // initialized).
-            info.target->AllocateTexturesIfNecessary();
-
-            // Make render pass use these textures as render targets.
-            info.renderPassState->SetCustomGraphicsCmdsDesc(
-                MakeGraphicsCmdsDesc(info.target,
-                                     /* clear = */ true));
-        }
     }
 }
 

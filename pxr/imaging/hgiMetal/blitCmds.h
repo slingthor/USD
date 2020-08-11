@@ -53,6 +53,12 @@ public:
     void CopyTextureGpuToCpu(HgiTextureGpuToCpuOp const& copyOp) override;
 
     HGIMETAL_API
+    void CopyTextureCpuToGpu(HgiTextureCpuToGpuOp const& copyOp) override;
+
+    HGIMETAL_API
+    void CopyBufferGpuToGpu(HgiBufferGpuToGpuOp const& copyOp) override;
+
+    HGIMETAL_API
     void CopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp) override;
 
     HGIMETAL_API
@@ -65,7 +71,7 @@ protected:
     HgiMetalBlitCmds(HgiMetal* hgi);
 
     HGIMETAL_API
-    bool Commit();
+    bool _Submit(Hgi* hgi) override;
 
 private:
     HgiMetalBlitCmds() = delete;

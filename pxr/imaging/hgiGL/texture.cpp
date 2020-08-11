@@ -175,10 +175,17 @@ HgiGLTexture::HgiGLTexture(HgiTextureDesc const & desc)
     const bool isCompressed = HgiIsCompressed(desc.format);
 
     if (desc.usage & HgiTextureUsageBitsDepthTarget) {
-        TF_VERIFY(desc.format == HgiFormatFloat32);
-        glFormat = GL_DEPTH_COMPONENT;
+        TF_VERIFY(desc.format == HgiFormatFloat32 ||
+                  desc.format == HgiFormatFloat32UInt8);
+        
+        if (desc.format == HgiFormatFloat32UInt8) {
+            glFormat = GL_DEPTH_STENCIL;
+            glInternalFormat = GL_DEPTH32F_STENCIL8;
+        } else {
+            glFormat = GL_DEPTH_COMPONENT;
+            glInternalFormat = GL_DEPTH_COMPONENT32F;
+        }
         glPixelType = GL_FLOAT;
-        glInternalFormat = GL_DEPTH_COMPONENT32F;
     } else {
         HgiGLConversions::GetFormat(
             desc.format, 
@@ -266,6 +273,17 @@ HgiGLTexture::HgiGLTexture(HgiTextureDesc const & desc)
             GL_TRUE);
     }
 
+    const GLint swizzleMask[] = {
+        GLint(HgiGLConversions::GetComponentSwizzle(desc.componentMapping.r)),
+        GLint(HgiGLConversions::GetComponentSwizzle(desc.componentMapping.g)),
+        GLint(HgiGLConversions::GetComponentSwizzle(desc.componentMapping.b)),
+        GLint(HgiGLConversions::GetComponentSwizzle(desc.componentMapping.a)) };
+
+    glTextureParameteriv(
+        _textureId,
+        GL_TEXTURE_SWIZZLE_RGBA,
+        swizzleMask);
+
     HGIGL_POST_PENDING_GL_ERRORS();
 }
 
@@ -277,6 +295,14 @@ HgiGLTexture::~HgiGLTexture()
     }
 
     HGIGL_POST_PENDING_GL_ERRORS();
+}
+
+size_t
+HgiGLTexture::GetByteSizeOfResource() const
+{
+    GfVec3i const& s = _descriptor.dimensions;
+    return HgiDataSizeOfFormat(_descriptor.format) * 
+        s[0] * s[1] * std::max(s[2], 1);
 }
 
 uint64_t

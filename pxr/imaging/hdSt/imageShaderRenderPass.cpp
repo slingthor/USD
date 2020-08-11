@@ -164,7 +164,8 @@ HdSt_ImageShaderRenderPass::_Execute(
     context->StartFrameForThread();
 	
     // Create graphics work to render into aovs.
-    HgiGraphicsCmdsDesc desc = stRenderPassState->MakeGraphicsCmdsDesc();
+    const HgiGraphicsCmdsDesc desc =
+        stRenderPassState->MakeGraphicsCmdsDesc(GetRenderIndex());
     HgiGraphicsCmdsUniquePtr gfxCmds = _hgi->CreateGraphicsCmds(desc);
 
     // XXX When there are no aovBindings we get a null work object.

@@ -26,7 +26,8 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
-#include "pxr/imaging/hd/bufferArrayRange.h"
+#include "pxr/imaging/hdSt/bufferArrayRange.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/strategyBase.h"
 #include "pxr/imaging/hd/bufferArray.h"
@@ -35,6 +36,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class HdStResourceRegistry;
 
 /// \class HdStVBOSimpleMemoryManager
 ///
@@ -44,6 +46,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///
 class HdStVBOSimpleMemoryManager : public HdAggregationStrategy {
 public:
+    HdStVBOSimpleMemoryManager(HdStResourceRegistry* resourceRegistry)
+        : _resourceRegistry(resourceRegistry) {}
+    
     /// Factory for creating HdBufferArray managed by
     /// HdStVBOSimpleMemoryManager.
     HDST_API
@@ -63,57 +68,51 @@ public:
         HdBufferArrayUsageHint usageHint) const;
 
     /// Returns the buffer specs from a given buffer array
-    HDST_API
     virtual HdBufferSpecVector GetBufferSpecs(
         HdBufferArraySharedPtr const &bufferArray) const;
 
     /// Returns the size of the GPU memory used by the passed buffer array
-    HDST_API
     virtual size_t GetResourceAllocation(
         HdBufferArraySharedPtr const &bufferArray, 
         VtDictionary &result) const;
 
-public:
+protected:
     class _SimpleBufferArray;
 
     /// \class _SimpleBufferArrayRange
     ///
     /// Specialized buffer array range for SimpleBufferArray.
     ///
-    class _SimpleBufferArrayRange : public HdBufferArrayRange
+    class _SimpleBufferArrayRange : public HdStBufferArrayRange
     {
     public:
         /// Constructor.
-        HDST_API
         _SimpleBufferArrayRange() :
             _bufferArray(nullptr), _numElements(0) {
         }
 
         /// Returns true if this range is valid
-        HDST_API
-        virtual bool IsValid() const override {
+        virtual bool IsValid() const {
             return (bool)_bufferArray;
         }
 
         /// Returns true is the range has been assigned to a buffer
         HDST_API
-        virtual bool IsAssigned() const override;
+        virtual bool IsAssigned() const;
 
         /// Returns true if this range is marked as immutable.
-        HDST_API
-        virtual bool IsImmutable() const override;
+        virtual bool IsImmutable() const;
 
         /// Resize memory area for this range. Returns true if it causes container
         /// buffer reallocation.
-        HDST_API
-        virtual bool Resize(int numElements) override {
+        virtual bool Resize(int numElements) {
             _numElements = numElements;
             return _bufferArray->Resize(numElements);
         }
 
         /// Copy source data into buffer
         HDST_API
-        virtual void CopyData(HdBufferSourceSharedPtr const &bufferSource) override;
+        virtual void CopyData(HdBufferSourceSharedPtr const &bufferSource);
 
         /// Read back the buffer content
         HDST_API
@@ -133,32 +132,28 @@ public:
         }
 
         /// Returns the number of elements allocated
-        HDST_API
-        virtual size_t GetNumElements() const override {
+        virtual size_t GetNumElements() const {
             return _numElements;
         }
 
         /// Returns the capacity of allocated area for this range
-        HDST_API
         virtual int GetCapacity() const {
             return _bufferArray->GetCapacity();
         }
 
         /// Returns the version of the buffer array.
-        HDST_API
-        virtual size_t GetVersion() const override {
+        virtual size_t GetVersion() const {
             return _bufferArray->GetVersion();
         }
 
         /// Increment the version of the buffer array.
-        HDST_API
-        virtual void IncrementVersion() override {
+        virtual void IncrementVersion() {
             _bufferArray->IncrementVersion();
         }
 
         /// Returns the max number of elements
         HDST_API
-        virtual size_t GetMaxNumElements() const override;
+        virtual size_t GetMaxNumElements() const;
 
         /// Returns the usage hint from the underlying buffer array
         HDST_API
@@ -167,44 +162,40 @@ public:
         /// Returns the GPU resource. If the buffer array contains more than one
         /// resource, this method raises a coding error.
         HDST_API
-        virtual HdBufferResourceSharedPtr GetResource() const override;
+        virtual HdStBufferResourceSharedPtr GetResource() const;
 
         /// Returns the named GPU resource.
         HDST_API
-        virtual HdBufferResourceSharedPtr GetResource(TfToken const& name) override;
+        virtual HdStBufferResourceSharedPtr GetResource(TfToken const& name);
 
         /// Returns the list of all named GPU resources for this bufferArrayRange.
         HDST_API
-        virtual HdBufferResourceNamedList const& GetResources() const override;
+        virtual HdStBufferResourceNamedList const& GetResources() const;
 
         /// Sets the buffer array associated with this buffer;
         HDST_API
-        virtual void SetBufferArray(HdBufferArray *bufferArray) override;
+        virtual void SetBufferArray(HdBufferArray *bufferArray);
 
         /// Debug dump
         HDST_API
-        virtual void DebugDump(std::ostream &out) const override;
+        virtual void DebugDump(std::ostream &out) const;
 
-        HDST_API
-        virtual void GetBufferSpecs(HdBufferSpecVector *bufferSpecs) const override {}
-        
         /// Make this range invalid
-        HDST_API
         void Invalidate() {
-            _bufferArray = nullptr;
+            _bufferArray = NULL;
         }
 
     protected:
         /// Returns the aggregation container
         HDST_API
-        virtual const void *_GetAggregation() const override;
+        virtual const void *_GetAggregation() const;
 
         /// Adds a new, named GPU resource and returns it.
         HDST_API
-        HdBufferResourceSharedPtr _AddResource(TfToken const& name,
-                                               HdTupleType tupleType,
-                                               int offset,
-                                               int stride);
+        HdStBufferResourceSharedPtr _AddResource(TfToken const& name,
+                                                   HdTupleType tupleType,
+                                                   int offset,
+                                                   int stride);
 
     private:
         _SimpleBufferArray * _bufferArray;
@@ -227,7 +218,8 @@ public:
     public:
         /// Constructor.
         HDST_API
-        _SimpleBufferArray(TfToken const &role,
+        _SimpleBufferArray(HdStResourceRegistry* resourceRegistry,
+                           TfToken const &role,
                            HdBufferSpecVector const &bufferSpecs,
                            HdBufferArrayUsageHint usageHint);
 
@@ -237,11 +229,11 @@ public:
 
         /// perform compaction if necessary, returns true if it becomes empty.
         HDST_API
-        virtual bool GarbageCollect() override;
+        virtual bool GarbageCollect();
 
         /// Debug output
         HDST_API
-        virtual void DebugDump(std::ostream &out) const override;
+        virtual void DebugDump(std::ostream &out) const;
 
         /// Set to resize buffers. Actual reallocation happens on Reallocate()
         HDST_API
@@ -252,14 +244,13 @@ public:
         HDST_API
         virtual void Reallocate(
                 std::vector<HdBufferArrayRangeSharedPtr> const &ranges,
-                HdBufferArraySharedPtr const &curRangeOwner) override = 0;
+                HdBufferArraySharedPtr const &curRangeOwner);
 
         /// Returns the maximum number of elements capacity.
         HDST_API
-        virtual size_t GetMaxNumElements() const override;
+        virtual size_t GetMaxNumElements() const;
 
         /// Returns current capacity. It could be different from numElements.
-        HDST_API
         int GetCapacity() const {
             return _capacity;
         }
@@ -272,45 +263,51 @@ public:
         /// Returns the GPU resource. If the buffer array contains more than one
         /// resource, this method raises a coding error.
         HDST_API
-        HdBufferResourceSharedPtr GetResource() const;
+        HdStBufferResourceSharedPtr GetResource() const;
 
         /// Returns the named GPU resource. This method returns the first found
         /// resource. In HD_SAFE_MODE it checks all underlying GL buffers
         /// in _resourceMap and raises a coding error if there are more than
         /// one GL buffers exist.
         HDST_API
-        HdBufferResourceSharedPtr GetResource(TfToken const& name);
+        HdStBufferResourceSharedPtr GetResource(TfToken const& name);
 
         /// Returns the list of all named GPU resources for this bufferArray.
-        HDST_API
-        HdBufferResourceNamedList const& GetResources() const {return _resourceList;}
+        HdStBufferResourceNamedList const& GetResources() const {return _resourceList;}
 
         /// Reconstructs the bufferspecs and returns it (for buffer splitting)
         HDST_API
         HdBufferSpecVector GetBufferSpecs() const;
+        
+        /// APPLE METAL: HGI accessors needed for _SimpleBufferArrayRange::CopyData()
+        Hgi* GetHgi() { return _resourceRegistry->GetHgi(); }
+        HgiBlitCmds* GetBlitCmds() { return _resourceRegistry->GetBlitCmds(); }
 
     protected:
         HDST_API
-        virtual void _DeallocateResources() = 0;
+        void _DeallocateResources();
 
         /// Adds a new, named GPU resource and returns it.
         HDST_API
-        HdBufferResourceSharedPtr _AddResource(TfToken const& name,
-                                               HdTupleType tupleType,
-                                               int offset,
-                                               int stride);
+        HdStBufferResourceSharedPtr _AddResource(TfToken const& name,
+                                                   HdTupleType tupleType,
+                                                   int offset,
+                                                   int stride);
+    private:
+        HdStResourceRegistry* const _resourceRegistry;
         int _capacity;
         size_t _maxBytesPerElement;
 
-        HdBufferResourceNamedList _resourceList;
+        HdStBufferResourceNamedList _resourceList;
 
-        HDST_API
         _SimpleBufferArrayRangeSharedPtr _GetRangeSharedPtr() const {
             return GetRangeCount() > 0
                 ? std::static_pointer_cast<_SimpleBufferArrayRange>(GetRange(0).lock())
                 : _SimpleBufferArrayRangeSharedPtr();
         }
     };
+    
+    HdStResourceRegistry* const _resourceRegistry;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -34,12 +34,9 @@ HgiGLResourceBindings::HgiGLResourceBindings(
     HgiResourceBindingsDesc const& desc)
     : HgiResourceBindings(desc)
 {
-
 }
 
-HgiGLResourceBindings::~HgiGLResourceBindings()
-{
-}
+HgiGLResourceBindings::~HgiGLResourceBindings() = default;
 
 void
 HgiGLResourceBindings::BindResources()
@@ -65,11 +62,9 @@ HgiGLResourceBindings::BindResources()
         HgiGLTexture* glTexture = static_cast<HgiGLTexture*>(texHandle.Get());
         textures[texDesc.bindingIndex] = glTexture->GetTextureId();
 
-        if (!texDesc.samplers.empty()) {
-            HgiSamplerHandle const& smpHandle = texDesc.samplers.front();
-            HgiGLSampler* glSmp = static_cast<HgiGLSampler*>(smpHandle.Get());
-            samplers[texDesc.bindingIndex] = glSmp->GetSamplerId();
-        }
+        HgiSamplerHandle const& smpHandle = texDesc.samplers.front();
+        HgiGLSampler* glSmp = static_cast<HgiGLSampler*>(smpHandle.Get());
+        samplers[texDesc.bindingIndex] = glSmp->GetSamplerId();
     }
 
     if (!textures.empty()) {
@@ -112,9 +107,8 @@ HgiGLResourceBindings::BindResources()
             dst->resize(unit+1, 0);
         }
         HgiBufferHandle const& bufHandle = bufDesc.buffers.front();
-        HgiGLBuffer* glbuffer = static_cast<HgiGLBuffer*>(bufHandle.Get());
 
-        (*dst)[bufDesc.bindingIndex] = glbuffer->GetBufferId();
+        (*dst)[bufDesc.bindingIndex] = bufHandle->GetRawResource();
     }
 
     if (!ubos.empty()) {

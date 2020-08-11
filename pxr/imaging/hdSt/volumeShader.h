@@ -63,11 +63,11 @@ public:
     /// Querries render delegate for step sizes and binds the uniforms and
     /// calls base class's method.
     ///
-    void BindResources(HdStProgram const &program,
+    void BindResources(HdStGLSLProgram const &program,
                        HdSt_ResourceBinder const &binder,
                        HdRenderPassState const &state) override;
 
-    void UnbindResources(HdStProgram const &program,
+    void UnbindResources(HdStGLSLProgram const &program,
                          HdSt_ResourceBinder const &binder,
                          HdRenderPassState const &state) override;
 

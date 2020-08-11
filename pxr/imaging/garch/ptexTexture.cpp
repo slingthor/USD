@@ -74,16 +74,18 @@ TF_REGISTRY_FUNCTION(TfType)
 
 //------------------------------------------------------------------------------
 GarchPtexTextureRefPtr
-GarchPtexTexture::New(const TfToken &imageFilePath)
+GarchPtexTexture::New(const TfToken &imageFilePath, const bool premultiplyAlpha)
 {
-    return GarchResourceFactory::GetInstance()->NewPtexTexture(imageFilePath);
+    return GarchResourceFactory::GetInstance()->NewPtexTexture(imageFilePath, premultiplyAlpha);
 }
 
 //------------------------------------------------------------------------------
-GarchPtexTexture::GarchPtexTexture(const TfToken &imageFilePath) :
+GarchPtexTexture::GarchPtexTexture(const TfToken &imageFilePath,
+								   const bool premultiplyAlpha) :
     _loaded(false),
     _width(0), _height(0), _depth(0),
-    _imageFilePath(imageFilePath)
+    _imageFilePath(imageFilePath),
+    _premultiplyAlpha(premultiplyAlpha)
 {
 }
 

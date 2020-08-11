@@ -56,90 +56,17 @@ public:
     HDST_API
     virtual HdSt_CodeGen *NewCodeGen(
         HdStShaderCodeSharedPtrVector const &shaders) const override;
-    
-    /// commandNumUints is given in how many integers.
-    HDST_API
-    virtual HdStDispatchBufferSharedPtr NewDispatchBuffer(
-        TfToken const &role, int count,
-        unsigned int commandNumUints) const override;
-    
-    /// Creates a buffer relocator for Metal
-    HDST_API
-    virtual HdStBufferRelocator *NewBufferRelocator(
-        HdResourceGPUHandle srcBuffer,
-        HdResourceGPUHandle dstBuffer) const override;
-    
-    /// Creates a buffer resource for Metal
-    HDST_API
-    virtual HdStBufferResource *NewBufferResource(
-        TfToken const &role,
-        HdTupleType tupleType,
-        int offset,
-        int stride) const override;
 
     /// Creates a draw target texture resource for Metal
     HDST_API
     virtual HdStTextureResourceSharedPtr
     NewDrawTargetTextureResource() const override;
     
-    /// Create a striped interleaved buffer for Metal
-    HDST_API
-    virtual HdBufferArraySharedPtr NewStripedInterleavedBuffer(
-        TfToken const &role,
-        HdBufferSpecVector const &bufferSpecs,
-        HdBufferArrayUsageHint usageHint,
-        int bufferOffsetAlignment,
-        int structAlignment,
-        size_t maxSize,
-        TfToken const &garbageCollectionPerfToken) const override;
-    
-    /// Create a VBO simple memory buffer for Metal
-    HDST_API
-    virtual HdBufferArraySharedPtr NewVBOSimpleMemoryBuffer(
-        TfToken const &role,
-        HdBufferSpecVector const &bufferSpecs,
-        HdBufferArrayUsageHint usageHint) const override;
-    
-    /// Create a VBO memory buffer for Metal
-    HDST_API
-    virtual HdBufferArraySharedPtr NewVBOMemoryBuffer(
-        TfToken const &role,
-        HdBufferSpecVector const &bufferSpecs,
-        HdBufferArrayUsageHint usageHint) const override;
-    
+
     /// Creates an indirect draw batch for Metal
     HDST_API
     virtual HdSt_DrawBatchSharedPtr NewIndirectDrawBatch(
         HdStDrawItemInstance * drawItemInstance) const override;
-    
-    /// Creates a persistent buffer for Metal
-    HDST_API
-    virtual HdStPersistentBufferSharedPtr NewPersistentBuffer(
-        TfToken const &role, size_t dataSize, void* data) const override;
-
-    /// Creates a graphics API specific GPU quadrangulate computation
-    /// This computaion doesn't generate buffer source (i.e. 2nd phase)
-    HDST_API
-    virtual HdSt_QuadrangulateComputationGPU *NewQuadrangulateComputationGPU(
-        HdSt_MeshTopology *topology,
-        TfToken const &sourceName,
-        HdType dataType,
-        SdfPath const &id) const override;
-    
-    /// Creates a new smooth normals GPU computation for Metal
-    HDST_API
-    virtual HdSt_SmoothNormalsComputationGPU *NewSmoothNormalsComputationGPU(
-        Hd_VertexAdjacency const *adjacency,
-        TfToken const &srcName, TfToken const &dstName,
-        HdType srcDataType, bool packed) const override;
-    
-    /// Creates a GPU flat normals computation for Metal
-    HDST_API
-    virtual HdSt_FlatNormalsComputationGPU *NewFlatNormalsComputationGPU(
-        HdBufferArrayRangeSharedPtr const &topologyRange,
-        HdBufferArrayRangeSharedPtr const &vertexRange,
-        int numFaces, TfToken const &srcName, TfToken const &dstName,
-        HdType srcDataType, bool packed) const override;
 
     /// Creates a new ExtCompGPUComputation computation
     HDST_API
@@ -204,7 +131,7 @@ public:
     }
       
     HDST_API
-    virtual HdStProgram *NewProgram(
+    virtual HdStGLSLProgram *NewProgram(
         TfToken const &role, HdStResourceRegistry *const registry) const override;
       
     HDST_API

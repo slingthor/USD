@@ -204,11 +204,13 @@ public:
     /// 
     /// \return A valid UsdShadeMaterialBindingAPI object is returned upon success. 
     /// An invalid (or empty) UsdShadeMaterialBindingAPI object is returned upon 
-    /// failure. See \ref UsdAPISchemaBase::_ApplyAPISchema() for conditions 
+    /// failure. See \ref UsdPrim::ApplyAPI() for conditions 
     /// resulting in failure. 
     /// 
     /// \sa UsdPrim::GetAppliedSchemas()
     /// \sa UsdPrim::HasAPI()
+    /// \sa UsdPrim::ApplyAPI()
+    /// \sa UsdPrim::RemoveAPI()
     ///
     USDSHADE_API
     static UsdShadeMaterialBindingAPI 
@@ -862,6 +864,11 @@ public:
     /// \sa UsdGeomSubset::GetFamilyNameAttr
     USDSHADE_API
     TfToken GetMaterialBindSubsetsFamilyType();
+
+    /// Test whether a given \p name contains the "material:binding:" prefix
+    ///
+    USDSHADE_API
+    static bool CanContainPropertyName(const TfToken &name);
 
     /// @}
 

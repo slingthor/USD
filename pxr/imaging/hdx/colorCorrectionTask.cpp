@@ -67,6 +67,7 @@ HdxColorCorrectionTask::HdxColorCorrectionTask(
     , _indexBuffer()
     , _vertexBuffer()
     , _texture3dLUT()
+    , _sampler()
     , _shaderProgram()
     , _resourceBindings()
     , _pipeline()
@@ -78,6 +79,10 @@ HdxColorCorrectionTask::~HdxColorCorrectionTask()
 {
     if (_texture3dLUT) {
         _GetHgi()->DestroyTexture(&_texture3dLUT);
+    }
+
+    if (_sampler) {
+        _GetHgi()->DestroySampler(&_sampler);
     }
 
     if (_vertexBuffer) {
@@ -97,7 +102,7 @@ HdxColorCorrectionTask::~HdxColorCorrectionTask()
     }
 
     if (_pipeline) {
-        _GetHgi()->DestroyPipeline(&_pipeline);
+        _GetHgi()->DestroyGraphicsPipeline(&_pipeline);
     }
 }
 
@@ -332,34 +337,38 @@ HdxColorCorrectionTask::_CreateShaderResources()
     HioGlslfx glslfx(HdxPackageColorCorrectionShader(), technique);
 
     // Setup the vertex shader
+    std::string vsCode;
     HgiShaderFunctionDesc vertDesc;
     vertDesc.debugName = _tokens->colorCorrectionVertex.GetString();
     vertDesc.shaderStage = HgiShaderStageVertex;
     if (technique != HgiTokens->Metal) {
-        vertDesc.shaderCode = "#version 450 \n";
+        vsCode = "#version 450 \n";
     }
-    vertDesc.shaderCode += glslfx.GetSource(_tokens->colorCorrectionVertex);
+    vsCode += glslfx.GetSource(_tokens->colorCorrectionVertex);
+    vertDesc.shaderCode = vsCode.c_str();;
     HgiShaderFunctionHandle vertFn = _GetHgi()->CreateShaderFunction(vertDesc);
 
     // Setup the fragment shader
+    std::string fsCode;
     HgiShaderFunctionDesc fragDesc;
     fragDesc.debugName = _tokens->colorCorrectionFragment.GetString();
     fragDesc.shaderStage = HgiShaderStageFragment;
     if (technique != HgiTokens->Metal) {
-        fragDesc.shaderCode = "#version 450 \n";
+        fsCode = "#version 450 \n";
     }
 
     if (useOCIO) {
-        fragDesc.shaderCode += "#define GLSLFX_USE_OCIO\n";
+        fsCode += "#define GLSLFX_USE_OCIO\n";
         // Our current version of OCIO outputs 130 glsl and texture3D is
         // removed from glsl in 140.
-        fragDesc.shaderCode += "#define texture3D texture\n";
+        fsCode += "#define texture3D texture\n";
     }
-    fragDesc.shaderCode += glslfx.GetSource(_tokens->colorCorrectionFragment);
+    fsCode += glslfx.GetSource(_tokens->colorCorrectionFragment);
     if (useOCIO) {
         std::string ocioGpuShaderText = _CreateOpenColorIOResources();
-        fragDesc.shaderCode = ocioGpuShaderText + fragDesc.shaderCode;
+        fsCode += ocioGpuShaderText;
     }
+    fragDesc.shaderCode = fsCode.c_str();
     HgiShaderFunctionHandle fragFn = _GetHgi()->CreateShaderFunction(fragDesc);
 
     // Setup the shader program
@@ -423,21 +432,20 @@ HdxColorCorrectionTask::_CreateResourceBindings(
     // Begin the resource set
     HgiResourceBindingsDesc resourceDesc;
     resourceDesc.debugName = "ColorCorrection";
-    resourceDesc.pipelineType = HgiPipelineTypeGraphics;
 
     HgiTextureBindDesc texBind0;
     texBind0.bindingIndex = 0;
-    texBind0.resourceType = HgiBindResourceTypeCombinedImageSampler;
     texBind0.stageUsage = HgiShaderStageFragment;
     texBind0.textures.push_back(aovTexture);
+    texBind0.samplers.push_back(_sampler);
     resourceDesc.textures.emplace_back(std::move(texBind0));
 
     if (useOCIO && _texture3dLUT) {
         HgiTextureBindDesc texBind1;
         texBind1.bindingIndex = 1;
-        texBind1.resourceType = HgiBindResourceTypeCombinedImageSampler;
         texBind1.stageUsage = HgiShaderStageFragment;
         texBind1.textures.push_back(_texture3dLUT);
+        texBind1.samplers.push_back(_sampler);
         resourceDesc.textures.emplace_back(std::move(texBind1));
     }
 
@@ -465,13 +473,11 @@ HdxColorCorrectionTask::_CreatePipeline(HgiTextureHandle const& aovTexture)
             return true;
         }
         
-        _GetHgi()->DestroyPipeline(&_pipeline);
+        _GetHgi()->DestroyGraphicsPipeline(&_pipeline);
     }
 
-    HgiPipelineDesc desc;
+    HgiGraphicsPipelineDesc desc;
     desc.debugName = "ColorCorrection Pipeline";
-    desc.pipelineType = HgiPipelineTypeGraphics;
-    desc.resourceBindings = _resourceBindings;
     desc.shaderProgram = _shaderProgram;
     
     // Describe the vertex buffer
@@ -511,7 +517,27 @@ HdxColorCorrectionTask::_CreatePipeline(HgiTextureHandle const& aovTexture)
     _attachment0.format = aovTexture->GetDescriptor().format;
     desc.colorAttachmentDescs.emplace_back(_attachment0);
 
-    _pipeline = _GetHgi()->CreatePipeline(desc);
+    _pipeline = _GetHgi()->CreateGraphicsPipeline(desc);
+
+    return true;
+}
+
+bool
+HdxColorCorrectionTask::_CreateSampler()
+{
+    if (_sampler) {
+        return true;
+    }
+
+    HgiSamplerDesc sampDesc;
+
+    sampDesc.magFilter = HgiSamplerFilterLinear;
+    sampDesc.minFilter = HgiSamplerFilterLinear;
+
+    sampDesc.addressModeU = HgiSamplerAddressModeClampToEdge;
+    sampDesc.addressModeV = HgiSamplerAddressModeClampToEdge;
+
+    _sampler = _GetHgi()->CreateSampler(sampDesc);
 
     return true;
 }
@@ -575,7 +601,7 @@ HdxColorCorrectionTask::_Sync(HdSceneDelegate* delegate,
                 _GetHgi()->DestroyResourceBindings(&_resourceBindings);
             }
             if (_pipeline) {
-                _GetHgi()->DestroyPipeline(&_pipeline);
+                _GetHgi()->DestroyGraphicsPipeline(&_pipeline);
             }
         }
     }
@@ -614,6 +640,9 @@ HdxColorCorrectionTask::Execute(HdTaskContext* ctx)
         ctx, HdxAovTokens->colorIntermediate, &aovTextureIntermediate);
 
     if (!TF_VERIFY(_CreateBufferResources())) {
+        return;
+    }
+    if (!TF_VERIFY(_CreateSampler())) {
         return;
     }
     if (!TF_VERIFY(_CreateShaderResources())) {

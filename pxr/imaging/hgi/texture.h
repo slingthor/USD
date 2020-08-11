@@ -36,6 +36,38 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+/// \struct HgiComponentMapping
+///
+/// Describes color component mapping.
+///
+/// <ul>
+/// <li>r:
+///   What component is used for red channel.
+/// <li>g:
+///   What component is used for green channel.
+/// <li>b:
+///   What component is used for blue channel.
+/// <li>a:
+///   What component is used for alpha channel.
+/// </ul>
+///
+struct HgiComponentMapping
+{
+    HgiComponentSwizzle r;
+    HgiComponentSwizzle g;
+    HgiComponentSwizzle b;
+    HgiComponentSwizzle a;
+};
+
+HGI_API
+bool operator==(
+    const HgiComponentMapping& lhs,
+    const HgiComponentMapping& rhs);
+
+HGI_API
+bool operator!=(
+    const HgiComponentMapping& lhs,
+    const HgiComponentMapping& rhs);
 
 /// \struct HgiTextureDesc
 ///
@@ -48,6 +80,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///   Describes how the texture is intended to be used.</li>
 /// <li>format:
 ///   The format of the texture.
+/// <li>componentMapping:
+///   The mapping of rgba components when accessing the texture.</li>
 /// <li>dimensions:
 ///   The resolution of the texture (width, height, depth).</li>
 /// <li>type:
@@ -73,6 +107,11 @@ struct HgiTextureDesc
     HgiTextureDesc()
     : usage(0)
     , format(HgiFormatInvalid)
+    , componentMapping{
+        HgiComponentSwizzleR,
+        HgiComponentSwizzleG,
+        HgiComponentSwizzleB,
+        HgiComponentSwizzleA}
     , type(HgiTextureType2D)
     , dimensions(0)
     , layerCount(1)
@@ -85,6 +124,7 @@ struct HgiTextureDesc
     std::string debugName;
     HgiTextureUsage usage;
     HgiFormat format;
+    HgiComponentMapping componentMapping;
     HgiTextureType type;
     GfVec3i dimensions;
     uint16_t layerCount;
@@ -124,6 +164,11 @@ public:
     /// The descriptor describes the object.
     HGI_API
     HgiTextureDesc const& GetDescriptor() const;
+
+    /// Returns the byte size of the GPU texture.
+    /// This can be helpful if the application wishes to tally up memory usage.
+    HGI_API
+    virtual size_t GetByteSizeOfResource() const = 0;
 
     /// This function returns the handle to the Hgi backend's gpu resource, cast
     /// to a uint64_t. Clients should avoid using this function and instead

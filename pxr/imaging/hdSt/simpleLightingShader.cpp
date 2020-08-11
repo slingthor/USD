@@ -49,11 +49,11 @@
 #include "pxr/base/tf/staticTokens.h"
 
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
+#include "pxr/imaging/hdSt/GL/glslProgramGL.h"
 #include "pxr/imaging/hgiGL/conversions.h"
 #endif
 #if defined(PXR_METAL_SUPPORT_ENABLED)
-#include "pxr/imaging/hdSt/Metal/mslProgram.h"
+#include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #endif
 #include "pxr/imaging/hdSt/resourceFactory.h"
@@ -159,7 +159,7 @@ _HasDomeLight(GarchSimpleLightingContextRefPtr const &ctx)
 
 /* virtual */
 void
-HdStSimpleLightingShader::BindResources(HdStProgram const &program,
+HdStSimpleLightingShader::BindResources(HdStGLSLProgram const &program,
                                         HdSt_ResourceBinder const &binder,
                                         HdRenderPassState const &state)
 {
@@ -179,7 +179,7 @@ HdStSimpleLightingShader::BindResources(HdStProgram const &program,
 
 /* virtual */
 void
-HdStSimpleLightingShader::UnbindResources(HdStProgram const &program,
+HdStSimpleLightingShader::UnbindResources(HdStGLSLProgram const &program,
                                           HdSt_ResourceBinder const &binder,
                                           HdRenderPassState const &state)
 {
@@ -362,8 +362,9 @@ HdStSimpleLightingShader::AllocateTextureHandles(HdSceneDelegate *const delegate
 
     const HdStTextureIdentifier textureId(
         TfToken(resolvedPath),
-        std::make_unique<HdStUvOrientationSubtextureIdentifier>(
-            /* flipVertically = */ true));
+        std::make_unique<HdStAssetUvSubtextureIdentifier>(
+            /* flipVertically = */ true,
+            /* premultiplyAlpha = */ false));
 
     static const HdSamplerParameters envSamplerParameters{
         HdWrapRepeat, HdWrapRepeat, HdWrapRepeat,

@@ -27,6 +27,7 @@
 #include "pxr/imaging/hdSt/basisCurvesComputations.h"
 #include "pxr/imaging/hdSt/basisCurvesShaderKey.h"
 #include "pxr/imaging/hdSt/basisCurvesTopology.h"
+#include "pxr/imaging/hdSt/bufferArrayRange.h"
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/extCompGpuComputation.h"
 #include "pxr/imaging/hdSt/geometricShader.h"
@@ -35,11 +36,12 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/rprimUtils.h"
 
+#include "pxr/base/arch/hash.h"
+
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/gf/vec2i.h"
 
-#include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSource.h"
 #include "pxr/imaging/hd/computation.h"
 #include "pxr/imaging/hd/perfLog.h"
@@ -854,26 +856,26 @@ HdSt_HasResource(HdStDrawItem* drawItem, const TfToken& resourceToken){
 
     typedef HdBufferArrayRangeSharedPtr HdBarPtr;
     if (HdBarPtr const& bar = drawItem->GetConstantPrimvarRange()){
-        HdBufferArrayRangeSharedPtr bar_ =
-            std::static_pointer_cast<HdBufferArrayRange> (bar);
+        HdStBufferArrayRangeSharedPtr bar_ =
+            std::static_pointer_cast<HdStBufferArrayRange> (bar);
         hasAuthoredResouce |= bool(bar_->GetResource(resourceToken));
     }
     if (HdBarPtr const& bar = drawItem->GetVertexPrimvarRange()) {
-        HdBufferArrayRangeSharedPtr bar_ =
-            std::static_pointer_cast<HdBufferArrayRange> (bar);
+        HdStBufferArrayRangeSharedPtr bar_ =
+            std::static_pointer_cast<HdStBufferArrayRange> (bar);
         hasAuthoredResouce |= bool(bar_->GetResource(resourceToken));
     }
     if (HdBarPtr const& bar = drawItem->GetElementPrimvarRange()){
-        HdBufferArrayRangeSharedPtr bar_ =
-            std::static_pointer_cast<HdBufferArrayRange> (bar);
+        HdStBufferArrayRangeSharedPtr bar_ =
+            std::static_pointer_cast<HdStBufferArrayRange> (bar);
 
         hasAuthoredResouce |= bool(bar_->GetResource(resourceToken));
     }
     int instanceNumLevels = drawItem->GetInstancePrimvarNumLevels();
     for (int i = 0; i < instanceNumLevels; ++i) {
         if (HdBarPtr const& bar = drawItem->GetInstancePrimvarRange(i)) {
-            HdBufferArrayRangeSharedPtr bar_ =
-                std::static_pointer_cast<HdBufferArrayRange> (bar);
+            HdStBufferArrayRangeSharedPtr bar_ =
+                std::static_pointer_cast<HdStBufferArrayRange> (bar);
 
             hasAuthoredResouce |= bool(bar_->GetResource(resourceToken));
         }

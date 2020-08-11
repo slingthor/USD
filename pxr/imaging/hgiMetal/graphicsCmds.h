@@ -54,10 +54,18 @@ public:
     void SetScissor(GfVec4i const& sc) override;
 
     HGIMETAL_API
-    void BindPipeline(HgiPipelineHandle pipeline) override;
+    void BindPipeline(HgiGraphicsPipelineHandle pipeline) override;
 
     HGIMETAL_API
     void BindResources(HgiResourceBindingsHandle resources) override;
+
+    HGIMETAL_API
+    void SetConstantValues(
+        HgiGraphicsPipelineHandle pipeline,
+        HgiShaderStage stages,
+        uint32_t bindIndex,
+        uint32_t byteSize,
+        const void* data) override;
 
     HGIMETAL_API
     void BindVertexBuffers(
@@ -89,7 +97,7 @@ protected:
         HgiGraphicsCmdsDesc const& desc);
 
     HGIMETAL_API
-    bool Commit();
+    bool _Submit(Hgi* hgi) override;
 
 private:
     HgiMetalGraphicsCmds() = delete;
@@ -99,6 +107,7 @@ private:
     HgiMetal* _hgi;
     id<MTLRenderCommandEncoder> _encoder;
     HgiGraphicsCmdsDesc _descriptor;
+    HgiPrimitiveType _primitiveType;
     bool _hasWork;
 };
 

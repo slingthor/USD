@@ -44,6 +44,7 @@ GarchBaseTextureData::_GLInternalFormatFromImageData(
     bool a =  (numElements == 4);
 
     switch (type) {
+    case GL_UNSIGNED_SHORT:
     case GL_UNSIGNED_INT:
         return g ? GL_R16 : (a ? GL_RGBA16 : GL_RGB16);        
     case GL_HALF_FLOAT:

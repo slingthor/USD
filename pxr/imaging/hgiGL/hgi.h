@@ -26,6 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hgiGL/api.h"
+#include "pxr/imaging/hgiGL/garbageCollector.h"
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
 
@@ -44,6 +45,11 @@ using HgiGLOpsVector = std::vector<HgiGLOpsFn>;
 ///
 /// OpenGL implementation of the Hydra Graphics Interface.
 ///
+/// HgiGL expects the GL context to be externally managed.
+/// When HgiGL is constructed and during any of its resource create / destroy
+/// calls and during command recording operations it expects that the OpenGL
+/// context is valid and current.
+///
 class HgiGL final : public Hgi
 {
 public:
@@ -54,14 +60,14 @@ public:
     ~HgiGL() override;
 
     HGIGL_API
-    void SubmitCmds(HgiCmds* cmds) override;
-
-    HGIGL_API
     HgiGraphicsCmdsUniquePtr CreateGraphicsCmds(
         HgiGraphicsCmdsDesc const& desc) override;
 
     HGIGL_API
     HgiBlitCmdsUniquePtr CreateBlitCmds() override;
+
+    HGIGL_API
+    HgiComputeCmdsUniquePtr CreateComputeCmds() override;
 
     HGIGL_API
     HgiTextureHandle CreateTexture(HgiTextureDesc const & desc) override;
@@ -105,20 +111,28 @@ public:
     void DestroyResourceBindings(HgiResourceBindingsHandle* resHandle) override;
 
     HGIGL_API
-    HgiPipelineHandle CreatePipeline(
-        HgiPipelineDesc const& pipeDesc) override;
+    HgiGraphicsPipelineHandle CreateGraphicsPipeline(
+        HgiGraphicsPipelineDesc const& pipeDesc) override;
 
     HGIGL_API
-    void DestroyPipeline(HgiPipelineHandle* pipeHandle) override;
+    void DestroyGraphicsPipeline(
+        HgiGraphicsPipelineHandle* pipeHandle) override;
+
+    HGIGL_API
+    HgiComputePipelineHandle CreateComputePipeline(
+        HgiComputePipelineDesc const& pipeDesc) override;
+
+    HGIGL_API
+    void DestroyComputePipeline(HgiComputePipelineHandle* pipeHandle) override;
 
     HGIGL_API
     TfToken const& GetAPIName() const override;
 
     HGIGL_API
-    void StartFrame() override {};
+    void StartFrame() override;
 
     HGIGL_API
-    void EndFrame() override {};
+    void EndFrame() override;
 
     //
     // HgiGL specific
@@ -128,11 +142,27 @@ public:
     HGIGL_API
     HgiGLDevice* GetPrimaryDevice() const;
 
+protected:
+    HGIGL_API
+    bool _SubmitCmds(HgiCmds* cmds) override;
+
 private:
     HgiGL & operator=(const HgiGL&) = delete;
     HgiGL(const HgiGL&) = delete;
 
+    // Invalidates the resource handle and places the object in the garbage
+    // collector vector for future destruction.
+    // This is helpful to avoid destroying GPU resources still in-flight.
+    template<class T>
+    void _TrashObject(
+        HgiHandle<T>* handle, std::vector<HgiHandle<T>>* collector) {
+        collector->push_back(HgiHandle<T>(handle->Get(), /*id*/0));
+        *handle = HgiHandle<T>();
+    }
+
     HgiGLDevice* _device;
+    HgiGLGarbageCollector _garbageCollector;
+    int _frameDepth;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

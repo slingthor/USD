@@ -33,7 +33,7 @@
 #include "pxr/imaging/hdSt/samplerObject.h"
 #include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/textureObject.h"
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
+#include "pxr/imaging/hdSt/GL/glslProgramGL.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSpec.h"
@@ -85,9 +85,6 @@ namespace {
             case HdBinding::SSBO:
                 return HdBinding(HdBinding::SSBO, ssboLocation++);
                 break;
-            case HdBinding::TBO:
-                return HdBinding(HdBinding::TBO, uniformLocation++, textureUnit++);
-                break;
             case HdBinding::BINDLESS_UNIFORM:
                 return HdBinding(HdBinding::BINDLESS_UNIFORM, uniformLocation++);
                 break;
@@ -136,7 +133,7 @@ HdSt_ResourceBinderGL::HdSt_ResourceBinderGL()
 
 void
 HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
-                                  HdBufferResourceSharedPtr const &buffer,
+                                  HdStBufferResourceSharedPtr const &buffer,
                                   int offset,
                                   int level) const
 {
@@ -144,7 +141,7 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
 
     // it is possible that the buffer has not been initialized when
     // the instanceIndex is empty (e.g. FX points. see bug 120354)
-    GLuint bufferId = (GLuint)(uint64_t)buffer->GetId();
+    uint64_t bufferId = buffer->GetId()->GetRawResource();
     if (bufferId == 0) return;
 
     HdBinding binding = GetBinding(name, level);
@@ -229,8 +226,8 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
     case HdBinding::BINDLESS_SSBO_RANGE:
         // at least in nvidia driver 346.59, this query call doesn't show
         // any pipeline stall.
-        if (!glIsNamedBufferResidentNV(buffer->GetId())) {
-            glMakeNamedBufferResidentNV(buffer->GetId(), GL_READ_WRITE);
+        if (!glIsNamedBufferResidentNV(bufferId)) {
+            glMakeNamedBufferResidentNV(bufferId, GL_READ_WRITE);
         }
         glUniformui64NV(loc, buffer->GetGPUAddress()+offset);
         break;
@@ -243,14 +240,6 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
                           bufferId,
                           offset,
                           buffer->GetStride());
-        break;
-    case HdBinding::TBO:
-        if (loc != HdBinding::NOT_EXIST) {
-            glUniform1i(loc, textureUnit);
-            glActiveTexture(GL_TEXTURE0 + textureUnit);
-            glBindSampler(textureUnit, 0);
-            glBindTexture(GL_TEXTURE_BUFFER, buffer->GetTextureBuffer());
-        }
         break;
     case HdBinding::TEXTURE_2D:
     case HdBinding::TEXTURE_FIELD:
@@ -265,14 +254,14 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
 
 void
 HdSt_ResourceBinderGL::UnbindBuffer(TfToken const &name,
-                                    HdBufferResourceSharedPtr const &buffer,
+                                    HdStBufferResourceSharedPtr const &buffer,
                                     int level) const
 {
     HD_TRACE_FUNCTION();
 
     // it is possible that the buffer has not been initialized when
     // the instanceIndex is empty (e.g. FX points)
-    if (!buffer->GetId().IsSet()) return;
+    if (!buffer->GetId()) return;
 
     HdBinding binding = GetBinding(name, level);
     HdBinding::Type type = binding.GetType();
@@ -301,16 +290,16 @@ HdSt_ResourceBinderGL::UnbindBuffer(TfToken const &name,
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         break;
     case HdBinding::BINDLESS_UNIFORM:
-        if (glIsNamedBufferResidentNV((GLuint)(uint64_t)buffer->GetId())) {
-            glMakeNamedBufferNonResidentNV((GLuint)(uint64_t)buffer->GetId());
+        if (glIsNamedBufferResidentNV(buffer->GetId()->GetRawResource())) {
+            glMakeNamedBufferNonResidentNV(buffer->GetId()->GetRawResource());
         }
         break;
     case HdBinding::SSBO:
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, loc, 0);
         break;
     case HdBinding::BINDLESS_SSBO_RANGE:
-        if (glIsNamedBufferResidentNV(buffer->GetId())) {
-            glMakeNamedBufferNonResidentNV(buffer->GetId());
+        if (glIsNamedBufferResidentNV(buffer->GetId()->GetRawResource())) {
+            glMakeNamedBufferNonResidentNV(buffer->GetId()->GetRawResource());
         }
         break;
     case HdBinding::DISPATCH:
@@ -319,12 +308,6 @@ HdSt_ResourceBinderGL::UnbindBuffer(TfToken const &name,
     case HdBinding::UBO:
     case HdBinding::UNIFORM:
         glBindBufferBase(GL_UNIFORM_BUFFER, loc, 0);
-        break;
-    case HdBinding::TBO:
-        if (loc != HdBinding::NOT_EXIST) {
-            glActiveTexture(GL_TEXTURE0 + binding.GetTextureUnit());
-            glBindTexture(GL_TEXTURE_BUFFER, 0);
-        }
         break;
     case HdBinding::TEXTURE_2D:
     case HdBinding::TEXTURE_FIELD:
@@ -423,10 +406,10 @@ HdSt_ResourceBinderGL::BindUniformf(TfToken const &name,
 }
 
 void
-HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource) const
+HdSt_ResourceBinderGL::IntrospectBindings(HdStGLSLProgramSharedPtr programResource) const
 {
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-    GLuint program = std::dynamic_pointer_cast<HdStGLSLProgram>(programResource)->GetGLProgram();
+    GLuint program = std::dynamic_pointer_cast<HdStglslProgramGLSL>(programResource)->GetGLProgram();
 
     if (ARCH_UNLIKELY(!caps.shadingLanguage420pack)) {
         GLint numUBO = 0;
@@ -461,8 +444,7 @@ HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource) 
                 name = n.str();
             }
             if (type == HdBinding::UNIFORM       ||
-                type == HdBinding::UNIFORM_ARRAY ||
-                type == HdBinding::TBO) {
+                type == HdBinding::UNIFORM_ARRAY) {
                 GLint loc = glGetUniformLocation(program, name.c_str());
                 // update location in resource binder.
                 // some uniforms may be optimized out.
@@ -698,7 +680,7 @@ void _BindTextureDispatch(
 void
 HdSt_ResourceBinderGL::BindShaderResources(
     HdStShaderCode const *shader,
-    HdStProgram const &shaderProgram) const
+    HdStGLSLProgram const &shaderProgram) const
 {
     // bind fallback values and sampler uniforms (unit#? or bindless address)
 
@@ -717,7 +699,7 @@ HdSt_ResourceBinderGL::BindShaderResources(
 void
 HdSt_ResourceBinderGL::UnbindShaderResources(
     HdStShaderCode const *shader,
-    HdStProgram const &shaderProgram) const
+    HdStGLSLProgram const &shaderProgram) const
 {
 //    UnbindBufferArray(shader->GetShaderData());
 

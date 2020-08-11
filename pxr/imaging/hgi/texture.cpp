@@ -30,14 +30,27 @@ HgiTexture::HgiTexture(HgiTextureDesc const& desc)
 {
 }
 
-HgiTexture::~HgiTexture()
-{
-}
+HgiTexture::~HgiTexture() = default;
 
 HgiTextureDesc const&
 HgiTexture::GetDescriptor() const
 {
     return _descriptor;
+}
+
+bool operator==(const HgiComponentMapping& lhs,
+    const HgiComponentMapping& rhs)
+{
+    return lhs.r == rhs.r &&
+           lhs.g == rhs.g &&
+           lhs.b == rhs.b &&
+           lhs.a == rhs.a;
+}
+
+bool operator!=(const HgiComponentMapping& lhs,
+    const HgiComponentMapping& rhs)
+{
+    return !(lhs == rhs);
 }
 
 bool operator==(const HgiTextureDesc& lhs,
@@ -46,6 +59,7 @@ bool operator==(const HgiTextureDesc& lhs,
     return  lhs.debugName == rhs.debugName &&
             lhs.usage == rhs.usage &&
             lhs.format == rhs.format &&
+            lhs.componentMapping == rhs.componentMapping &&
             lhs.type == rhs.type &&
             lhs.dimensions == rhs.dimensions &&
             lhs.sampleCount == rhs.sampleCount &&

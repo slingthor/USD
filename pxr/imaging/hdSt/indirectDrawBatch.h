@@ -29,6 +29,7 @@
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
 #include "pxr/imaging/hdSt/drawBatch.h"
+#include "pxr/imaging/hdSt/persistentBuffer.h"
 
 #include <vector>
 
@@ -96,17 +97,17 @@ protected:
 
     HDST_API
     void _Init(HdStDrawItemInstance * drawItemInstance) override;
-    
-protected:
-    void _ValidateCompatibility(HdBufferArrayRangeSharedPtr const& constantBar,
-                                HdBufferArrayRangeSharedPtr const& indexBar,
-                                HdBufferArrayRangeSharedPtr const& topologyVisibilityBar,
-                                HdBufferArrayRangeSharedPtr const& elementBar,
-                                HdBufferArrayRangeSharedPtr const& fvarBar,
-                                HdBufferArrayRangeSharedPtr const& vertexBar,
-                                int instancerNumLevels,
-                                HdBufferArrayRangeSharedPtr const& instanceIndexBar,
-                                std::vector<HdBufferArrayRangeSharedPtr> const& instanceBars) const;
+
+    void _ValidateCompatibility(
+        HdStBufferArrayRangeSharedPtr const& constantBar,
+        HdStBufferArrayRangeSharedPtr const& indexBar,
+        HdStBufferArrayRangeSharedPtr const& topologyVisibilityBar,
+        HdStBufferArrayRangeSharedPtr const& elementBar,
+        HdStBufferArrayRangeSharedPtr const& fvarBar,
+        HdStBufferArrayRangeSharedPtr const& vertexBar,
+        int instancerNumLevels,
+        HdStBufferArrayRangeSharedPtr const& instanceIndexBar,
+        std::vector<HdStBufferArrayRangeSharedPtr> const& instanceBars) const;
     
     HDST_API
     virtual void _PrepareDraw(bool gpuCulling, bool freezeCulling) = 0;
@@ -120,14 +121,14 @@ protected:
     HDST_API
     virtual void _GPUFrustumInstanceCullingExecute(
                        HdStResourceRegistrySharedPtr const &resourceRegistry,
-                       HdStProgramSharedPtr const &program,
+                       HdStGLSLProgramSharedPtr const &program,
                        HdSt_ResourceBinder const &binder,
                        HdBufferResourceSharedPtr cullCommandBuffer) = 0;
     
     HDST_API
     virtual void _GPUFrustumNonInstanceCullingExecute(
                         HdStResourceRegistrySharedPtr const &resourceRegistry,
-                        HdStProgramSharedPtr const &program,
+                        HdStGLSLProgramSharedPtr const &program,
                         HdSt_ResourceBinder const &binder) = 0;
 
     // Culling requires custom resource binding.
@@ -157,21 +158,22 @@ protected:
     HDST_API
     virtual HdSt_IndirectDrawBatch::_CullingProgram *NewCullingProgram() const = 0;
     
-    _CullingProgram &_GetCullingProgram(HdStResourceRegistrySharedPtr const &resourceRegistry);
-    
+    _CullingProgram &_GetCullingProgram(
+        HdStResourceRegistrySharedPtr const &resourceRegistry);
+
     void _CompileBatch(HdStResourceRegistrySharedPtr const &resourceRegistry);
-    
+
     void _GPUFrustumInstanceCulling(HdStDrawItem const *item,
-                            HdStRenderPassStateSharedPtr const &renderPassState,
-                            HdStResourceRegistrySharedPtr const &resourceRegistry);
-    
+        HdStRenderPassStateSharedPtr const &renderPassState,
+        HdStResourceRegistrySharedPtr const &resourceRegistry);
+
     void _GPUFrustumNonInstanceCulling(HdStDrawItem const *item,
-                               HdStRenderPassStateSharedPtr const &renderPassState,
-                               HdStResourceRegistrySharedPtr const &resourceRegistry);
+        HdStRenderPassStateSharedPtr const &renderPassState,
+        HdStResourceRegistrySharedPtr const &resourceRegistry);
     
     HdStDispatchBufferSharedPtr _dispatchBuffer;
     HdStDispatchBufferSharedPtr _dispatchBufferCullInput;
-    
+
     std::vector<GLuint> _drawCommandBuffer;
     bool _drawCommandBufferDirty;
     size_t _bufferArraysHash;
@@ -188,7 +190,7 @@ protected:
     bool _useInstancing;
     bool _useGpuCulling;
     bool _useGpuInstanceCulling;
-    
+
     int _instanceCountOffset;
     int _cullInstanceCountOffset;
 };

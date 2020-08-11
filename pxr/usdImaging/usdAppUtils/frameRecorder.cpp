@@ -47,19 +47,17 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-UsdAppUtilsFrameRecorder::UsdAppUtilsFrameRecorder(
-    UsdImagingGLEngine::RenderAPI api) :
+UsdAppUtilsFrameRecorder::UsdAppUtilsFrameRecorder() :
     _imageWidth(960u),
     _complexity(1.0f),
     _colorCorrectionMode("disabled"),
-    _purposes({UsdGeomTokens->default_, UsdGeomTokens->proxy}),
-    _api(api)
+    _purposes({UsdGeomTokens->default_, UsdGeomTokens->proxy})
 {
     _hgi = Hgi::CreatePlatformDefaultHgi();
     _driver.name = HgiTokens->renderDriver;
     _driver.driver = VtValue(_hgi.get());
 
-    _imagingEngine.reset(new UsdImagingGLEngine(api, _driver));
+    _imagingEngine.reset(new UsdImagingGLEngine(_driver));
     
     GlfGlewInit();
 }
@@ -160,8 +158,6 @@ _ReadbackTexture(Hgi* const hgi,
     copyOp.gpuSourceTexture = textureHandle;
     copyOp.sourceTexelOffset = GfVec3i(0);
     copyOp.mipLevel = 0;
-    copyOp.startLayer = 0;
-    copyOp.numLayers = 1;
     copyOp.cpuDestinationBuffer = buffer.data();
     copyOp.destinationByteOffset = 0;
     copyOp.destinationBufferByteSize = alignedByteSize;
@@ -206,7 +202,9 @@ static constexpr _FormatDesc FORMAT_DESC[HgiFormatCount] =
     {GL_RGBA, GL_UNSIGNED_BYTE }, // UNorm8Vec4sRGB,
 
     {GL_RGB, GL_FLOAT          }, // BC6FloatVec3
-    {GL_RGB, GL_FLOAT          }
+    {GL_RGB, GL_FLOAT          },
+    
+    {GL_DEPTH_STENCIL, GL_FLOAT}
 };
 
 static bool
@@ -298,10 +296,7 @@ UsdAppUtilsFrameRecorder::Record(
     const GfFrustum frustum = gfCamera.GetFrustum();
     const GfVec3d cameraPos = frustum.GetPosition();
 
-    const TfToken& interopDst =
-        _api == UsdImagingGLEngine::RenderAPI::Metal?
-            HgiTokens->Metal:HgiTokens->OpenGL;
-    _imagingEngine->SetRendererAov(HdAovTokens->color, interopDst);
+    _imagingEngine->SetRendererAov(HdAovTokens->color, HgiTokens->Metal);
 
     _imagingEngine->SetCameraState(
         frustum.ComputeViewMatrix(),
@@ -357,7 +352,7 @@ UsdAppUtilsFrameRecorder::Record(
     } while (!_imagingEngine->IsConverged());
 
     HgiTextureHandle handle =
-        _imagingEngine->GetPresentationTexture(HdAovTokens->color);
+        _imagingEngine->GetAovTexture(HdAovTokens->color);
     
     if (!handle) {
         TF_CODING_ERROR("No color presentation texture");

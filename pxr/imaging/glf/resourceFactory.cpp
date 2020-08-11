@@ -101,18 +101,20 @@ GarchBaseTexture *GlfResourceFactory::NewBaseTexture() const
 
 #ifdef PXR_PTEX_SUPPORT_ENABLED
 GarchPtexTextureRefPtr GlfResourceFactory::NewPtexTexture(
-                            const TfToken &imageFilePath) const
+                            const TfToken &imageFilePath,
+                            const bool premultiplyAlpha) const
 {
-    return TfCreateRefPtr(new GlfPtexTexture(imageFilePath));
+    return TfCreateRefPtr(new GlfPtexTexture(imageFilePath, premultiplyAlpha));
 }
 #endif
 
 GarchUdimTextureRefPtr GlfResourceFactory::NewUdimTexture(
                             TfToken const& imageFilePath,
                             GarchImage::ImageOriginLocation originLocation,
-                            std::vector<std::tuple<int, TfToken>>&& tiles) const
+                            std::vector<std::tuple<int, TfToken>>&& tiles,
+                            const bool premultiplyAlpha) const
 {
-    return TfCreateRefPtr(new GlfUdimTexture(imageFilePath, originLocation, std::move(tiles)));
+    return TfCreateRefPtr(new GlfUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha));
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

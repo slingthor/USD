@@ -304,7 +304,7 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
             colorAttachment.texture = tidMS;
             colorAttachment.resolveTexture = tid;
             
-            colorAttachment.storeAction = MTLStoreActionMultisampleResolve;
+            colorAttachment.storeAction = MTLStoreActionStoreAndMultisampleResolve;
         } else {
             colorAttachment.texture = tid;
             
@@ -430,9 +430,6 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     
     id<MTLTexture> texture = attachment->GetTextureName();
  
-    if (hgiMetal->_useFinalTextureForGetImage) {
-        texture = hgiMetal->_finalTexture;
-    }
     int bytesPerPixel = attachment->GetBytesPerPixel();
     int width = [texture width];
     int height = [texture height];

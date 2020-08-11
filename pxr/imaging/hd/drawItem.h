@@ -189,35 +189,16 @@ public:
     HD_API
     size_t GetBufferArraysHash() const;
 
-    /// Tests the intersection with the view projection matrix.
-    /// Returns true if this drawItem is in the frustum.
-    HD_API
-    bool IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
-                              vector_float2 windowDimensions) const;
-
     HD_API
     friend std::ostream &operator <<(std::ostream &out, 
                                      const HdDrawItem& self);
 
     void CountPrimitives(std::atomic_ulong &primCount, int numIndicesPerPrimitive) const;
     
-    int GetNumVisible() const {
-        return numVisible;
-    }
-    
-    void SetNumVisible(int visibleCount) const {
-        numVisible = visibleCount;
-    }
-    
-    void CalculateCullingBounds() const;
-    
-    const std::vector<GfBBox3f>* GetInstanceBounds() const {
-        return &_instancedCullingBounds;
-    }
-    
-    int BuildInstanceBuffer(uint8_t** instanceVisibility) const;
-    
 protected:
+    // TfHash support.
+    template <class HashState>
+    friend void TfHashAppend(HashState &h, HdDrawItem const &di);
 
     /// Returns the shared data
     HD_API
@@ -239,11 +220,6 @@ private:
     // pointer to shared data across reprs, owned by rprim:
     //    bufferArrayRanges, bounds, visibility
     HdRprimSharedData const *_sharedData;
-    
-    // CPU culling
-    mutable std::vector<GfBBox3f> _instancedCullingBounds;
-    mutable bool _instancedCullingBoundsCalculated = false;
-    mutable int numVisible = 1;
 };
 
 

@@ -31,7 +31,7 @@
 #include "pxr/imaging/garch/gl.h"
 #include "pxr/base/gf/vec2i.h"
 #include "pxr/imaging/hgi/buffer.h"
-#include "pxr/imaging/hgi/pipeline.h"
+#include "pxr/imaging/hgi/graphicsPipeline.h"
 #include "pxr/imaging/hgi/resourceBindings.h"
 #include "pxr/imaging/hgi/shaderProgram.h"
 #include "pxr/imaging/hgi/texture.h"
@@ -140,6 +140,9 @@ private:
         HgiTextureHandle const& depthDst,
         bool depthWrite);
 
+    // Utility to create a texture sampler
+    bool _CreateSampler();
+
     // Internal draw method
     void _Draw(TextureMap const& textures, 
               HgiTextureHandle const& colorDst,
@@ -165,7 +168,8 @@ private:
     HgiBufferHandle _vertexBuffer;
     HgiShaderProgramHandle _shaderProgram;
     HgiResourceBindingsHandle _resourceBindings;
-    HgiPipelineHandle _pipeline;
+    HgiGraphicsPipelineHandle _pipeline;
+    HgiSamplerHandle _sampler;
     HgiVertexBufferDesc _vboDesc;
 
     HgiDepthStencilState _depthState;

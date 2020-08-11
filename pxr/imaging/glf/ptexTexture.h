@@ -64,7 +64,7 @@ public:
 
 protected:
     GLF_API
-    GlfPtexTexture(const TfToken &imageFilePath);
+    GlfPtexTexture(const TfToken &imageFilePath, const bool premultiplyAlpha);
     
     friend class GlfResourceFactory;
 

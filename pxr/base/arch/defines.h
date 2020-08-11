@@ -131,7 +131,6 @@ defined(_M_IX86) || defined(_M_X64)
 // Metal API present
 #if defined(PXR_METAL_SUPPORT_ENABLED)
 #define ARCH_GFX_METAL
-#define PXR_UNITTEST_GFX_ARCH UsdImagingGLEngine::Metal
 #if (__MAC_OS_X_VERSION_MAX_ALLOWED >= 101400) || (__IPHONE_OS_VERSION_MAX_ALLOWED >= 120000) /* __MAC_10_14 __IOS_12_00 */
 #define METAL_EVENTS_API_PRESENT
 #endif
@@ -140,10 +139,6 @@ defined(_M_IX86) || defined(_M_X64)
 #else
 #define MTLResourceStorageModeDefault MTLResourceStorageModeShared
 #endif
-#endif
-
-#if !defined(PXR_UNITTEST_GFX_ARCH)
-#define PXR_UNITTEST_GFX_ARCH UsdImagingGLEngine::OpenGL
 #endif
 
 PXR_NAMESPACE_CLOSE_SCOPE

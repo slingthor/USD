@@ -23,7 +23,6 @@
 //
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/diagnostic.h"
 #endif
 
 #include "pxr/imaging/garch/contextCaps.h"
@@ -34,15 +33,13 @@
 #include "pxr/imaging/hdSt/extCompGpuPrimvarBufferSource.h"
 #include "pxr/imaging/hdSt/extCompGpuComputation.h"
 #include "pxr/imaging/hdSt/extComputation.h"
-#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
-#include "pxr/imaging/hd/bufferArrayRange.h"
-#include "pxr/imaging/hd/compExtCompInputSource.h"
+#include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/extComputation.h"
 #include "pxr/imaging/hd/extCompPrimvarBufferSource.h"
 #include "pxr/imaging/hd/extCompCpuComputation.h"
-#include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/sceneExtCompInputSource.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
@@ -95,27 +92,29 @@ HdStExtCompGpuComputation::Execute(
             "GPU computation '%s' executed for primvars: %s\n",
             _id.GetText(), _GetDebugPrimvarNames(_compPrimvars).c_str());
 
-    bool hasDispatchCompute = GarchResourceFactory::GetInstance()->GetContextCaps().hasDispatchCompute;
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
+    bool hasDispatchCompute = caps.hasDispatchCompute;
     if (!hasDispatchCompute) {
         TF_WARN("Compute Dispatch not available");
         return;
     }
 
-    HdStProgramSharedPtr const &computeProgram = _resource->GetProgram();
+    HdStGLSLProgramSharedPtr const &computeProgram = _resource->GetProgram();
     HdSt_ResourceBinder const &binder = _resource->GetResourceBinder();
 
     if (!TF_VERIFY(computeProgram)) {
         return;
     }
 
+
     if (!_introspectedBindings) {
         binder.IntrospectBindings(computeProgram);
         _introspectedBindings = true;
     }
     computeProgram->SetProgram();
-
-    HdBufferArrayRangeSharedPtr outputBar =
-        std::static_pointer_cast<HdBufferArrayRange>(outputRange);
+	
+    HdStBufferArrayRangeSharedPtr outputBar =
+        std::static_pointer_cast<HdStBufferArrayRange>(outputRange);
     TF_VERIFY(outputBar);
 
     // Prepare uniform buffer for GPU computation
@@ -126,30 +125,30 @@ HdStExtCompGpuComputation::Execute(
     // Bind buffers as SSBOs to the indices matching the layout in the shader
     for (HdExtComputationPrimvarDescriptor const &compPrimvar: _compPrimvars) {
         TfToken const & name = compPrimvar.sourceComputationOutputName;
-        HdBufferResourceSharedPtr const & buffer =
+        HdStBufferResourceSharedPtr const & buffer =
                 outputBar->GetResource(compPrimvar.name);
 
         HdBinding const &binding = binder.GetBinding(name);
         // These should all be valid as they are required outputs
-        if (TF_VERIFY(binding.IsValid()) && TF_VERIFY(buffer->GetId().IsSet())) {
+        if (TF_VERIFY(binding.IsValid()) && TF_VERIFY(buffer->GetId())) {
             size_t componentSize = HdDataSizeOfType(
                 HdGetComponentType(buffer->GetTupleType().type));
             _uniforms.push_back(buffer->GetOffset() / componentSize);
             // Assumes non-SSBO allocator for the stride
             _uniforms.push_back(buffer->GetStride() / componentSize);
-            binder.BindBuffer(name, std::dynamic_pointer_cast<HdStBufferResource>(buffer));
+            binder.BindBuffer(name, buffer);
         } 
     }
 
-    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
+
     for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
-        HdBufferArrayRangeSharedPtr const & inputBar =
-            std::static_pointer_cast<HdBufferArrayRange>(input);
+        HdStBufferArrayRangeSharedPtr const & inputBar =
+            std::static_pointer_cast<HdStBufferArrayRange>(input);
 
         for (HdStBufferResourceNamedPair const & it:
                         inputBar->GetResources()) {
             TfToken const &name = it.first;
-            HdBufferResourceSharedPtr const &buffer = it.second;
+            HdStBufferResourceSharedPtr const &buffer = it.second;
 
             HdBinding const &binding = binder.GetBinding(name);
             // These should all be valid as they are required inputs
@@ -174,6 +173,7 @@ HdStExtCompGpuComputation::Execute(
         }
     }
     
+
     _Execute(computeProgram, _uniforms, outputBar);
 
     computeProgram->UnsetProgram();
@@ -303,8 +303,6 @@ HdSt_GetExtComputationPrimvarsComputations(
         byComputation[compPrimvar.sourceComputationId].push_back(compPrimvar);
     }
 
-    bool gpuComputeEnabled = GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled;
-
     // Create computation primvar buffer sources by source computation
     for (CompPrimvarsByComputation::value_type it: byComputation) { 
         SdfPath const &computationId = it.first;
@@ -319,8 +317,7 @@ HdSt_GetExtComputationPrimvarsComputations(
             continue;
         }
 
-        if (gpuComputeEnabled &&
-            !sourceComp->GetGpuKernelSource().empty()) {
+        if (!sourceComp->GetGpuKernelSource().empty()) {
 
             HdStExtCompGpuComputationSharedPtr gpuComputation;
             for (HdExtComputationPrimvarDescriptor const & compPrimvar:

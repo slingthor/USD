@@ -27,7 +27,7 @@
 
 #include "pxr/imaging/hdSt/domeLightComputations.h"
 #include "pxr/imaging/hdSt/simpleLightingShader.h"
-#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/package.h"
@@ -97,6 +97,15 @@ HdSt_DomeLightComputationGPU::_GetSrcTextureDimensionsAndGLName(
     if (!TF_VERIFY(srcTextureObject)) {
         return false;
     }
+
+    if (!srcTextureObject->IsValid()) {
+        const std::string &filePath =
+            srcTextureObject->GetTextureIdentifier().GetFilePath();
+        TF_WARN("Could not open dome light texture file at %s.",
+                filePath.c_str());
+        return false;
+    }
+
     const HgiTexture * const srcTexture = srcTextureObject->GetTexture().Get();
     if (!TF_VERIFY(srcTexture)) {
         return false;
@@ -118,8 +127,8 @@ HdSt_DomeLightComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range,
         return;
     }
 
-    HdStProgramSharedPtr const computeProgram = 
-        HdStProgram::GetComputeProgram(
+    HdStGLSLProgramSharedPtr const computeProgram = 
+        HdStGLSLProgram::GetComputeProgram(
             HdStPackageDomeLightShader(), 
             _shaderToken,
             static_cast<HdStResourceRegistry*>(resourceRegistry));

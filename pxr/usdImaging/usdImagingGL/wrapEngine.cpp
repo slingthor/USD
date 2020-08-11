@@ -56,6 +56,7 @@ _TestIntersection(
     SdfPath hitPrimPath;
     SdfPath hitInstancerPath;
     int hitInstanceIndex;
+    HdInstancerContext hitInstancerContext;
 
     self.TestIntersection(
         viewMatrix,
@@ -65,9 +66,18 @@ _TestIntersection(
         &hitPoint,
         &hitPrimPath,
         &hitInstancerPath,
-        &hitInstanceIndex);
+        &hitInstanceIndex,
+        &hitInstancerContext);
 
-    return boost::python::make_tuple(hitPoint, hitPrimPath, hitInstancerPath, hitInstanceIndex);
+    SdfPath topLevelPath = SdfPath::EmptyPath();
+    int topLevelInstanceIndex = -1;
+    if (hitInstancerContext.size() > 0) {
+        topLevelPath = hitInstancerContext[0].first;
+        topLevelInstanceIndex = hitInstancerContext[0].second;
+    }
+
+    return boost::python::make_tuple(hitPoint, hitPrimPath,
+            hitInstanceIndex, topLevelPath, topLevelInstanceIndex);
 }
 
 static void
@@ -83,10 +93,9 @@ void wrapEngine()
 {
     { 
         scope engineScope = class_<UsdImagingGLEngine, boost::noncopyable>(
-                "Engine", "UsdImaging Renderer class",
-                init<const UsdImagingGLEngine::RenderAPI>())
-            .def( init<const UsdImagingGLEngine::RenderAPI,
-                    const SdfPath &, const SdfPathVector&,
+                "Engine", "UsdImaging Renderer class")
+            .def( init<>() )
+            .def( init<const SdfPath &, const SdfPathVector&,
                     const SdfPathVector& >() )
             .def("Render", &UsdImagingGLEngine::Render)
             .def("SetWindowPolicy", &UsdImagingGLEngine::SetWindowPolicy)
@@ -130,6 +139,9 @@ void wrapEngine()
             .def("SetRendererSetting", &UsdImagingGLEngine::SetRendererSetting)
             .def("SetColorCorrectionSettings", 
                     &UsdImagingGLEngine::SetColorCorrectionSettings)
+            .def("IsColorCorrectionCapable", 
+                &UsdImagingGLEngine::IsColorCorrectionCapable)
+                .staticmethod("IsColorCorrectionCapable")
             .def("IsPauseRendererSupported", 
                 &UsdImagingGLEngine::IsPauseRendererSupported)
             .def("PauseRenderer", &UsdImagingGLEngine::PauseRenderer)
@@ -145,12 +157,6 @@ void wrapEngine()
     // Wrap the constants.
     scope().attr("ALL_INSTANCES") = UsdImagingDelegate::ALL_INSTANCES;
     
-    // Wrap the RenderAPI enum. Accessible as UsdImagingGL.RenderAPI
-    enum_<UsdImagingGLEngine::RenderAPI>("RenderAPI")
-    .value("OpenGL", UsdImagingGLEngine::OpenGL)
-    .value("Metal", UsdImagingGLEngine::Metal)
-    ;
-
     TfPyContainerConversions::from_python_sequence<
         std::vector<GarchSimpleLight>,
         TfPyContainerConversions::variable_capacity_policy>();

@@ -80,13 +80,13 @@ public:
 
     /// Binds shader-specific resources to \a program
     HDST_API
-    void BindResources(HdStProgram const &program,
+    void BindResources(HdStGLSLProgram const &program,
                        HdSt_ResourceBinder const &binder,
                        HdRenderPassState const &state) override;
 
     /// Unbinds shader-specific resources.
     HDST_API
-    void UnbindResources(HdStProgram const &program,
+    void UnbindResources(HdStGLSLProgram const &program,
                          HdSt_ResourceBinder const &binder,
                          HdRenderPassState const &state) override;
 

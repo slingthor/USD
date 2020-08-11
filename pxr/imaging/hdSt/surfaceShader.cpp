@@ -41,6 +41,7 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
+#include "pxr/base/arch/hash.h"
 #include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/staticTokens.h"
 
@@ -151,7 +152,7 @@ HdStSurfaceShader::GetNamedTextureHandles() const
 
 /*virtual*/
 void
-HdStSurfaceShader::BindResources(HdStProgram const &program,
+HdStSurfaceShader::BindResources(HdStGLSLProgram const &program,
 								 HdSt_ResourceBinder const &binder,
                                  HdRenderPassState const &state)
 {
@@ -163,7 +164,7 @@ HdStSurfaceShader::BindResources(HdStProgram const &program,
 }
 /*virtual*/
 void
-HdStSurfaceShader::UnbindResources(HdStProgram const &program,
+HdStSurfaceShader::UnbindResources(HdStGLSLProgram const &program,
                                    HdSt_ResourceBinder const &binder,
                                    HdRenderPassState const &state)
 {
@@ -402,13 +403,13 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 
 static TfTokenVector const &
-_GetExtraWhitelistedShaderPrimvarNames()
+_GetExtraIncludedShaderPrimvarNames()
 {
     static const TfTokenVector primvarNames = {
         HdTokens->displayColor,
         HdTokens->displayOpacity,
 
-        // Whitelist a few ad hoc primvar names that
+        // Include a few ad hoc primvar names that
         // are used by the built-in material shading system.
 
         _tokens->ptexFaceOffset,
@@ -436,7 +437,7 @@ _GetExtraWhitelistedShaderPrimvarNames()
 static TfTokenVector
 _CollectPrimvarNames(const HdSt_MaterialParamVector &params)
 {
-    TfTokenVector primvarNames = _GetExtraWhitelistedShaderPrimvarNames();
+    TfTokenVector primvarNames = _GetExtraIncludedShaderPrimvarNames();
 
     for (HdSt_MaterialParam const &param: params) {
         if (param.IsFallback()) {

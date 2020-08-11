@@ -69,8 +69,17 @@ static const _FormatDesc FORMAT_DESC[] =
     // {GL_RGB,  GL_UNSIGNED_BYTE, GL_SRGB8      }, // Unsupported by HgiFormat
     {GL_RGBA, GL_UNSIGNED_BYTE, GL_SRGB8_ALPHA8}, // UNorm8Vec4sRGB,
 
-    {GL_RGB, GL_FLOAT, GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT  }, // BC6FloatVec3
-    {GL_RGB, GL_FLOAT, GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT}, // BC6UFloatVec3
+    {GL_RGB,  GL_FLOAT,
+              GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT  }, // BC6FloatVec3
+    {GL_RGB,  GL_FLOAT,
+              GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT}, // BC6UFloatVec3
+    {GL_RGBA, GL_UNSIGNED_BYTE,
+              GL_COMPRESSED_RGBA_BPTC_UNORM }, // BC7UNorm8Vec4
+    {GL_RGBA, GL_UNSIGNED_BYTE,
+              GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM }, // BC7UNorm8Vec4srgb
+
+    {GL_DEPTH_STENCIL, GL_FLOAT, GL_DEPTH32F_STENCIL8}, // HdFormatFloat32UInt8
+
 };
 
 // A few random format validations to make sure out GL table stays aligned
@@ -178,6 +187,27 @@ _samplerAddressModeTable[HgiSamplerAddressModeCount][2] =
     {HgiSamplerAddressModeClampToBorderColor, GL_CLAMP_TO_BORDER}
 };
 
+static const uint32_t
+_componentSwizzleTable[HgiComponentSwizzleCount][2] =
+{
+    {HgiComponentSwizzleZero, GL_ZERO},
+    {HgiComponentSwizzleOne,  GL_ONE},
+    {HgiComponentSwizzleR,    GL_RED},
+    {HgiComponentSwizzleG,    GL_GREEN},
+    {HgiComponentSwizzleB,    GL_BLUE},
+    {HgiComponentSwizzleA,    GL_ALPHA}
+};
+
+static const uint32_t
+_primitiveTypeTable[HgiPrimitiveTypeCount][2] =
+{
+    {HgiPrimitiveTypePointList,    GL_POINTS},
+    {HgiPrimitiveTypeLineList,     GL_LINES},
+    {HgiPrimitiveTypeLineStrip,    GL_LINES_ADJACENCY},
+    {HgiPrimitiveTypeTriangleList, GL_TRIANGLES},
+    {HgiPrimitiveTypePatchList,    GL_PATCHES}
+};
+
 void
 HgiGLConversions::GetFormat(
         HgiFormat inFormat,
@@ -188,17 +218,28 @@ HgiGLConversions::GetFormat(
     if ((inFormat < 0) || (inFormat >= HgiFormatCount))
     {
         TF_CODING_ERROR("Unexpected  %d", inFormat);
-        *outFormat = GL_RGBA;
-        *outType = GL_BYTE;
-        *outInternalFormat = GL_RGBA8;
+        if (outFormat) {
+            *outFormat = GL_RGBA;
+        }
+        if (outType) {
+            *outType = GL_BYTE;
+        }
+        if (outInternalFormat) {
+            *outInternalFormat = GL_RGBA8;
+        }
         return;
     }
 
     const _FormatDesc &desc = FORMAT_DESC[inFormat];
-
-    *outFormat = desc.format;
-    *outType = desc.type;
-    *outInternalFormat = desc.internalFormat;
+    if (outFormat) {
+        *outFormat = desc.format;
+    }
+    if (outType) {
+        *outType = desc.type;
+    }
+    if (outInternalFormat) {
+        *outInternalFormat = desc.internalFormat;
+    }
 }
 
 GLenum
@@ -312,6 +353,18 @@ HgiGLConversions::GetMinFilter(
 
     TF_CODING_ERROR("Unsupported sampler options");
     return GL_NONE;
+}
+
+GLenum
+HgiGLConversions::GetComponentSwizzle(HgiComponentSwizzle componentSwizzle)
+{
+    return _componentSwizzleTable[componentSwizzle][1];
+}
+
+GLenum
+HgiGLConversions::GetPrimitiveType(HgiPrimitiveType pt)
+{
+    return _primitiveTypeTable[pt][1];
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

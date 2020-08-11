@@ -26,45 +26,39 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
-#include "pxr/base/tf/token.h"
+
+#include "pxr/imaging/hd/resource.h"
+
+#include "pxr/imaging/hgi/buffer.h"
 
 #include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class Hgi;
 
 using HdStPersistentBufferSharedPtr = 
     std::shared_ptr<class HdStPersistentBuffer>;
-using HdResourceSharedPtr =
-	std::shared_ptr<class HdResource>;
-
 
 /// \class HdStPersistentBuffer
 ///
 /// A buffer used to prepare data on the GPU that has a persistent mapping
 /// from the CPU.
 ///
-class HdStPersistentBuffer {
+class HdStPersistentBuffer : public HdResource {
 public:
-
     HDST_API
-    virtual ~HdStPersistentBuffer();
+    HdStPersistentBuffer(
+        Hgi* hgi, TfToken const &role, size_t dataSize, void* data);
+    HDST_API
+    ~HdStPersistentBuffer();
 
     /// Returns the mapped address
-    HDST_API
-    virtual void * GetMappedAddress() const { return _mappedAddress; }
-
-    /// Returns the GPU resource.
-    HDST_API
-    HdResourceSharedPtr GetResource() const { return _resource; }
-    
-protected:
-    HDST_API
-    HdStPersistentBuffer(HdResourceSharedPtr resource);
+    HgiBufferHandle const& GetBuffer() const { return _buffer; }
 
 private:
-    HdResourceSharedPtr _resource;
-    void * _mappedAddress;
+    Hgi* const _hgi;
+    HgiBufferHandle _buffer;
 };
 
 

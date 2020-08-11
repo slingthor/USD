@@ -34,6 +34,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 HgiGLShaderProgram::HgiGLShaderProgram(HgiShaderProgramDesc const& desc)
     : HgiShaderProgram(desc)
     , _programId(0)
+    , _programByteSize(0)
+    , _uniformBuffer(0)
+    , _uboByteSize(0)
 {
     _programId = glCreateProgram();
 
@@ -60,7 +63,13 @@ HgiGLShaderProgram::HgiGLShaderProgram(HgiShaderProgramDesc const& desc)
         glGetProgramInfoLog(_programId, logSize, nullptr, &_errors[0]);
         glDeleteProgram(_programId);
         _programId = 0;
+    } else {
+        GLint size;
+        glGetProgramiv(_programId, GL_PROGRAM_BINARY_LENGTH, &size);
+        _programByteSize = (size_t)size;
     }
+
+    glCreateBuffers(1, &_uniformBuffer);
 
     HGIGL_POST_PENDING_GL_ERRORS();
 }
@@ -69,6 +78,8 @@ HgiGLShaderProgram::~HgiGLShaderProgram()
 {
     glDeleteProgram(_programId);
     _programId = 0;
+    glDeleteBuffers(1, &_uniformBuffer);
+    _uniformBuffer = 0;
     HGIGL_POST_PENDING_GL_ERRORS();
 }
 
@@ -90,6 +101,12 @@ HgiGLShaderProgram::GetCompileErrors()
     return _errors;
 }
 
+size_t
+HgiGLShaderProgram::GetByteSizeOfResource() const
+{
+    return _programByteSize + _uboByteSize;
+}
+
 uint64_t
 HgiGLShaderProgram::GetRawResource() const
 {
@@ -100,6 +117,13 @@ uint32_t
 HgiGLShaderProgram::GetProgramId() const
 {
     return _programId;
+}
+
+uint32_t
+HgiGLShaderProgram::GetUniformBuffer(size_t sizeHint)
+{
+    _uboByteSize = sizeHint;
+    return _uniformBuffer;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

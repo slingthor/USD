@@ -70,8 +70,10 @@ UsdSchemaType UsdShadeMaterialBindingAPI::_GetSchemaType() const {
 UsdShadeMaterialBindingAPI
 UsdShadeMaterialBindingAPI::Apply(const UsdPrim &prim)
 {
-    return UsdAPISchemaBase::_ApplyAPISchema<UsdShadeMaterialBindingAPI>(
-            prim, _schemaTokens->MaterialBindingAPI);
+    if (prim.ApplyAPI<UsdShadeMaterialBindingAPI>()) {
+        return UsdShadeMaterialBindingAPI(prim);
+    }
+    return UsdShadeMaterialBindingAPI();
 }
 
 /* static */
@@ -861,6 +863,13 @@ UsdShadeMaterialBindingAPI::GetMaterialBindSubsetsFamilyType()
 {
     UsdGeomImageable geom(GetPrim());
     return UsdGeomSubset::GetFamilyType(geom, UsdShadeTokens->materialBind);
+}
+
+/* static */
+bool
+UsdShadeMaterialBindingAPI::CanContainPropertyName(const TfToken &name)
+{
+    return TfStringStartsWith(name, UsdShadeTokens->materialBinding);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -29,12 +29,18 @@
 #include "pxr/usd/plugin/usdMtlx/api.h"
 #include "pxr/usd/ndr/declare.h"
 #include "pxr/usd/sdf/valueTypeName.h"
+#include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/vt/value.h"
 #include <MaterialXCore/Document.h>
 #include <string>
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+#define USD_MTLX_TOKENS \
+    ((DefaultOutputName, "out"))
+
+TF_DECLARE_PUBLIC_TOKENS(UsdMtlxTokens, USDMTLX_LOCAL, USD_MTLX_TOKENS);
 
 /// Return the contents of a search path environment variable named
 /// \p name as a vector of strings.  The path is split on the platform's
@@ -60,6 +66,15 @@ UsdMtlxStandardLibraryPaths();
 USDMTLX_LOCAL
 NdrStringVec
 UsdMtlxStandardFileExtensions();
+
+// MaterialX versions prior to 1.37.0 only allow nodes with nodeType as 
+// MULTI_OUTPUT_TYPE_STRING to provide outputs. With version 1.37 output tags
+// are mandatory for all mtlxNodes hence removing the nodeType restriction.
+// https://www.materialx.org/assets/MaterialX.v1.37REV2.Changelist.pdf
+// Checks if the MaterialX Library version is less than 1.37.0
+USDMTLX_LOCAL
+bool
+UsdMtlxOutputNodesRequireMultiOutputStringType();
 
 /// Return the (possibly cached) MaterialX document at \p resolvedUri.
 /// Return null if the document could not be read and report a

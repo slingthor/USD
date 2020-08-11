@@ -139,7 +139,6 @@ public:
     USDCONTRIVED_API
     static bool
     IsMultipleApplyAPIPath(const SdfPath &path, TfToken *name);
-private:
 
     /// Applies this <b>multiple-apply</b> API schema to the given \p prim 
     /// along with the given instance name, \p name. 
@@ -151,14 +150,17 @@ private:
     /// 
     /// \return A valid UsdContrivedMultipleApplyAPI object is returned upon success. 
     /// An invalid (or empty) UsdContrivedMultipleApplyAPI object is returned upon 
-    /// failure. See \ref UsdAPISchemaBase::_MultipleApplyAPISchema() for 
+    /// failure. See \ref UsdPrim::ApplyAPI() for 
     /// conditions resulting in failure. 
     /// 
     /// \sa UsdPrim::GetAppliedSchemas()
     /// \sa UsdPrim::HasAPI()
+    /// \sa UsdPrim::ApplyAPI()
+    /// \sa UsdPrim::RemoveAPI()
     ///
+    USDCONTRIVED_API
     static UsdContrivedMultipleApplyAPI 
-    _Apply(const UsdPrim &prim, const TfToken &name);
+    Apply(const UsdPrim &prim, const TfToken &name);
 
 protected:
     /// Returns the type of schema this class belongs to.

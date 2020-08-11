@@ -85,9 +85,6 @@ public:
     // workarounds for driver issues
     bool copyBufferEnabled;
 
-    // GPU compute
-    bool gpuComputeEnabled;           // GPU subdivision                  (4.3)
-    
     // Texture vertical flip
     bool flipTexturesOnLoad;
     
@@ -129,9 +126,6 @@ protected:
 
 	GARCH_API
     virtual ~GarchContextCaps() = default;
-    
-	GARCH_API
-    bool IsGPUComputeEnabled();
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

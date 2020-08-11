@@ -105,7 +105,7 @@ protected:
 
 private:
     
-    friend class HdStMSLProgram;
+    friend class HdStGLSLProgramMSL;
 };
 
 

@@ -117,20 +117,8 @@ void _InitGL()
 }
 
 bool
-_IsHydraEnabled(const UsdImagingGLEngine::RenderAPI api)
+_IsHydraEnabled()
 {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    if (api == UsdImagingGLEngine::OpenGL) {
-        // Make sure there is an OpenGL context when
-        // trying to initialize Hydra/Reference
-        GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
-        if (!context || !context->IsValid()) {
-            TF_CODING_ERROR("OpenGL context required, "
-                "using reference renderer");
-            return false;
-        }
-    }
-#endif
     if (!_GetHydraEnabledEnvVar()) {
         return false;
     }
@@ -143,6 +131,8 @@ _IsHydraEnabled(const UsdImagingGLEngine::RenderAPI api)
 }
 
 } // anonymous namespace
+
+bool UsdImagingGLEngine::_floatingPointBuffersEnabled = true;
 
 std::recursive_mutex UsdImagingGLEngine::ResourceFactoryGuard::contextLock;
 
@@ -167,7 +157,7 @@ UsdImagingGLEngine::ResourceFactoryGuard::~ResourceFactoryGuard() {
 bool
 UsdImagingGLEngine::IsHydraEnabled()
 {
-    static bool isHydraEnabled = _IsHydraEnabled(Unset);
+    static bool isHydraEnabled = _IsHydraEnabled();
     return isHydraEnabled;
 }
 
@@ -175,10 +165,8 @@ UsdImagingGLEngine::IsHydraEnabled()
 // Construction
 //----------------------------------------------------------------------------
 
-UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api,
-                                       const HdDriver& driver)
-    : UsdImagingGLEngine(api,
-            SdfPath::AbsoluteRootPath(),
+UsdImagingGLEngine::UsdImagingGLEngine(const HdDriver& driver)
+    : UsdImagingGLEngine(SdfPath::AbsoluteRootPath(),
             {},
             {},
             _GetUsdImagingDelegateId(),
@@ -188,7 +176,6 @@ UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api,
 }
 
 UsdImagingGLEngine::UsdImagingGLEngine(
-    const RenderAPI api,
     const SdfPath& rootPath,
     const SdfPathVector& excludedPaths,
     const SdfPathVector& invisedPaths,
@@ -203,7 +190,6 @@ UsdImagingGLEngine::UsdImagingGLEngine(
     , _excludedPrimPaths(excludedPaths)
     , _invisedPrimPaths(invisedPaths)
     , _isPopulated(false)
-    , _renderAPI(api)
 #if defined(PXR_METAL_SUPPORT_ENABLED)
     , _legacyImpl(nullptr)
 #endif
@@ -212,25 +198,9 @@ UsdImagingGLEngine::UsdImagingGLEngine(
 #if defined(PXR_METAL_SUPPORT_ENABLED)
     engineCountMutex.lock();
     engineCount++;
-#endif
 
-    _engine = new HdEngine();
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    if (_renderAPI == Metal) {
-        _resourceFactory = new HdStResourceFactoryMetal();
-    }
-    else
+    _resourceFactory = new HdStResourceFactoryMetal();
 #endif
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    if (_renderAPI == OpenGL) {
-		_InitGL();
-        _resourceFactory = new HdStResourceFactoryGL();
-    }
-    else
-#endif
-    {
-        TF_FATAL_CODING_ERROR("No valid rendering API specified: %d", _renderAPI);
-    }
 
     if (IsHydraEnabled()) {
 
@@ -258,22 +228,34 @@ UsdImagingGLEngine::UsdImagingGLEngine(
 #endif
 }
 
+void
+UsdImagingGLEngine::_DestroyHydraObjects()
+{
+    // Destroy objects in opposite order of construction.
+    _engine = nullptr;
+    _taskController = nullptr;
+    _sceneDelegate = nullptr;
+    _renderIndex = nullptr;
+    _renderDelegate = nullptr;
+}
+
 UsdImagingGLEngine::~UsdImagingGLEngine()
 {
-    delete _engine;
-    _engine = NULL;
-    
-    delete _resourceFactory;
-    _resourceFactory = NULL;
+    TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    engineCountMutex.lock();
-    engineCount--;
-    if (MtlfMetalContext::context && engineCount == 0)  {
-        MtlfMetalContext::context = NULL;
-    }
-    engineCountMutex.unlock();
-#endif
+	delete _resourceFactory;
+    _resourceFactory = nullptr;
+
+    _DestroyHydraObjects();
+
+    #if defined(PXR_METAL_SUPPORT_ENABLED)
+        engineCountMutex.lock();
+        engineCount--;
+        if (MtlfMetalContext::context && engineCount == 0)  {
+            MtlfMetalContext::context = NULL;
+        }
+        engineCountMutex.unlock();
+    #endif
 }
 
 //----------------------------------------------------------------------------
@@ -501,45 +483,15 @@ UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
         return;
     }
 
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    GfMatrix4d modifiedProjMatrix;
-    static GfMatrix4d zTransform;
-    
-    // Transform from [-1, 1] to [0, 1] clip space
-    static bool _zTransformSet = false;
-    if (!_zTransformSet) {
-        _zTransformSet = true;
-        zTransform.SetIdentity();
-        zTransform.SetScale(GfVec3d(1.0, 1.0, 0.5));
-        zTransform.SetTranslateOnly(GfVec3d(0.0, 0.0, 0.5));
-    }
-    
-    modifiedProjMatrix = projectionMatrix * zTransform;
-#else
-    GfMatrix4d const &modifiedProjMatrix = projectionMatrix;
-#endif
 
     TF_VERIFY(_taskController);
-    _taskController->SetFreeCameraMatrices(viewMatrix, modifiedProjMatrix);
+    _taskController->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
 }
 
 void
 UsdImagingGLEngine::SetCameraStateFromOpenGL()
 {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    if (_renderAPI == OpenGL) {
-        GfMatrix4d viewMatrix, projectionMatrix;
-        GfVec4d viewport;
-        glGetDoublev(GL_MODELVIEW_MATRIX, viewMatrix.GetArray());
-        glGetDoublev(GL_PROJECTION_MATRIX, projectionMatrix.GetArray());
-        glGetDoublev(GL_VIEWPORT, &viewport[0]);
-
-        SetCameraState(viewMatrix, projectionMatrix);
-		SetRenderViewport(viewport);
-    }
-#else
     TF_FATAL_CODING_ERROR("No OpenGL support available");
-#endif
 }
 
 void
@@ -695,7 +647,7 @@ UsdImagingGLEngine::SetSelectionColor(GfVec4f const& color)
 bool 
 UsdImagingGLEngine::TestIntersection(
     const GfMatrix4d &viewMatrix,
-    const GfMatrix4d &inProjectionMatrix,
+    const GfMatrix4d &projectionMatrix,
     const UsdPrim& root,
     const UsdImagingGLRenderParams& params,
     GfVec3d *outHitPoint,
@@ -708,7 +660,7 @@ UsdImagingGLEngine::TestIntersection(
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
         return _legacyImpl->TestIntersection(
             viewMatrix,
-            inProjectionMatrix,
+            projectionMatrix,
             root,
             params,
             outHitPoint,
@@ -721,24 +673,6 @@ UsdImagingGLEngine::TestIntersection(
     ResourceFactoryGuard guard(_resourceFactory);
 
     TF_VERIFY(_sceneDelegate);
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    GfMatrix4d projectionMatrix;
-    static GfMatrix4d zTransform;
-    
-    // Transform from [-1, 1] to [0, 1] clip space
-    static bool _zTransformSet = false;
-    if (!_zTransformSet) {
-        _zTransformSet = true;
-        zTransform.SetIdentity();
-        zTransform.SetScale(GfVec3d(1.0, 1.0, 0.5));
-        zTransform.SetTranslateOnly(GfVec3d(0.0, 0.0, 0.5));
-    }
-    
-    projectionMatrix = inProjectionMatrix * zTransform;
-#else
-    GfMatrix4d const &projectionMatrix = inProjectionMatrix;
-#endif
-
     TF_VERIFY(_taskController);
 
     // XXX(UsdImagingPaths): This is incorrect...  "Root" points to a USD
@@ -825,6 +759,11 @@ UsdImagingGLEngine::DecodeIntersection(
     const int instanceIdx = HdxPickTask::DecodeIDRenderColor(instanceIdColor);
     SdfPath primPath =
         _sceneDelegate->GetRenderIndex().GetRprimPathFromPrimId(primId);
+
+    if (primPath.IsEmpty()) {
+        return false;
+    }
+
     SdfPath delegateId, instancerId;
     _sceneDelegate->GetRenderIndex().GetSceneDelegateAndInstancerIds(
         primPath, &delegateId, &instancerId);
@@ -844,7 +783,7 @@ UsdImagingGLEngine::DecodeIntersection(
         *outHitInstanceIndex = instanceIdx;
     }
 
-    return !primPath.IsEmpty();
+    return true;
 }
 
 //----------------------------------------------------------------------------
@@ -938,6 +877,8 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId, bool forceReload)
         return true;
     }
 
+    TF_PY_ALLOW_THREADS_IN_SCOPE();
+
     HdPluginRenderDelegateUniqueHandle renderDelegate =
         registry.CreateRenderDelegate(resolvedId);
     if(!renderDelegate) {
@@ -945,6 +886,11 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId, bool forceReload)
     }
 
     _SetRenderDelegateAndRestoreState(std::move(renderDelegate));
+ 
+    // Cache the state of the floatingPointBuffersEnabled flag for static method.
+    GarchContextCaps const &caps =
+        GarchResourceFactory::GetInstance()->GetContextCaps();
+    _floatingPointBuffersEnabled = caps.floatingPointBuffersEnabled;
 
     return true;
 }
@@ -986,13 +932,10 @@ void
 UsdImagingGLEngine::_SetRenderDelegate(
     HdPluginRenderDelegateUniqueHandle &&renderDelegate)
 {
-    // Destruction
+    // This relies on SetRendererPlugin to release the GIL...
 
-    // Destroy objects in opposite order of construction.
-    _taskController = nullptr;
-    _sceneDelegate = nullptr;
-    _renderIndex = nullptr;
-    _renderDelegate = nullptr;
+    // Destruction
+    _DestroyHydraObjects();
 
     _isPopulated = false;
 
@@ -1015,6 +958,10 @@ UsdImagingGLEngine::_SetRenderDelegate(
         _renderIndex.get(),
         _ComputeControllerPath(_renderDelegate));
 
+    // The task context holds on to resources in the render
+    // delegate, so we want to destroy it first and thus
+    // create it last.
+    _engine = std::make_unique<HdEngine>();
 }
 
 //----------------------------------------------------------------------------
@@ -1065,6 +1012,22 @@ UsdImagingGLEngine::SetRendererAov(TfToken const &id, TfToken const& interopDst)
         return true;
     }
     return false;
+}
+
+HgiTextureHandle
+UsdImagingGLEngine::GetAovTexture(
+    TfToken const& name) const
+{
+    VtValue aov;
+    HgiTextureHandle aovTexture;
+
+    if (_engine->GetTaskContextData(name, &aov)) {
+        if (aov.IsHolding<HgiTextureHandle>()) {
+            aovTexture = aov.Get<HgiTextureHandle>();
+        }
+    }
+
+    return aovTexture;
 }
 
 UsdImagingGLRendererSettingsList
@@ -1158,6 +1121,8 @@ UsdImagingGLEngine::PauseRenderer()
         return false;
     }
 
+    TF_PY_ALLOW_THREADS_IN_SCOPE();
+
     TF_VERIFY(_renderDelegate);
     return _renderDelegate->Pause();
 }
@@ -1168,6 +1133,8 @@ UsdImagingGLEngine::ResumeRenderer()
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return false;
     }
+
+    TF_PY_ALLOW_THREADS_IN_SCOPE();
 
     TF_VERIFY(_renderDelegate);
     return _renderDelegate->Resume();
@@ -1191,6 +1158,8 @@ UsdImagingGLEngine::StopRenderer()
         return false;
     }
 
+    TF_PY_ALLOW_THREADS_IN_SCOPE();
+
     TF_VERIFY(_renderDelegate);
     return _renderDelegate->Stop();
 }
@@ -1201,6 +1170,8 @@ UsdImagingGLEngine::RestartRenderer()
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return false;
     }
+
+    TF_PY_ALLOW_THREADS_IN_SCOPE();
 
     TF_VERIFY(_renderDelegate);
     return _renderDelegate->Restart();
@@ -1217,12 +1188,23 @@ UsdImagingGLEngine::SetColorCorrectionSettings(
         return;
     }
 
+    if (!IsColorCorrectionCapable()) {
+        return;
+    }
+
     TF_VERIFY(_taskController);
 
     HdxColorCorrectionTaskParams hdParams;
     hdParams.colorCorrectionMode = id;
     _taskController->SetColorCorrectionParams(hdParams);
 }
+
+bool 
+UsdImagingGLEngine::IsColorCorrectionCapable()
+{
+    return _floatingPointBuffersEnabled && IsHydraEnabled();
+}
+
 
 //----------------------------------------------------------------------------
 // Resource Information
@@ -1237,6 +1219,12 @@ UsdImagingGLEngine::GetRenderStats() const
 
     TF_VERIFY(_renderDelegate);
     return _renderDelegate->GetRenderStats();
+}
+
+Hgi*
+UsdImagingGLEngine::GetHgi()
+{
+    return _hgi.get();
 }
 
 //----------------------------------------------------------------------------
@@ -1295,8 +1283,13 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
               );
         hdStRenderDelegate->PrepareRender(delegateParams);
     }
-    
-    _engine->Execute(_renderIndex.get(), &tasks);
+
+    {
+        // Release the GIL before calling into hydra, in case any hydra plugins
+        // call into python.
+        TF_PY_ALLOW_THREADS_IN_SCOPE();
+        _engine->Execute(_renderIndex.get(), &tasks);
+    }
 
     if (hdStRenderDelegate) {
         hdStRenderDelegate->FinalizeRender();
@@ -1574,20 +1567,22 @@ UsdImagingGLEngine::_GetSceneDelegate() const
     return _sceneDelegate.get();
 }
 
-HgiTextureHandle
-UsdImagingGLEngine::GetPresentationTexture(
-    TfToken const &name) const
+HdEngine *
+UsdImagingGLEngine::_GetHdEngine()
 {
-    VtValue aov;
-    HgiTextureHandle aovTexture;
+    return _engine.get();
+}
 
-    if (_engine->GetTaskContextData(name, &aov)) {
-        if (aov.IsHolding<HgiTextureHandle>()) {
-            aovTexture = aov.Get<HgiTextureHandle>();
-        }
-    }
+HdxTaskController *
+UsdImagingGLEngine::_GetTaskController() const
+{
+    return _taskController.get();
+}
 
-    return aovTexture;
+bool
+UsdImagingGLEngine::_IsUsingLegacyImpl() const
+{
+    return bool(_legacyImpl);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

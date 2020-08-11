@@ -57,16 +57,16 @@ HdBufferArrayRangeContainer::Set(int index,
     _ranges[index] = range;
 }
 
-void
-HdBufferArrayRange::GetBufferSpecs(HdBufferSpecVector *specs) const
+HdBufferArrayRangeSharedPtr const &
+HdBufferArrayRangeContainer::Get(int index) const
 {
-    HD_TRACE_FUNCTION();
-    
-    HdBufferResourceNamedList const &resources = GetResources();
-    
-    TF_FOR_ALL(it, resources) {
-        specs->emplace_back(it->first, it->second->GetTupleType());
+    if (index < 0 || static_cast<size_t>(index) >= _ranges.size()) {
+        // out of range access is not an errorneous path.
+        // (i.e. element/instance bars can be null if not exists)
+        static HdBufferArrayRangeSharedPtr empty;
+        return empty;
     }
+    return _ranges[index];
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

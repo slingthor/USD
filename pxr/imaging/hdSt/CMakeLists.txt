@@ -26,28 +26,16 @@ set(GFXADDITIONALPUBLIC "")
 if (PXR_ENABLE_GL_SUPPORT)
     list(APPEND GFX     glf
     			        hgiGL)
-    list(APPEND GFXADDITIONAL GL/bufferRelocatorGL
-                        GL/bufferResourceGL
-                        GL/codeGenGLSL
-                        GL/dispatchBufferGL
+    list(APPEND GFXADDITIONAL   GL/codeGenGLSL
                         GL/domeLightComputationsGL
                         GL/drawTargetTextureResourceGL
                         GL/extCompGpuComputationGL
-                        GL/flatNormalsGL
-                        GL/glslProgram
-                        GL/glUtils
+                        GL/glslProgramGL
                         GL/indirectDrawBatchGL
-                        GL/interleavedMemoryBufferGL
-                        GL/persistentBufferGL
-                        GL/quadrangulateGL
                         GL/renderPassShaderGL
                         GL/renderPassStateGL
                         GL/resourceBinderGL
-                        GL/resourceGL
-                        GL/smoothNormalsGL
-                        GL/textureResourceGL
-                        GL/vboMemoryBufferGL
-                        GL/vboSimpleMemoryBufferGL)
+                        GL/textureResourceGL)
 
     list(APPEND GFXADDITIONALPUBLIC
                         GL/renderDelegateGL
@@ -58,29 +46,17 @@ endif()
 if (PXR_ENABLE_METAL_SUPPORT)
     list(APPEND GFX     mtlf
                         hgiMetal)
-    list(APPEND GFXADDITIONAL  Metal/bufferRelocatorMetal
-                        Metal/bufferResourceMetal
-                        Metal/codeGenMSL
-                        Metal/dispatchBufferMetal
+    list(APPEND GFXADDITIONAL  Metal/codeGenMSL
                         Metal/domeLightComputationsMetal
                         Metal/drawTargetTextureResourceMetal
                         Metal/extCompGpuComputationMetal
-                        Metal/flatNormalsMetal
                         Metal/indirectDrawBatchMetal
-                        Metal/interleavedMemoryBufferMetal
                         Metal/metalConversions
-                        Metal/mslProgram
-                        Metal/mtlUtils
-                        Metal/persistentBufferMetal
-                        Metal/quadrangulateMetal
+                        Metal/glslProgramMetal
                         Metal/renderPassShaderMetal
                         Metal/renderPassStateMetal
                         Metal/resourceBinderMetal
-                        Metal/resourceMetal
-                        Metal/smoothNormalsMetal
-                        Metal/textureResourceMetal
-                        Metal/vboMemoryBufferMetal
-                        Metal/vboSimpleMemoryBufferMetal)
+                        Metal/textureResourceMetal)
 
     list(APPEND GFXADDITIONALPUBLIC
                         Metal/renderDelegateMetal
@@ -106,7 +82,7 @@ pxr_library(hdSt
 
     PUBLIC_CLASSES
         basisCurves
-        bufferRelocator
+        bufferArrayRange
         bufferResource
         commandBuffer
         computeShader
@@ -132,6 +108,7 @@ pxr_library(hdSt
         geometricShader
         glConversions
         glslfxShader
+        glUtils
         hgiConversions
         imageShaderRenderPass
         instancer
@@ -145,7 +122,7 @@ pxr_library(hdSt
         package
         persistentBuffer
         points
-        program
+        glslProgram
         renderBuffer
         renderDelegate
         renderPass
@@ -178,6 +155,8 @@ pxr_library(hdSt
 
     PUBLIC_HEADERS
         api.h
+        dynamicUvTextureImplementation.h
+        textureCpuData.h
 
     PRIVATE_CLASSES
         basisCurvesComputations

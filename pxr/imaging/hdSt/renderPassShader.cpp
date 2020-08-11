@@ -104,7 +104,7 @@ HdStRenderPassShader::GetSource(TfToken const &shaderStageKey) const
 
 /*virtual*/
 void
-HdStRenderPassShader::BindResources(HdStProgram const &program,
+HdStRenderPassShader::BindResources(HdStGLSLProgram const &program,
                                     HdSt_ResourceBinder const &binder,
                                     HdRenderPassState const &state)
 {
@@ -120,7 +120,7 @@ HdStRenderPassShader::BindResources(HdStProgram const &program,
 
 /*virtual*/
 void
-HdStRenderPassShader::UnbindResources(HdStProgram const &program,
+HdStRenderPassShader::UnbindResources(HdStGLSLProgram const &program,
                                       HdSt_ResourceBinder const &binder,
                                       HdRenderPassState const &state)
 {

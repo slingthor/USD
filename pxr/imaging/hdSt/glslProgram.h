@@ -21,65 +21,121 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef PXR_IMAGING_HD_ST_GLSL_PROGRAM_H
-#define PXR_IMAGING_HD_ST_GLSL_PROGRAM_H
+#ifndef HDST_PROGRAM_H
+#define HDST_PROGRAM_H
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hdSt/api.h"
-#include "pxr/imaging/hdSt/resourceGL.h"
+
+#include "pxr/base/tf/declarePtrs.h"
+#include "pxr/base/tf/token.h"
+
 #include "pxr/imaging/hgi/shaderProgram.h"
 #include "pxr/imaging/hgi/enums.h"
+
+#include <boost/shared_ptr.hpp>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdStResourceRegistry;
-using HdStGLSLProgramSharedPtr = std::shared_ptr<class HdStGLSLProgram>;
+class HdResource;
+class HdStSurfaceShader;
+class HdSt_ResourceBinder;
+
+using HdStGLSLProgramSharedPtr =
+    std::shared_ptr<class HdStGLSLProgram>;
 
 using HgiShaderProgramHandle = HgiHandle<class HgiShaderProgram>;
 
-/// \class HdStGLSLProgram
+TF_DECLARE_WEAK_AND_REF_PTRS(GarchBindingMap);
+
+/// \class HdProgram
 ///
-/// An instance of a glsl program.
+/// An instance of a shader language program.
 ///
-class HdStGLSLProgram final
+// XXX: this design is transitional and will be revised soon.
+class HdStGLSLProgram
 {
 public:
     typedef size_t ID;
+    
+    HDST_API
+    virtual ~HdStGLSLProgram();
+    
+    /// Returns the role of the GPU data in this resource.
+    TfToken const & GetRole() const { return _role; }
+
+    /// Compile shader source for a shader stage.
+    HDST_API
+    virtual bool CompileShader(HgiShaderStage type, std::string const & source) = 0;
+
+    /// Link the compiled shaders together.
+    HDST_API
+    virtual bool Link() = 0;
+
+    /// Validate if this program is a valid progam in the current context.
+    HDST_API
+    virtual bool Validate() const = 0;
+
+    /// Returns HdResource of the program object.
+    HgiShaderProgramHandle const &GetProgram() const { return _program; }
+
+    /// Returns true if the program has been successfully linked.
+    /// if not, returns false and fills the error log into reason.
+    HDST_API
+    virtual bool GetProgramLinkStatus(std::string * reason) const = 0;
+    
+    /// Returns the binary size of the program (if available)
+    HDST_API
+    virtual uint32_t GetProgramSize() const = 0;
+    
+    HDST_API
+    virtual void AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const = 0;
+    
+    HDST_API
+    virtual void AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const = 0;
+    
+    HDST_API
+    virtual void AddCustomBindings(GarchBindingMapRefPtr bindingMap) const = 0;
+    
+    HDST_API
+    virtual void BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const = 0;
 
     HDST_API
-    HdStGLSLProgram(TfToken const &role, HdStResourceRegistry*const registry);
+    virtual void UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const = 0;
+    
     HDST_API
-    ~HdStGLSLProgram();
+    virtual void SetProgram(char const* const label = NULL) = 0;
+    
+    HDST_API
+    virtual void UnsetProgram() = 0;
+    
+    HDST_API
+    virtual void DrawElementsInstancedBaseVertex(int primitiveMode,
+                                                 int indexCount,
+                                                 int indexType,
+                                                 int firstIndex,
+                                                 int instanceCount,
+                                                 int baseVertex) const = 0;
 
+    HDST_API
+    virtual void DrawArraysInstanced(int primitiveMode,
+                                     int baseVertex,
+                                     int vertexCount,
+                                     int instanceCount) const = 0;
+    
+    HDST_API
+    virtual void DrawArrays(int primitiveMode,
+                            int baseVertex,
+                            int vertexCount) const = 0;
+    
     /// Returns the hash value of the program for \a sourceFile
     HDST_API
     static ID ComputeHash(TfToken const & sourceFile);
 
-    /// Compile shader source for a shader stage.
-    HDST_API
-    bool CompileShader(HgiShaderStage stage, std::string const & source);
-
-    /// Link the compiled shaders together.
-    HDST_API
-    bool Link();
-
-    /// Validate if this program is a valid progam in the current context.
-    HDST_API
-    bool Validate() const;
-
-    /// Returns HdResource of the program object.
-    HdStResourceGL const &GetProgram() const { return _programResource; }
-
-    /// Returns HdResource of the global uniform buffer object for this program.
-    HdStResourceGL const &GetGlobalUniformBuffer() const {
-        return _uniformBuffer;
-    }
-
     /// Convenience method to get a shared compute shader program
     HDST_API
-    static HdStGLSLProgramSharedPtr GetComputeProgram(
-        TfToken const &shaderToken,
+    static HdStGLSLProgramSharedPtr GetComputeProgram(TfToken const &shaderToken,
         HdStResourceRegistry *resourceRegistry);
     
     HDST_API
@@ -88,22 +144,22 @@ public:
         TfToken const &shaderToken,
         HdStResourceRegistry *resourceRegistry);
 
-private:
-    HdStResourceRegistry *const _registry;
-    HdStResourceGL _programResource;
-    HdStResourceGL _uniformBuffer;
+protected:
+    HDST_API
+    HdStGLSLProgram(TfToken const &role,
+                HdStResourceRegistry* resourceRegistry);
 
+    HDST_API
+    virtual std::string GetComputeHeader() const = 0;
+    
+    TfToken const _role;
+    HdStResourceRegistry* _registry;
+    
     HgiShaderProgramDesc _programDesc;
     HgiShaderProgramHandle _program;
-
-    // An identifier for uniquely identifying the program, for debugging
-    // purposes - programs that fail to compile for one reason or another
-    // will get deleted, and their GL program IDs reused, so we can't use
-    // that to identify it uniquely
-    size_t _debugID;
 };
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif  // PXR_IMAGING_HD_ST_GLSL_PROGRAM_H
+#endif  // HDST_PROGRAM_H

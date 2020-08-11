@@ -361,10 +361,13 @@ void MtlfMetalContext::Cleanup()
         NSLog(@"Metal   Buffers reused:     %7llu / %7lu",
               resourceStats.buffersReused.load(std::memory_order_relaxed) / frameCount,
               resourceStats.buffersReused.load(std::memory_order_relaxed));
-        NSLog(@"Metal   Av buf search depth:%7lu"       ,
-              resourceStats.bufferSearches.load(std::memory_order_relaxed) /
-              (resourceStats.buffersCreated.load(std::memory_order_relaxed) +
-               resourceStats.buffersReused.load(std::memory_order_relaxed)));
+        int32_t buffersCreated = resourceStats.buffersCreated.load(std::memory_order_relaxed);
+        int32_t buffersReused = resourceStats.buffersReused.load(std::memory_order_relaxed);
+        if (buffersCreated + buffersReused) {
+            NSLog(@"Metal   Av buf search depth:%7lu"       ,
+                  resourceStats.bufferSearches.load(std::memory_order_relaxed) /
+                  (buffersCreated + buffersReused));
+        }
         NSLog(@"Render  Encoders requested: %7llu / %7lu",
               resourceStats.renderEncodersRequested.load(std::memory_order_relaxed) / frameCount,
               resourceStats.renderEncodersRequested.load(std::memory_order_relaxed));
@@ -475,7 +478,7 @@ MtlfMetalContext::GetTriListIndexBuffer(MTLIndexType indexTypeMetal, uint32_t nu
         uint32_t *destData = (uint32_t *)[triIndexBuffer contents];
         for (int i = 0; i < numIndices; i++)
         {
-            *destData = i;
+            *destData++ = i;
         }
 #if defined(ARCH_OS_MACOS)
         [triIndexBuffer didModifyRange:(NSMakeRange(0, triIndexBuffer.length))];

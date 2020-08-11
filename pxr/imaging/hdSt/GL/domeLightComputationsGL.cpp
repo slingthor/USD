@@ -24,14 +24,14 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/GL/domeLightComputationsGL.h"
+#include "pxr/imaging/hdSt/GL/glslProgramGL.h"
 #include "pxr/imaging/hdSt/simpleLightingShader.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/package.h"
-#include "pxr/imaging/hdSt/dynamicUvTextureObject.h"
-#include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/tokens.h"
-
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
+#include "pxr/imaging/hdSt/textureObject.h"
+#include "pxr/imaging/hdSt/textureHandle.h"
+#include "pxr/imaging/hdSt/dynamicUvTextureObject.h"
 #include "pxr/imaging/hgiGL/texture.h"
 
 #include "pxr/imaging/hd/perfLog.h"
@@ -43,11 +43,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 
 HdSt_DomeLightComputationGPUGL::HdSt_DomeLightComputationGPUGL(
-    const TfToken & shaderToken,
+    const TfToken &shaderToken,
     HdStSimpleLightingShaderPtr const &lightingShader,
-    unsigned int numLevels,
-    unsigned int level,
-    float roughness)
+    const unsigned int numLevels,
+    const unsigned int level, 
+    const float roughness) 
     : HdSt_DomeLightComputationGPU(
         shaderToken,
         lightingShader,
@@ -60,7 +60,7 @@ HdSt_DomeLightComputationGPUGL::HdSt_DomeLightComputationGPUGL(
 GarchTextureGPUHandle
 HdSt_DomeLightComputationGPUGL::_GetGlTextureName(const HgiTexture * const hgiTexture)
 {
-    const HgiGLTexture * const glTexture =
+    const HgiGLTexture * const glTexture = 
         dynamic_cast<const HgiGLTexture*>(hgiTexture);
     if (!glTexture) {
         TF_CODING_ERROR(
@@ -76,17 +76,17 @@ HdSt_DomeLightComputationGPUGL::_GetGlTextureName(const HgiTexture * const hgiTe
 }
 
 void
-HdSt_DomeLightComputationGPUGL::_Execute(HdStProgramSharedPtr computeProgram)
+HdSt_DomeLightComputationGPUGL::_Execute(HdStGLSLProgramSharedPtr computeProgram)
 {
-    HdStGLSLProgram const *glslProgram(
-        dynamic_cast<const HdStGLSLProgram*>(computeProgram.get()));
+    HdStglslProgramGLSL const *glslProgram(
+        dynamic_cast<const HdStglslProgramGLSL*>(computeProgram.get()));
     const GLuint programId = glslProgram->GetGLProgram();
 
     HdStSimpleLightingShaderSharedPtr const shader = _lightingShader.lock();
     if (!TF_VERIFY(shader)) {
         return;
     }
-    
+
     // Size of source texture (the dome light environment map)
     GfVec3i srcDim;
     // GL name of source texture
@@ -104,18 +104,17 @@ HdSt_DomeLightComputationGPUGL::_Execute(HdStProgramSharedPtr computeProgram)
     // computation is supposed to populate
     HdStTextureHandleSharedPtr const &dstTextureHandle =
         shader->GetTextureHandle(_shaderToken);
-
     if (!TF_VERIFY(dstTextureHandle)) {
         return;
     }
 
     HdStDynamicUvTextureObject * const dstUvTextureObject =
-      dynamic_cast<HdStDynamicUvTextureObject*>(
-          dstTextureHandle->GetTextureObject().get());
+        dynamic_cast<HdStDynamicUvTextureObject*>(
+            dstTextureHandle->GetTextureObject().get());
     if (!TF_VERIFY(dstUvTextureObject)) {
         return;
     }
-      
+        
     if (_level == 0) {
         // Level zero is in charge of actually creating the
         // GPU resource.

@@ -26,6 +26,8 @@
 #include "pxr/imaging/hdSt/mixinShader.h"
 #include "pxr/imaging/hd/tokens.h"
 
+#include "pxr/base/arch/hash.h"
+
 #include <boost/functional/hash.hpp>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -99,7 +101,7 @@ HdStMixinShader::GetTextures() const
 }
 
 void
-HdStMixinShader::BindResources(HdStProgram const &program,
+HdStMixinShader::BindResources(HdStGLSLProgram const &program,
                                HdSt_ResourceBinder const &binder,
                                HdRenderPassState const &state)
 {
@@ -107,7 +109,7 @@ HdStMixinShader::BindResources(HdStProgram const &program,
 }
 
 void
-HdStMixinShader::UnbindResources(HdStProgram const &program,
+HdStMixinShader::UnbindResources(HdStGLSLProgram const &program,
                                  HdSt_ResourceBinder const &binder,
                                  HdRenderPassState const &state)
 {

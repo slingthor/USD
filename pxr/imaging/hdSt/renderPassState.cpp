@@ -27,9 +27,10 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
+#include "pxr/imaging/hdSt/bufferArrayRange.h"
 #include "pxr/imaging/hdSt/drawItem.h"
-#include "pxr/imaging/hdSt/fallbackLightingShader.h"
 #include "pxr/imaging/hdSt/glConversions.h"
+#include "pxr/imaging/hdSt/fallbackLightingShader.h"
 #include "pxr/imaging/hdSt/renderBuffer.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
@@ -38,9 +39,8 @@
 #include "pxr/imaging/hdSt/shaderCode.h"
 
 #include "pxr/imaging/hd/aov.h"
-#include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/changeTracker.h"
-#include "pxr/imaging/hd/engine.h"
+#include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
@@ -73,7 +73,6 @@ HdStRenderPassState::HdStRenderPassState(
     , _fallbackLightingShader(std::make_shared<HdSt_FallbackLightingShader>())
     , _clipPlanesBufferSize(0)
     , _alphaThresholdCurrent(0)
-    , _hasCustomGraphicsCmdsDesc(false)
 {
     _lightingShader = _fallbackLightingShader;
 }
@@ -180,8 +179,8 @@ HdStRenderPassState::Prepare(
             hdStResourceRegistry->AllocateUniformBufferArrayRange(
                 HdTokens->drawingShader, bufferSpecs, HdBufferArrayUsageHint());
 
-        HdBufferArrayRangeSharedPtr _renderPassStateBar_ =
-            std::static_pointer_cast<HdBufferArrayRange> (_renderPassStateBar);
+        HdStBufferArrayRangeSharedPtr _renderPassStateBar_ =
+            std::static_pointer_cast<HdStBufferArrayRange> (_renderPassStateBar);
 
         // add buffer binding request
         _renderPassShader->AddBufferBinding(
@@ -288,8 +287,8 @@ HdStRenderPassState::SetRenderPassShader(HdStRenderPassShaderSharedPtr const &re
     _renderPassShader = renderPassShader;
     if (_renderPassStateBar) {
 
-        HdBufferArrayRangeSharedPtr _renderPassStateBar_ =
-            std::static_pointer_cast<HdBufferArrayRange> (_renderPassStateBar);
+        HdStBufferArrayRangeSharedPtr _renderPassStateBar_ =
+            std::static_pointer_cast<HdStBufferArrayRange> (_renderPassStateBar);
 
         _renderPassShader->AddBufferBinding(
             HdBindingRequest(HdBinding::UBO, _tokens->renderPassState,
@@ -361,20 +360,66 @@ HdStRenderPassState::GetAovDimensions() const
     return GfVec2f(aov.renderBuffer->GetWidth(), aov.renderBuffer->GetHeight());
 }
 
+static
+HdRenderBuffer *
+_GetRenderBuffer(const HdRenderPassAovBinding& aov,
+                 const HdRenderIndex * const renderIndex)
+{
+    if (aov.renderBuffer) {
+        return aov.renderBuffer;
+    }
+
+    return 
+        dynamic_cast<HdRenderBuffer*>(
+            renderIndex->GetBprim(
+                HdPrimTypeTokens->renderBuffer,
+                aov.renderBufferId));
+}
+
+// Clear values are always vec4f in HgiGraphicsCmdDesc.
+static
+GfVec4f _ToVec4f(const VtValue &v)
+{
+    if (v.IsHolding<float>()) {
+        const float depth = v.UncheckedGet<float>();
+        return GfVec4f(depth,0,0,0);
+    }
+    if (v.IsHolding<double>()) {
+        const double val = v.UncheckedGet<double>();
+        return GfVec4f(val);
+    }
+    if (v.IsHolding<GfVec2f>()) {
+        const GfVec2f val = v.UncheckedGet<GfVec2f>();
+        return GfVec4f(val[0], val[1], 0.0, 1.0);
+    }
+    if (v.IsHolding<GfVec2d>()) {
+        const GfVec2d val = v.UncheckedGet<GfVec2d>();
+        return GfVec4f(val[0], val[1], 0.0, 1.0);
+    }
+    if (v.IsHolding<GfVec3f>()) {
+        const GfVec3f val = v.UncheckedGet<GfVec3f>();
+        return GfVec4f(val[0], val[1], val[2], 1.0);
+    }
+    if (v.IsHolding<GfVec3d>()) {
+        const GfVec3d val = v.UncheckedGet<GfVec3d>();
+        return GfVec4f(val[0], val[1], val[2], 1.0);
+    }
+    if (v.IsHolding<GfVec4f>()) {
+        return v.UncheckedGet<GfVec4f>();
+    }
+    if (v.IsHolding<GfVec4d>()) {
+        return GfVec4f(v.UncheckedGet<GfVec4d>());
+    }
+
+    TF_CODING_ERROR("Unsupported clear value for draw target attachment.");
+    return GfVec4f(0.0);
+}
+
 HgiGraphicsCmdsDesc
-HdStRenderPassState::MakeGraphicsCmdsDesc() const
+HdStRenderPassState::MakeGraphicsCmdsDesc(
+    const HdRenderIndex * const renderIndex) const
 {
     const HdRenderPassAovBindingVector& aovBindings = GetAovBindings();
-
-    if (_hasCustomGraphicsCmdsDesc) {
-        if (!aovBindings.empty()) {
-            TF_CODING_ERROR(
-                "Cannot specify a graphics cmds desc and aov bindings "
-                "at the same time.");
-        }
-
-        return _customGraphicsCmdsDesc;
-    }
 
     static const size_t maxColorTex = 8;
     const bool useMultiSample = GetUseAovMultiSample();
@@ -387,12 +432,17 @@ HdStRenderPassState::MakeGraphicsCmdsDesc() const
     // that backs the render buffer and was attached for graphics encoding.
 
     for (const HdRenderPassAovBinding& aov : aovBindings) {
-        if (!TF_VERIFY(aov.renderBuffer, "Invalid render buffer")) {
+        HdRenderBuffer * const renderBuffer =
+            _GetRenderBuffer(aov, renderIndex);
+
+
+        if (!TF_VERIFY(renderBuffer, "Invalid render buffer")) {
             continue;
         }
 
-        bool multiSampled= useMultiSample && aov.renderBuffer->IsMultiSampled();
-        VtValue rv = aov.renderBuffer->GetResource(multiSampled);
+        const bool multiSampled =
+            useMultiSample && renderBuffer->IsMultiSampled();
+        const VtValue rv = renderBuffer->GetResource(multiSampled);
 
         if (!TF_VERIFY(rv.IsHolding<HgiTextureHandle>(), 
             "Invalid render buffer texture")) {
@@ -405,7 +455,7 @@ HdStRenderPassState::MakeGraphicsCmdsDesc() const
         // Get resolve texture target.
         HgiTextureHandle hgiResolveHandle;
         if (multiSampled) {
-            VtValue resolveRes = aov.renderBuffer->GetResource(/*ms*/false);
+            VtValue resolveRes = renderBuffer->GetResource(/*ms*/false);
             if (!TF_VERIFY(resolveRes.IsHolding<HgiTextureHandle>())) {
                 continue;
             }
@@ -413,8 +463,8 @@ HdStRenderPassState::MakeGraphicsCmdsDesc() const
         }
 
         // Assume AOVs have the same dimensions so pick size of any.
-        desc.width = aov.renderBuffer->GetWidth();
-        desc.height = aov.renderBuffer->GetHeight();
+        desc.width = renderBuffer->GetWidth();
+        desc.height = renderBuffer->GetHeight();
 
         HgiAttachmentDesc attachmentDesc;
 
@@ -436,12 +486,8 @@ HdStRenderPassState::MakeGraphicsCmdsDesc() const
             HgiAttachmentStoreOpDontCare :
             HgiAttachmentStoreOpStore;
 
-        if (aov.clearValue.IsHolding<float>()) {
-            float depth = aov.clearValue.UncheckedGet<float>();
-            attachmentDesc.clearValue = GfVec4f(depth,0,0,0);
-        } else if (aov.clearValue.IsHolding<GfVec4f>()) {
-            const GfVec4f& col = aov.clearValue.UncheckedGet<GfVec4f>();
-            attachmentDesc.clearValue = col;
+        if (!aov.clearValue.IsEmpty()) {
+            attachmentDesc.clearValue = _ToVec4f(aov.clearValue);
         }
 
         // HdSt expresses blending per RenderPassState, where Hgi expresses
@@ -473,21 +519,5 @@ HdStRenderPassState::MakeGraphicsCmdsDesc() const
 
     return desc;
 }
-
-void
-HdStRenderPassState::SetCustomGraphicsCmdsDesc(
-    const HgiGraphicsCmdsDesc &graphicsCmdDesc)
-{
-    _customGraphicsCmdsDesc = graphicsCmdDesc;
-    _hasCustomGraphicsCmdsDesc = true;
-}
-
-void
-HdStRenderPassState::ClearCustomGraphicsCmdsDesc()
-{
-    _customGraphicsCmdsDesc = HgiGraphicsCmdsDesc();
-    _hasCustomGraphicsCmdsDesc = false;
-}
-
 
 PXR_NAMESPACE_CLOSE_SCOPE

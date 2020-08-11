@@ -32,13 +32,10 @@ import argparse
 import os
 import sys
 
-renderAPI = None
 if sys.platform != "darwin":
     from pxr import Glf as _gfxAPI
-    renderAPI = UsdImagingGL.RenderAPI.OpenGL
 else:
     from pxr import Mtlf as _gfxAPI
-    renderAPI = UsdImagingGL.RenderAPI.Metal
 
 def _Msg(msg):
     sys.stdout.write(msg + '\n')
@@ -145,7 +142,7 @@ def main():
     # output image. We just pass it along for cleanliness.
     glWidget = _SetupOpenGLContext(args.imageWidth, args.imageWidth)
 
-    frameRecorder = UsdAppUtils.FrameRecorder(renderAPI)
+    frameRecorder = UsdAppUtils.FrameRecorder()
     if args.rendererPlugin:
         frameRecorder.SetRendererPlugin(args.rendererPlugin.id)
     frameRecorder.SetImageWidth(args.imageWidth)

@@ -23,6 +23,7 @@
 //
 #include "pxr/imaging/mtlf/OSDMetalContext.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/hgiMetal/hgi.h"
 
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -30,8 +31,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 void OSDMetalContext::Init()
 {
-    device       = MtlfMetalContext::GetMetalContext()->currentDevice;
-    commandQueue = MtlfMetalContext::GetMetalContext()->gpus.commandQueue;
+    HgiMetal* hgi = MtlfMetalContext::GetMetalContext()->GetHgi();
+
+    device       = hgi->GetPrimaryDevice();
+    commandQueue = hgi->GetQueue();
 }
 
 #if OSD_METAL_DEFERRED
@@ -42,12 +45,15 @@ void OSDMetalContext::MetalWaitUntilCompleted(id<MTLCommandBuffer> cmdBuf)
     // Non deferred version would be - [cmdBuf waitUntilCompleted];
 }
 
-id<MTLCommandBuffer> OSDMetalContext::MetalGetCommandBuffer(id<MTLCommandQueue> cmdQueue)
+id<MTLCommandBuffer>
+OSDMetalContext::MetalGetCommandBuffer(id<MTLCommandQueue> cmdQueue)
 {
     // Ignore the provided command queue as we're using the Hydra one
     // Non deferred version would be -  return [cmdQueue commandBuffer];
-    // OSD workloads go in the GS buffer as they need to go in the same pass as smooth normals and anything else done before we draw
-    return MtlfMetalContext::GetMetalContext()->GetCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+    // OSD workloads go in the GS buffer as they need to go in the same pass as
+    // smooth normals and anything else done before we draw
+    HgiMetal* hgi = MtlfMetalContext::GetMetalContext()->GetHgi();
+    return hgi->GetCommandBuffer(false);
 }
 
 void  OSDMetalContext::MetalCommitCommandBuffer(id<MTLCommandBuffer> cmdBuf)

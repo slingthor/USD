@@ -336,17 +336,15 @@ UsdImagingInstanceAdapter::_Populate(UsdPrim const& prim,
                     TfType::GetCanonicalTypeName(typeid(*primAdapter)).c_str() :
                     "none");
         }
-        // Add this instancer into the render index if it has any prototypes.
-        if (primCount > 0) {
-            index->InsertInstancer(instancerPath,
-                                   /*parentPath=*/ctx.instancerCachePath,
-                                   _GetPrim(instancerPath),
-                                   ctx.instancerAdapter);
+        // Add this instancer into the render index
+        index->InsertInstancer(instancerPath,
+                               /*parentPath=*/ctx.instancerCachePath,
+                               _GetPrim(instancerPath),
+                               ctx.instancerAdapter);
 
-            // Mark this instancer as having a TrackVariability queued, since
-            // we automatically queue it in InsertInstancer.
-            instancerData.refreshVariability = true;
-        }
+        // Mark this instancer as having a TrackVariability queued, since
+        // we automatically queue it in InsertInstancer.
+        instancerData.refreshVariability = true;
     }
 
     // Add an entry to the instancer data for the given instance. Keep
@@ -1303,14 +1301,12 @@ UsdImagingInstanceAdapter::ProcessPropertyChange(UsdPrim const& prim,
         return HdChangeTracker::DirtyInstanceIndex;
     }
 
-    if (UsdGeomPrimvar::IsPrimvarRelatedPropertyName(propertyName)) {
+    if (UsdGeomPrimvarsAPI::CanContainPropertyName(propertyName)) {
         return UsdImagingPrimAdapter::_ProcessPrefixedPrimvarPropertyChange(
                 prim, cachePath, propertyName);
     }
 
-    // For other property changes, blast everything.  This will trigger a
-    // prim resync.
-    return HdChangeTracker::AllDirty;
+    return HdChangeTracker::Clean;
 }
 
 void
@@ -2006,6 +2002,8 @@ UsdImagingInstanceAdapter::_ComputeInstanceMap(
                     _InstancerData const& instrData,
                     UsdTimeCode time) const
 {
+    TRACE_FUNCTION();
+
     VtIntArray indices(0);
 
     _ComputeInstanceMapFn computeInstanceMapFn(
@@ -2075,8 +2073,8 @@ UsdImagingInstanceAdapter::GetScenePrimPath(
     // find the associated hydra instancer, and use the instance index to
     // look up the composed instance path.  They differ based on whether you
     // append a prototype path, and how you find the hydra instancer.
-    if (_IsChildPrim(
-            _GetPrim(cachePath.GetAbsoluteRootOrPrimPath()), cachePath)) {
+    UsdPrim usdPrim = _GetPrim(cachePath.GetAbsoluteRootOrPrimPath());
+    if (_IsChildPrim(usdPrim, cachePath)) {
 
         TF_DEBUG(USDIMAGING_SELECTION).Msg(
             "GetScenePrimPath: instance proto = %s\n", cachePath.GetText());
@@ -2086,9 +2084,23 @@ UsdImagingInstanceAdapter::GetScenePrimPath(
             cachePath.GetAbsoluteRootOrPrimPath(),
             cachePath, &instancerContext);
 
+        _InstancerData const* instrData =
+            TfMapLookupPtr(_instancerData, instancerContext.instancerCachePath);
+        if (!instrData) {
+            return SdfPath();
+        }
+
+        UsdPrim instancerPrim = _GetPrim(instancerContext.instancerCachePath);
+
+        // Translate from hydra instance index to USD (since hydra filters out
+        // invisible instances).
+        VtIntArray indices = _ComputeInstanceMap(instancerPrim, *instrData, 
+            _GetTimeWithOffset(0.0));
+
+        instanceIndex = indices[instanceIndex];
+
         _GetScenePrimPathFn primPathFn(this, instanceIndex, proto.path);
-        _RunForAllInstancesToDraw(
-            _GetPrim(instancerContext.instancerCachePath), &primPathFn);
+        _RunForAllInstancesToDraw(instancerPrim, &primPathFn);
         return primPathFn.primPath;
     } else {
 
@@ -2121,6 +2133,7 @@ struct UsdImagingInstanceAdapter::_PopulateInstanceSelectionFn
             int const hydraInstanceIndex_,
             VtIntArray const& parentInstanceIndices_,
             _InstancerData const* instrData_,
+            VtIntArray const& drawnIndices_,
             UsdImagingInstanceAdapter const* adapter_,
             HdSelection::HighlightMode const& highlightMode_,
             HdSelectionSharedPtr const& result_)
@@ -2128,6 +2141,7 @@ struct UsdImagingInstanceAdapter::_PopulateInstanceSelectionFn
         , hydraInstanceIndex(hydraInstanceIndex_)
         , parentInstanceIndices(parentInstanceIndices_)
         , instrData(instrData_)
+        , drawnIndices(drawnIndices_)
         , adapter(adapter_)
         , highlightMode(highlightMode_)
         , result(result_)
@@ -2212,12 +2226,17 @@ struct UsdImagingInstanceAdapter::_PopulateInstanceSelectionFn
         }
 
         // Create an instanceIndices that selects this instance, for use if the
-        // paths match.
-        // XXX: Ignore parentInstanceIndices since instanceAdapter can't
+        // paths match. Ignore parentInstanceIndices since instanceAdapter can't
         // have a parent.
+        // Note: "instanceIdx" is an index into the list of USD instances, but
+        // hydra's index buffer filters out invisible instances.  This means
+        // we need to translate here for the correct hydra encoding.
         VtIntArray instanceIndices;
-        if (hydraInstanceIndex == -1) {
-            instanceIndices.push_back((int)instanceIdx);
+        for (size_t i=0; i < drawnIndices.size(); i++) {
+            if (drawnIndices[i] == (int)instanceIdx) {
+                instanceIndices.push_back(i);
+                break;
+            }
         }
 
         if (selectionCount == selectionPathVec.size()) {
@@ -2272,6 +2291,7 @@ struct UsdImagingInstanceAdapter::_PopulateInstanceSelectionFn
     int const hydraInstanceIndex;
     VtIntArray const& parentInstanceIndices;
     _InstancerData const* instrData;
+    VtIntArray const& drawnIndices;
     UsdImagingInstanceAdapter const* adapter;
     HdSelection::HighlightMode const& highlightMode;
     HdSelectionSharedPtr const& result;
@@ -2341,16 +2361,12 @@ UsdImagingInstanceAdapter::PopulateSelection(
         }
 
         // Compose the instance indices.
-        // If hydraInstanceIndex != -1, just pass that through; otherwise,
-        // add the native instances to the parentInstanceIndices we pass
-        // down.
-        // XXX: We're ignoring parentInstanceIndices here since we
+        // Add the native instances to the parentInstanceIndices we pass
+        // down.  We're ignoring parentInstanceIndices here since we
         // know the instance adapter can't have a parent.
         VtIntArray instanceIndices;
-        if (hydraInstanceIndex == -1) {
-            for (size_t i = 0; i < instrData->numInstancesToDraw; ++i) {
-                instanceIndices.push_back(i);
-            }
+        for (size_t i = 0; i < instrData->numInstancesToDraw; ++i) {
+            instanceIndices.push_back(i);
         }
 
         // Populate selection.
@@ -2372,9 +2388,16 @@ UsdImagingInstanceAdapter::PopulateSelection(
             "PopulateSelection: instance = %s instancer = %s\n",
             cachePath.GetText(), instancerPath->GetText());
 
-        _PopulateInstanceSelectionFn populateFn(usdPrim, hydraInstanceIndex,
-            parentInstanceIndices, instrData, this, highlightMode, result);
-        _RunForAllInstancesToDraw(_GetPrim(*instancerPath), &populateFn);
+        UsdPrim instancerPrim = _GetPrim(*instancerPath);
+
+        VtIntArray indices = _ComputeInstanceMap(instancerPrim, *instrData, 
+            _GetTimeWithOffset(0.0));
+
+        _PopulateInstanceSelectionFn populateFn(usdPrim, 
+                hydraInstanceIndex,
+            parentInstanceIndices, instrData, indices, 
+            this, highlightMode, result);
+        _RunForAllInstancesToDraw(instancerPrim, &populateFn);
 
         return populateFn.added;
     }

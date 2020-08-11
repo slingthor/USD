@@ -92,14 +92,16 @@ public:
 #ifdef PXR_PTEX_SUPPORT_ENABLED
     // Ptex Texture
     GLF_API
-    virtual GarchPtexTextureRefPtr NewPtexTexture(const TfToken &imageFilePath) const override;
+    virtual GarchPtexTextureRefPtr NewPtexTexture(const TfToken &imageFilePath,
+                                                  const bool premultiplyAlpha) const override;
 #endif
     
     // UDIM Texture
     GLF_API
     virtual GarchUdimTextureRefPtr NewUdimTexture(TfToken const& imageFilePath,
                                                   GarchImage::ImageOriginLocation originLocation,
-                                                  std::vector<std::tuple<int, TfToken>>&& tiles) const override;
+                                                  std::vector<std::tuple<int, TfToken>>&& tiles,
+                                                  const bool premultiplyAlpha) const override;
     
 private:
     GlfContextCaps contextCaps;

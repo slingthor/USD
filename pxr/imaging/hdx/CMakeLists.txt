@@ -15,15 +15,6 @@ if (PXR_BUILD_OPENCOLORIO_PLUGIN)
     list(APPEND optionalIncludeDirs ${OCIO_INCLUDE_DIRS})
 endif()
 
-if (PXR_ENABLE_GL_SUPPORT AND PXR_ENABLE_METAL_SUPPORT)
-    list(APPEND optionalLibs hgiInterop)
-endif()
-
-set (optionalPublicClasses "")
-if (PXR_ENABLE_GL_SUPPORT)
-    list(APPEND optionalPublicClasses fullscreenShaderGL)
-endif()
-
 pxr_library(hdx
     LIBRARIES
         plug
@@ -49,7 +40,6 @@ pxr_library(hdx
 
     PUBLIC_CLASSES
         aovInputTask
-        colorizeTask
         colorizeSelectionTask
         colorChannelTask
         colorCorrectionTask
@@ -76,7 +66,6 @@ pxr_library(hdx
         taskController
         tokens
         types
-        ${optionalPublicClasses}
 
     PUBLIC_HEADERS
         shadowMatrixComputation.h

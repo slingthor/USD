@@ -235,7 +235,6 @@ public:
     USD_API
     static bool
     IsCollectionAPIPath(const SdfPath &path, TfToken *name);
-private:
 
     /// Applies this <b>multiple-apply</b> API schema to the given \p prim 
     /// along with the given instance name, \p name. 
@@ -247,14 +246,17 @@ private:
     /// 
     /// \return A valid UsdCollectionAPI object is returned upon success. 
     /// An invalid (or empty) UsdCollectionAPI object is returned upon 
-    /// failure. See \ref UsdAPISchemaBase::_MultipleApplyAPISchema() for 
+    /// failure. See \ref UsdPrim::ApplyAPI() for 
     /// conditions resulting in failure. 
     /// 
     /// \sa UsdPrim::GetAppliedSchemas()
     /// \sa UsdPrim::HasAPI()
+    /// \sa UsdPrim::ApplyAPI()
+    /// \sa UsdPrim::RemoveAPI()
     ///
+    USD_API
     static UsdCollectionAPI 
-    _Apply(const UsdPrim &prim, const TfToken &name);
+    Apply(const UsdPrim &prim, const TfToken &name);
 
 protected:
     /// Returns the type of schema this class belongs to.
@@ -382,6 +384,8 @@ public:
     // --(BEGIN CUSTOM CODE)--
 
 public:
+    /// \deprecated Use UsdCollectionAPI::Apply instead.
+    /// 
     /// Adds a new collection named \p name on the given prim, \p prim with the 
     /// specified expansion-rule, \p expansionRule.
     /// 
@@ -543,6 +547,11 @@ public:
     /// (assuming there are no opinions in stronger edit targets).
     USD_API
     bool BlockCollection() const;
+
+    /// Test whether a given \p name contains the "collection:" prefix
+    ///
+    USD_API
+    static bool CanContainPropertyName(const TfToken &name);
 
 private:
 

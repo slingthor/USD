@@ -42,9 +42,10 @@ public:
     ~HgiGLBuffer() override;
 
     HGIGL_API
-    uint64_t GetRawResource() const override;
+    size_t GetByteSizeOfResource() const override;
 
-    uint32_t GetBufferId() const {return _bufferId;}
+    HGIGL_API
+    uint64_t GetRawResource() const override;
 
 protected:
     friend class HgiGL;

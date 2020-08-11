@@ -33,6 +33,8 @@
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
+#include "pxr/base/arch/hash.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
@@ -93,7 +95,7 @@ HdStComputeShader::GetTextures() const
 }
 /*virtual*/
 void
-HdStComputeShader::BindResources(HdStProgram const &program,
+HdStComputeShader::BindResources(HdStGLSLProgram const &program,
                                  HdSt_ResourceBinder const &binder,
                                  HdRenderPassState const &state)
 {
@@ -101,7 +103,7 @@ HdStComputeShader::BindResources(HdStProgram const &program,
 }
 /*virtual*/
 void
-HdStComputeShader::UnbindResources(HdStProgram const &program,
+HdStComputeShader::UnbindResources(HdStGLSLProgram const &program,
                                    HdSt_ResourceBinder const &binder,
                                    HdRenderPassState const &state)
 {

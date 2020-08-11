@@ -73,11 +73,8 @@ using HdStShaderCodeSharedPtr =
 class HdSt_TextureHandleRegistry final
 {
 public:
-    HdSt_TextureHandleRegistry();
+    explicit HdSt_TextureHandleRegistry(Hgi * hgi);
     ~HdSt_TextureHandleRegistry();
-
-    /// Set Hgi instance
-    void SetHgi(Hgi* hgi);
 
     /// Allocate texture handle (thread-safe).
     ///
@@ -144,8 +141,6 @@ private:
 
     class _TextureToHandlesMap;
 
-    bool _samplerGarbageCollectionNeeded;
-
     // Handles that are new or for which the underlying texture has
     // changed: samplers might need to be (re-)allocated and the
     // corresponding shader code might need to update the shader bar.
@@ -160,9 +155,9 @@ private:
     // the texture).
     tbb::concurrent_vector<HdStShaderCodePtr> _dirtyShaders;
 
-    std::unique_ptr<_TextureToHandlesMap> _textureToHandlesMap;
     std::unique_ptr<class HdSt_SamplerObjectRegistry> _samplerObjectRegistry;
     std::unique_ptr<class HdSt_TextureObjectRegistry> _textureObjectRegistry;
+    std::unique_ptr<_TextureToHandlesMap> _textureToHandlesMap;
 
 };
 

@@ -35,8 +35,8 @@
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/GL/codeGenGLSL.h"
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
-#include "pxr/imaging/hdSt/GL/glUtils.h"
+#include "pxr/imaging/hdSt/GL/glslProgramGL.h"
+#include "pxr/imaging/hdSt/glUtils.h"
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/engine.h"
@@ -422,7 +422,6 @@ namespace {
             break;
         case HdBinding::UNIFORM:
         case HdBinding::UNIFORM_ARRAY:
-        case HdBinding::TBO:
         case HdBinding::BINDLESS_UNIFORM:
         case HdBinding::BINDLESS_SSBO_RANGE:
             if (caps.explicitUniformLocation) {
@@ -463,7 +462,7 @@ namespace {
     }
 }
 
-HdStProgramSharedPtr
+HdStGLSLProgramSharedPtr
 HdSt_CodeGenGLSL::Compile(HdStResourceRegistry *const registry)
 {
     HD_TRACE_FUNCTION();
@@ -489,8 +488,8 @@ HdSt_CodeGenGLSL::Compile(HdStResourceRegistry *const registry)
     bool hasFS  = (!fragmentShader.empty());
 
     // create GLSL program.
-    HdStProgramSharedPtr glslProgram(
-        new HdStGLSLProgram(HdTokens->drawingShader, registry));
+    HdStGLSLProgramSharedPtr glslProgram(
+        new HdStglslProgramGLSL(HdTokens->drawingShader, registry));
 
     // initialize autogen source buckets
     _genCommon.str(""); _genVS.str(""); _genTCS.str(""); _genTES.str("");
@@ -825,14 +824,14 @@ HdSt_CodeGenGLSL::Compile(HdStResourceRegistry *const registry)
     if (hasVS) {
         _vsSource = _genCommon.str() + _genVS.str();
         if (!glslProgram->CompileShader(HgiShaderStageVertex, _vsSource)) {
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
         shaderCompiled = true;
     }
     if (hasFS) {
         _fsSource = _genCommon.str() + _genFS.str();
         if (!glslProgram->CompileShader(HgiShaderStageFragment, _fsSource)) {
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
         shaderCompiled = true;
     }
@@ -840,7 +839,7 @@ HdSt_CodeGenGLSL::Compile(HdStResourceRegistry *const registry)
         _tcsSource = _genCommon.str() + _genTCS.str();
         if (!glslProgram->CompileShader(
                 HgiShaderStageTessellationControl, _tcsSource)) {
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
         shaderCompiled = true;
     }
@@ -848,26 +847,26 @@ HdSt_CodeGenGLSL::Compile(HdStResourceRegistry *const registry)
         _tesSource = _genCommon.str() + _genTES.str();
         if (!glslProgram->CompileShader(
                     HgiShaderStageTessellationEval, _tesSource)) {
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
         shaderCompiled = true;
     }
     if (hasGS) {
         _gsSource = _genCommon.str() + _genGS.str();
         if (!glslProgram->CompileShader(HgiShaderStageGeometry, _gsSource)) {
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
         shaderCompiled = true;
     }
 
     if (!shaderCompiled) {
-        return HdStProgramSharedPtr();
+        return HdStGLSLProgramSharedPtr();
     }
 
     return glslProgram;
 }
 
-HdStProgramSharedPtr
+HdStGLSLProgramSharedPtr
 HdSt_CodeGenGLSL::CompileComputeProgram(HdStResourceRegistry* const registry)
 {
     HD_TRACE_FUNCTION();
@@ -1018,8 +1017,8 @@ HdSt_CodeGenGLSL::CompileComputeProgram(HdStResourceRegistry* const registry)
     _genCS << "}\n";
     
     // create GLSL program.
-    HdStProgramSharedPtr glslProgram(
-        new HdStGLSLProgram(HdTokens->computeShader, registry));
+    HdStGLSLProgramSharedPtr glslProgram(
+        new HdStglslProgramGLSL(HdTokens->computeShader, registry));
     
     // compile shaders
     {
@@ -1032,11 +1031,11 @@ HdSt_CodeGenGLSL::CompileComputeProgram(HdStResourceRegistry* const registry)
             glCompileShader(shader);
 
             std::string logString;
-            HdStGLUtils::GetShaderCompileStatus(shader, &logString);
+            //HdStGLUtils::GetShaderCompileStatus(shader, &logString);
             TF_WARN("Failed to compile compute shader: %s",
                     logString.c_str());
             glDeleteShader(shader);
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
     }
     
@@ -1124,10 +1123,6 @@ static void _EmitDeclaration(std::stringstream &str,
         case HdBinding::BINDLESS_SSBO_RANGE:
             str << "uniform " << _GetPackedType(type, true)
             << " *" << name << ";\n";
-            break;
-        case HdBinding::TBO:
-            str << "uniform " << _GetSamplerBufferType(type)
-            << " " << name << ";\n";
             break;
         case HdBinding::BINDLESS_UNIFORM:
             str << "uniform " << _GetPackedType(type, true)
@@ -1257,13 +1252,7 @@ static void _EmitComputeAccessor(
     if (index) {
         str << _GetUnpackedType(type, false)
             << " HdGet_" << name << "(int localIndex) {\n";
-        if (binding.GetType() == HdBinding::TBO) {
-            str << "  int index = " << index << ";\n";
-            str << "  return "
-                << _GetPackedTypeAccessor(type, false)
-                << "(texelFetch(" << name << ", index)"
-                << _GetSwizzleString(type) << ");\n}\n";
-        } else if (binding.GetType() == HdBinding::SSBO) {
+        if (binding.GetType() == HdBinding::SSBO) {
             str << "  int index = " << index << ";\n";
             str << "  return " << _GetPackedTypeAccessor(type, false) << "("
                 << _GetPackedType(type, false) << "(";
@@ -1353,15 +1342,9 @@ static void _EmitAccessor(std::stringstream &str,
         str << _GetUnpackedType(type, false)
             << " HdGet_" << name << "(int localIndex) {\n"
             << "  int index = " << index << ";\n";
-        if (binding.GetType() == HdBinding::TBO) {
-            str << "  return "
-                << _GetPackedTypeAccessor(type, false)
-                << "(texelFetch(" << name << ", index)"
-                << _GetSwizzleString(type) << ");\n}\n";
-        } else {
-            str << "  return " << _GetPackedTypeAccessor(type, true) << "("
-                << name << "[index]);\n}\n";
-        }
+
+        str << "  return " << _GetPackedTypeAccessor(type, true) << "("
+            << name << "[index]);\n}\n";
     } else {
         // non-indexed, only makes sense for uniform or vertex.
         if (binding.GetType() == HdBinding::UNIFORM ||
@@ -1582,17 +1565,10 @@ static void _EmitFVarGSAccessor(
     str << _GetUnpackedType(type, false)
         << " HdGet_" << name << "_Coarse(int localIndex) {\n"
         << "  int fvarIndex = GetFVarIndex(localIndex);\n";
-    
-    if (binding.GetType() == HdBinding::TBO) {
-        str << "  return "
-            << _GetPackedTypeAccessor(type, false)
-            << "(texelFetch(" << name << ", fvarIndex)"
-            << _GetSwizzleString(type) << ");\n}\n";
-    } else {
-        str << "  return " << _GetPackedTypeAccessor(type, true) << "("
-            << name << "[fvarIndex]);\n}\n";
-    }
-    
+
+    str << "  return " << _GetPackedTypeAccessor(type, true) << "("
+        << name << "[fvarIndex]);\n}\n";
+
     // emit the (public) accessor for the fvar data, accounting for refinement
     // interpolation
     str << "vec4 GetPatchCoord(int index);\n"; // forward decl

@@ -22,10 +22,9 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/diagnostic.h"
-
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
+#include "pxr/imaging/glf/diagnostic.h"
 
 #include <vector>
 
@@ -36,15 +35,18 @@
 #include "pxr/base/tf/enum.h"
 
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/glConversions.h"
-#include "pxr/imaging/hdSt/resourceFactory.h"
+#include "pxr/imaging/hdSt/glUtils.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/vboMemoryManager.h"
-
-#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/imaging/hf/perfLog.h"
+
+#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/blitCmds.h"
+#include "pxr/imaging/hgi/blitCmdsOps.h"
+#include "pxr/imaging/hgi/buffer.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -61,8 +63,8 @@ HdStVBOMemoryManager::CreateBufferArray(
     HdBufferSpecVector const &bufferSpecs,
     HdBufferArrayUsageHint usageHint)
 {
-    return HdStResourceFactory::GetInstance()->NewVBOMemoryBuffer(
-                            role, bufferSpecs, usageHint);
+    return std::make_shared<HdStVBOMemoryManager::_StripedBufferArray>(
+        _resourceRegistry, role, bufferSpecs, usageHint);
 }
 
 
@@ -108,17 +110,18 @@ HdStVBOMemoryManager::GetResourceAllocation(
     HdBufferArraySharedPtr const &bufferArray, 
     VtDictionary &result) const 
 { 
-    std::set<HdResourceGPUHandle> idSet;
+    std::set<GLuint> idSet;
     size_t gpuMemoryUsed = 0;
 
     _StripedBufferArraySharedPtr bufferArray_ =
         std::static_pointer_cast<_StripedBufferArray> (bufferArray);
 
     TF_FOR_ALL(resIt, bufferArray_->GetResources()) {
-        HdBufferResourceSharedPtr const & resource = resIt->second;
+        HdStBufferResourceSharedPtr const & resource = resIt->second;
+        HgiBufferHandle buffer = resource->GetId();
 
         // XXX avoid double counting of resources shared within a buffer
-        HdResourceGPUHandle id = resource->GetId();
+        GLuint id = buffer ? buffer->GetRawResource() : 0;
         if (idSet.count(id) == 0) {
             idSet.insert(id);
 
@@ -144,10 +147,12 @@ HdStVBOMemoryManager::GetResourceAllocation(
 //  _StripedBufferArray
 // ---------------------------------------------------------------------------
 HdStVBOMemoryManager::_StripedBufferArray::_StripedBufferArray(
+    HdStResourceRegistry* resourceRegistry,
     TfToken const &role,
     HdBufferSpecVector const &bufferSpecs,
     HdBufferArrayUsageHint usageHint)
     : HdBufferArray(role, HdPerfTokens->garbageCollectedVbo, usageHint),
+      _resourceRegistry(resourceRegistry),
       _needsCompaction(false),
       _totalCapacity(0),
       _maxBytesPerElement(0)
@@ -202,7 +207,7 @@ HdStVBOMemoryManager::_StripedBufferArray::_StripedBufferArray(
     }
 }
 
-HdBufferResourceSharedPtr
+HdStBufferResourceSharedPtr
 HdStVBOMemoryManager::_StripedBufferArray::_AddResource(TfToken const& name,
                                                    HdTupleType tupleType,
                                                    int offset,
@@ -211,15 +216,14 @@ HdStVBOMemoryManager::_StripedBufferArray::_AddResource(TfToken const& name,
     HD_TRACE_FUNCTION();
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
         // duplication check
-        HdBufferResourceSharedPtr bufferRes = GetResource(name);
+        HdStBufferResourceSharedPtr bufferRes = GetResource(name);
         if (!TF_VERIFY(!bufferRes)) {
             return bufferRes;
         }
     }
 
-    HdBufferResourceSharedPtr bufferRes = HdStBufferResourceSharedPtr(
-        HdStResourceFactory::GetInstance()->NewBufferResource(
-            GetRole(), tupleType, offset, stride));
+    HdStBufferResourceSharedPtr bufferRes = HdStBufferResourceSharedPtr(
+        new HdStBufferResource(GetRole(), tupleType, offset, stride));
     _resourceList.emplace_back(name, bufferRes);
     return bufferRes;
 }
@@ -269,6 +273,200 @@ HdStVBOMemoryManager::_StripedBufferArray::GarbageCollect()
     return false;
 }
 
+void
+HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
+    std::vector<HdBufferArrayRangeSharedPtr> const &ranges,
+    HdBufferArraySharedPtr const &curRangeOwner)
+{
+    HD_TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
+
+    HD_PERF_COUNTER_INCR(HdPerfTokens->vboRelocated);
+
+    _StripedBufferArraySharedPtr curRangeOwner_ =
+        std::static_pointer_cast<_StripedBufferArray> (curRangeOwner);
+
+    if (!TF_VERIFY(GetResources().size() ==
+                      curRangeOwner_->GetResources().size())) {
+        TF_CODING_ERROR("Resource mismatch when reallocating buffer array");
+        return;
+    }
+
+    if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
+        HdStBufferResourceNamedList::size_type bresIdx = 0;
+        TF_FOR_ALL(bresIt, GetResources()) {
+            TF_VERIFY(curRangeOwner_->GetResources()[bresIdx++].second ==
+                      curRangeOwner_->GetResource(bresIt->first));
+        }
+    }
+
+    GLF_GROUP_FUNCTION();
+
+    // count up total elements and update new offsets
+    size_t totalNumElements = 0;
+    std::vector<size_t> newOffsets;
+    newOffsets.reserve(ranges.size());
+
+    TF_FOR_ALL (it, ranges) {
+        HdBufferArrayRangeSharedPtr const &range = *it;
+        if (!range) {
+            TF_CODING_ERROR("Expired range found in the reallocation list");
+            continue;
+        }
+
+        // save new offset
+        newOffsets.push_back(totalNumElements);
+
+        // XXX: always tightly pack for now.
+        totalNumElements += range->GetNumElements();
+    }
+
+    // update range list (should be done before early exit)
+    _SetRangeList(ranges);
+
+    _totalCapacity = totalNumElements;
+    
+    Hgi* hgi = _resourceRegistry->GetHgi();
+    HgiBlitCmds* blitCmds = _resourceRegistry->GetBlitCmds();
+
+    // resize each BufferResource
+    HdStBufferResourceNamedList const& resources = GetResources();
+    for (size_t bresIdx=0; bresIdx<resources.size(); ++bresIdx) {
+        HdStBufferResourceSharedPtr const &bres = resources[bresIdx].second;
+        HdStBufferResourceSharedPtr const &curRes =
+                curRangeOwner_->GetResources()[bresIdx].second;
+
+        int bytesPerElement = HdDataSizeOfTupleType(bres->GetTupleType());
+        TF_VERIFY(bytesPerElement > 0);
+        size_t bufferSize = bytesPerElement * _totalCapacity;
+
+        // allocate new one
+        // curId and oldId will be different when we are adopting ranges
+        // from another buffer array.
+        HgiBufferHandle newIds[3];
+        HgiBufferHandle oldIds[3];
+        HgiBufferHandle curIds[3];
+
+        HgiBufferDesc bufDesc;
+        bufDesc.usage = HgiBufferUsageUniform;
+        bufDesc.byteSize = bufferSize;
+
+        for (int32_t i = 0; i < 3; i++) {
+            oldIds[i] = bres->GetId(i);
+            curIds[i] = curRes->GetId(i);
+                        
+            // Skip buffers of zero size
+            if (bufferSize > 0) {
+                // Disable triple buffering
+                if (i == 0) {
+                    newIds[i] = hgi->CreateBuffer(bufDesc);
+                }
+            }
+        }
+
+        // if old and new buffer exist, copy unchanged data
+        if (curIds[0] && newIds[0]) {
+            std::vector<size_t>::iterator newOffsetIt = newOffsets.begin();
+
+            // pre-pass to combine consecutive buffer range relocation
+            std::unique_ptr<HdStBufferRelocator> relocators[3];
+            
+            for (int i = 0; i < 3; i++) {
+                int const curIndex = curIds[i] ? i : 0;
+                if (newIds[i]) {
+                    relocators[i] = std::make_unique<HdStBufferRelocator>(curIds[curIndex], newIds[i]);
+                }
+            }
+            TF_FOR_ALL (it, ranges) {
+                _StripedBufferArrayRangeSharedPtr range =
+                    std::static_pointer_cast<_StripedBufferArrayRange>(*it);
+                if (!range) {
+                    TF_CODING_ERROR("_StripedBufferArrayRange "
+                                    "expired unexpectedly.");
+                    continue;
+                }
+
+                // copy the range. There are three cases:
+                //
+                // 1. src length (capacity) == dst length (numElements)
+                //   Copy the entire range
+                //
+                // 2. src length < dst length
+                //   Enlarging the range. This typically happens when
+                //   applying quadrangulation/subdivision to populate
+                //   additional data at the end of source data.
+                //
+                // 3. src length > dst length
+                //   Shrinking the range. When the garbage collection
+                //   truncates ranges.
+                //
+                int oldSize = range->GetCapacity();
+                int newSize = range->GetNumElements();
+                GLsizeiptr copySize =
+                    std::min(oldSize, newSize) * bytesPerElement;
+                int oldOffset = range->GetElementOffset();
+                if (copySize > 0) {
+                    GLintptr readOffset = oldOffset * bytesPerElement;
+                    GLintptr writeOffset = *newOffsetIt * bytesPerElement;
+
+                    for (int i = 0; i < 3; i++) {
+                        if (relocators[i]) {
+                            relocators[i]->AddRange(readOffset, writeOffset, copySize);
+                        }
+                    }
+                }
+                ++newOffsetIt;
+            }
+
+            // buffer copy
+            for (int i = 0; i < 3; i++) {
+                if (relocators[i]) {
+                    relocators[i]->Commit(blitCmds);
+                }
+            }
+        }
+
+        for (int i = 0; i < 3; i++) {
+            if (oldIds[i]) {
+                // delete old buffer
+                hgi->DestroyBuffer(&oldIds[i]);
+            }
+        }
+
+        // update id of buffer resource
+        bres->SetAllocations(newIds[0], newIds[1], newIds[2], bufferSize);
+    }
+
+    // update ranges
+    for (size_t idx = 0; idx < ranges.size(); ++idx) {
+        _StripedBufferArrayRangeSharedPtr range =
+            std::static_pointer_cast<_StripedBufferArrayRange>(ranges[idx]);
+        if (!range) {
+            TF_CODING_ERROR("_StripedBufferArrayRange expired unexpectedly.");
+            continue;
+        }
+        range->SetElementOffset(newOffsets[idx]);
+        range->SetCapacity(range->GetNumElements());
+    }
+    _needsReallocation = false;
+    _needsCompaction = false;
+
+    // increment version to rebuild dispatch buffers.
+    IncrementVersion();
+}
+
+void
+HdStVBOMemoryManager::_StripedBufferArray::_DeallocateResources()
+{
+    Hgi* hgi = _resourceRegistry->GetHgi();
+    TF_FOR_ALL (it, GetResources()) {
+        HdStBufferResourceSharedPtr bufferRes = it->second;
+        hgi->DestroyBuffer(&bufferRes->GetId(0));
+        hgi->DestroyBuffer(&bufferRes->GetId(1));
+        hgi->DestroyBuffer(&bufferRes->GetId(2));
+    }
+}
+
 /*virtual*/
 size_t
 HdStVBOMemoryManager::_StripedBufferArray::GetMaxNumElements() const
@@ -293,7 +491,7 @@ HdStVBOMemoryManager::_StripedBufferArray::DebugDump(std::ostream &out) const
     }
 }
 
-HdBufferResourceSharedPtr
+HdStBufferResourceSharedPtr
 HdStVBOMemoryManager::_StripedBufferArray::GetResource() const
 {
     HD_TRACE_FUNCTION();
@@ -302,7 +500,7 @@ HdStVBOMemoryManager::_StripedBufferArray::GetResource() const
 
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
         // make sure this buffer array has only one resource.
-        HdResourceGPUHandle id = _resourceList.begin()->second->GetId();
+        HgiBufferHandle const& id = _resourceList.begin()->second->GetId();
         TF_FOR_ALL (it, _resourceList) {
             if (it->second->GetId() != id) {
                 TF_CODING_ERROR("GetResource(void) called on"
@@ -315,14 +513,14 @@ HdStVBOMemoryManager::_StripedBufferArray::GetResource() const
     return _resourceList.begin()->second;
 }
 
-HdBufferResourceSharedPtr
+HdStBufferResourceSharedPtr
 HdStVBOMemoryManager::_StripedBufferArray::GetResource(TfToken const& name)
 {
     HD_TRACE_FUNCTION();
 
     // linear search.
     // The number of buffer resources should be small (<10 or so).
-    for (HdBufferResourceNamedList::iterator it = _resourceList.begin();
+    for (HdStBufferResourceNamedList::iterator it = _resourceList.begin();
          it != _resourceList.end(); ++it) {
         if (it->first == name) return it->second;
     }
@@ -450,10 +648,10 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::CopyData(
 
     if (!TF_VERIFY(_stripedBufferArray)) return;
 
-    HdBufferResourceSharedPtr VBO =
+    HdStBufferResourceSharedPtr VBO =
         _stripedBufferArray->GetResource(bufferSource->GetName());
 
-    if (!TF_VERIFY((VBO && VBO->GetId().IsSet()),
+    if (!TF_VERIFY((VBO && VBO->GetId()),
                       "VBO doesn't exist for %s",
                       bufferSource->GetName().GetText())) {
         return;
@@ -495,7 +693,8 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::CopyData(
 
         void const* const data = bufferSource->GetData();
         if (data) {
-            VBO->CopyData(vboOffset, srcSize, data);
+            VBO->CopyData(_stripedBufferArray->GetBlitCmds(),
+                          vboOffset, srcSize, data);
         }
     }
 }
@@ -505,10 +704,10 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::GetByteOffset(
     TfToken const& resourceName) const
 {
     if (!TF_VERIFY(_stripedBufferArray)) return 0;
-    HdBufferResourceSharedPtr VBO =
+    HdStBufferResourceSharedPtr VBO =
         _stripedBufferArray->GetResource(resourceName);
 
-    if (!VBO || (VBO->GetId().IsSet() && _numElements > 0)) {
+    if (!VBO || (!VBO->GetId() && _numElements > 0)) {
         TF_CODING_ERROR("VBO doesn't exist for %s", resourceName.GetText());
         return 0;
     }
@@ -525,16 +724,17 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::ReadData(TfToken const &name) co
     VtValue result;
     if (!TF_VERIFY(_stripedBufferArray)) return result;
 
-    HdBufferResourceSharedPtr VBO = _stripedBufferArray->GetResource(name);
+    HdStBufferResourceSharedPtr VBO = _stripedBufferArray->GetResource(name);
 
-    if (!VBO || (!VBO->GetId().IsSet() && _numElements > 0)) {
+    if (!VBO || (!VBO->GetId() && _numElements > 0)) {
         TF_CODING_ERROR("VBO doesn't exist for %s", name.GetText());
         return result;
     }
 
     GLintptr vboOffset = _GetByteOffset(VBO);
 
-    result = VBO->ReadBuffer(VBO->GetTupleType(),
+    result = VBO->ReadBuffer(_stripedBufferArray->GetHgi(),
+                             VBO->GetTupleType(),
                              vboOffset,
                              /*stride=*/0,  // not interleaved.
                              _numElements);
@@ -559,7 +759,7 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::GetUsageHint() const
 }
 
 
-HdBufferResourceSharedPtr
+HdStBufferResourceSharedPtr
 HdStVBOMemoryManager::_StripedBufferArrayRange::GetResource() const
 {
     if (!TF_VERIFY(_stripedBufferArray)) return HdStBufferResourceSharedPtr();
@@ -567,7 +767,7 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::GetResource() const
     return _stripedBufferArray->GetResource();
 }
 
-HdBufferResourceSharedPtr
+HdStBufferResourceSharedPtr
 HdStVBOMemoryManager::_StripedBufferArrayRange::GetResource(TfToken const& name)
 {
     if (!TF_VERIFY(_stripedBufferArray)) return HdStBufferResourceSharedPtr();
@@ -575,11 +775,11 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::GetResource(TfToken const& name)
     return _stripedBufferArray->GetResource(name);
 }
 
-HdBufferResourceNamedList const&
+HdStBufferResourceNamedList const&
 HdStVBOMemoryManager::_StripedBufferArrayRange::GetResources() const
 {
     if (!TF_VERIFY(_stripedBufferArray)) {
-        static HdBufferResourceNamedList empty;
+        static HdStBufferResourceNamedList empty;
         return empty;
     }
     return _stripedBufferArray->GetResources();
@@ -608,7 +808,7 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::_GetAggregation() const
 
 size_t
 HdStVBOMemoryManager::_StripedBufferArrayRange::_GetByteOffset(
-    HdBufferResourceSharedPtr const& resource) const
+    HdStBufferResourceSharedPtr const& resource) const
 {
     return HdDataSizeOfTupleType(resource->GetTupleType()) * _elementOffset;
 }

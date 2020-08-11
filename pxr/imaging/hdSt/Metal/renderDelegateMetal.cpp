@@ -102,10 +102,6 @@ HdStRenderDelegateMetal::GetRenderSettingDescriptors() const
         apiDevices[i++] = _MetalDeviceDescriptor(dev);
     }
 
-    ret.push_back({ "GPU",
-        HdStRenderSettingsTokens->graphicsAPI,
-        VtValue(apiDevices) });
-
     return ret;
 }
 
@@ -138,10 +134,6 @@ void HdStRenderDelegateMetal::CommitResources(HdChangeTracker *tracker)
 
 VtValue HdStRenderDelegateMetal::GetRenderSetting(TfToken const& key) const
 {
-    if (key == HdStRenderSettingsTokens->graphicsAPI) {
-        return VtValue(std::string(_deviceDesc.GetText()));
-    }
-    
     return  HdStRenderDelegate::GetRenderSetting(key);
 }
 

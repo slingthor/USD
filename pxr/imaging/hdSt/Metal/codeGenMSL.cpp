@@ -32,7 +32,7 @@
 #include "pxr/imaging/hio/glslfx.h"
 
 #include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
-#include "pxr/imaging/hdSt/Metal/mslProgram.h"
+#include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
 
 #include "pxr/imaging/hdSt/geometricShader.h"
 #include "pxr/imaging/hdSt/package.h"
@@ -196,7 +196,6 @@ static bool InDeviceMemory(const HdBinding binding)
     switch (binding.GetType()) {
         case HdBinding::SSBO:
         case HdBinding::UBO:
-        case HdBinding::TBO:
             return true;
         default:
             return false;
@@ -535,7 +534,7 @@ static HdSt_CodeGenMSL::TParam& _AddInputPtrParam(
 {
     return _AddInputPtrParam(inputParams,
                         bd.name, bd.dataType, attribute,
-                        bd.binding, arraySize, programScope, bd.writable);
+                        bd.binding, arraySize, programScope);
 }
 
 static void _EmitDeclaration(std::stringstream &str,
@@ -744,7 +743,6 @@ namespace {
             break;
         case HdBinding::UNIFORM:
         case HdBinding::UNIFORM_ARRAY:
-        case HdBinding::TBO:
         case HdBinding::SSBO:
         case HdBinding::BINDLESS_UNIFORM:
         case HdBinding::TEXTURE_2D:
@@ -1153,7 +1151,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                                     std::stringstream& glueGS,
                                     std::stringstream& gluePS,
                                     std::stringstream& glueCS,
-                                    HdStMSLProgramSharedPtr mslProgram)
+                                    HdStGLSLProgramMSLSharedPtr mslProgram)
 {
     std::stringstream   glueCommon, copyInputsVtx, copyOutputsVtx, copyInputsVtxStruct_Compute,
                         copyInputsVtx_Compute, copyGSOutputsIntoVSOutputs, fragExtrasStruct;
@@ -2339,7 +2337,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     METAL_DEBUG_COMMENT(&glueCS, "End of _GenerateGlue(glueCS)\n\n"); //MTL_FIXME
 }
 
-HdStProgramSharedPtr
+HdStGLSLProgramSharedPtr
 HdSt_CodeGenMSL::Compile(HdStResourceRegistry* const registry)
 {
     HD_TRACE_FUNCTION();
@@ -2370,8 +2368,8 @@ HdSt_CodeGenMSL::Compile(HdStResourceRegistry* const registry)
     _buildTarget = (_hasGS ? kMSL_BuildTarget_MVA_ComputeGS : kMSL_BuildTarget_MVA);
     
     // create MSL program.
-    HdStMSLProgramSharedPtr mslProgram(
-        new HdStMSLProgram(HdTokens->drawingShader, registry));
+    HdStGLSLProgramMSLSharedPtr mslProgram(
+        new HdStGLSLProgramMSL(HdTokens->drawingShader, registry));
     
     // initialize autogen source buckets
     _genDefinitions.str(""); _genOSDDefinitions.str(""); _genCommon.str("");
@@ -2643,7 +2641,7 @@ HdSt_CodeGenMSL::Compile(HdStResourceRegistry* const registry)
 //    }
     
     if (!shaderCompiled) {
-        return HdStProgramSharedPtr();
+        return HdStGLSLProgramSharedPtr();
     }
     
     return mslProgram;
@@ -2776,7 +2774,7 @@ HdSt_CodeGenMSL::GetComputeHeader()
     return header.str();
 }
                 
-HdStProgramSharedPtr
+HdStGLSLProgramSharedPtr
 HdSt_CodeGenMSL::CompileComputeProgram(HdStResourceRegistry* const registry)
 {
     HD_TRACE_FUNCTION();
@@ -2886,8 +2884,8 @@ HdSt_CodeGenMSL::CompileComputeProgram(HdStResourceRegistry* const registry)
     glueVS.str(""); gluePS.str(""); glueGS.str(""); glueCS.str("");
     
     // create Metal function.
-    HdStMSLProgramSharedPtr program(
-        new HdStMSLProgram(HdTokens->drawingShader, registry));
+    HdStGLSLProgramMSLSharedPtr program(
+        new HdStGLSLProgramMSL(HdTokens->drawingShader, registry));
 
     _GenerateGlue(glueVS, glueGS, gluePS, glueCS, program);
     
@@ -2897,7 +2895,7 @@ HdSt_CodeGenMSL::CompileComputeProgram(HdStResourceRegistry* const registry)
         _csSource = replaceStringAll(_csSource, "<st>", "_Compute");
 
         if (!program->CompileShader(HgiShaderStageCompute, _csSource)) {
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
     }
 
@@ -3018,10 +3016,7 @@ static void _EmitComputeAccessor(
         str << _GetUnpackedType(type, false)
             << " HdGet_" << name << "(int localIndex) {\n"
             << "  int index = " << index << ";\n";
-        if (binding.GetType() == HdBinding::TBO) {
-            str << "  return texelFetch("
-                << name << ", index)" << _GetPackedTypeAccessor(type, false) << ";\n}\n";
-        } else if (binding.GetType() == HdBinding::SSBO) {
+        if (binding.GetType() == HdBinding::SSBO) {
             str << "  return " << _GetPackedTypeAccessor(type, false) << "(";
             int numComponents = _GetNumComponents(type);
             for (int c = 0; c < numComponents; ++c) {
@@ -3109,15 +3104,8 @@ static void _EmitAccessor(std::stringstream &str,
         str << _GetUnpackedType(type, false)
             << " HdGet_" << name << "(int localIndex) {\n"
             << "  int index = " << index << ";\n";
-        if (binding.GetType() == HdBinding::TBO) {
-            str << "  return "
-                << _GetPackedTypeAccessor(type, false)
-                << "(texelFetch(" << name << ", index)"
-                << _GetSwizzleString(type) << ");\n}\n";
-        } else {
-            str << "  return " << _GetPackedTypeAccessor(type, true) << "("
-                << name << "[index]);\n}\n";
-        }
+        str << "  return " << _GetPackedTypeAccessor(type, true) << "("
+            << name << "[index]);\n}\n";
     } else {
         // non-indexed, only makes sense for uniform or vertex.
         if (binding.GetType() == HdBinding::UNIFORM ||
@@ -3537,7 +3525,7 @@ HdSt_CodeGenMSL::_GenerateBindingsCode()
             if (binDecl->binding.GetType() == HdBinding::SSBO)
             {
                 indexStr = "localIndex";
-                if (binDecl->typeIsAtomic || binDecl->writable)
+                if (binDecl->typeIsAtomic)
                 {
                     _EmitDeclarationMutablePtr(_genCommon, *binDecl);
                 }

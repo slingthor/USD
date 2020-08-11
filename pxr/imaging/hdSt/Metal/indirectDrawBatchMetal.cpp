@@ -40,8 +40,8 @@
 #include "pxr/imaging/hdSt/shaderKey.h"
 
 #include "pxr/imaging/hdSt/Metal/indirectDrawBatchMetal.h"
-#include "pxr/imaging/hdSt/Metal/mslProgram.h"
-#include "pxr/imaging/hdSt/Metal/persistentBufferMetal.h"
+#include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
+#include "pxr/imaging/hdSt/persistentBuffer.h"
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
@@ -142,7 +142,7 @@ HdSt_IndirectDrawBatchMetal::_ExecuteDraw(_DrawingProgram &program, int batchCou
 void
 HdSt_IndirectDrawBatchMetal::_GPUFrustumInstanceCullingExecute(
     HdStResourceRegistrySharedPtr const &resourceRegistry,
-    HdStProgramSharedPtr const &program,
+    HdStGLSLProgramSharedPtr const &program,
     HdSt_ResourceBinder const &binder,
     HdBufferResourceSharedPtr cullCommandBuffer)
 {
@@ -186,7 +186,7 @@ HdSt_IndirectDrawBatchMetal::_SyncFence() {
 void
 HdSt_IndirectDrawBatchMetal::_GPUFrustumNonInstanceCullingExecute(
       HdStResourceRegistrySharedPtr const &resourceRegistry,
-      HdStProgramSharedPtr const &program,
+      HdStGLSLProgramSharedPtr const &program,
       HdSt_ResourceBinder const &binder)
 {
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
@@ -222,13 +222,14 @@ HdSt_IndirectDrawBatchMetal::_BeginGPUCountVisibleInstances(
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     if (!_resultBuffer) {
-        _resultBuffer = std::dynamic_pointer_cast<HdStPersistentBufferMetal>(
-            resourceRegistry->RegisterPersistentBuffer(
-                _tokens->drawIndirectResult, sizeof(GLint), 0));
+        // APPLE METAL: Removed dynamic cast
+        _resultBuffer = resourceRegistry->RegisterPersistentBuffer(
+                _tokens->drawIndirectResult, sizeof(GLint), 0);
     }
 
     // Reset visible item count
-    *((GLint *)_resultBuffer->GetMappedAddress()) = 0;
+    // APPLE METAL: Don't understand how this was
+    //*((GLint *)_resultBuffer->GetMappedAddress()) = 0;
 }
 
 void
@@ -258,7 +259,7 @@ HdSt_IndirectDrawBatchMetal::_EndGPUCountVisibleInstances(GLsync resultSync, siz
 /* virtual */
 bool
 HdSt_IndirectDrawBatchMetal::_CullingProgramMetal::_Link(
-        HdStProgramSharedPtr const & program)
+        HdStGLSLProgramSharedPtr const & program)
 {
     if (!TF_VERIFY(program)) return false;
 
