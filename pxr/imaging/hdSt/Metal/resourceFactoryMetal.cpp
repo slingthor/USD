@@ -30,7 +30,6 @@
 #include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
 #include "pxr/imaging/hdSt/Metal/domeLightComputationsMetal.h"
 #include "pxr/imaging/hdSt/Metal/drawTargetTextureResourceMetal.h"
-#include "pxr/imaging/hdSt/Metal/extCompGpuComputationMetal.h"
 #include "pxr/imaging/hdSt/Metal/indirectDrawBatchMetal.h"
 #include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
 #include "pxr/imaging/hdSt/Metal/renderPassShaderMetal.h"
@@ -122,18 +121,6 @@ HdStGLSLProgram *HdStResourceFactoryMetal::NewProgram(
     TfToken const &role, HdStResourceRegistry *const registry) const
 {
     return new HdStGLSLProgramMSL(role, registry);
-}
-
-HdStExtCompGpuComputation*
-HdStResourceFactoryMetal::NewExtCompGPUComputationGPU(
-    SdfPath const &id,
-    HdStExtCompGpuComputationResourceSharedPtr const &resource,
-    HdExtComputationPrimvarDescriptorVector const &compPrimvars,
-    int dispatchCount,
-    int elementCount) const
-{
-    return new HdStExtCompGpuComputationMetal(
-        id, resource, compPrimvars, dispatchCount, elementCount);
 }
 
 HdSt_DomeLightComputationGPU*

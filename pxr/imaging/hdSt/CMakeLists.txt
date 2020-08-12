@@ -29,7 +29,6 @@ if (PXR_ENABLE_GL_SUPPORT)
     list(APPEND GFXADDITIONAL   GL/codeGenGLSL
                         GL/domeLightComputationsGL
                         GL/drawTargetTextureResourceGL
-                        GL/extCompGpuComputationGL
                         GL/glslProgramGL
                         GL/indirectDrawBatchGL
                         GL/renderPassShaderGL
@@ -49,7 +48,6 @@ if (PXR_ENABLE_METAL_SUPPORT)
     list(APPEND GFXADDITIONAL  Metal/codeGenMSL
                         Metal/domeLightComputationsMetal
                         Metal/drawTargetTextureResourceMetal
-                        Metal/extCompGpuComputationMetal
                         Metal/indirectDrawBatchMetal
                         Metal/metalConversions
                         Metal/glslProgramMetal

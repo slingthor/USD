@@ -128,6 +128,7 @@ namespace {
 }
 
 HdSt_ResourceBinderMetal::HdSt_ResourceBinderMetal()
+: _introspectedBindingsMap(nullptr)
 {
 }
 
@@ -257,8 +258,15 @@ HdSt_ResourceBinderMetal::IntrospectBindings(HdStGLSLProgramSharedPtr programRes
 {
     HdStGLSLProgramMSLSharedPtr program(std::dynamic_pointer_cast<HdStGLSLProgramMSL>(programResource));
     
+    MSL_ShaderBindingMap const &bm = program->GetBindingMap();
+    
+    if (&bm == _introspectedBindingsMap) {
+        return;
+    }
+    _introspectedBindingsMap = &bm;
+
     //Copy the all shader bindings from the program.
-    _shaderBindingMap = program->GetBindingMap();
+    _shaderBindingMap = bm;
 
     TF_FOR_ALL(it, _bindingMap) {
         HdBinding binding = it->second;
@@ -453,6 +461,22 @@ HdSt_ResourceBinderMetal::UnbindShaderResources(
     for (const HdStShaderCode::NamedTextureHandle & texture : textures) {
         _BindTextureDispatch(texture, *this, shaderProgram, /* bind = */ false);
     }
+}
+
+uint32_t
+HdSt_ResourceBinderMetal::GetLocation(TfToken const &name) const
+{
+    // This onlu finds the first hit - won't work for bindings
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+
+    auto shaderBindings = MSL_FindBinding(_shaderBindingMap, name, -1);
+    auto it = shaderBindings.first;
+    
+    for(; it != shaderBindings.second; ++it) {
+        MSL_ShaderBinding const* const shaderBinding = (*it).second;
+        return shaderBinding->_index;
+    }
+    return 0;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
