@@ -890,20 +890,20 @@ function(pxr_toplevel_prologue)
             # case we assume the files will be found there regardless
             # of IMPORTED_LOCATION.  Note, however, that the install
             # cannot be relocated in this case.
-            if(NOT PXR_INSTALL_LOCATION AND TARGET usd_ms)
-                get_property(location TARGET usd_ms PROPERTY IMPORTED_LOCATION)
-                if(location)
-                    # Remove filename and directory.
-                    get_filename_component(parent "${location}" PATH)
-                    get_filename_component(parent "${parent}" PATH)
-                    get_filename_component(parent "${parent}" ABSOLUTE)
-                    get_filename_component(prefix "${CMAKE_INSTALL_PREFIX}" ABSOLUTE)
-                    if(NOT "${parent}" STREQUAL "${prefix}")
-                        message("IMPORTED_LOCATION for usd_ms ${location} inconsistent with install directory ${CMAKE_INSTALL_PREFIX}.")
-                        message(WARNING "May not find plugins at runtime.")
-                    endif()
-                endif()
-            endif()
+            # if(NOT PXR_INSTALL_LOCATION AND TARGET usd_ms)
+            #     get_property(location TARGET usd_ms PROPERTY IMPORTED_LOCATION)
+            #     if(location)
+            #         # Remove filename and directory.
+            #         get_filename_component(parent "${location}" PATH)
+            #         get_filename_component(parent "${parent}" PATH)
+            #         get_filename_component(parent "${parent}" ABSOLUTE)
+            #         get_filename_component(prefix "${CMAKE_INSTALL_PREFIX}" ABSOLUTE)
+            #         if(NOT "${parent}" STREQUAL "${prefix}")
+            #             message("IMPORTED_LOCATION for usd_ms ${location} inconsistent with install directory ${CMAKE_INSTALL_PREFIX}.")
+            #             message(WARNING "May not find plugins at runtime.")
+            #         endif()
+            #     endif()
+            # endif()
         else()
             # Note that we ignore BUILD_SHARED_LIBS when building monolithic
             # when PXR_MONOLITHIC_IMPORT isn't set:  we always build an
@@ -913,42 +913,42 @@ function(pxr_toplevel_prologue)
 
             # We need at least one source file for the library so we
             # create an empty one.
-            add_custom_command(
-                OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/usd_ms.cpp"
-                COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/usd_ms.cpp"
-            )
+            # add_custom_command(
+            #     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/usd_ms.cpp"
+            #     COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/usd_ms.cpp"
+            # )
 
             # Our shared library.
-            add_library(usd_ms SHARED "${CMAKE_CURRENT_BINARY_DIR}/usd_ms.cpp")
-            _get_folder("" folder)
-            set_target_properties(usd_ms
-                PROPERTIES
-                    FOLDER "${folder}"
-                    PREFIX "${PXR_LIB_PREFIX}"
-                    IMPORT_PREFIX "${PXR_LIB_PREFIX}"
-            )
-            _get_install_dir("lib" libInstallPrefix)
-            install(
-                TARGETS usd_ms
-                LIBRARY DESTINATION ${libInstallPrefix}
-                ARCHIVE DESTINATION ${libInstallPrefix}
-                RUNTIME DESTINATION ${libInstallPrefix}
-            )
-            if(WIN32)
-                install(
-                    FILES $<TARGET_PDB_FILE:usd_ms>
-                    DESTINATION ${libInstallPrefix}
-                    OPTIONAL
-                )
-            endif()
+            # add_library(usd_ms SHARED "${CMAKE_CURRENT_BINARY_DIR}/usd_ms.cpp")
+            # _get_folder("" folder)
+            # set_target_properties(usd_ms
+            #     PROPERTIES
+            #         FOLDER "${folder}"
+            #         PREFIX "${PXR_LIB_PREFIX}"
+            #         IMPORT_PREFIX "${PXR_LIB_PREFIX}"
+            # )
+            # _get_install_dir("lib" libInstallPrefix)
+            # install(
+            #     TARGETS usd_ms
+            #     LIBRARY DESTINATION ${libInstallPrefix}
+            #     ARCHIVE DESTINATION ${libInstallPrefix}
+            #     RUNTIME DESTINATION ${libInstallPrefix}
+            # )
+            # if(WIN32)
+            #     install(
+            #         FILES $<TARGET_PDB_FILE:usd_ms>
+            #         DESTINATION ${libInstallPrefix}
+            #         OPTIONAL
+            #     )
+            # endif()
         endif()
     endif()
 
     # Create a target for shared libraries.  We currently use this only
     # to test its existence.
-    if(BUILD_SHARED_LIBS OR TARGET usd_ms)
-        add_custom_target(shared_libs)
-    endif()
+    # if(BUILD_SHARED_LIBS OR TARGET usd_ms)
+    #     add_custom_target(shared_libs)
+    # endif()
 
     # Create a target for targets that require Python.  Each should add
     # itself as a dependency to the "python" target.
@@ -960,66 +960,66 @@ endfunction() # pxr_toplevel_prologue
 function(pxr_toplevel_epilogue)
     # If we're building a shared monolithic library then link it against
     # usd_m.
-    if(TARGET usd_ms AND NOT PXR_MONOLITHIC_IMPORT)
-        # We need to use whole-archive to get all the symbols.  Also note
-        # that we carefully avoid adding the usd_m target itself by using
-        # TARGET_FILE.  Linking the usd_m target would link usd_m and
-        # everything it links to.
-        if(MSVC)
-            target_link_libraries(usd_ms
-                PRIVATE
-                    -WHOLEARCHIVE:$<TARGET_FILE:usd_m>
-            )
-        elseif(CMAKE_COMPILER_IS_GNUCXX)
-            target_link_libraries(usd_ms
-                PRIVATE
-                    -Wl,--whole-archive $<TARGET_FILE:usd_m> -Wl,--no-whole-archive
-            )
-        elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-            target_link_libraries(usd_ms
-                PRIVATE
-                    -Wl,-force_load $<TARGET_FILE:usd_m>
-            )
-        endif()
+    # if(TARGET usd_ms AND NOT PXR_MONOLITHIC_IMPORT)
+    #     # We need to use whole-archive to get all the symbols.  Also note
+    #     # that we carefully avoid adding the usd_m target itself by using
+    #     # TARGET_FILE.  Linking the usd_m target would link usd_m and
+    #     # everything it links to.
+    #     if(MSVC)
+    #         target_link_libraries(usd_ms
+    #             PRIVATE
+    #                 -WHOLEARCHIVE:$<TARGET_FILE:usd_m>
+    #         )
+    #     elseif(CMAKE_COMPILER_IS_GNUCXX)
+    #         target_link_libraries(usd_ms
+    #             PRIVATE
+    #                 -Wl,--whole-archive $<TARGET_FILE:usd_m> -Wl,--no-whole-archive
+    #         )
+    #     elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+    #         target_link_libraries(usd_ms
+    #             PRIVATE
+    #                 -Wl,-force_load $<TARGET_FILE:usd_m>
+    #         )
+    #     endif()
 
-        # Since we didn't add a dependency to usd_ms on usd_m above, we
-        # manually add it here along with compile definitions, include
-        # directories, etc
-        add_dependencies(usd_ms usd_m)
+    #     # Since we didn't add a dependency to usd_ms on usd_m above, we
+    #     # manually add it here along with compile definitions, include
+    #     # directories, etc
+    #     add_dependencies(usd_ms usd_m)
 
-        # Add the stuff we didn't get because we didn't link against the
-        # usd_m target.
-        target_compile_definitions(usd_ms
-            PUBLIC
-                $<TARGET_PROPERTY:usd_m,INTERFACE_COMPILE_DEFINITIONS>
-        )
-        target_include_directories(usd_ms
-            PUBLIC
-                $<TARGET_PROPERTY:usd_m,INTERFACE_INCLUDE_DIRECTORIES>
-        )
-        target_include_directories(usd_ms
-            SYSTEM
-            PUBLIC
-                $<TARGET_PROPERTY:usd_m,INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>
-        )
-        foreach(lib ${PXR_OBJECT_LIBS})
-            get_property(libs TARGET ${lib} PROPERTY INTERFACE_LINK_LIBRARIES)
-            target_link_libraries(usd_ms
-                PUBLIC
-                    ${libs}
-            )
-        endforeach()
-        target_link_libraries(usd_ms
-            PUBLIC
-                ${PXR_MALLOC_LIBRARY}
-                ${PXR_THREAD_LIBS}
-        )
+    #     # Add the stuff we didn't get because we didn't link against the
+    #     # usd_m target.
+    #     target_compile_definitions(usd_ms
+    #         PUBLIC
+    #             $<TARGET_PROPERTY:usd_m,INTERFACE_COMPILE_DEFINITIONS>
+    #     )
+    #     target_include_directories(usd_ms
+    #         PUBLIC
+    #             $<TARGET_PROPERTY:usd_m,INTERFACE_INCLUDE_DIRECTORIES>
+    #     )
+    #     target_include_directories(usd_ms
+    #         SYSTEM
+    #         PUBLIC
+    #             $<TARGET_PROPERTY:usd_m,INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>
+    #     )
+    #     foreach(lib ${PXR_OBJECT_LIBS})
+    #         get_property(libs TARGET ${lib} PROPERTY INTERFACE_LINK_LIBRARIES)
+    #         target_link_libraries(usd_ms
+    #             PUBLIC
+    #                 ${libs}
+    #         )
+    #     endforeach()
+    #     target_link_libraries(usd_ms
+    #         PUBLIC
+    #             ${PXR_MALLOC_LIBRARY}
+    #             ${PXR_THREAD_LIBS}
+    #     )
 
-        _pxr_init_rpath(rpath "${libInstallPrefix}")
-        _pxr_add_rpath(rpath "${CMAKE_INSTALL_PREFIX}/${PXR_INSTALL_SUBDIR}/lib")
-        _pxr_add_rpath(rpath "${CMAKE_INSTALL_PREFIX}/lib")
-        _pxr_install_rpath(rpath usd_ms)
-    endif()
+    #     _pxr_init_rpath(rpath "${libInstallPrefix}")
+    #     _pxr_add_rpath(rpath "${CMAKE_INSTALL_PREFIX}/${PXR_INSTALL_SUBDIR}/lib")
+    #     _pxr_add_rpath(rpath "${CMAKE_INSTALL_PREFIX}/lib")
+    #     _pxr_install_rpath(rpath usd_ms)
+    # endif()
 
     # Setup the plugins in the top epilogue to ensure that everybody has had a
     # chance to update PXR_EXTRA_PLUGINS with their plugin paths.
@@ -1110,22 +1110,22 @@ function(pxr_monolithic_epilogue)
         OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/usd-targets-$<CONFIG>.cmake"
         CONTENT "${export}"
     )
-    set(export "")
-    set(export "${export}# Boilerplate for export of usd_ms.  Replace FIXMEs with appropriate paths\n")
-    set(export "${export}# or include usd-targets-$<CONFIG>.cmake in your own build and generate your\n")
-    set(export "${export}# own export file.  Configure with PXR_MONOLITHIC_IMPORT set to the path of\n")
-    set(export "${export}# the export file.\n")
-    set(export "${export}add_library(usd_ms SHARED IMPORTED)\n")
-    set(export "${export}set_property(TARGET usd_ms PROPERTY IMPORTED_LOCATION FIXME)\n")
-    set(export "${export}#set_property(TARGET usd_ms PROPERTY IMPORTED_IMPLIB FIXME)\n")
-    set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_COMPILE_DEFINITIONS $<TARGET_PROPERTY:usd_m,INTERFACE_COMPILE_DEFINITIONS>)\n")
-    set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_INCLUDE_DIRECTORIES $<TARGET_PROPERTY:usd_m,INTERFACE_INCLUDE_DIRECTORIES>)\n")
-    set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_SYSTEM_INCLUDE_DIRECTORIES $<TARGET_PROPERTY:usd_m,INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>)\n")
-    set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_LINK_LIBRARIES $<TARGET_PROPERTY:usd_m,INTERFACE_LINK_LIBRARIES>)\n")
-    file(GENERATE
-        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/usd-imports-$<CONFIG>.cmake"
-        CONTENT "${export}"
-    )
+    # set(export "")
+    # set(export "${export}# Boilerplate for export of usd_ms.  Replace FIXMEs with appropriate paths\n")
+    # set(export "${export}# or include usd-targets-$<CONFIG>.cmake in your own build and generate your\n")
+    # set(export "${export}# own export file.  Configure with PXR_MONOLITHIC_IMPORT set to the path of\n")
+    # set(export "${export}# the export file.\n")
+    # set(export "${export}add_library(usd_ms SHARED IMPORTED)\n")
+    # set(export "${export}set_property(TARGET usd_ms PROPERTY IMPORTED_LOCATION FIXME)\n")
+    # set(export "${export}#set_property(TARGET usd_ms PROPERTY IMPORTED_IMPLIB FIXME)\n")
+    # set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_COMPILE_DEFINITIONS $<TARGET_PROPERTY:usd_m,INTERFACE_COMPILE_DEFINITIONS>)\n")
+    # set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_INCLUDE_DIRECTORIES $<TARGET_PROPERTY:usd_m,INTERFACE_INCLUDE_DIRECTORIES>)\n")
+    # set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_SYSTEM_INCLUDE_DIRECTORIES $<TARGET_PROPERTY:usd_m,INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>)\n")
+    # set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_LINK_LIBRARIES $<TARGET_PROPERTY:usd_m,INTERFACE_LINK_LIBRARIES>)\n")
+    # file(GENERATE
+    #     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/usd-imports-$<CONFIG>.cmake"
+    #     CONTENT "${export}"
+    # )
 
     # Convenient name for building the monolithic library.
     add_custom_target(monolithic

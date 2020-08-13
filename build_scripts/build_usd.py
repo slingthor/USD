@@ -1701,6 +1701,9 @@ PTEX = Dependency("Ptex", InstallPtex, "include/PtexVersion.h")
 BLOSC_URL = "https://github.com/Blosc/c-blosc/archive/v1.17.0.zip"
 
 def InstallBLOSC(context, force, buildArgs):
+    if context.static_dependencies_macOS:
+        unexported_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'unexported_symbols_list_blosc')
+
     with CurrentWorkingDirectory(DownloadURL(BLOSC_URL, context, force)):
         extraArgs = []
 
@@ -1719,6 +1722,9 @@ def InstallBLOSC(context, force, buildArgs):
                 [('#include "gzguts.h"', '#include <unistd.h>\n#include "gzguts.h"')])
             PatchFile("internal-complibs/zlib-1.2.8/gzwrite.c",
                 [('#include "gzguts.h"', '#include <unistd.h>\n#include "gzguts.h"')])
+
+        if context.static_dependencies_macOS:
+            extraArgs.append('-DCMAKE_STATIC_LINKER_FLAGS="-unexported_symbols_list ' + unexported_file + ' " ')
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
@@ -1770,8 +1776,8 @@ OPENVDB = Dependency("OpenVDB", InstallOpenVDB, "include/openvdb/openvdb.h")
 OIIO_URL = "https://github.com/OpenImageIO/oiio/archive/Release-2.1.16.0.zip"
 
 def InstallOpenImageIO(context, force, buildArgs):
-    if context.static_dependencies_macOS:
-        unexported_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'unexported_symbols_list_oiio')
+    # if context.static_dependencies_macOS:
+    #     unexported_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'unexported_symbols_list_oiio')
 
     with CurrentWorkingDirectory(DownloadURL(OIIO_URL, context, force)):
         extraArgs = ['-DOIIO_BUILD_TESTS=OFF',
@@ -1780,7 +1786,8 @@ def InstallOpenImageIO(context, force, buildArgs):
 
         if context.static_dependencies_macOS:
             extraArgs.append('-DLINKSTATIC=1 ')
-            extraArgs.append('-DCMAKE_SHARED_LINKER_FLAGS="-unexported_symbols_list ' + unexported_file + ' " ')
+            extraArgs.append('-DBUILD_SHARED_LIBS=0 ')
+            # extraArgs.append('-DCMAKE_STATIC_LINKER_FLAGS="-unexported_symbols_list ' + unexported_file + ' " ')
 
         if context.buildOIIOTools:
             extraArgs.append('-DOIIO_BUILD_TOOLS=ON')
@@ -2179,6 +2186,9 @@ EMBREE = Dependency("Embree", InstallEmbree, "include/embree3/rtcore.h")
 # USD
 
 def InstallUSD(context, force, buildArgs):
+    if context.static_dependencies_macOS:
+        unexported_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'unexported_symbols_list')
+
     with CurrentWorkingDirectory(context.usdSrcDir):
         extraArgs = []
         extraArgs.append('-DPXR_OVERRIDE_PLUGINPATH_NAME=../Resources/usd')
@@ -2253,6 +2263,8 @@ def InstallUSD(context, force, buildArgs):
 
             if context.enableOpenVDB:
                 extraArgs.append('-DPXR_ENABLE_OPENVDB_SUPPORT=ON')
+                if context.static_dependencies_macOS:
+                    extraArgs.append('-DCMAKE_STATIC_LINKER_FLAGS="-unexported_symbols_list ' + unexported_file + ' " ')
             else:
                 extraArgs.append('-DPXR_ENABLE_OPENVDB_SUPPORT=OFF')
 
