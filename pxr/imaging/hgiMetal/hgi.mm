@@ -335,7 +335,12 @@ HgiMetal::BeginMtlf()
     _needsFlip = false;
 
     if (_encoder) {
-        _sampleCount = _encoder->_descriptor.colorTextures[0]->GetDescriptor().sampleCount;
+        if (_encoder->_descriptor.colorTextures.size()) {
+            _sampleCount = _encoder->_descriptor.colorTextures[0]->GetDescriptor().sampleCount;
+        }
+        else if (_encoder->_descriptor.depthTexture) {
+            _sampleCount = _encoder->_descriptor.depthTexture->GetDescriptor().sampleCount;
+        }
         _encoder->_Submit(this);
         CommitCommandBuffer();
         return true;
