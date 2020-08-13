@@ -761,7 +761,7 @@ HgiInteropMetal::_RestoreOpenGlState()
     }
     glBindBuffer(GL_ARRAY_BUFFER, _restoreVbo);
     
-    if (!_restoreVao) {
+    if (!_restoreVao && _restoreVbo) {
         for (int i = 0; i < 2; i++) {
             VertexAttribState &state(_restoreVertexAttribState[i]);
             if (state.enabled) {

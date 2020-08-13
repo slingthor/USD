@@ -30,7 +30,6 @@
 #include "pxr/imaging/hdSt/GL/codeGenGLSL.h"
 #include "pxr/imaging/hdSt/GL/domeLightComputationsGL.h"
 #include "pxr/imaging/hdSt/GL/drawTargetTextureResourceGL.h"
-#include "pxr/imaging/hdSt/GL/extCompGpuComputationGL.h"
 #include "pxr/imaging/hdSt/GL/glslProgramGL.h"
 #include "pxr/imaging/hdSt/GL/indirectDrawBatchGL.h"
 #include "pxr/imaging/hdSt/GL/renderPassStateGL.h"
@@ -121,18 +120,6 @@ HdStGLSLProgram *HdStResourceFactoryGL::NewProgram(
     TfToken const &role, HdStResourceRegistry *const registry) const
 {
     return new HdStglslProgramGLSL(role, registry);
-}
-
-HdStExtCompGpuComputation *
-HdStResourceFactoryGL::NewExtCompGPUComputationGPU(
-    SdfPath const &id,
-    HdStExtCompGpuComputationResourceSharedPtr const &resource,
-    HdExtComputationPrimvarDescriptorVector const &compPrimvars,
-    int dispatchCount,
-    int elementCount) const
-{
-    return new HdStExtCompGpuComputationGL(
-                    id, resource, compPrimvars, dispatchCount, elementCount);
 }
 
 HdSt_DomeLightComputationGPU*

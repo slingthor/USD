@@ -67,15 +67,6 @@ public:
     HDST_API
     virtual HdSt_DrawBatchSharedPtr NewIndirectDrawBatch(
         HdStDrawItemInstance * drawItemInstance) const override;
-
-    /// Creates a new ExtCompGPUComputation computation
-    HDST_API
-    virtual HdStExtCompGpuComputation *NewExtCompGPUComputationGPU(
-        SdfPath const &id,
-        HdStExtCompGpuComputationResourceSharedPtr const &resource,
-        HdExtComputationPrimvarDescriptorVector const &compPrimvars,
-        int dispatchCount,
-        int elementCount) const override;
       
     /// Creates a new HdSt_DomeLightComputationGPU computation
     HDST_API

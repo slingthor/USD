@@ -109,10 +109,10 @@ MAT4 GetInstanceTransform(int level)
 #ifdef HD_HAS_INSTANCE_translate
     vec3 t = HdGetInstance_translate(level, /*default=*/vec3(0));
 #if !defined(_matrix_initialised)
-    MAT4 m((  1,   0,   0,  0,
-              0,   1,   0,  0,
-              0,   0,   1,  0,
-            t.x, t.y, t.z,  1);
+    MAT4 m(  1,   0,   0,  0,
+             0,   1,   0,  0,
+             0,   0,   1,  0,
+             t.x, t.y, t.z,  1);
   #define _matrix_initialised
 #else
       m[3] += vec4(t.xyz, 0);
