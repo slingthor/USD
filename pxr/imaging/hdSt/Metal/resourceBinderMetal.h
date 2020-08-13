@@ -88,8 +88,13 @@ public:
     HDST_API
     virtual void BindUniformf(TfToken const &name, int count, const float *value) const override;
 
+    /// Return the Metal binding location for the buffer
+    HDST_API
+    uint32_t GetLocation(TfToken const &name) const;
+    
 private:
     mutable MSL_ShaderBindingMap _shaderBindingMap;
+    mutable MSL_ShaderBindingMap const* _introspectedBindingsMap;
 };
 
 
