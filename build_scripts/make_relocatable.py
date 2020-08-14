@@ -160,6 +160,7 @@ def make_relocatable(install_path, buildPython, iOS, verbose_output=False):
         pyside_path = os.path.dirname(pyside_file)
 
         if foundOpenGL:
+            import OpenGL
             openGL_file = os.path.abspath(OpenGL.__file__)
             openGL_path = os.path.dirname(openGL_file)
 
