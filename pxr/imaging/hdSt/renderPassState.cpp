@@ -486,6 +486,9 @@ HdStRenderPassState::MakeGraphicsCmdsDesc(
             HgiAttachmentStoreOpDontCare :
             HgiAttachmentStoreOpStore;
 
+        // APPLE METAL: When Mtlf is gone, remove this
+        attachmentDesc.storeOp = HgiAttachmentStoreOpStore;
+        
         if (!aov.clearValue.IsEmpty()) {
             attachmentDesc.clearValue = _ToVec4f(aov.clearValue);
         }
