@@ -998,11 +998,24 @@ public:
     }
 
     string const & GetUninlinedValue(uint32_t i, string *) const {
-        return crate->GetString(StringIndex(i));
+        const StringIndex& sIndex = StringIndex(i);
+        if (ARCH_UNLIKELY(crate->GetStrings().size() <= sIndex.value)) {
+            static auto emptyString = new string("");
+            TF_RUNTIME_ERROR("Failed to get string for index %u", sIndex.value);
+            return *emptyString;
+        }
+
+        return crate->GetString(sIndex);
     }
 
     TfToken const &GetUninlinedValue(uint32_t i, TfToken *) const {
-        return crate->GetToken(TokenIndex(i));
+        const TokenIndex& tIndex = TokenIndex(i);
+        if( ARCH_UNLIKELY(crate->GetTokens().size() <= tIndex.value)) {
+            static auto emptyToken = new TfToken();
+            TF_RUNTIME_ERROR("Failed to get token for index %u", tIndex.value);
+            return *emptyToken;
+        }
+        return crate->GetToken(tIndex);
     }
 
     SdfPath const &GetUninlinedValue(uint32_t i, SdfPath *) const {
@@ -1010,7 +1023,12 @@ public:
     }
 
     SdfAssetPath GetUninlinedValue(uint32_t i, SdfAssetPath *) const {
-        return SdfAssetPath(crate->GetToken(TokenIndex(i)));
+        const TokenIndex& tIndex = TokenIndex(i);
+        if (ARCH_UNLIKELY(crate->GetTokens().size() <= tIndex.value)) {
+            TF_RUNTIME_ERROR("Failed to get token for index %u", tIndex.value);
+            return SdfAssetPath();
+        }
+        return SdfAssetPath(crate->GetToken(tIndex));
     }
              
     SdfVariability GetUninlinedValue(uint32_t i, SdfVariability *) const {
@@ -3054,7 +3072,7 @@ CrateFile::_ReadStructuralSections(Reader reader, int64_t fileSize)
     _boot = _ReadBootStrap(reader.src, fileSize);
     if (m.IsClean()) _toc = _ReadTOC(reader, _boot);
     if (m.IsClean()) _PrefetchStructuralSections(reader);
-    if (m.IsClean()) _ReadTokens(reader);
+    if (m.IsClean()) _ReadTokens(reader, fileSize);
     if (m.IsClean()) _ReadStrings(reader);
     if (m.IsClean()) _ReadFields(reader);
     if (m.IsClean()) _ReadFieldSets(reader);
@@ -3087,7 +3105,7 @@ CrateFile::_ReadBootStrap(ByteStream src, int64_t fileSize)
     }
     // Check that the table of contents is not past the end of the file.  This
     // catches some cases where a file was corrupted by truncation.
-    else if (fileSize <= b.tocOffset) {
+    else if (fileSize <= b.tocOffset || b.tocOffset < 0) {
         TF_RUNTIME_ERROR(
             "Usd crate file corrupt, possibly truncated: table of contents "
             "at offset %" PRId64 " but file size is %" PRId64,
@@ -3178,11 +3196,17 @@ CrateFile::_ReadFields(Reader reader)
             _fields.resize(numFields);
 
             // Create temporary space for decompressing.
+            const size_t compressedBufferSize = Usd_IntegerCompression::GetCompressedBufferSize(numFields);
             std::unique_ptr<char[]> compBuffer(
-                new char[Usd_IntegerCompression::
-                         GetCompressedBufferSize(numFields)]);
+                new char[compressedBufferSize]);
             vector<uint32_t> tmp(numFields);
             auto fieldsSize = reader.template Read<uint64_t>();
+
+             if (ARCH_UNLIKELY(fieldsSize > compressedBufferSize)) {
+                 TF_RUNTIME_ERROR("Failed read fields, buffer overflow.");
+                 return;
+             }
+
             reader.ReadContiguous(compBuffer.get(), fieldsSize);
             Usd_IntegerCompression::DecompressFromBuffer(
                 compBuffer.get(), fieldsSize, tmp.data(), numFields);
@@ -3294,7 +3318,7 @@ CrateFile::_ReadStrings(Reader reader)
 
 template <class Reader>
 void
-CrateFile::_ReadTokens(Reader reader)
+CrateFile::_ReadTokens(Reader reader, int64_t fileSize)
 {
     TfAutoMallocTag tag("_ReadTokens");
 
@@ -3302,13 +3326,20 @@ CrateFile::_ReadTokens(Reader reader)
     if (!tokensSection)
         return;
 
+    if ARCH_UNLIKELY(fileSize <= tokensSection->start || tokensSection->start < 0) {
+        TF_RUNTIME_ERROR(
+            "Usd crate file corrupt, tokens section is possibly truncated"
+            "at offset %" PRId64 " but file size is %" PRId64,
+            tokensSection->start, fileSize);
+        return;
+    }
     reader.Seek(tokensSection->start);
 
     // Read number of tokens.
     auto numTokens = reader.template Read<uint64_t>();
 
     RawDataPtr chars;
-    
+    uint64_t charsSize = 0;
     Version fileVer(_boot);
     if (fileVer < Version(0,4,0)) {
         // XXX: To support pread(), we need to read the whole thing into memory
@@ -3317,6 +3348,7 @@ CrateFile::_ReadTokens(Reader reader)
         auto tokensNumBytes = reader.template Read<uint64_t>();
         chars.reset(new char[tokensNumBytes]);
         reader.ReadContiguous(chars.get(), tokensNumBytes);
+        charsSize = tokensNumBytes;
     } else {
         // Compressed token data.
         uint64_t uncompressedSize = reader.template Read<uint64_t>();
@@ -3326,12 +3358,18 @@ CrateFile::_ReadTokens(Reader reader)
         reader.ReadContiguous(compressed.get(), compressedSize);
         TfFastCompression::DecompressFromBuffer(
             compressed.get(), chars.get(), compressedSize, uncompressedSize);
+        charsSize = uncompressedSize;
     }
 
     // Now we read that many null-terminated strings into _tokens.
-    char const *p = chars.get();
+    char *p = chars.get();
     _tokens.clear();
     _tokens.resize(numTokens);
+    // To prevent buffer overflows we force the last char to be \0 null character.
+    // It should already be the case for valid char buffers.
+    if (ARCH_LIKELY(charsSize > 0)) {
+        p[charsSize - 1] = '\0';
+    }
 
     WorkArenaDispatcher wd;
     struct MakeToken {
@@ -3341,6 +3379,14 @@ CrateFile::_ReadTokens(Reader reader)
         char const *str;
     };
     for (size_t i = 0; i != numTokens; ++i) {
+        // The number of tokens trying to be read might be larger
+        // than the number of tokens available in the valid char array range.
+        // Making sure here we're staying within bounds.
+        auto pOffset = p - chars.get();
+        if (ARCH_UNLIKELY(pOffset >= charsSize)) {
+            TF_RUNTIME_ERROR("Failed read tokens, buffer overflow.");
+            return;
+        }
         MakeToken mt { &_tokens, i, p };
         wd.Run(mt);
         p += strlen(p) + 1;
