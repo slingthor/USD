@@ -86,10 +86,7 @@ public:
     
     // APPLE METAL: Multibuffering support.
     HDST_API
-    virtual void CopyData(class HgiBlitCmds* blitCmds,
-                          size_t vboOffset,
-                          size_t dataSize,
-                          void const *data);
+    virtual void CopyDataIsHappening();
     
     // APPLE METAL: Multibuffering support.
     HDST_API

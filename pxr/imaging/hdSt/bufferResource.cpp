@@ -148,10 +148,7 @@ HdStBufferResource::SetAllocations(HgiBufferHandle const& id0,
 }
 
 // APPLE METAL: Multibuffering support.
-void HdStBufferResource::CopyData(HgiBlitCmds* blitCmds,
-                                    size_t vboOffset,
-                                    size_t dataSize,
-                                    void const *data)
+void HdStBufferResource::CopyDataIsHappening()
 {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
@@ -165,14 +162,6 @@ void HdStBufferResource::CopyData(HgiBlitCmds* blitCmds,
         }
         _lastFrameModified = currentFrame;
     }
-
-    HgiBufferCpuToGpuOp blitOp;
-    blitOp.byteSize = dataSize;
-    blitOp.cpuSourceBuffer = data;
-    blitOp.sourceByteOffset = 0;
-    blitOp.gpuDestinationBuffer = GetId();
-    blitOp.destinationByteOffset = vboOffset;
-    blitCmds->CopyBufferCpuToGpu(blitOp);
 }
 
 // APPLE METAL: Multibuffering support.

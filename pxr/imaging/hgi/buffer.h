@@ -123,6 +123,8 @@ public:
     /// In DX12 this returns the ID3D12Resource pointer as uint64_t.
     HGI_API
     virtual uint64_t GetRawResource() const = 0;
+    
+    virtual void* GetCPUStagingAddress() = 0;
 
 protected:
     HGI_API

@@ -80,6 +80,16 @@ HgiMetalBuffer::GetRawResource() const
     return (uint64_t) _bufferId;
 }
 
+void*
+HgiMetalBuffer::GetCPUStagingAddress()
+{
+    if (_bufferId) {
+        return [_bufferId contents];
+    }
+    
+    return nullptr;
+}
+
 id<MTLBuffer> HgiMetalBuffer::MTLBuffer(HgiBufferHandle const& bufferHandle)
 {
     HgiMetalBuffer const* metalBuffer = dynamic_cast<HgiMetalBuffer*>(bufferHandle.Get());

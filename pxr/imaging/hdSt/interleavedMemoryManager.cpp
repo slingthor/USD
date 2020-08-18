@@ -49,7 +49,6 @@
 
 #include "pxr/imaging/hf/perfLog.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -712,24 +711,33 @@ HdStInterleavedMemoryManager::_StripedInterleavedBufferRange::CopyData(
         return;
     }
 
-    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-    if (caps.hasSubDataCopy) {
+    const unsigned char *data =
+        (const unsigned char*)bufferSource->GetData();
+
+    if (data) {
+        // APPLE METAL: Temp for triple buffering
+        VBO->CopyDataIsHappening();
+
         int vboStride = VBO->GetStride();
         GLintptr vboOffset = VBO->GetOffset() + vboStride * _index;
         int dataSize = HdDataSizeOfTupleType(VBO->GetTupleType());
         const unsigned char *data =
             (const unsigned char*)bufferSource->GetData();
 
-        if (data) {
-            for (size_t i = 0; i < _numElements; ++i) {
-                HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
+        HgiBlitCmds* blitCmds = _stripedBuffer->GetBlitCmds();
+        HgiBufferCpuToGpuOp blitOp;
+        blitOp.gpuDestinationBuffer = VBO->GetId();
+        blitOp.sourceByteOffset = 0;
+        blitOp.byteSize = dataSize;
 
-                VBO->CopyData(_stripedBuffer->GetBlitCmds(),
-                              vboOffset, dataSize, data);
+        for (size_t i = 0; i < _numElements; ++i) {
+            blitOp.cpuSourceBuffer = data;
+            
+            blitOp.destinationByteOffset = vboOffset;
+            blitCmds->QueueCopyBufferCpuToGpu(blitOp);
 
-                vboOffset += vboStride;
-                data += dataSize;
-            }
+            vboOffset += vboStride;
+            data += dataSize;
         }
     }
 }
