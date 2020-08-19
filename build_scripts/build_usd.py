@@ -112,7 +112,7 @@ def GetMacArch():
     if macArch == "i386" or macArch == "x86_64":
         macArch = "x86_64"
     else:
-        macArch = "arm64"
+        macArch = "arm64e"
     return macArch
 
 def SupportsMacOSUniversalBinaries():
@@ -410,14 +410,14 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
 
     if context.buildUniversal and SupportsMacOSUniversalBinaries():
         extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
-        extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64')
+        extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64e')
     else:
         extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=YES')
         MacArch = GetCommandOutput('arch').strip()
         if MacArch == "i386" or MacArch == "x86_64":
             extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64')
         else:
-            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64')
+            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64e')
 
     if targetIOS:
         # Add the default iOS toolchain file if one isn't aready specified
@@ -950,7 +950,7 @@ def InstallBoost_Helper(context, force, buildArgs):
                 'using clang-darwin : arm64\n',
                 ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
                     .format(XCODE_ROOT=xcodeRoot),
-                ': <compileflags>"-target arm64-apple-macos10.15 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target arm64-apple-macos10.15 -isysroot {SDK_PATH}" address-model=64 architecture=arm64\n'
+                ': <compileflags>"-target arm64e-apple-macos10.15 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target arm64e-apple-macos10.15 -isysroot {SDK_PATH}" address-model=64 architecture=arm64e\n'
                     .format(SDK_PATH=sdkPath),
                 ';\n\n'
             ]
@@ -967,7 +967,7 @@ def InstallBoost_Helper(context, force, buildArgs):
 
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
             b2_toolset = "toolset=clang-darwin-arm64"
-            b2_settings[0] = '--prefix="{instDir}/_tmp/arm64"'.format(instDir=context.instDir)
+            b2_settings[0] = '--prefix="{instDir}/_tmp/arm64e"'.format(instDir=context.instDir)
                 
             b2CmdSecondary = '{b2} {toolset} {options} install'.format(
                 b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
@@ -977,7 +977,7 @@ def InstallBoost_Helper(context, force, buildArgs):
             CopyDirectory(context, os.path.join(context.instDir, "_tmp/x86_64/include/boost"), "include/boost")
 
             x86Dir = os.path.join(context.instDir, "_tmp/x86_64/lib")
-            armDir = os.path.join(context.instDir, "_tmp/arm64/lib")
+            armDir = os.path.join(context.instDir, "_tmp/arm64e/lib")
             libNames = [f for f in os.listdir(x86Dir) if os.path.isfile(os.path.join(x86Dir, f))]
             lipoCommands = CreateUniversalBinaries(context, libNames, x86Dir, armDir)
 
@@ -1107,16 +1107,18 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
                       "LIBDL = -ldl\n"
                       "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/MacOSX.*' 2>/dev/null | head -1)"),
                      ("-m64",
-                      "-m64 -arch x86_64")],
+                      "-m64 -arch x86_64"),
+                    ("ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64))",
+                     "ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64 arm64e))")],
                     True)
 
         archPrimary = GetMacArch()
         archSecondary = ""
         if (archPrimary == "x86_64"):
             archPrimary = "intel64"
-            archSecondary = "arm64"
+            archSecondary = "arm64e"
         else:
-            archSecondary = "arm64"
+            archSecondary = "arm64e"
 
         if context.static_dependencies_macOS:
             buildArgs.append('extra_inc=big_iron.inc ')
@@ -1142,7 +1144,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         # builds. Plus, the TBB build system builds both versions anyway.
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
             x86Files = glob.glob(os.getcwd() + "/build/*intel64*_release/libtbb*.*")
-            armFiles = glob.glob(os.getcwd() + "/build/*arm64*_release/libtbb*.*")
+            armFiles = glob.glob(os.getcwd() + "/build/*arm64e*_release/libtbb*.*")
             libNames = [os.path.basename(x) for x in x86Files]
             x86Dir = os.path.dirname(x86Files[0])
             armDir = os.path.dirname(armFiles[0])
@@ -1348,7 +1350,7 @@ def InstallPNG(context, force, buildArgs):
         extraPNGArgs = buildArgs;
         extraPNGArgs.append("-DCMAKE_C_FLAGS=\"-DPNG_ARM_NEON_OPT=0\"");
 
-        if (context.buildUniversal and SupportsMacOSUniversalBinaries()) or (GetMacArch() == "arm64"):
+        if (context.buildUniversal and SupportsMacOSUniversalBinaries()) or (GetMacArch() == "arm64e"):
             extraPNGArgs.append("-DCMAKE_C_FLAGS=\"-DPNG_ARM_NEON_OPT=0\"");
 
         if iOS():
@@ -1578,9 +1580,9 @@ def InstallGLEW_LinuxOrMacOS(context, force, buildArgs):
                   "LDFLAGS.EXTRA = -arch x86_64")])
             sdkPath = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path']).strip()
             PatchFile("config/Makefile.darwin", 
-                [("CFLAGS.EXTRA = -arch arm64 -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
+                [("CFLAGS.EXTRA = -arch arm64e -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
                   "CFLAGS.EXTRA = -arch x86_64 -dynamic -fno-common"),
-                 ("LDFLAGS.EXTRA = -arch arm64 -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
+                 ("LDFLAGS.EXTRA = -arch arm64e -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
                   "LDFLAGS.EXTRA = -arch x86_64")])
             Run('make clean')
             Run('make GLEW_DEST="{instDir}/_tmp/x86_64" -j{procs} {buildArgs} install'
@@ -1590,17 +1592,17 @@ def InstallGLEW_LinuxOrMacOS(context, force, buildArgs):
 
             PatchFile("config/Makefile.darwin", 
                 [("CFLAGS.EXTRA = -arch x86_64 -dynamic -fno-common",
-                  "CFLAGS.EXTRA = -arch arm64 -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath)),
+                  "CFLAGS.EXTRA = -arch arm64e -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath)),
                  ("LDFLAGS.EXTRA = -arch x86_64",
-                  "LDFLAGS.EXTRA = -arch arm64 -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath))]),
+                  "LDFLAGS.EXTRA = -arch arm64e -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath))]),
             Run('make clean')
-            Run('make GLEW_DEST="{instDir}/_tmp/arm64" -j{procs} {buildArgs} install'
+            Run('make GLEW_DEST="{instDir}/_tmp/arm64e" -j{procs} {buildArgs} install'
                 .format(instDir=context.instDir,
                         procs=context.numJobs,
                         buildArgs=" ".join(buildArgs)))
 
             x86Dir = os.path.join(context.instDir, "_tmp/x86_64/lib")
-            armDir = os.path.join(context.instDir, "_tmp/arm64/lib")
+            armDir = os.path.join(context.instDir, "_tmp/arm64e/lib")
             libNames = [f for f in os.listdir(x86Dir) if os.path.isfile(os.path.join(x86Dir, f))]
             CreateUniversalBinaries(context, libNames, x86Dir, armDir)
 
@@ -1836,7 +1838,7 @@ def InstallOpenColorIO(context, force, buildArgs):
                      '-DOCIO_USE_SSE=OFF']
 
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
-            arch = "x86_64;arm64"
+            arch = "x86_64;arm64e"
         else:
             arch = GetMacArch()
 
