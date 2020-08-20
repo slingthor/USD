@@ -1787,7 +1787,12 @@ def InstallOpenImageIO(context, force, buildArgs):
         if context.static_dependencies_macOS:
             extraArgs.append('-DLINKSTATIC=1 ')
             extraArgs.append('-DBUILD_SHARED_LIBS=0 ')
+            extraArgs.append('-DBUILD_ROBINMAP_FORCE=1 ')
             # extraArgs.append('-DCMAKE_STATIC_LINKER_FLAGS="-unexported_symbols_list ' + unexported_file + ' " ')
+
+        PatchFile("src/cmake/modules/FindRobinmap.cmake", 
+                   [('"${PROJECT_SOURCE_DIR}/ext/robin-map"',
+                     '"${PROJECT_SOURCE_DIR}/ext/robin-map/include"')])
 
         if context.buildOIIOTools:
             extraArgs.append('-DOIIO_BUILD_TOOLS=ON')
