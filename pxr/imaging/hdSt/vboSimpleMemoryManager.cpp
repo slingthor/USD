@@ -470,27 +470,36 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::CopyData(
 
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
-    if (caps.hasSubDataCopy) {
-        int bytesPerElement = HdDataSizeOfTupleType(VBO->GetTupleType());
-        // overrun check. for graceful handling of erroneous assets,
-        // issue warning here and continue to copy for the valid range.
-        size_t dstSize = _numElements * bytesPerElement;
-        size_t srcSize =
-            bufferSource->GetNumElements() *
-            HdDataSizeOfTupleType(bufferSource->GetTupleType());
-        if (srcSize > dstSize) {
-            TF_WARN("%s: size %ld is larger than the range (%ld)",
-                    bufferSource->GetName().GetText(), srcSize, dstSize);
-            srcSize = dstSize;
-        }
-
-        GLintptr vboOffset = bytesPerElement * offset;
-
-        HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
-
-        VBO->CopyData(_bufferArray->GetBlitCmds(),
-                      vboOffset, srcSize, bufferSource->GetData());
+    int bytesPerElement = HdDataSizeOfTupleType(VBO->GetTupleType());
+    // overrun check. for graceful handling of erroneous assets,
+    // issue warning here and continue to copy for the valid range.
+    size_t dstSize = _numElements * bytesPerElement;
+    size_t srcSize =
+        bufferSource->GetNumElements() *
+        HdDataSizeOfTupleType(bufferSource->GetTupleType());
+    if (srcSize > dstSize) {
+        TF_WARN("%s: size %ld is larger than the range (%ld)",
+                bufferSource->GetName().GetText(), srcSize, dstSize);
+        srcSize = dstSize;
     }
+
+    GLintptr vboOffset = bytesPerElement * offset;
+
+    // APPLE METAL: Temp for triple buffering
+    VBO->CopyDataIsHappening();
+
+    HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
+
+    HgiBufferCpuToGpuOp blitOp;
+    blitOp.cpuSourceBuffer = bufferSource->GetData();
+    blitOp.gpuDestinationBuffer = VBO->GetId();
+    
+    blitOp.sourceByteOffset = 0;
+    blitOp.byteSize = srcSize;
+    blitOp.destinationByteOffset = vboOffset;
+
+    HgiBlitCmds* blitCmds = _bufferArray->GetBlitCmds();
+    blitCmds->CopyBufferCpuToGpu(blitOp);
 }
 
 VtValue

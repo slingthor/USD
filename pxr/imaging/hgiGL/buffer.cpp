@@ -91,6 +91,11 @@ HgiGLBuffer::~HgiGLBuffer()
         glDeleteBuffers(1, &_bufferId);
         _bufferId = 0;
     }
+    
+    if (_cpuStaging) {
+        free(_cpuStaging);
+        _cpuStaging = nullptr;
+    }
 
     HGIGL_POST_PENDING_GL_ERRORS();
 }
@@ -107,5 +112,13 @@ HgiGLBuffer::GetRawResource() const
     return (uint64_t) _bufferId;
 }
 
+void*
+HgiGLBuffer::GetCPUStagingAddress()
+{
+    if (!_cpuStaging) {
+        _cpuStaging = malloc(_descriptor.byteSize);
+    }
+    return _cpuStaging;
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE

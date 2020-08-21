@@ -149,19 +149,27 @@ def make_relocatable(install_path, buildPython, iOS, verbose_output=False):
 
     if buildPython:
         import PySide2
-        import OpenGL
+        import imp
+        try:
+            imp.find_module('OpenGL')
+            foundOpenGL = True
+        except ImportError:
+            foundOpenGL = False
         
         pyside_file = os.path.abspath(PySide2.__file__)
         pyside_path = os.path.dirname(pyside_file)
 
-        openGL_file = os.path.abspath(OpenGL.__file__)
-        openGL_path = os.path.dirname(openGL_file)
+        if foundOpenGL:
+            import OpenGL
+            openGL_file = os.path.abspath(OpenGL.__file__)
+            openGL_path = os.path.dirname(openGL_file)
 
         subprocess.call(['chmod', '-R', '+w', install_path + "/lib"],
             stdout=devout)
         
         copy_tree(pyside_path, install_path + "/lib/python/PySide2")
-        copy_tree(openGL_path, install_path + "/lib/python/OpenGL")
+        if foundOpenGL:
+            copy_tree(openGL_path, install_path + "/lib/python/OpenGL")
         copy_tree(os.path.dirname(pyside_path) + "/shiboken2", install_path+"/lib/python/shiboken2")
         copy_tree(src_path + "/lib/python/pysideuic", install_path+"/lib/python/pysideuic")
         copy_tree(src_path + "/lib/python/pyside2uic", install_path+"/lib/python/pyside2uic")

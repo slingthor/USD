@@ -61,7 +61,7 @@ HgiMetalGraphicsCmds::HgiMetalGraphicsCmds(
         [[MTLRenderPassDescriptor alloc] init];
 
     // Color attachments
-    bool resolving = !desc.colorResolveTextures.empty();
+    bool resolvingColor = !desc.colorResolveTextures.empty();
     for (size_t i=0; i<desc.colorAttachmentDescs.size(); i++) {
         HgiAttachmentDesc const &hgiColorAttachment =
             desc.colorAttachmentDescs[i];
@@ -94,7 +94,7 @@ HgiMetalGraphicsCmds::HgiMetalGraphicsCmds(
             colorTexture->GetDescriptor().format == hgiColorAttachment.format);
         metalColorAttachment.texture = colorTexture->GetTextureId();
         
-        if (resolving) {
+        if (resolvingColor) {
             HgiMetalTexture *resolveTexture =
                 static_cast<HgiMetalTexture*>(desc.colorResolveTextures[i].Get());
 
@@ -135,7 +135,7 @@ HgiMetalGraphicsCmds::HgiMetalGraphicsCmds(
             depthTexture->GetDescriptor().format == hgiDepthAttachment.format);
         metalDepthAttachment.texture = depthTexture->GetTextureId();
         
-        if (resolving) {
+        if (desc.depthResolveTexture) {
             HgiMetalTexture *resolveTexture =
                 static_cast<HgiMetalTexture*>(desc.depthResolveTexture.Get());
 
