@@ -764,7 +764,7 @@ private:
     template <class Reader> void _ReadFields(Reader src);
     template <class Reader> void _ReadSpecs(Reader src);
     template <class Reader> void _ReadStrings(Reader src);
-    template <class Reader> void _ReadTokens(Reader src);
+    template <class Reader> void _ReadTokens(Reader src, int64_t fileSize);
     template <class Reader> void _ReadPaths(Reader src);
     template <class Header, class Reader>
     void _ReadPathsImpl(Reader reader,
