@@ -1785,14 +1785,23 @@ def InstallOpenImageIO(context, force, buildArgs):
                      '-DSTOP_ON_WARNING=OFF']
 
         if context.static_dependencies_macOS:
+            # extraArgs.append('-DCMAKE_STATIC_LINKER_FLAGS="-unexported_symbols_list ' + unexported_file + ' " ')
             extraArgs.append('-DLINKSTATIC=1 ')
             extraArgs.append('-DBUILD_SHARED_LIBS=0 ')
             extraArgs.append('-DBUILD_ROBINMAP_FORCE=1 ')
-            # extraArgs.append('-DCMAKE_STATIC_LINKER_FLAGS="-unexported_symbols_list ' + unexported_file + ' " ')
 
-        PatchFile("src/cmake/modules/FindRobinmap.cmake", 
-                   [('"${PROJECT_SOURCE_DIR}/ext/robin-map"',
-                     '"${PROJECT_SOURCE_DIR}/ext/robin-map/include"')])
+            PatchFile("src/include/OpenImageIO/strutil.h", 
+                   [("#    define OIIO_USE_FMT 1", "#    define OIIO_USE_FMT 0"),
+                    ("#    define FMT_HEADER_ONLY", "#    define FMT_HEADER_ONLY 0"),
+                    ("#    define FMT_USE_GRISU 1", "#    define FMT_USE_GRISU 0"),
+                    ('#    include "fmt/ostream.h"', '//#    include "fmt/ostream.h"'),
+                    ('#    include "fmt/format.h"', '//#    include "fmt/format.h"'),
+                    ('#    include "fmt/printf.h"', '//#    include "fmt/printf.h"')
+                     ])
+
+            PatchFile("src/cmake/modules/FindRobinmap.cmake", 
+                    [('"${PROJECT_SOURCE_DIR}/ext/robin-map"',
+                        '"${PROJECT_SOURCE_DIR}/ext/robin-map/include"')])
 
         if context.buildOIIOTools:
             extraArgs.append('-DOIIO_BUILD_TOOLS=ON')
