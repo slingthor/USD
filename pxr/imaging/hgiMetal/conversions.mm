@@ -391,6 +391,46 @@ struct {
     {HgiPrimitiveTypePatchList,    MTLPrimitiveTypeTriangle /*Invalid*/}
 };
 
+#if (defined(__MAC_10_15) && __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_10_15) \
+    || __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
+struct {
+    HgiComponentSwizzle hgiComponentSwizzle;
+    MTLTextureSwizzle metalCS;
+} static const _componentSwizzleTable[HgiComponentSwizzleCount] =
+{
+    {HgiComponentSwizzleZero, MTLTextureSwizzleZero},
+    {HgiComponentSwizzleOne,  MTLTextureSwizzleOne},
+    {HgiComponentSwizzleR,    MTLTextureSwizzleRed},
+    {HgiComponentSwizzleG,    MTLTextureSwizzleGreen},
+    {HgiComponentSwizzleB,    MTLTextureSwizzleBlue},
+    {HgiComponentSwizzleA,    MTLTextureSwizzleAlpha}
+};
+#endif
+
+struct {
+    HgiPrimitiveType hgiPrimitiveType;
+    MTLPrimitiveTopologyClass metalTC;
+} static const _primitiveClassTable[HgiPrimitiveTypeCount] =
+{
+    {HgiPrimitiveTypePointList,    MTLPrimitiveTopologyClassPoint},
+    {HgiPrimitiveTypeLineList,     MTLPrimitiveTopologyClassLine},
+    {HgiPrimitiveTypeLineStrip,    MTLPrimitiveTopologyClassLine},
+    {HgiPrimitiveTypeTriangleList, MTLPrimitiveTopologyClassTriangle},
+    {HgiPrimitiveTypePatchList,    MTLPrimitiveTopologyClassUnspecified}
+};
+
+struct {
+    HgiPrimitiveType hgiPrimitiveType;
+    MTLPrimitiveType metalPT;
+} static const _primitiveTypeTable[HgiPrimitiveTypeCount] =
+{
+    {HgiPrimitiveTypePointList,    MTLPrimitiveTypePoint},
+    {HgiPrimitiveTypeLineList,     MTLPrimitiveTypeLine},
+    {HgiPrimitiveTypeLineStrip,    MTLPrimitiveTypeLineStrip},
+    {HgiPrimitiveTypeTriangleList, MTLPrimitiveTypeTriangle},
+    {HgiPrimitiveTypePatchList,    MTLPrimitiveTypeTriangle /*Invalid*/}
+};
+
 MTLPixelFormat
 HgiMetalConversions::GetPixelFormat(HgiFormat inFormat)
 {

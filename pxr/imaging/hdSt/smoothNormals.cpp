@@ -266,11 +266,7 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     computeCmds->BindPipeline(pipeline);
 
     // transfer uniform buffer
-    int slotIndex = 0;
-    if (hgi->GetAPIName() == HgiTokens->Metal) {
-        slotIndex = 3;
-    }
-    computeCmds->SetConstantValues(pipeline, slotIndex, sizeof(uniform), &uniform);
+    computeCmds->SetConstantValues(pipeline, 0, sizeof(uniform), &uniform);
 
     // dispatch compute kernel
     computeCmds->Dispatch(numPoints, 1);

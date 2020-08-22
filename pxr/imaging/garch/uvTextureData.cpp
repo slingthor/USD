@@ -42,7 +42,8 @@ GarchUVTextureData::New(
     unsigned int cropTop,
     unsigned int cropBottom,
     unsigned int cropLeft,
-    unsigned int cropRight)
+    unsigned int cropRight,
+    GlfImage::SourceColorSpace sourceColorSpace)
 {
     GarchUVTextureData::Params params;
     params.targetMemory = targetMemory;
@@ -50,13 +51,15 @@ GarchUVTextureData::New(
     params.cropBottom   = cropBottom;
     params.cropLeft     = cropLeft;
     params.cropRight    = cropRight;
-    return New(filePath, params);
+    return New(filePath, params, sourceColorSpace);
 }
 
 GarchUVTextureDataRefPtr
 GarchUVTextureData::New(std::string const &filePath, Params const &params)
+                      GlfImage::SourceColorSpace sourceColorSpace)
 {
-    return TfCreateRefPtr(new GarchUVTextureData(filePath, params));
+    return TfCreateRefPtr(new GlfUVTextureData(filePath, params));
+                                               sourceColorSpace));
 }
 
 GarchUVTextureData::~GarchUVTextureData()
@@ -64,7 +67,8 @@ GarchUVTextureData::~GarchUVTextureData()
 }
 
 GarchUVTextureData::GarchUVTextureData(std::string const &filePath,
-                                     Params const &params)
+                                   Params const &params, 
+                                   GlfImage::SourceColorSpace sourceColorSpace)
   : _filePath(filePath),
     _params(params),
     _targetMemory(0),
@@ -74,7 +78,8 @@ GarchUVTextureData::GarchUVTextureData(std::string const &filePath,
     _glInternalFormat(GL_RGB),
     _glFormat(GL_RGB),
     _glType(GL_UNSIGNED_BYTE),
-    _size(0)
+    _size(0),
+    _sourceColorSpace(sourceColorSpace)
 {
     /* nothing */
 }
@@ -109,7 +114,8 @@ GarchUVTextureData::_GetDegradedImageInputChain(double scaleX, double scaleY,
 {
     _DegradedImageInput chain(scaleX, scaleY);
     for (int level = startMip; level < lastMip; level++) {
-        GarchImageSharedPtr image = GarchImage::OpenForReading(_filePath, 0, level);
+        GlfImageSharedPtr image = GarchImage::OpenForReading(_filePath, 0, level,
+                                                           _sourceColorSpace);
         chain.images.push_back(image);
     }
     return chain;
@@ -130,7 +136,8 @@ GarchUVTextureData::_GetNumMipLevelsValid(const GarchImageSharedPtr image) const
     // in that case 
     for (int mipCounter = 1; mipCounter < 32; mipCounter++) {
         GarchImageSharedPtr image = GarchImage::OpenForReading(_filePath,
-            0 /*subimage*/, mipCounter, /*suppressErrors=*/ true);
+            0 /*subimage*/, mipCounter, _sourceColorSpace, 
+            /*suppressErrors=*/ true);
         if (!image) {
             potentialMipLevels = mipCounter;
             break;
@@ -164,8 +171,8 @@ GarchUVTextureData::_GetNumMipLevelsValid(const GarchImageSharedPtr image) const
 
 GarchUVTextureData::_DegradedImageInput
 GarchUVTextureData::_ReadDegradedImageInput(bool generateMipmap,
-                                           size_t targetMemory,
-                                           size_t degradeLevel)
+                                          size_t targetMemory,
+                                          size_t degradeLevel)
 {
     TRACE_FUNCTION();
 
@@ -200,7 +207,7 @@ GarchUVTextureData::_ReadDegradedImageInput(bool generateMipmap,
     // If no targetMemory set, use degradeLevel to determine mipLevel
     if (targetMemory == 0) {
         GarchImageSharedPtr image =
-		GarchImage::OpenForReading(_filePath, 0, degradeLevel);
+        GarchImage::OpenForReading(_filePath, 0, degradeLevel);
         if (!image) {
             return _DegradedImageInput(1.0, 1.0);
         }
@@ -225,7 +232,8 @@ GarchUVTextureData::_ReadDegradedImageInput(bool generateMipmap,
     for (int i = 1; i < numMipLevels; i++) {
         // Open the image and is requested to use the i-th
         // down-sampled image (mipLevel).
-        GarchImageSharedPtr image = GarchImage::OpenForReading(_filePath, 0, i);
+        GlfImageSharedPtr image = GarchImage::OpenForReading(_filePath, 0, i,
+                                                           _sourceColorSpace);
 
         // If mipLevel could not be opened, return fullImage. We are
         // not supposed to hit this. GarchImage will return the last

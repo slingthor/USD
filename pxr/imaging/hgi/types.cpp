@@ -27,7 +27,8 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-size_t HgiGetComponentCount(const HgiFormat f)
+size_t
+HgiGetComponentCount(const HgiFormat f)
 {
     switch (f) {
     case HgiFormatUNorm8:
@@ -69,8 +70,19 @@ size_t HgiGetComponentCount(const HgiFormat f)
     return 0;
 }
 
-size_t HgiDataSizeOfFormat(const HgiFormat f)
+size_t
+HgiDataSizeOfFormat(
+    const HgiFormat f,
+    size_t * const blockWidth,
+    size_t * const blockHeight)
 {
+    if (blockWidth) {
+        *blockWidth = 1;
+    }
+    if (blockHeight) {
+        *blockHeight = 1;
+    }
+
     switch(f) {
     case HgiFormatUNorm8:
     case HgiFormatSNorm8:
@@ -110,7 +122,13 @@ size_t HgiDataSizeOfFormat(const HgiFormat f)
     case HgiFormatBC6UFloatVec3:
     case HgiFormatBC7UNorm8Vec4:
     case HgiFormatBC7UNorm8Vec4srgb:
-        return 1;
+        if (blockWidth) {
+            *blockWidth = 4;
+        }
+        if (blockHeight) {
+            *blockHeight = 4;
+        }
+        return 16;
     case HgiFormatCount:
     case HgiFormatInvalid:
         TF_CODING_ERROR("Invalid Format");
@@ -120,7 +138,8 @@ size_t HgiDataSizeOfFormat(const HgiFormat f)
     return 0;
 }
 
-bool HgiIsCompressed(const HgiFormat f)
+bool
+HgiIsCompressed(const HgiFormat f)
 {
     switch(f) {
     case HgiFormatBC6FloatVec3:
@@ -131,6 +150,53 @@ bool HgiIsCompressed(const HgiFormat f)
     default:
         return false;
     }
+}
+
+const void*
+HgiGetMipInitialData(
+    const HgiFormat format,
+    const GfVec3i& dimensions,
+    const uint16_t mipLevel,
+    const size_t initialDataByteSize,
+    const void* initialData,
+    GfVec3i* mipDimensions,
+    size_t* mipByteSize)
+{
+    // The most common case is loading the first mip. Exit early.
+    if (mipLevel == 0) {
+        *mipDimensions = dimensions;
+        *mipByteSize = initialDataByteSize;
+        return initialData;
+    }
+
+    size_t blockWidth, blockHeight;
+    const size_t bpt = HgiDataSizeOfFormat(format, &blockWidth, &blockHeight);
+
+    GfVec3i& size = *mipDimensions;
+    size = dimensions;
+    size_t byteOffset = 0;
+
+    // Each mip image is half the dimensions of the previous level.
+    for (size_t i=0; i<mipLevel; i++) {
+        byteOffset += 
+            ((size[0] + blockWidth  - 1) / blockWidth ) *
+            ((size[1] + blockHeight - 1) / blockHeight) *
+            size[2] * bpt;
+        size[0] = std::max(size[0] / 2, 1);
+        size[1] = std::max(size[1] / 2, 1);
+        size[2] = std::max(size[2] / 2, 1);
+    }
+
+    if (byteOffset >= initialDataByteSize) {
+        return nullptr;
+    }
+
+    // Each mip image is a quarter of the bytes of the previous level.
+    *mipByteSize =
+        ((size[0] + blockWidth  - 1) / blockWidth ) *
+        ((size[1] + blockHeight - 1) / blockHeight) *
+        size[2] * bpt;
+    return static_cast<char const*>(initialData) + byteOffset;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -150,7 +150,6 @@ PXR_NAMESPACE_OPEN_SCOPE
     (garbageCollectedSsbo)                      \
     (garbageCollectedUbo)                       \
     (garbageCollectedVbo)                       \
-    (glBufferSubData)                           \
     (gpuMemoryUsed)                             \
     (instBasisCurvesTopology)                   \
     (instBasisCurvesTopologyRange)              \
@@ -352,7 +351,8 @@ TfToken HdAovTokensMakeShader(TfToken const& shader);
     (threadLimit)
 
 #define HD_RESOURCE_TYPE_TOKENS                       \
-    (texture)                        
+    (texture)                                         \
+    (shaderFile)
 
 TF_DECLARE_PUBLIC_TOKENS(HdTokens, HD_API, HD_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(HdInstancerTokens, HD_API, HD_INSTANCER_TOKENS);

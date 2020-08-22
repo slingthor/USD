@@ -239,27 +239,48 @@ HgiGLTexture::HgiGLTexture(HgiTextureDesc const & desc)
             glInternalFormat,
             desc.dimensions);
 
+        // Upload texel data
         if (desc.initialData && desc.pixelsByteSize > 0) {
-            if (isCompressed) {
-                _GlCompressedTextureSubImageND(
-                    desc.type,
-                    _textureId,
-                    /*mip*/0,
-                    /*offsets*/GfVec3i(0),
+            // Upload each (available) mip
+            for (size_t mip=0; mip<desc.mipLevels; mip++) {
+
+                GfVec3i mipDimensions;
+                size_t mipByteSize = 0;
+
+                const void* mipSrc = HgiGetMipInitialData(
+                    desc.format,
                     desc.dimensions,
-                    glInternalFormat,
+                    mip,
                     desc.pixelsByteSize,
-                    desc.initialData);
-            } else {
-                _GlTextureSubImageND(
-                    desc.type,
-                    _textureId,
-                    /*mip*/0,
-                    /*offsets*/GfVec3i(0),
-                    desc.dimensions,
-                    glFormat,
-                    glPixelType,
-                    desc.initialData);
+                    desc.initialData,
+                    &mipDimensions,
+                    &mipByteSize);
+
+                if (!mipSrc) {
+                    break;
+                }
+
+                if (isCompressed) {
+                    _GlCompressedTextureSubImageND(
+                        desc.type,
+                        _textureId,
+                        mip,
+                        /*offsets*/GfVec3i(0),
+                        mipDimensions,
+                        glInternalFormat,
+                        mipByteSize,
+                        mipSrc);
+                } else {
+                    _GlTextureSubImageND(
+                        desc.type,
+                        _textureId,
+                        mip,
+                        /*offsets*/GfVec3i(0),
+                        mipDimensions,
+                        glFormat,
+                        glPixelType,
+                        mipSrc);
+                }
             }
         }
     } else {
@@ -301,8 +322,13 @@ size_t
 HgiGLTexture::GetByteSizeOfResource() const
 {
     GfVec3i const& s = _descriptor.dimensions;
-    return HgiDataSizeOfFormat(_descriptor.format) * 
-        s[0] * s[1] * std::max(s[2], 1);
+    size_t blockWidth, blockHeight;
+    const size_t bytesPerBlock =
+        HgiDataSizeOfFormat(_descriptor.format, &blockWidth, &blockHeight);
+    return
+        ((s[0] + blockWidth  - 1) / blockWidth) *
+        ((s[1] + blockHeight - 1) / blockHeight) *
+        std::max(s[2], 1) * bytesPerBlock;
 }
 
 uint64_t

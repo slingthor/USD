@@ -59,7 +59,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdBufferArrayRangeSharedPtr
 HdStInterleavedMemoryManager::CreateBufferArrayRange()
 {
-    return (std::make_shared<_StripedInterleavedBufferRange>());
+    return std::make_shared<_StripedInterleavedBufferRange>(_resourceRegistry);
 }
 
 /// Returns the buffer specs from a given buffer array
@@ -736,10 +736,12 @@ HdStInterleavedMemoryManager::_StripedInterleavedBufferRange::CopyData(
             blitOp.destinationByteOffset = vboOffset;
             blitCmds->QueueCopyBufferCpuToGpu(blitOp);
 
-            vboOffset += vboStride;
-            data += dataSize;
-        }
+        vboOffset += vboStride;
+        data += dataSize;
     }
+    
+    HD_PERF_COUNTER_ADD(HdStPerfTokens->copyBufferCpuToGpu,
+                        (double)_numElements);
 }
 
 VtValue

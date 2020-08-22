@@ -76,7 +76,8 @@ HdStVBOSimpleMemoryManager::CreateBufferArray(
 HdBufferArrayRangeSharedPtr
 HdStVBOSimpleMemoryManager::CreateBufferArrayRange()
 {
-    return std::make_shared<HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange>();
+    return std::make_shared<HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange>
+                (_resourceRegistry);
 }
 
 HdAggregationStrategy::AggregationId

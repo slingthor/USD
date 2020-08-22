@@ -41,6 +41,7 @@
 #include "pxr/usd/sdf/types.h"
 
 #include "pxr/base/tf/envSetting.h"
+#include "pxr/base/tf/hash.h"
 
 #include <memory>
 
@@ -68,6 +69,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (wrapR)
     (minFilter)
     (magFilter)
+    (sourceColorSpace)
 
     (in)
 );
@@ -248,8 +250,10 @@ _GetMaterialTag(
 
 static void
 _GetGlslfxForTerminal(
-    HioGlslfxUniquePtr& glslfxOut,
-    TfToken const& nodeTypeId)
+    HioGlslfxSharedPtr& glslfxOut,
+    size_t *glslfxOutHash,
+    TfToken const& nodeTypeId,
+    HdStResourceRegistry *resourceRegistry)
 {
     HD_TRACE_FUNCTION();
 
@@ -263,17 +267,27 @@ _GetGlslfxForTerminal(
         std::string const& glslfxFilePath = sdrNode->GetResolvedImplementationURI();
         if (!glslfxFilePath.empty()) {
 
-            // It is slow to go to disk and load the glslfx file. We don't want
-            // to do this every time the material is dirtied.
-            // XXX We need a way to force reload the same glslfx.
-            if (glslfxOut && glslfxOut->GetFilePath() == glslfxFilePath) {
-                return;
+            // Hash the filepath if it has changed.
+            if (!(*glslfxOutHash) ||
+                (glslfxOut && glslfxOut->GetFilePath() != glslfxFilePath)) {
+                *glslfxOutHash = TfHash()(glslfxFilePath);
             }
 
-            glslfxOut.reset(new HioGlslfx(glslfxFilePath));
+            // Find the glslfx file from the registry
+            HdInstance<HioGlslfxSharedPtr> glslfxInstance = 
+                resourceRegistry->RegisterGLSLFXFile(*glslfxOutHash);
+
+            if (glslfxInstance.IsFirstInstance()) {
+                glslfxOut.reset(new HioGlslfx(glslfxFilePath));
+                glslfxInstance.SetValue(glslfxOut);
+            }
+            glslfxOut = glslfxInstance.GetValue();
+
         } else {
             std::string const& sourceCode = sdrNode->GetSourceCode();
             if (!sourceCode.empty()) {
+                // Do not use the registry for the source code to avoid
+                // the cost of hashing the entire source code.
                 std::istringstream sourceCodeStream(sourceCode);
                 glslfxOut.reset(new HioGlslfx(sourceCodeStream));
             }
@@ -795,15 +809,17 @@ std::unique_ptr<HdStSubtextureIdentifier>
 _GetSubtextureIdentifier(
     const HdTextureType textureType,
     const TfToken &nodeType,
-    const bool premultiplyAlpha)
+    const bool premultiplyAlpha,
+    const TfToken &sourceColorSpace)
 {
     if (textureType == HdTextureType::Uv) {
         const bool flipVertically = (nodeType == _tokens->HwUvTexture_1);
         return std::make_unique<HdStAssetUvSubtextureIdentifier>(flipVertically, 
-            premultiplyAlpha);
+            premultiplyAlpha, sourceColorSpace);
     } 
     if (textureType == HdTextureType::Udim) {
-        return std::make_unique<HdStUdimSubtextureIdentifier>(premultiplyAlpha);
+        return std::make_unique<HdStUdimSubtextureIdentifier>(premultiplyAlpha, 
+            sourceColorSpace);
     }
     if (textureType == HdTextureType::Ptex) {
         return std::make_unique<HdStPtexSubtextureIdentifier>(premultiplyAlpha);
@@ -865,6 +881,10 @@ _MakeMaterialParamsForTexture(
     }
     texParam.isPremultiplied = premultiplyTexture;
 
+    // Get texture's sourceColorSpace hint 
+    const TfToken sourceColorSpace = _ResolveParameter(
+        node, sdrNode, _tokens->sourceColorSpace, HdStTokens->colorSpaceAuto);
+
     // Extract texture file path
     bool useTexturePrimToFindTexture = true;
     
@@ -924,7 +944,8 @@ _MakeMaterialParamsForTexture(
                     _GetSubtextureIdentifier(
                         texParam.textureType, 
                         node.nodeTypeId, 
-                        premultiplyTexture));
+                        premultiplyTexture,
+                        sourceColorSpace));
             // If the file attribute is an SdfPath, interpret it as path
             // to a prim holding the texture resource (e.g., a render buffer).
             } else if (HdStDrawTarget::GetUseStormTextureSystem() &&
@@ -1273,6 +1294,7 @@ _GatherMaterialParams(
 
 HdStMaterialNetwork::HdStMaterialNetwork()
     : _materialTag(HdStMaterialTagTokens->defaultMaterialTag)
+    , _surfaceGfxHash(0)
 {
 }
 
@@ -1281,7 +1303,8 @@ HdStMaterialNetwork::~HdStMaterialNetwork() = default;
 void
 HdStMaterialNetwork::ProcessMaterialNetwork(
     SdfPath const& materialId,
-    HdMaterialNetworkMap const& hdNetworkMap)
+    HdMaterialNetworkMap const& hdNetworkMap,
+    HdStResourceRegistry *resourceRegistry)
 {
     HD_TRACE_FUNCTION();
 
@@ -1313,7 +1336,8 @@ HdStMaterialNetwork::ProcessMaterialNetwork(
             _GetTerminalNode(materialId, surfaceNetwork)) 
     {
         // Extract the glslfx and metadata for surface/volume.
-        _GetGlslfxForTerminal(_surfaceGfx, surfTerminal->nodeTypeId);
+        _GetGlslfxForTerminal(_surfaceGfx, &_surfaceGfxHash,
+                              surfTerminal->nodeTypeId, resourceRegistry);
         if (_surfaceGfx) {
 
             // If the glslfx file is not valid we skip parsing the network.
@@ -1375,11 +1399,6 @@ HdStMaterialNetwork::GetTextureDescriptors() const
     return _textureDescriptors;
 }
 
-void
-HdStMaterialNetwork::ClearGlslfx()
-{
-    _surfaceGfx.reset();
-}
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

@@ -99,8 +99,10 @@ public:
                        VtDictionary const & metadata);
 
 protected:
-    bool _OpenForReading(std::string const & filename, 
-                         int subimage, int mip, bool suppressErrors) override;
+    bool _OpenForReading(std::string const & filename, int subimage,
+                                 int mip, 
+                                 GlfImage::SourceColorSpace sourceColorSpace, 
+                                 bool suppressErrors) override;
     bool _OpenForWriting(std::string const & filename) override;
 
 private:
@@ -116,6 +118,7 @@ private:
     int _subimage;
     int _miplevel;
     ImageSpec _imagespec;
+    GlfImage::SourceColorSpace _sourceColorSpace;
 };
 
 TF_REGISTRY_FUNCTION(TfType)
@@ -476,11 +479,14 @@ GarchOIIOImage::_CanUseIOProxyForExtension(std::string extension,
 /* virtual */
 bool
 GarchOIIOImage::_OpenForReading(std::string const & filename, int subimage,
-                                 int mip, bool suppressErrors)
+                               int mip, 
+                               GlfImage::SourceColorSpace sourceColorSpace, 
+                               bool suppressErrors)
 {
     _filename = filename;
     _subimage = subimage;
     _miplevel = mip;
+    _sourceColorSpace = sourceColorSpace;
     _imagespec = ImageSpec();
 
 #if OIIO_VERSION >= 20003

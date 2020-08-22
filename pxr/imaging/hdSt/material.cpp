@@ -227,7 +227,8 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
         HdMaterialNetworkMap const& hdNetworkMap =
             vtMat.UncheckedGet<HdMaterialNetworkMap>();
         if (!hdNetworkMap.terminals.empty() && !hdNetworkMap.map.empty()) {
-            _networkProcessor.ProcessMaterialNetwork(GetId(), hdNetworkMap);
+            _networkProcessor.ProcessMaterialNetwork(GetId(), hdNetworkMap,
+                                                    resourceRegistry.get());
             fragmentSource = _networkProcessor.GetFragmentCode();
             geometrySource = _networkProcessor.GetGeometryCode();
             materialMetadata = _networkProcessor.GetMetadata();
@@ -504,15 +505,6 @@ HdDirtyBits
 HdStMaterial::GetInitialDirtyBitsMask() const
 {
     return AllDirty;
-}
-
-
-//virtual
-void
-HdStMaterial::Reload()
-{
-    _networkProcessor.ClearGlslfx();
-    _surfaceShader->Reload();
 }
 
 HdStShaderCodeSharedPtr

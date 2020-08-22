@@ -49,9 +49,9 @@ protected:
     GLF_API
     GlfUdimTexture(
         TfToken const& imageFilePath,
-        GarchImage::ImageOriginLocation originLocation,
+        GlfImage::ImageOriginLocation originLocation,
         std::vector<std::tuple<int, TfToken>>&& tiles,
-        bool const premultiplyAlpha);
+        bool const premultiplyAlpha,
 
     friend class GlfResourceFactory;
 

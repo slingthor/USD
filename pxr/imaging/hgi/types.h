@@ -25,6 +25,7 @@
 #define PXR_IMAGING_HGI_TYPES_H
 
 #include "pxr/pxr.h"
+#include "pxr/base/gf/vec3i.h"
 #include "pxr/imaging/hgi/api.h"
 #include <stdlib.h>
 
@@ -109,15 +110,44 @@ size_t HgiGetComponentCount(HgiFormat f);
 
 /// Return the size of a single element of the given format.
 ///
-/// Returns the bytes-per-pixel even for blocked formats such as
-/// BC6 since - luckily - the number still happens to be integral for supported
-/// compression formats.
+/// For an uncompressed format, returns the number of bytes per pixel
+/// and sets blockWidth and blockHeight to 1.
+/// For a compressed format (e.g., BC6), returns the number of bytes per
+/// block and sets blockWidth and blockHeight to the width and height of
+/// a block.
+///
 HGI_API
-size_t HgiDataSizeOfFormat(HgiFormat f);
+size_t HgiDataSizeOfFormat(
+    HgiFormat f,
+    size_t *blockWidth = nullptr,
+    size_t *blockHeight = nullptr);
 
 /// Return whether the given format uses compression.
 HGI_API
 bool HgiIsCompressed(HgiFormat f);
+
+/// Returns a pointer to the start of the mip's data inside 'initialData'.
+/// The dimensions and byte size of the mip are also returned.
+/// A nullptr if returned if there is no mip data for the requested mipLevel.
+/// I.e. initialDataByteSize is too small to contain data for the mipLevel.
+/// Mip map sizes are calculated by dividing the previous mip level by two and
+/// rounding down to the nearest integer (minimum integer is 1).
+/// level 0: 37x53
+/// level 1: 18x26
+/// level 2: 9x13
+/// level 3: 4x6
+/// level 4: 2x3
+/// level 5: 1x1
+HGI_API
+const void* HgiGetMipInitialData(
+    const HgiFormat format,
+    const GfVec3i& dimensions,
+    const uint16_t mipLevel,
+    const size_t initialDataByteSize,
+    const void* initialData,
+    GfVec3i* mipDimensions,
+    size_t* mipByteSize);
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

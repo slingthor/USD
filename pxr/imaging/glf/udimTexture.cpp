@@ -52,8 +52,10 @@ GlfUdimTexture::GlfUdimTexture(
     TfToken const& imageFilePath,
     GarchImage::ImageOriginLocation originLocation,
     std::vector<std::tuple<int, TfToken>>&& tiles,
-    bool const premultiplyAlpha)
-    : GarchUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha)
+    bool const premultiplyAlpha,
+    GlfImage::SourceColorSpace sourceColorSpace)
+    : GarchUdimTexture(imageFilePath, originLocation, std::move(tiles),
+      _premultiplyAlpha(premultiplyAlpha), _sourceColorSpace(sourceColorSpace))
 {
 }
 
@@ -104,8 +106,15 @@ GlfUdimTexture::_CreateGPUResources(unsigned int numChannels,
         internalFormat = internalFormats[numChannels - 1];
     } else if (type == GL_UNSIGNED_BYTE) {
         constexpr GLenum internalFormats[] =
-        { GL_R8, GL_RG8, GL_RGB8, GL_RGBA8 };
-        internalFormat = internalFormats[numChannels - 1];
+            { GL_R8, GL_RG8, GL_RGB8, GL_RGBA8 };
+        constexpr GLenum internalFormatsSRGB[] =
+            { GL_R8, GL_RG8, GL_SRGB8, GL_SRGB8_ALPHA8 };    
+        if (firstImageMips[0].image->IsColorSpaceSRGB()) {
+            internalFormat = internalFormatsSRGB[numChannels - 1];
+        } else {
+            internalFormat = internalFormats[numChannels - 1];
+        }
+        sizePerElem = 1;
     }
 
     GLuint h;

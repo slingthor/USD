@@ -124,8 +124,14 @@ HdStExtCompGpuComputation::Execute(
             "GPU computation '%s' executed for primvars: %s\n",
             _id.GetText(), _GetDebugPrimvarNames(_compPrimvars).c_str());
 
-    HdStResourceRegistry* hdStResourceRegistry =
+
+    // XXX Submit any work recorded before this call since we are using raw gl
+    // calls below. If we don't submit Hgi work, things are out of order.
+    // Needs to be converted to Hgi.
+    HdStResourceRegistry* hdStResourceRegistry = 
         static_cast<HdStResourceRegistry*>(resourceRegistry);
+    hdStResourceRegistry->SubmitHgiWork();
+
     HdStGLSLProgramSharedPtr const &computeProgram = _resource->GetProgram();
     HdSt_ResourceBinder const &binder = _resource->GetResourceBinder();
 

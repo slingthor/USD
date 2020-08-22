@@ -374,6 +374,12 @@ public:
     void SetRendererSetting(TfToken const& settingId,
                                     VtValue const& value);
 
+    /// Enable / disable presenting the render to bound framebuffer.
+    /// An application may choose to manage the AOVs that are rendered into
+    /// itself and skip the engine's presentation.
+    USDIMAGINGGL_API
+    void SetEnablePresentation(bool enabled);
+
     /// @}
 
     // ---------------------------------------------------------------------
