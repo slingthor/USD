@@ -23,6 +23,26 @@
 //
 #include "pxr/usdImaging/usdImaging/textureUtils.h"
 
+#include "pxr/usdImaging/usdImaging/debugCodes.h"
+#include "pxr/usdImaging/usdImaging/delegate.h"
+#include "pxr/usdImaging/usdImaging/textureUtils.h"
+#include "pxr/usdImaging/usdImaging/tokens.h"
+
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/ptexTexture.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+#include "pxr/imaging/garch/textureHandle.h"
+#include "pxr/imaging/garch/textureRegistry.h"
+#include "pxr/imaging/garch/udimTexture.h"
+
+#include "pxr/imaging/hio/glslfx.h"
+
+#include "pxr/imaging/hd/material.h"
+#include "pxr/imaging/hd/tokens.h"
+
+#include "pxr/imaging/hdSt/resourceFactory.h"
+#include "pxr/imaging/hdSt/textureResource.h"
+
 #include "pxr/base/tf/fileUtils.h"
 #include "pxr/base/vt/value.h"
 
@@ -314,13 +334,6 @@ UsdImaging_GetTextureResourceID(UsdPrim const& usdPrim,
         filePath = TfToken(asset.GetAssetPath());
         if (GarchIsSupportedUdimTexture(filePath)) {
             GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-            if (!UsdImaging_UdimTilesExist(filePath, caps.maxArrayTextureLayers,
-                _FindLayerHandle(attr, time))) {
-                TF_WARN("Unable to find Texture '%s' with path '%s'. Fallback "
-                        "textures are not supported for udim",
-                        filePath.GetText(), usdPath.GetText());
-                return HdTextureResource::ID(-1);
-            }
             if (!caps.arrayTexturesEnabled) {
                 TF_WARN("OpenGL context does not support array textures, "
                         "skipping UDIM Texture %s with path %s.",

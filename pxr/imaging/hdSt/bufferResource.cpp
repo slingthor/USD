@@ -21,25 +21,78 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/contextCaps.h"
-
 #include "pxr/imaging/hdSt/bufferResource.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+
+#include "pxr/base/gf/vec2d.h"
+#include "pxr/base/gf/vec2f.h"
+#include "pxr/base/gf/vec2i.h"
+#include "pxr/base/gf/vec3d.h"
+#include "pxr/base/gf/vec3f.h"
+#include "pxr/base/gf/vec3i.h"
+#include "pxr/base/gf/vec4d.h"
+#include "pxr/base/gf/vec4f.h"
+#include "pxr/base/gf/vec4i.h"
+#include "pxr/base/gf/matrix4f.h"
+#include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/staticTokens.h"
+#include "pxr/base/vt/array.h"
+#include "pxr/base/vt/value.h"
+
+#include "pxr/imaging/hgi/blitCmds.h"
+#include "pxr/imaging/hgi/blitCmdsOps.h"
+#include "pxr/imaging/hgi/buffer.h"
+#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/tokens.h"
+
+#if defined(ARCH_OS_MACOS) || defined(ARCH_OS_IOS)
+#include "pxr/imaging/hgiMetal/buffer.h"
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+template <typename T>
+VtValue
+_CreateVtArray(int numElements, int arraySize, int stride,
+               uint8_t const* const data, size_t dataSize)
+{
+    VtArray<T> array(numElements*arraySize);
+    if (numElements == 0)
+    return VtValue(array);
+    
+    const unsigned char *src = data;
+    unsigned char *dst = (unsigned char *)array.data();
+    
+    TF_VERIFY(dataSize == stride*(numElements-1) + arraySize*sizeof(T));
+    
+    if (stride == sizeof(T)) {
+        memcpy(dst, src, numElements*arraySize*sizeof(T));
+    } else {
+        // deinterleaving
+        for (int i = 0; i < numElements; ++i) {
+            memcpy(dst, src, arraySize*sizeof(T));
+            dst += arraySize*sizeof(T);
+            src += stride;
+        }
+    }
+    return VtValue(array);
+}
 
 HdStBufferResource::HdStBufferResource(TfToken const &role,
                                            HdTupleType tupleType,
                                            int offset,
                                            int stride)
-    : HdBufferResource(role, tupleType, offset, stride),
-      _gpuAddr(0)
+    : HdBufferResource(role, tupleType, offset, stride)
+    , _lastFrameModified(0)
+    , _activeBuffer(0)
+    , _firstFrameBeingFilled(true)
 {
-    /*NOTHING*/
+    for (int32_t i = 0; i < MULTIBUFFERING; i++) {
+        _gpuAddr[i] = 0;
+    }
 }
 
 HdStBufferResource::~HdStBufferResource()
@@ -50,21 +103,144 @@ HdStBufferResource::~HdStBufferResource()
 void
 HdStBufferResource::SetAllocation(HgiBufferHandle const& id, size_t size)
 {
-    _id = id;
-    HdResource::SetSize(size);
+    SetAllocations(id, HgiBufferHandle(), HgiBufferHandle(), size);
+}
 
-    GlfContextCaps const & caps = GlfContextCaps::GetInstance();
+void
+HdStBufferResource::SetAllocations(HgiBufferHandle const& id0,
+                                     HgiBufferHandle const& id1,
+                                     HgiBufferHandle const& id2,
+                                     size_t size)
+{
+    _ids[0] = id0;
+    _ids[1] = id1;
+    _ids[2] = id2;
 
-    // note: gpu address remains valid until the buffer object is deleted,
-    // or when the data store is respecified via BufferData/BufferStorage.
-    // It doesn't change even when we make the buffer resident or non-resident.
-    // https://www.opengl.org/registry/specs/NV/shader_buffer_load.txt
-    if (id && caps.bindlessBufferEnabled) {
-        glGetNamedBufferParameterui64vNV(
-            id->GetRawResource(), GL_BUFFER_GPU_ADDRESS_NV, (GLuint64EXT*)&_gpuAddr);
-    } else {
-        _gpuAddr = 0;
+    // APPLE METAL: Platform-specific code should be pushed down to hgi.
+    // Need to pass hgi in to resolve it.
+#if defined(PXR_METAL_SUPPORT_ENABLED)
+    for (int32_t i = 0; i < MULTIBUFFERING; i++) {
+        id<MTLBuffer> b = HgiMetalBuffer::MTLBuffer(_ids[i]);
+        if (b) {
+            _gpuAddr[i] = (uint64_t)[b contents];
+        }
+        else {
+            _gpuAddr[i] = 0;
+        }
     }
+    
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    if (context) {
+        _lastFrameModified = context->GetCurrentFrame();
+    }
+    _activeBuffer = 0;
+    id<MTLBuffer> b = HgiMetalBuffer::MTLBuffer(_ids[1]);
+    _firstFrameBeingFilled = b != nil;
+#else
+    for (int32_t i = 0; i < MULTIBUFFERING; i++) {
+        _gpuAddr[i] = 0;
+    }
+    _activeBuffer = 0;
+    _firstFrameBeingFilled = false;
+#endif
+
+    HdResource::SetSize(size);
+}
+
+// APPLE METAL: Multibuffering support.
+void HdStBufferResource::CopyDataIsHappening()
+{
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    
+    if (_ids[1]) {
+        int64_t currentFrame = context->GetCurrentFrame();
+        
+        if (currentFrame != _lastFrameModified) {
+            _firstFrameBeingFilled = false;
+            _activeBuffer++;
+            _activeBuffer = (_activeBuffer < MULTIBUFFERING) ? _activeBuffer : 0;
+        }
+        _lastFrameModified = currentFrame;
+    }
+}
+
+// APPLE METAL: Multibuffering support.
+VtValue HdStBufferResource::ReadBuffer(Hgi* hgi,
+                                         HdTupleType tupleType,
+                                         int vboOffset,
+                                         int stride,
+                                         int numElems)
+{
+    // HdTupleType represents scalar, vector, matrix, and array types.
+    const int bytesPerElement = HdDataSizeOfTupleType(tupleType);
+    const int arraySize = tupleType.count;
+
+    if (stride == 0) stride = bytesPerElement;
+    TF_VERIFY(stride >= bytesPerElement);
+    
+    // +---------+---------+---------+
+    // |   :SRC: |   :SRC: |   :SRC: |
+    // +---------+---------+---------+
+    //     <-------read range------>
+    //     |       ^           | ^ |
+    //     | stride * (n -1)   |   |
+    //                       bytesPerElement
+    
+    // read data
+    uint8_t* data = nullptr;
+    size_t dataSize = 0;
+
+    // APPLE METAL: Platform-specific code should be pushed down to hgi.
+    // Complexity will be that the Metal path is optimised.
+    if (hgi->GetAPIName() == HgiTokens->Metal) {
+        data = (uint8_t*)_gpuAddr[_activeBuffer];
+        dataSize = GetSize();
+    }
+
+    VtValue result;
+    // create VtArray
+    switch (tupleType.type) {
+        case HdTypeInt8:
+            return _CreateVtArray<char>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeInt16:
+            return _CreateVtArray<int16_t>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeUInt16:
+            return _CreateVtArray<uint16_t>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeUInt32:
+            return _CreateVtArray<uint32_t>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeInt32:
+            return _CreateVtArray<int32_t>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeInt32Vec2:
+            return _CreateVtArray<GfVec2i>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeInt32Vec3:
+            return _CreateVtArray<GfVec3i>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeInt32Vec4:
+            return _CreateVtArray<GfVec4i>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeFloat:
+            return _CreateVtArray<float>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeFloatVec2:
+            return _CreateVtArray<GfVec2f>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeFloatVec3:
+            return _CreateVtArray<GfVec3f>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeFloatVec4:
+            return _CreateVtArray<GfVec4f>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeFloatMat4:
+            return _CreateVtArray<GfMatrix4f>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeDouble:
+            return _CreateVtArray<double>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeDoubleVec2:
+            return _CreateVtArray<GfVec2d>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeDoubleVec3:
+            return _CreateVtArray<GfVec3d>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeDoubleVec4:
+            return _CreateVtArray<GfVec4d>(numElems, arraySize, stride, data, dataSize);
+        case HdTypeDoubleMat4:
+            return _CreateVtArray<GfMatrix4d>(numElems, arraySize, stride, data, dataSize);
+        default:
+            TF_CODING_ERROR("Unhandled data type %i", tupleType.type);
+    }
+    
+    return VtValue();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -477,6 +477,10 @@ HdxFullscreenShader::_CreateSampler()
     return true;
 }
 
+void HdxFullscreenShader::SetFlipOnDraw(bool flip)
+{
+    _flipOnDraw = flip;
+}
 
 void
 HdxFullscreenShader::Draw(

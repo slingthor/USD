@@ -25,7 +25,7 @@
 
 #include "pxr/imaging/hdSt/glfTextureCpuData.h"
 
-#include "pxr/imaging/glf/baseTextureData.h"
+#include "pxr/imaging/garch/baseTextureData.h"
 
 #include "pxr/base/gf/math.h"
 #include "pxr/base/trace/trace.h"
@@ -67,7 +67,7 @@ _ComputeNumMipLevels(const GfVec3i &dimensions)
 }
 
 bool
-_IsValid(GlfBaseTextureDataRefPtr const &textureData)
+_IsValid(GarchBaseTextureDataRefPtr const &textureData)
 {
     return
         textureData->ResizedWidth() > 0 &&
@@ -230,11 +230,11 @@ _CheckValid()
 } // anonymous namespace
 
 HdStGlfTextureCpuData::HdStGlfTextureCpuData(
-    GlfBaseTextureDataRefPtr const &textureData,
+    GarchBaseTextureDataRefPtr const &textureData,
     const std::string &debugName,
     const bool generateMips,
     const bool premultiplyAlpha,
-    const GlfImage::ImageOriginLocation originLocation)
+    const GarchImage::ImageOriginLocation originLocation)
   : _textureData(textureData)
 {
     TRACE_FUNCTION();

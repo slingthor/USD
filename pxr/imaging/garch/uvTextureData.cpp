@@ -43,7 +43,7 @@ GarchUVTextureData::New(
     unsigned int cropBottom,
     unsigned int cropLeft,
     unsigned int cropRight,
-    GlfImage::SourceColorSpace sourceColorSpace)
+    GarchImage::SourceColorSpace sourceColorSpace) // APPLE METAL: GarchImage
 {
     GarchUVTextureData::Params params;
     params.targetMemory = targetMemory;
@@ -55,11 +55,11 @@ GarchUVTextureData::New(
 }
 
 GarchUVTextureDataRefPtr
-GarchUVTextureData::New(std::string const &filePath, Params const &params)
-                      GlfImage::SourceColorSpace sourceColorSpace)
+GarchUVTextureData::New(std::string const &filePath, Params const &params,
+                        GarchImage::SourceColorSpace sourceColorSpace) // APPLE METAL: GarchImage
 {
-    return TfCreateRefPtr(new GlfUVTextureData(filePath, params));
-                                               sourceColorSpace));
+    return TfCreateRefPtr(new GarchUVTextureData(filePath, params,
+												 sourceColorSpace));
 }
 
 GarchUVTextureData::~GarchUVTextureData()
@@ -68,7 +68,7 @@ GarchUVTextureData::~GarchUVTextureData()
 
 GarchUVTextureData::GarchUVTextureData(std::string const &filePath,
                                    Params const &params, 
-                                   GlfImage::SourceColorSpace sourceColorSpace)
+                                   GarchImage::SourceColorSpace sourceColorSpace) // APPLE METAL: GarchImage
   : _filePath(filePath),
     _params(params),
     _targetMemory(0),
@@ -114,8 +114,8 @@ GarchUVTextureData::_GetDegradedImageInputChain(double scaleX, double scaleY,
 {
     _DegradedImageInput chain(scaleX, scaleY);
     for (int level = startMip; level < lastMip; level++) {
-        GlfImageSharedPtr image = GarchImage::OpenForReading(_filePath, 0, level,
-                                                           _sourceColorSpace);
+        GarchImageSharedPtr image = GarchImage::OpenForReading(_filePath, 0, level,
+                                                               _sourceColorSpace);
         chain.images.push_back(image);
     }
     return chain;
@@ -207,7 +207,7 @@ GarchUVTextureData::_ReadDegradedImageInput(bool generateMipmap,
     // If no targetMemory set, use degradeLevel to determine mipLevel
     if (targetMemory == 0) {
         GarchImageSharedPtr image =
-        GarchImage::OpenForReading(_filePath, 0, degradeLevel);
+        GarchImage::OpenForReading(_filePath, 0, degradeLevel, _sourceColorSpace);
         if (!image) {
             return _DegradedImageInput(1.0, 1.0);
         }
@@ -232,8 +232,8 @@ GarchUVTextureData::_ReadDegradedImageInput(bool generateMipmap,
     for (int i = 1; i < numMipLevels; i++) {
         // Open the image and is requested to use the i-th
         // down-sampled image (mipLevel).
-        GlfImageSharedPtr image = GarchImage::OpenForReading(_filePath, 0, i,
-                                                           _sourceColorSpace);
+        GarchImageSharedPtr image = GarchImage::OpenForReading(_filePath, 0, i,
+                                                               _sourceColorSpace);
 
         // If mipLevel could not be opened, return fullImage. We are
         // not supposed to hit this. GarchImage will return the last
@@ -383,61 +383,35 @@ GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
 
     // Check if the image is providing a mip chain and check if it is valid
     // If the user wants cropping/resize then the mip chain will be discarded.
-    size_t computedMips = _ComputeNumMipLevels(_resizedWidth, _resizedHeight, 1);
-    bool regenerateMips = generateMipmap || needsResizeOnLoad;
-    size_t numMipLevels = regenerateMips ? computedMips : degradedImage.images.size();
-    
+    // will be discarded.
+    bool usePregeneratedMips = !needsResizeOnLoad && generateMipmap;
+    int numMipLevels = usePregeneratedMips ? degradedImage.images.size() : 1;
+
     // If rawbuffer has any memory let's clean it now before we load the 
     // new textures in memory
     _rawBufferMips.clear();
     _rawBufferMips.resize(numMipLevels);
-    
-    if (regenerateMips) {
-        int mipWidth = _resizedWidth;
-        int mipHeight = _resizedHeight;
 
-        // Read the metadata for the degraded mips in the structure that keeps
-        // track of all the mips
-        for (size_t i = 0 ; i < numMipLevels; i++) {
-            // Create the new mipmap
-            Mip & mip  = _rawBufferMips[i];
-            mip.width  = mipWidth;
-            mip.height = mipHeight;
-            
-            const size_t numPixels = mip.width * mip.height;
-            mip.size   = isCompressed ? GarchGetCompressedTextureSize(
-                                         mip.width, mip.height, _glFormat, _glType):
-                                        numPixels * _bytesPerPixel;
-            mip.offset = _size;
-            _size += mip.size;
-
-            if (mipWidth > 1) {
-                mipWidth >>= 1;
-            }
-            if (mipHeight > 1) {
-                mipHeight >>= 1;
-            }
+    // Read the metadata for the degraded mips in the structure that keeps
+    // track of all the mips
+    for(int i = 0 ; i < numMipLevels; i++) {
+        GarchImageSharedPtr image = degradedImage.images[i];
+        if (!image) {
+            TF_RUNTIME_ERROR("Unable to load mip from Texture '%s'.",
+                _filePath.c_str());
+            return false;
         }
-    } else {
-        for (size_t i = 0 ; i < degradedImage.images.size(); i++) {
-            GarchImageSharedPtr image = degradedImage.images[i];
-            if (!image) {
-                TF_RUNTIME_ERROR("Unable to load mip from Texture '%s'.",
-                    _filePath.c_str());
-                return false;
-            }
 
-            Mip & mip  = _rawBufferMips[i];
-            mip.width  = image->GetWidth();
-            mip.height = image->GetHeight();
-            
-            const size_t numPixels = mip.width * mip.height;
-            mip.size   = isCompressed ? GarchGetCompressedTextureSize(
-                                         mip.width, mip.height, _glFormat, _glType):
-                                        numPixels * _bytesPerPixel;
-            mip.offset = _size;
-            _size += mip.size;
-        }
+        Mip & mip  = _rawBufferMips[i];
+        mip.width  = needsResizeOnLoad ? _resizedWidth : image->GetWidth();
+        mip.height = needsResizeOnLoad ? _resizedHeight : image->GetHeight();
+        
+        const size_t numPixels = mip.width * mip.height;
+        mip.size   = isCompressed ? GarchGetCompressedTextureSize(
+                                     mip.width, mip.height, _glFormat, _glType):
+                                    numPixels * _bytesPerPixel;
+        mip.offset = _size;
+        _size += mip.size;
     }
 
     {
@@ -467,7 +441,7 @@ GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
 
     std::atomic<bool> returnVal(true);
 
-    WorkParallelForN(degradedImage.images.size(),
+    WorkParallelForN(numMipLevels, 
         [this, &degradedImage, cropTop, cropBottom, cropLeft, cropRight, 
         &commonStorageSpec, &returnVal] (size_t begin, size_t end) {
 

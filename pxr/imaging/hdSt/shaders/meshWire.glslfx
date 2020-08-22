@@ -168,9 +168,12 @@ void ProcessQuadEdgeDistance(vec4 Peye0, vec4 Peye1, vec4 Peye2, vec4 Peye3,
 --- --------------------------------------------------------------------------
 -- glsl MeshWire.Geometry.SelOffset
 
+#if !defined(ARCH_GFX_METAL)
 const int GetMaxNumSelectionHighlightModes();
 bool IsFaceSelected(int mode, int elementId);
 int GetElementID(); // code gen
+#endif
+
 
 vec4 ComputeSelectionOffset()
 {
@@ -298,7 +301,6 @@ vec4 ApplyEdgeColor(vec4 Cfill, vec4 patchCoord)
 
 --- --------------------------------------------------------------------------
 -- glsl MeshWire.Fragment.EdgeOnlyBlendColor
-
 vec4 ApplyEdgeColor(vec4 Cfill, vec4 patchCoord)
 {
     float p = GetEdgeOpacity();
@@ -316,7 +318,6 @@ vec4 ApplyEdgeColor(vec4 Cfill, vec4 patchCoord)
 
 --- --------------------------------------------------------------------------
 -- glsl MeshWire.Fragment.EdgeOnlyNoBlend
-
 vec4 ApplyEdgeColor(vec4 Cfill, vec4 patchCoord)
 {
     float p = GetEdgeOpacity();
@@ -348,7 +349,6 @@ vec4 ApplyEdgeColor(vec4 Cfill, vec4 patchCoord)
 
 --- --------------------------------------------------------------------------
 -- glsl MeshPatchWire.Fragment.EdgeOnly
-
 vec4 ApplyEdgeColor(vec4 Cfill, vec4 patchCoord)
 {
     float p = GetEdgeOpacity();

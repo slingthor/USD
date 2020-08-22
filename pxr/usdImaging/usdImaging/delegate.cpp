@@ -2683,8 +2683,10 @@ UsdImagingDelegate::GetMaterialResource(SdfPath const &materialId)
     TF_VERIFY(result, "Material network not found: %s", cachePath.GetText());
 
     return vtMatResource;
-VtValue 
-UsdImagingDelegate::GetLightParamValue(SdfPath const &id, 
+}
+
+VtValue
+UsdImagingDelegate::GetLightParamValue(SdfPath const &id,
                                        TfToken const &paramName)
 {
     // PERFORMANCE: We should schedule this to be updated during Sync, rather

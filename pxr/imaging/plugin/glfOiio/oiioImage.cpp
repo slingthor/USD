@@ -101,7 +101,7 @@ public:
 protected:
     bool _OpenForReading(std::string const & filename, int subimage,
                                  int mip, 
-                                 GlfImage::SourceColorSpace sourceColorSpace, 
+                                 GarchImage::SourceColorSpace sourceColorSpace,  // APPLE METAL: GarchImage
                                  bool suppressErrors) override;
     bool _OpenForWriting(std::string const & filename) override;
 
@@ -118,7 +118,7 @@ private:
     int _subimage;
     int _miplevel;
     ImageSpec _imagespec;
-    GlfImage::SourceColorSpace _sourceColorSpace;
+    GarchImage::SourceColorSpace _sourceColorSpace; // APPLE METAL: GarchImage
 };
 
 TF_REGISTRY_FUNCTION(TfType)
@@ -369,9 +369,16 @@ GarchOIIOImage::GetBytesPerPixel() const
 bool
 GarchOIIOImage::IsColorSpaceSRGB() const
 {
-    return ((_imagespec.nchannels == 3  ||
-             _imagespec.nchannels == 4) &&
-            _imagespec.format == TypeDesc::UINT8);
+    if (_sourceColorSpace == GarchImage::SRGB) {
+        return true;
+    } 
+    if (_sourceColorSpace == GarchImage::Raw) {
+        return false;
+    }
+
+    return ((_imagespec.nchannels == 3 || _imagespec.nchannels == 4) &&
+           _imagespec.format == TypeDesc::UINT8);
+
 }
 
 /* virtual */
@@ -480,7 +487,7 @@ GarchOIIOImage::_CanUseIOProxyForExtension(std::string extension,
 bool
 GarchOIIOImage::_OpenForReading(std::string const & filename, int subimage,
                                int mip, 
-                               GlfImage::SourceColorSpace sourceColorSpace, 
+                               GarchImage::SourceColorSpace sourceColorSpace,  // APPLE METAL: GarchImage
                                bool suppressErrors)
 {
     _filename = filename;

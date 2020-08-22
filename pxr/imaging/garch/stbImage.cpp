@@ -331,10 +331,10 @@ Garch_StbImage::GetBytesPerPixel() const
 bool
 Garch_StbImage::IsColorSpaceSRGB() const
 {
-    if (_sourceColorSpace == SourceColorSpace::SRGB) {
+    if (_sourceColorSpace == GarchImage::SRGB) {
         return true;
     }
-    if (_sourceColorSpace == SourceColorSpace::Raw) {
+    if (_sourceColorSpace == GarchImage::Raw) {
         return false;
     }
 

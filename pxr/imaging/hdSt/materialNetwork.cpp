@@ -23,10 +23,11 @@
 //
 
 #include "pxr/imaging/hdSt/materialNetwork.h"
-#include "pxr/imaging/hdSt/tokens.h"
-#include "pxr/imaging/hdSt/materialParam.h"
-#include "pxr/imaging/hdSt/subtextureIdentifier.h"
 #include "pxr/imaging/hdSt/drawTarget.h"
+#include "pxr/imaging/hdSt/materialParam.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/subtextureIdentifier.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/garch/udimTexture.h"
 #include "pxr/imaging/garch/resourceFactory.h"
@@ -801,8 +802,9 @@ _GetSamplerParameters(
 }
 
 //
-// We need to flip the image for the legacy HwUvTexture_1 shader node and 
-// pre-multiply textures by their alpha if applicable
+// We need to flip the image for the legacy HwUvTexture_1 shader node, 
+// pre-multiply textures by their alpha if applicable, and provide a hint for
+// in what color space the texture is encoded 
 //
 static
 std::unique_ptr<HdStSubtextureIdentifier>

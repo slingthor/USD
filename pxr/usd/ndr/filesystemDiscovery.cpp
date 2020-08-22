@@ -48,7 +48,7 @@ TF_DEFINE_ENV_SETTING(
     "'.'. Extensions should be separated by a colon.");
 
 TF_DEFINE_ENV_SETTING(
-    PXR_NDR_FS_PLUGIN_FOLLOW_SYMLINKS, false,
+    PXR_NDR_FS_PLUGIN_FOLLOW_SYMLINKS, true,
     "Whether symlinks should be followed while walking the search paths. Set "
     "to 'true' (case sensitive) if they should be followed.");
 

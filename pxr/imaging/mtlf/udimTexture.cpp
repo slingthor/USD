@@ -47,8 +47,9 @@ MtlfUdimTexture::MtlfUdimTexture(
     TfToken const& imageFilePath,
     GarchImage::ImageOriginLocation originLocation,
     std::vector<std::tuple<int, TfToken>>&& tiles,
-    bool const premultiplyAlpha)
-    : GarchUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha)
+    bool const premultiplyAlpha,
+    GarchImage::SourceColorSpace sourceColorSpace)
+    : GarchUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha, sourceColorSpace)
 {
 }
 

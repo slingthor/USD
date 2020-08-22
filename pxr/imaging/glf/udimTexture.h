@@ -49,9 +49,10 @@ protected:
     GLF_API
     GlfUdimTexture(
         TfToken const& imageFilePath,
-        GlfImage::ImageOriginLocation originLocation,
+        GarchImage::ImageOriginLocation originLocation,
         std::vector<std::tuple<int, TfToken>>&& tiles,
         bool const premultiplyAlpha,
+        GarchImage::SourceColorSpace sourceColorSpace); // APPLE METAL: GarchImage
 
     friend class GlfResourceFactory;
 

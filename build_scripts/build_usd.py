@@ -117,10 +117,10 @@ def GetMacArch():
         macArch = "x86_64"
     else:
         macArch = "arm64"
-    return macArch;
+    return macArch
 
 def SupportsMacOSUniversalBinaries():
-    MacOS_SDK = GetCommandOutput('xcrun --show-sdk-version').strip()
+    MacOS_SDK = GetCommandOutput('/usr/bin/xcodebuild -version').split(' ')[1]
     return MacOS() and MacOS_SDK >= "10.16"
 
 def GetXcodeDeveloperDirectory():
@@ -305,6 +305,7 @@ def CurrentWorkingDirectory(dir):
     finally: os.chdir(curdir)
 
 def CreateUniversalBinaries(context, libNames, x86Dir, armDir):
+    lipoCommands = []
     xcodeRoot = subprocess.check_output(["xcode-select", "--print-path"]).strip()
     lipoBinary = "{XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo".format(XCODE_ROOT=xcodeRoot)
     for libName in libNames:
@@ -314,6 +315,7 @@ def CreateUniversalBinaries(context, libNames, x86Dir, armDir):
                 os.remove(outputName)
             lipoCmd = "{lipo} -create {x86Dir}/{libName} {armDir}/{libName} -output {outputName}".format(
                 lipo=lipoBinary, x86Dir=x86Dir, armDir=armDir, libName=libName, outputName=outputName)
+            lipoCommands.append(lipoCmd)
             Run(lipoCmd)
     for libName in libNames:
         if os.path.islink("{x86Dir}/{libName}".format(x86Dir=x86Dir, libName=libName)):
@@ -324,6 +326,7 @@ def CreateUniversalBinaries(context, libNames, x86Dir, armDir):
             targetName = os.path.basename(targetName)
             os.symlink("{instDir}/lib/{libName}".format(instDir=context.instDir, libName=targetName),
                 outputName)
+    return lipoCommands
 
 def CopyFiles(context, src, dest):
     """Copy files like shutil.copy, but src may be a glob pattern."""
@@ -729,11 +732,14 @@ ZLIB = Dependency("zlib", InstallZlib, "include/zlib.h")
 ############################################################
 # boost
 
-if Linux() or MacOS() or iOS():
+if Linux():
     if Python3():
         BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.70.0/boost_1_70_0.tar.gz"
     else:
         BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.bz2"
+        BOOST_VERSION_FILE = "include/boost/version.hpp"
+elif MacOS() or iOS():
+    BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.70.0/boost_1_70_0.tar.bz2"
     BOOST_VERSION_FILE = "include/boost/version.hpp"
 elif Windows():
     # The default installation of boost on Windows puts headers in a versioned 
@@ -952,18 +958,21 @@ def InstallBoost_Helper(context, force, buildArgs):
 
             with open(projectPath, 'a') as projectFile:
                 projectFile.writelines(newLines)
+
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
             b2_toolset = "toolset=clang-darwin-x86_64"
             b2_settings[0] = '--prefix="{instDir}/_tmp/x86_64"'.format(instDir=context.instDir)
-            b2Cmd = '{b2} {toolset} {options} install'.format(
-                b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
-            Run( b2Cmd )
+        b2CmdPrimary = '{b2} {toolset} {options} install'.format(
+            b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
+        Run(b2CmdPrimary)
 
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
             b2_toolset = "toolset=clang-darwin-arm64"
             b2_settings[0] = '--prefix="{instDir}/_tmp/arm64"'.format(instDir=context.instDir)
-        
-        b2Cmd = '{b2} {toolset} {options} install'.format(
-            b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
-        Run(b2Cmd)
+                
+            b2CmdSecondary = '{b2} {toolset} {options} install'.format(
+                b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
+            Run(b2CmdSecondary)
 
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
             CopyDirectory(context, os.path.join(context.instDir, "_tmp/x86_64/include/boost"), "include/boost")
@@ -971,7 +980,7 @@ def InstallBoost_Helper(context, force, buildArgs):
             x86Dir = os.path.join(context.instDir, "_tmp/x86_64/lib")
             armDir = os.path.join(context.instDir, "_tmp/arm64/lib")
             libNames = [f for f in os.listdir(x86Dir) if os.path.isfile(os.path.join(x86Dir, f))]
-            CreateUniversalBinaries(context, libNames, x86Dir, armDir)
+            lipoCommands = CreateUniversalBinaries(context, libNames, x86Dir, armDir)
 
             shutil.rmtree(os.path.join(context.instDir, "_tmp"))
 
@@ -980,7 +989,10 @@ def InstallBoost_Helper(context, force, buildArgs):
             file.write('ARCHIVE:' + BOOST_URL.split("/")[-1] + '\n')
             file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
             file.write('BOOTSTRAP:' + bootstrapCmd + '\n')
-            file.write('B2:' + b2Cmd + '\n')
+            file.write('B2PRIMARY:' + b2CmdPrimary + '\n')
+            if context.buildUniversal and SupportsMacOSUniversalBinaries():
+                file.write('B2SECONDARY:' + b2CmdSecondary + '\n')
+                file.write('LIPO:' + ','.join(lipoCommands) + '\n')
 
         if iOS():
             for filename in os.listdir(context.instDir + "/lib"):
@@ -1102,30 +1114,24 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         archPrimary = GetMacArch()
         archSecondary = ""
         if (archPrimary == "x86_64"):
-            archPimary = "intel64"
+            archPrimary = "intel64"
             archSecondary = "arm64"
         else:
             archSecondary = "arm64"
 
-        makeTBBCmd = 'make -j{procs} arch={arch} {buildArgs}'.format(
+        makeTBBCmdPrimary = 'make -j{procs} arch={arch} {buildArgs}'.format(
             arch=archPrimary,
             procs=context.numJobs, 
             buildArgs=" ".join(buildArgs))
-        Run(makeTBBCmd)
+        Run(makeTBBCmdPrimary)
         
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
-            makeTBBCmd = "make -j{procs} arch={arch} {buildArgs}".format(
+            makeTBBCmdSecondary = "make -j{procs} arch={arch} {buildArgs}".format(
                 arch=archSecondary,
                 procs=context.numJobs,
                 buildArgs=" ".join(buildArgs))
 
-            Run(makeTBBCmd)
-
-        # Output paths that are of interest
-        with open(os.path.join(context.usdInstDir, 'tbbBuild.txt'), 'wt') as file:
-            file.write('ARCHIVE:' + TBB_URL.split("/")[-1] + '\n')
-            file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
-            file.write('MAKE:' + makeTBBCmd + '\n')
+            Run(makeTBBCmdSecondary)
 
         # Install both release and debug builds. USD requires the debug
         # libraries when building in debug mode, and installing both
@@ -1133,13 +1139,13 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         # location that can be shared by both release and debug USD
         # builds. Plus, the TBB build system builds both versions anyway.
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
-            x86Files = glob.glob("build/*x86_64*_release/libtbb*.*")
-            armFiles = glob.glob("build/*arm64*_release/libtbb*.*")
+            x86Files = glob.glob(os.getcwd() + "/build/*x86_64*_release/libtbb*.*")
+            armFiles = glob.glob(os.getcwd() + "/build/*arm64*_release/libtbb*.*")
             libNames = [os.path.basename(x) for x in x86Files]
             x86Dir = os.path.dirname(x86Files[0])
             armDir = os.path.dirname(armFiles[0])
 
-            CreateUniversalBinaries(context, libNames, x86Dir, armDir)
+            lipoCommandsRelease = CreateUniversalBinaries(context, libNames, x86Dir, armDir)
 
             x86Files = glob.glob(os.getcwd() + "/build/*x86_64*_debug/libtbb*.*")
             armFiles = glob.glob(os.getcwd() + "/build/*arm64*_debug/libtbb*.*")
@@ -1147,11 +1153,22 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             x86Dir = os.path.dirname(x86Files[0])
             armDir = os.path.dirname(armFiles[0])
 
-            CreateUniversalBinaries(context, libNames, x86Dir, armDir)
+            lipoCommandsDebug = CreateUniversalBinaries(context, libNames, x86Dir, armDir)
         else:
             CopyFiles(context, "build/*_release/libtbb*.*", "lib")
-            CopyFiles(context, "build/*_debug/libtbb*.*", "lib")
 
+        # Output paths that are of interest
+        with open(os.path.join(context.usdInstDir, 'tbbBuild.txt'), 'wt') as file:
+            file.write('ARCHIVE:' + TBB_URL.split("/")[-1] + '\n')
+            file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
+            file.write('MAKEPRIMARY:' + makeTBBCmdPrimary + '\n')
+
+            if context.buildUniversal and SupportsMacOSUniversalBinaries():
+                file.write('MAKESECONDARY:' + makeTBBCmdSecondary + '\n')
+                file.write('LIPO_RELEASE:' + ','.join(lipoCommandsRelease) + '\n')
+                file.write('LIPO_DEBUG:' + ','.join(lipoCommandsDebug) + '\n')
+
+        CopyFiles(context, "build/*_debug/libtbb*.*", "lib")
         CopyDirectory(context, "include/serial", "include/serial")
         CopyDirectory(context, "include/tbb", "include/tbb")
         return os.getcwd()
@@ -1178,6 +1195,7 @@ def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
 
         if MacOS():
             extraJPEGArgs.append("-DWITH_SIMD=FALSE")
+            extraJPEGArgs.append("-DENABLE_STATIC=TRUE")
 
         if iOS():
             extraJPEGArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
@@ -1267,6 +1285,7 @@ JPEG = Dependency("JPEG", InstallJPEG, "include/jpeglib.h")
 TIFF_URL = "https://download.osgeo.org/libtiff/tiff-4.0.7.zip"
 
 def InstallTIFF(context, force, buildArgs):
+    scriptFolder = os.path.dirname(os.path.abspath(__file__))
     with CurrentWorkingDirectory(DownloadURL(TIFF_URL, context, force)):
         # libTIFF has a build issue on Windows where tools/tiffgt.c
         # unconditionally includes unistd.h, which does not exist.
@@ -1281,6 +1300,25 @@ def InstallTIFF(context, force, buildArgs):
                     ("add_subdirectory(test)", "# add_subdirectory(test)")])
 
         if MacOS() or iOS():
+            patchPath = os.path.join(os.path.dirname(scriptFolder), 'patches')
+
+            devout = open(os.devnull, 'w')
+            subprocess.call(['git', 'apply', '--reject', '--whitespace=fix', 
+                patchPath + '/0001-tif_fax3.h-allow-0-length-run-in-DECODE2D.patch'],
+                stdout=devout, stderr=devout)
+
+            subprocess.call(['git', 'apply', '--reject', '--whitespace=fix', 
+                patchPath + '/0001-tif_fax3-better-fix-for-CVE-2011-0192.patch'],
+                stdout=devout, stderr=devout)
+
+            subprocess.call(['git', 'apply', '--reject', '--whitespace=fix', 
+                patchPath + '/0001-tif_fax3.h-check-for-buffer-overflow-in-EXPAND2D-bef.patch'],
+                stdout=devout, stderr=devout)
+
+            subprocess.call(['git', 'apply', '--reject', '--whitespace=fix', 
+                patchPath + '/0001-tif_fax3-more-buffer-overflow-checks-in-Fax3Decode2D.patch'],
+                stdout=devout, stderr=devout)
+
             PatchFile("CMakeLists.txt",
                    [("option(ld-version-script \"Enable linker version script\" ON)",
                      "option(ld-version-script \"Enable linker version script\" OFF)")])
@@ -1303,6 +1341,7 @@ PNG_URL = "https://downloads.sourceforge.net/project/libpng/libpng16/older-relea
 def InstallPNG(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PNG_URL, context, force)):
         extraPNGArgs = buildArgs;
+        extraPNGArgs.append("-DCMAKE_C_FLAGS=\"-DPNG_ARM_NEON_OPT=0\"");
 
         if (context.buildUniversal and SupportsMacOSUniversalBinaries()) or (GetMacArch() == "arm64"):
             extraPNGArgs.append("-DCMAKE_C_FLAGS=\"-DPNG_ARM_NEON_OPT=0\"");
@@ -1783,7 +1822,8 @@ def InstallOpenColorIO(context, force, buildArgs):
                      '-DOCIO_BUILD_TESTS=OFF',
                      '-DOCIO_BUILD_PYGLUE=OFF',
                      '-DOCIO_BUILD_JNIGLUE=OFF',
-                     '-DOCIO_STATIC_JNIGLUE=OFF']
+                     '-DOCIO_STATIC_JNIGLUE=OFF',
+                     '-DOCIO_USE_SSE=OFF']
 
         if MacOS():
             if context.buildUniversal and SupportsMacOSUniversalBinaries():
@@ -2022,6 +2062,14 @@ def InstallAlembic(context, force, buildArgs):
                 '-DUSE_HDF5=ON',
                 '-DHDF5_ROOT="{instDir}"'.format(instDir=context.instDir),
                 '-DCMAKE_CXX_FLAGS="-D H5_BUILT_AS_DYNAMIC_LIB"']
+                
+            if Windows():
+                # Alembic doesn't link against HDF5 libraries on Windows 
+                # whether or not USE_HDF5=ON or not.  There is a line to link 
+                # against HDF5 on DARWIN so we hijack it to also link on WIN32.
+                PatchFile("lib\\Alembic\\CMakeLists.txt", 
+                          [("ALEMBIC_SHARED_LIBS AND DARWIN",
+                            "ALEMBIC_SHARED_LIBS AND DARWIN OR ALEMBIC_SHARED_LIBS AND WIN32")])
         else:
            cmakeOptions += ['-DUSE_HDF5=OFF']
                  
@@ -2357,6 +2405,7 @@ group.add_argument("--cache", dest="use_download_cache", action="store_true",
                    help="Copy dependencies from repository folder instead of downloading")
 group.add_argument("--no-cache", dest="use_download_cache", action="store_false",
                    help="Download dependencies, don't use the cache download folder")
+
 group = parser.add_mutually_exclusive_group()
 group.add_argument("--make-relocatable", dest="make_relocatable",
                    action="store_true", default=True,

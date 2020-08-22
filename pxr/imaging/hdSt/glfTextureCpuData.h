@@ -29,14 +29,14 @@
 
 #include "pxr/imaging/hdSt/textureCpuData.h"
 #include "pxr/imaging/hgi/texture.h"
-#include "pxr/imaging/glf/image.h"
+#include "pxr/imaging/garch/image.h"
 #include "pxr/base/tf/declarePtrs.h"
 
 #include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_DECLARE_REF_PTRS(GlfBaseTextureData);
+TF_DECLARE_REF_PTRS(GarchBaseTextureData);
 
 /// \class HdStTextureCpuData
 ///
@@ -48,11 +48,11 @@ class HdStGlfTextureCpuData : public HdStTextureCpuData
 public:
     HDST_API
     HdStGlfTextureCpuData(
-        GlfBaseTextureDataRefPtr const &textureData,
+        GarchBaseTextureDataRefPtr const &textureData,
         const std::string &debugName,
         bool generateMips = false,
         bool premultiplyAlpha = true,
-        GlfImage::ImageOriginLocation originLoc = GlfImage::OriginUpperLeft);
+        GarchImage::ImageOriginLocation originLoc = GarchImage::OriginUpperLeft);
     
     HDST_API
     ~HdStGlfTextureCpuData();
@@ -82,7 +82,7 @@ private:
 
     // To avoid a copy, hold on to original data if we
     // can use them.
-    GlfBaseTextureDataRefPtr _textureData;
+    GarchBaseTextureDataRefPtr _textureData;
 
     // Buffer if we had to convert the data.
     std::unique_ptr<const unsigned char[]> _convertedRawData;

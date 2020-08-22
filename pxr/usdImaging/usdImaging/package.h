@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-<<<<<<< HEAD:pxr/usdImaging/usdImaging/package.h
 #ifndef USDIMAGINGGL_PACKAGE_H
 #define USDIMAGINGGL_PACKAGE_H
 
@@ -38,32 +37,3 @@ TfToken UsdImagingPackageDrawModeShader();
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // USDIMAGINGGL_PACKAGE_H
-=======
-#ifndef PXR_IMAGING_HD_ST_TEXTURE_CPU_DATA_H
-#define PXR_IMAGING_HD_ST_TEXTURE_CPU_DATA_H
-
-#include "pxr/pxr.h"
-
-PXR_NAMESPACE_OPEN_SCOPE
-
-struct HgiTextureDesc;
-
-/// \class HdStTextureCpuData
-///
-/// Represents CPU data that can be stored in a HdStUvTextureObject, mostly,
-/// likely during the load phase to be committed to the GPU.
-///
-class HdStTextureCpuData {
-public:
-    /// The metadata of the texture (width, height, ...) including a
-    /// pointer to the CPU data (as initialData).
-    virtual const HgiTextureDesc &GetTextureDesc() const = 0;
-
-    /// Are the data valid (e.g., false if file could not be found).
-    virtual bool IsValid() const = 0;
-};
-
-PXR_NAMESPACE_CLOSE_SCOPE
-
-#endif
->>>>>>> dev:pxr/imaging/hdSt/textureCpuData.h

@@ -29,14 +29,14 @@
 
 #include "pxr/imaging/hdSt/interleavedMemoryManager.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/resourceFactory.h"
-#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/glUtils.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
+#include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/blitCmds.h"
 #include "pxr/imaging/hgi/blitCmdsOps.h"
 #include "pxr/imaging/hgi/buffer.h"
-#include "pxr/imaging/hgi/hgi.h"
 
 #include "pxr/base/arch/hash.h"
 #include "pxr/base/tf/diagnostic.h"
@@ -736,12 +736,10 @@ HdStInterleavedMemoryManager::_StripedInterleavedBufferRange::CopyData(
             blitOp.destinationByteOffset = vboOffset;
             blitCmds->QueueCopyBufferCpuToGpu(blitOp);
 
-        vboOffset += vboStride;
-        data += dataSize;
+            vboOffset += vboStride;
+            data += dataSize;
+        }
     }
-    
-    HD_PERF_COUNTER_ADD(HdStPerfTokens->copyBufferCpuToGpu,
-                        (double)_numElements);
 }
 
 VtValue

@@ -225,7 +225,6 @@ private:
 /// \class HdStUdimSubtextureIdentifier
 ///
 /// Specifies whether a Udim texture should be loaded with pre-multiplied alpha
-/// values and the color space in which the texture is encoded.
 ///
 class HdStUdimSubtextureIdentifier final
                                 : public HdStSubtextureIdentifier

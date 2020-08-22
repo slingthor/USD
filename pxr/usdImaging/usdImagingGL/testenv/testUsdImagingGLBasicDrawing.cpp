@@ -298,7 +298,7 @@ My_TestGLDrawing::DrawTest(bool offscreen)
             _engine->SetLightingStateFromOpenGL();
         }
     }
-
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (PresentDisabled()) {
         _engine->SetEnablePresentation(false);
     }

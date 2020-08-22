@@ -44,8 +44,6 @@
 #include "pxr/imaging/hdx/shadowTask.h"
 #include "pxr/imaging/hdx/shadowMatrixComputation.h"
 
-#include "pxr/imaging/garch/drawTarget.h"
-
 #include "pxr/imaging/pxOsd/tokens.h"
 
 PXR_NAMESPACE_OPEN_SCOPE

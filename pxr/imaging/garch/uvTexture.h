@@ -71,7 +71,7 @@ public:
         unsigned int cropLeft   = 0,
         unsigned int cropRight  = 0,
         GarchImage::ImageOriginLocation originLocation = 
-                           GarchImage::OriginUpperLeft); 
+                           GarchImage::OriginUpperLeft);
 
     int GetNumDimensions() const override;
     
@@ -168,7 +168,7 @@ private:
     const unsigned int _cropBottom;
     const unsigned int _cropLeft;
     const unsigned int _cropRight;
-    
+
     std::mutex _readMutex;
 };
 

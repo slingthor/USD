@@ -44,12 +44,11 @@
 #include "pxr/imaging/hio/glslfx.h"
 #include "pxr/imaging/hgi/hgi.h"
 
-#include "pxr/imaging/hd/engine.h"
-#include "pxr/imaging/hd/tokens.h"
-
 #include "pxr/base/tf/envSetting.h"
+#include "pxr/base/tf/hash.h"
 
 // APPLE METAL: Remove once cast to HgiMetal is gone
+#include "pxr/imaging/hgiMetal/hgi.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -909,9 +908,8 @@ HdStResourceRegistry::_Commit()
         }
     }
 
-    // submit the GPU work queued
     SubmitHgiWork();
-    
+
     // release sources
     WorkParallelForEach(_pendingSources.begin(), _pendingSources.end(),
                         [](_PendingSource &ps) {
@@ -994,8 +992,7 @@ HdStResourceRegistry::_GarbageCollect()
     _uniformUboBufferArrayRegistry.GarbageCollect();
     _uniformSsboBufferArrayRegistry.GarbageCollect();
     _singleBufferArrayRegistry.GarbageCollect();
-    
-    // submit the GPU work queued
+
     SubmitHgiWork();
 }
 

@@ -361,7 +361,9 @@ void emit(int index, vec4 Peye, vec3 Neye,
     EmitVertex();
 }
 
+#if !defined(ARCH_GFX_METAL)
 vec4 ComputeSelectionOffset();
+#endif
 
 void main(void)
 {
@@ -478,7 +480,9 @@ void emit(int index, vec4 Peye, vec3 Neye,
     EmitVertex();
 }
 
+#if !defined(ARCH_GFX_METAL)
 vec4 ComputeSelectionOffset();
+#endif
 
 void main(void)
 {
@@ -572,7 +576,9 @@ void emit(int triCounter, int index, vec4 Peye, vec3 Neye,
     EmitVertex();
 }
 
+#if !defined(ARCH_GFX_METAL)
 vec4 ComputeSelectionOffset();
+#endif
 
 void main(void)
 {

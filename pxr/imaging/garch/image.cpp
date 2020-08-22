@@ -49,7 +49,7 @@ GarchImage::IsSupportedImageFile(std::string const & filename)
 /* static */
 GarchImageSharedPtr
 GarchImage::OpenForReading(std::string const & filename, int subimage,
-                         int mip, SourceColorSpace sourceColorSpace, 
+                         int mip, SourceColorSpace sourceColorSpace,
                          bool suppressErrors)
 {
     GarchImageRegistry & registry = GarchImageRegistry::GetInstance();

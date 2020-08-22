@@ -45,6 +45,8 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+TF_DEFINE_ENV_SETTING(GLF_ENABLE_BINDLESS_SHADOW_TEXTURES, true,
+                      "Enable use of bindless shadow maps");
 
 GlfSimpleShadowArray::GlfSimpleShadowArray() :
     GarchSimpleShadowArray(),
