@@ -299,6 +299,10 @@ My_TestGLDrawing::DrawTest(bool offscreen)
         }
     }
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
+    if (PresentDisabled()) {
+        _engine->SetEnablePresentation(false);
+    }
+
     if (!GetClipPlanes().empty()) {
         params.clipPlanes = GetClipPlanes();
         for (size_t i=0; i<GetClipPlanes().size(); ++i) {

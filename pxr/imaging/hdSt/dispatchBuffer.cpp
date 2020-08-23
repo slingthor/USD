@@ -25,6 +25,7 @@
 
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hd/perfLog.h"
 
 #include "pxr/imaging/hf/perfLog.h"
@@ -36,12 +37,13 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
 class Hd_DispatchBufferArrayRange : public HdStBufferArrayRange {
 public:
     /// Constructor.
-    Hd_DispatchBufferArrayRange(HdStDispatchBuffer *buffer) :
-        _buffer(buffer) {
+    Hd_DispatchBufferArrayRange(
+        HdStResourceRegistry* resourceRegistry, HdStDispatchBuffer *buffer)
+        : HdStBufferArrayRange(resourceRegistry)
+        , _buffer(buffer) {
     }
 
     /// Returns true if this range is valid
@@ -197,7 +199,8 @@ HdStDispatchBuffer::HdStDispatchBuffer(
 
     // create a buffer array range, which aggregates all views
     // (will be added by AddBufferResourceView)
-    _bar = HdStBufferArrayRangeSharedPtr(new Hd_DispatchBufferArrayRange(this));
+    _bar = HdStBufferArrayRangeSharedPtr(
+        new Hd_DispatchBufferArrayRange(resourceRegistry, this));
 }
 
 HdStDispatchBuffer::~HdStDispatchBuffer()
@@ -212,6 +215,8 @@ HdStDispatchBuffer::CopyData(std::vector<GLuint> const &data)
 {
     if (!TF_VERIFY(data.size()*sizeof(GLuint) == static_cast<size_t>(_entireResource->GetSize())))
         return;
+
+    HD_PERF_COUNTER_INCR(HdStPerfTokens->copyBufferCpuToGpu);
 
     // Use blit op to copy over the data.
     HgiBlitCmds* blitCmds = _resourceRegistry->GetBlitCmds();

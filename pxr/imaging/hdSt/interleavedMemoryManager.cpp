@@ -29,14 +29,14 @@
 
 #include "pxr/imaging/hdSt/interleavedMemoryManager.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/resourceFactory.h"
-#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/glUtils.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
+#include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/blitCmds.h"
 #include "pxr/imaging/hgi/blitCmdsOps.h"
 #include "pxr/imaging/hgi/buffer.h"
-#include "pxr/imaging/hgi/hgi.h"
 
 #include "pxr/base/arch/hash.h"
 #include "pxr/base/tf/diagnostic.h"
@@ -59,7 +59,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdBufferArrayRangeSharedPtr
 HdStInterleavedMemoryManager::CreateBufferArrayRange()
 {
-    return (std::make_shared<_StripedInterleavedBufferRange>());
+    return std::make_shared<_StripedInterleavedBufferRange>(_resourceRegistry);
 }
 
 /// Returns the buffer specs from a given buffer array

@@ -37,6 +37,7 @@
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/glUtils.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/vboMemoryManager.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -71,7 +72,7 @@ HdStVBOMemoryManager::CreateBufferArray(
 HdBufferArrayRangeSharedPtr
 HdStVBOMemoryManager::CreateBufferArrayRange()
 {
-    return std::make_shared<_StripedBufferArrayRange>();
+    return std::make_shared<_StripedBufferArrayRange>(_resourceRegistry);
 }
 
 
@@ -691,7 +692,8 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::CopyData(
     // APPLE METAL: Temp for triple buffering
     VBO->CopyDataIsHappening();
     
-    HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
+    // APPLE METAL: No gl perf counters.
+    //HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
 
     HgiBufferCpuToGpuOp blitOp;
     blitOp.cpuSourceBuffer = bufferSource->GetData();

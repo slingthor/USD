@@ -52,12 +52,18 @@ TF_DEFINE_PRIVATE_TOKENS(
     (cardsUv)
     (cardsTexAssign)
 
-    (textureXPos)
-    (textureYPos)
-    (textureZPos)
-    (textureXNeg)
-    (textureYNeg)
-    (textureZNeg)
+    (textureXPosColor)
+    (textureYPosColor)
+    (textureZPosColor)
+    (textureXNegColor)
+    (textureYNegColor)
+    (textureZNegColor)
+    (textureXPosOpacity)
+    (textureYPosOpacity)
+    (textureZPosOpacity)
+    (textureXNegOpacity)
+    (textureYNegOpacity)
+    (textureZNegOpacity)
 
     (worldtoscreen)
 
@@ -65,7 +71,8 @@ TF_DEFINE_PRIVATE_TOKENS(
 
     (file)
     (st)
-    (rgba)
+    (rgb)
+    (a)
     (fallback)
     (minFilter)
     (magFilter)
@@ -116,7 +123,7 @@ UsdImagingGLDrawModeAdapter::ShouldCullChildren() const
 }
 
 bool
-UsdImagingGLDrawModeAdapter::CanPopulateMaster() const
+UsdImagingGLDrawModeAdapter::CanPopulateUsdInstance() const
 {
     return true;
 }
@@ -366,7 +373,6 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
 
         if (requestedBits & HdMaterial::DirtyResource) {
 
-
             SdfAssetPath path(UsdImagingGLPackageDrawModeShader());
             
             SdrRegistry &shaderReg = SdrRegistry::GetInstance();
@@ -400,13 +406,19 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
                 UsdGeomTokens->modelCardTextureYNeg,
                 UsdGeomTokens->modelCardTextureZNeg,
             };
-            const TfToken textureNames[6] = {
-                _tokens->textureXPos,
-                _tokens->textureYPos,
-                _tokens->textureZPos,
-                _tokens->textureXNeg,
-                _tokens->textureYNeg,
-                _tokens->textureZNeg,
+            const TfToken textureNames[12] = {
+                _tokens->textureXPosColor,
+                _tokens->textureYPosColor,
+                _tokens->textureZPosColor,
+                _tokens->textureXNegColor,
+                _tokens->textureYNegColor,
+                _tokens->textureZNegColor,
+                _tokens->textureXPosOpacity,
+                _tokens->textureYPosOpacity,
+                _tokens->textureZPosOpacity,
+                _tokens->textureXNegOpacity,
+                _tokens->textureYNegOpacity,
+                _tokens->textureZNegOpacity
             };
 
             GfVec3f schemaColor = GfVec3f(0.18f, 0.18f, 0.18f);
@@ -421,7 +433,8 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
             for (int i = 0; i < 6; ++i) {
                 UsdAttribute attr = prim.GetAttribute(textureAttrs[i]);
                 SdfAssetPath textureFile;
-                if (attr && attr.Get(&textureFile, time)) {
+                if (attr && attr.Get(&textureFile, time) &&
+                    !textureFile.GetAssetPath().empty()) {
                     SdfPath textureNodePath = _GetMaterialPath(prim)
                         .AppendProperty(textureAttrs[i]);
 
@@ -437,18 +450,29 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
                     textureNode.parameters[_tokens->magFilter] =
                         _tokens->linear;
 
-                    // Insert connection between texture node and terminal
-                    HdMaterialRelationship rel;
-                    rel.inputId = textureNode.path;
-                    rel.inputName = _tokens->rgba;
-                    rel.outputId = terminal.path;
-                    rel.outputName = textureNames[i];
-                    network.relationships.emplace_back(std::move(rel));
+                    // Insert connection between texture node and terminal color
+                    // input
+                    HdMaterialRelationship colorRel;
+                    colorRel.inputId = textureNode.path;
+                    colorRel.inputName = _tokens->rgb;
+                    colorRel.outputId = terminal.path;
+                    colorRel.outputName = textureNames[i];
+                    network.relationships.emplace_back(std::move(colorRel));
+
+                    // Insert connection between texture node and terminal 
+                    // opacity input
+                    HdMaterialRelationship opacityRel;
+                    opacityRel.inputId = textureNode.path;
+                    opacityRel.inputName = _tokens->a;
+                    opacityRel.outputId = terminal.path;
+                    opacityRel.outputName = textureNames[i + 6];
+                    network.relationships.emplace_back(std::move(opacityRel));
 
                     // Insert texture node
                     network.nodes.emplace_back(std::move(textureNode));
                 } else {
-                    terminal.parameters[textureNames[i]] = fallback;
+                    terminal.parameters[textureNames[i]] = schemaColor;
+                    terminal.parameters[textureNames[i + 6]] = VtValue(1.f);
                 }
             }
 
@@ -605,7 +629,8 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
                 for (int i = 0; i < 6; ++i) {
                     UsdAttribute attr = prim.GetAttribute(textureAttrs[i]);
                     SdfAssetPath asset;
-                    if (attr && attr.Get(&asset, time)) {
+                    if (attr && attr.Get(&asset, time) &&
+                        !asset.GetAssetPath().empty()) {
                         axes_mask |= mask[i];
                     }
                 }
@@ -1055,6 +1080,10 @@ UsdImagingGLDrawModeAdapter::_GetMatrixFromImageMetadata(
     // Fallback to the literal path if it couldn't be resolved.
     if (file.empty()) {
         file = asset.GetAssetPath();
+    }
+    // If the literal path is empty, ignore this attribute.
+    if (file.empty()) {
+        return false;
     }
 
     GlfImageSharedPtr img = GlfImage::OpenForReading(file);

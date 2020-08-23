@@ -87,10 +87,12 @@ void
 DeleteTheArenaManager()
 {
     if(theManager) {
-        tbb::task_arena *ret;
-        while(theManager->freeArenas.try_pop(ret)) {
-            delete ret;
-            ret = NULL;
+        while (!theManager->freeArenas.empty()) {
+            tbb::task_arena *ret;
+            if(theManager->freeArenas.try_pop(ret)) {
+                delete ret;
+                ret = NULL;
+            }
         }
         delete theManager;
         theManager = NULL;

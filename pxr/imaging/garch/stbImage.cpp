@@ -84,7 +84,8 @@ public:
 
 protected:
     virtual bool _OpenForReading(std::string const & filename, int subimage,
-                                 int mip, bool suppressErrors);
+                                 int mip, SourceColorSpace sourceColorSpace, 
+                                 bool suppressErrors);
     virtual bool _OpenForWriting(std::string const & filename);
 
 private:
@@ -107,6 +108,8 @@ private:
     GLenum _outputType; 
     
     int _nchannels;
+
+    SourceColorSpace _sourceColorSpace;
 };
 
 TF_REGISTRY_FUNCTION(TfType)
@@ -328,6 +331,13 @@ Garch_StbImage::GetBytesPerPixel() const
 bool
 Garch_StbImage::IsColorSpaceSRGB() const
 {
+    if (_sourceColorSpace == GarchImage::SRGB) {
+        return true;
+    }
+    if (_sourceColorSpace == GarchImage::Raw) {
+        return false;
+    }
+
     const float gamma_epsilon = 0.1f;
 
     // If we found gamma in the texture, use it to decide if we are sRGB
@@ -346,10 +356,9 @@ Garch_StbImage::IsColorSpaceSRGB() const
     }
 
     // Texture had no (recognized) gamma hint, make a reasonable guess
-    return ((_nchannels == 3  || _nchannels == 4) && 
+    return ((_nchannels == 3 || _nchannels == 4) && 
             GetType() == GL_UNSIGNED_BYTE);
 }
-
 
 //XXX Still need to investigate Metadata handling
 /* virtual */
@@ -376,9 +385,11 @@ Garch_StbImage::GetNumMipLevels() const
 /* virtual */
 bool
 Garch_StbImage::_OpenForReading(std::string const & filename, int subimage,
-                                int mip, bool suppressErrors)
+                              int mip, SourceColorSpace sourceColorSpace, 
+                              bool suppressErrors)
 {
     _filename = filename;
+    _sourceColorSpace = sourceColorSpace;
 
     std::string fileExtension = _GetFilenameExtension();
     if (fileExtension == "hdr") {

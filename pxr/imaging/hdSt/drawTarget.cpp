@@ -212,7 +212,7 @@ HdStDrawTarget::WriteToFile(const HdRenderIndex &renderIndex,
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (!_drawTarget ||
         (HdStResourceFactory::GetInstance()->IsOpenGL()
-          && !_drawTargetContextGL)) {
+          && !_drawTargetContext)) {
         TF_WARN("Missing draw target");
         return false;
     }
@@ -246,7 +246,7 @@ HdStDrawTarget::WriteToFile(const HdRenderIndex &renderIndex,
         // Make sure all draw target operations happen on the same
         // context.
         oldContext = GlfGLContext::GetCurrentGLContext();
-        GlfGLContext::MakeCurrent(_drawTargetContextGL);
+        GlfGLContext::MakeCurrent(_drawTargetContext);
     }
 #endif
     const bool result = _drawTarget->WriteToFile(attachment, path,
@@ -267,9 +267,9 @@ HdStDrawTarget::_SetAttachments(
     HF_MALLOC_TAG_FUNCTION();
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
-        if (!_drawTargetContextGL) {
+        if (!_drawTargetContext) {
             // Use one of the shared contexts as the master.
-            _drawTargetContextGL = GlfGLContext::GetSharedGLContext();
+            _drawTargetContext = GlfGLContext::GetSharedGLContext();
         }
     }
 #endif
@@ -284,7 +284,7 @@ HdStDrawTarget::_SetAttachments(
     // context.
     if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
         oldContext = GlfGLContext::GetCurrentGLContext();
-        GlfGLContext::MakeCurrent(_drawTargetContextGL);
+        GlfGLContext::MakeCurrent(_drawTargetContext);
     }
 #endif
 
@@ -419,7 +419,7 @@ HdStDrawTarget::_ResizeDrawTarget()
     
     if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
         oldContext = GlfGLContext::GetCurrentGLContext();
-        GlfGLContext::MakeCurrent(_drawTargetContextGL);
+        GlfGLContext::MakeCurrent(_drawTargetContext);
     }
 #endif
     _drawTarget->Bind();

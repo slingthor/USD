@@ -72,11 +72,13 @@ public:
         unsigned int cropTop,
         unsigned int cropBottom,
         unsigned int cropLeft,
-        unsigned int cropRight);
+        unsigned int cropRight,
+        GarchImage::SourceColorSpace sourceColorSpace=GarchImage::Auto);
 
     GARCH_API
     static GarchUVTextureDataRefPtr
-    New(std::string const &filePath, Params const &params);
+    New(std::string const &filePath, Params const &params, 
+        GarchImage::SourceColorSpace sourceColorSpace=GarchImage::Auto);
 
     int NumDimensions() const override;
 
@@ -130,9 +132,11 @@ public:
     unsigned char * GetRawBuffer(int mipLevel = 0) const override;
 
     GARCH_API
-    bool Read(int degradeLevel, bool generateMipmap,
-              GarchImage::ImageOriginLocation originLocation =
-                    GarchImage::OriginUpperLeft) override;
+    bool Read(
+		int degradeLevel,
+		bool generateMipmap,
+        GarchImage::ImageOriginLocation originLocation =
+            GarchImage::OriginUpperLeft) override;
 
     GARCH_API
     int GetNumMipLevels() const override;
@@ -193,7 +197,8 @@ private:
     // drop textures with non valid OpenGL pyramids.
     int _GetNumMipLevelsValid(const GarchImageSharedPtr image) const;
 
-    GarchUVTextureData(std::string const &filePath, Params const &params);
+    GarchUVTextureData(std::string const &filePath, Params const &params, 
+                     GarchImage::SourceColorSpace sourceColorSpace);
     virtual ~GarchUVTextureData();
         
     const std::string _filePath;
@@ -213,6 +218,8 @@ private:
 
     std::unique_ptr<unsigned char[]> _rawBuffer;
     std::vector<Mip> _rawBufferMips;
+
+    GarchImage::SourceColorSpace _sourceColorSpace;
 };
 
 

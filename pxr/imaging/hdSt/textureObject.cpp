@@ -25,11 +25,12 @@
 
 #include "pxr/imaging/hdSt/textureObject.h"
 
+#include "pxr/imaging/hdSt/glfTextureCpuData.h"
 #include "pxr/imaging/hdSt/textureCpuData.h"
-
 #include "pxr/imaging/hdSt/textureObjectRegistry.h"
 #include "pxr/imaging/hdSt/subtextureIdentifier.h"
 #include "pxr/imaging/hdSt/textureIdentifier.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/garch/uvTextureData.h"
 #ifdef PXR_OPENVDB_SUPPORT_ENABLED
@@ -105,8 +106,10 @@ _GetDebugName(const HdStTextureIdentifier &textureId)
             textureId.GetFilePath().GetString()
             + " - flipVertically="
             + std::to_string(int(subId->GetFlipVertically()))
-            + + " - premultiplyAlpha="
-            + std::to_string(int(subId->GetPremultiplyAlpha()));
+            + " - premultiplyAlpha="
+            + std::to_string(int(subId->GetPremultiplyAlpha()))
+            + " - sourceColorSpace="
+            + subId->GetSourceColorSpace().GetString();
     }
 
     if (const HdStPtexSubtextureIdentifier * const subId =
@@ -178,6 +181,40 @@ _GetPremultiplyAlpha(const HdStSubtextureIdentifier * const subId,
         default:
             return false;
     }
+}
+
+// Read from the HdStSubtextureIdentifier its source color space
+//
+static
+GarchImage::SourceColorSpace
+_GetSourceColorSpace(const HdStSubtextureIdentifier * const subId,
+                   const HdTextureType textureType)
+{
+    TfToken sourceColorSpace;
+    switch(textureType) {
+    case HdTextureType::Uv:
+        if (const HdStAssetUvSubtextureIdentifier* const uvSubId =
+            dynamic_cast<const HdStAssetUvSubtextureIdentifier *>(subId)) {
+            sourceColorSpace = uvSubId->GetSourceColorSpace();
+        }
+        break;
+    case HdTextureType::Udim:
+        if (const HdStUdimSubtextureIdentifier* const udimSubId =
+                dynamic_cast<const HdStUdimSubtextureIdentifier *>(subId)) {
+            sourceColorSpace = udimSubId->GetSourceColorSpace();
+        }
+        break;
+    default:
+        break;
+    }
+
+    if (sourceColorSpace == HdStTokens->sRGB) {
+        return GarchImage::SRGB;
+    }
+    if (sourceColorSpace == HdStTokens->raw) {
+        return GarchImage::Raw;
+    }
+    return GarchImage::Auto;
 }
 
 // A helper class that creates an HgiTextureDesc from GlfBaseTextureData.
@@ -836,7 +873,10 @@ HdStAssetUvTextureObject::_Load()
         GarchUVTextureData::New(
             GetTextureIdentifier().GetFilePath(),
             GetTargetMemory(),
-            /* borders */ 0, 0, 0, 0);
+            /* borders */ 0, 0, 0, 0,
+            _GetSourceColorSpace(
+                GetTextureIdentifier().GetSubtextureIdentifier(),
+                GetTextureType()));
 
     _SetCpuData(
         std::make_unique<_AssetCpuData>(
@@ -1159,6 +1199,9 @@ HdStUdimTextureObject::_Commit()
         GarchImage::OriginLowerLeft,
         std::move(_tiles),
         _GetPremultiplyAlpha(
+            GetTextureIdentifier().GetSubtextureIdentifier(), 
+            GetTextureType()),
+        _GetSourceColorSpace(
             GetTextureIdentifier().GetSubtextureIdentifier(), 
             GetTextureType()));
     _gpuTexture->SetMemoryRequested(GetTargetMemory());

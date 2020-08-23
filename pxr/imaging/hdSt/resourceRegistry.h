@@ -50,6 +50,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 using HdComputationSharedPtr = std::shared_ptr<class HdComputation>;
 using HdStDispatchBufferSharedPtr = std::shared_ptr<class HdStDispatchBuffer>;
 using HdStGLSLProgramSharedPtr = std::shared_ptr<class HdStGLSLProgram>;
+using HioGlslfxSharedPtr = std::shared_ptr<class HioGlslfx>;
 
 using HdSt_BasisCurvesTopologySharedPtr =
     std::shared_ptr<class HdSt_BasisCurvesTopology>;
@@ -103,6 +104,10 @@ public:
 
     HDST_API
     void InvalidateShaderRegistry() override;
+
+    HDST_API
+    void ReloadResource(TfToken const& resourceType,
+                        std::string const& path) override;
 
     HDST_API
     VtDictionary GetResourceAllocation() const override;
@@ -387,6 +392,11 @@ public:
     HdInstance<HdStGLSLProgramSharedPtr>
     RegisterGLSLProgram(HdInstance<HdStGLSLProgramSharedPtr>::ID id);
 
+    /// Register a GLSLFX file.
+    HDST_API
+    HdInstance<HioGlslfxSharedPtr>
+    RegisterGLSLFXFile(HdInstance<HioGlslfxSharedPtr>::ID id);
+
     /// Register a texture resource handle.
     HDST_API
     HdInstance<HdStTextureResourceHandleSharedPtr>
@@ -414,13 +424,17 @@ public:
     HdInstance<HgiComputePipelineSharedPtr>
     RegisterComputePipeline(HdInstance<HgiComputePipelineSharedPtr>::ID id);
 
-    /// Returns the global hgi compute command queue for registering computation work
+    /// Returns the global hgi compute command queue for registering
+    /// computation work.
+    HDST_API
     HgiComputeCmds* GetComputeCmds();
     
-    /// Returns the global hgi blit command queue for registering blitting work
+    /// Returns the global hgi blit command queue for registering blitting work.
+    HDST_API
     HgiBlitCmds* GetBlitCmds();
     
-    /// Submits any queued compute/blit work for GPU execution
+    /// Submits any queued compute/blit work for GPU execution.
+    HDST_API
     void SubmitHgiWork();
 
 public:
@@ -608,6 +622,10 @@ private:
     // glsl shader program registry
     HdInstanceRegistry<HdStGLSLProgramSharedPtr>
         _glslProgramRegistry;
+
+    // glslfx file registry
+    HdInstanceRegistry<HioGlslfxSharedPtr>
+        _glslfxFileRegistry;
 
     // texture resource handle registry
     HdInstanceRegistry<HdStTextureResourceHandleSharedPtr>

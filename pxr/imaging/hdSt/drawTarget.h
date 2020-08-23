@@ -186,14 +186,9 @@ private:
     std::vector<HdStTextureResourceHandleSharedPtr> _colorTextureResourceHandles;
     HdStTextureResourceHandleSharedPtr              _depthTextureResourceHandle;
 
-    /// The context which owns the draw target object, when using OpenGL.
-    GlfGLContextSharedPtr       _drawTargetContextGL;
-
-    GarchDrawTargetRefPtr       _drawTarget;
-
-    // Is it necessary to create GPU resources because they are uninitialized
-    // or the attachments/resolution changed.
-    bool _texturesDirty;
+    /// The context which owns the draw target object.
+    GlfGLContextSharedPtr  _drawTargetContext;
+    GarchDrawTargetRefPtr  _drawTarget;
 
     void _SetAttachments(HdSceneDelegate *sceneDelegate,
                          const HdStDrawTargetAttachmentDescArray &attachments);

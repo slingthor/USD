@@ -59,9 +59,11 @@ public:
     class _StripedInterleavedBufferRange : public HdStBufferArrayRange {
     public:
         /// Constructor.
-        _StripedInterleavedBufferRange() :
-        _stripedBuffer(nullptr), _index(NOT_ALLOCATED), _numElements(1) {
-        }
+        _StripedInterleavedBufferRange(HdStResourceRegistry* resourceRegistry)
+        : HdStBufferArrayRange(resourceRegistry)
+        , _stripedBuffer(nullptr)
+        , _index(NOT_ALLOCATED)
+        , _numElements(1) {}
 
         /// Destructor.
         HDST_API
