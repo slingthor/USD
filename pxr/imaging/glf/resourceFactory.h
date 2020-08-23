@@ -101,7 +101,8 @@ public:
     virtual GarchUdimTextureRefPtr NewUdimTexture(TfToken const& imageFilePath,
                                                   GarchImage::ImageOriginLocation originLocation,
                                                   std::vector<std::tuple<int, TfToken>>&& tiles,
-                                                  const bool premultiplyAlpha) const override;
+                                                  const bool premultiplyAlpha,
+                                                  GarchImage::SourceColorSpace sourceColorSpace) const override;
     
 private:
     GlfContextCaps contextCaps;

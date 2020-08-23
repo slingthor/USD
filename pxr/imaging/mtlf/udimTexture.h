@@ -51,7 +51,8 @@ protected:
         TfToken const& imageFilePath,
         GarchImage::ImageOriginLocation originLocation,
         std::vector<std::tuple<int, TfToken>>&& tiles,
-        bool const premultiplyAlpha);
+        bool const premultiplyAlpha,
+        GarchImage::SourceColorSpace sourceColorSpace);
 
     friend class MtlfResourceFactory;
 

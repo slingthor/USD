@@ -1100,6 +1100,18 @@ UsdImagingGLEngine::SetRendererSetting(
     _renderDelegate->SetRenderSetting(settingId, value);
 }
 
+void
+UsdImagingGLEngine::SetEnablePresentation(bool enabled)
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    if (TF_VERIFY(_taskController)) {
+        _taskController->SetEnablePresentation(enabled);
+    }
+}
+
 // ---------------------------------------------------------------------
 // Control of background rendering threads.
 // ---------------------------------------------------------------------

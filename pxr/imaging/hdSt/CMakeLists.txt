@@ -105,6 +105,7 @@ pxr_library(hdSt
         flatNormals
         geometricShader
         glConversions
+        glfTextureCpuData
         glslfxShader
         glUtils
         hgiConversions

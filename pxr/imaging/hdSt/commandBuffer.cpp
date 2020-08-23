@@ -108,6 +108,9 @@ HdStCommandBuffer::PrepareDraw(
     for (auto const& batch : _drawBatches) {
         batch->PrepareDraw(renderPassState, resourceRegistry);
     }
+
+    // Submit work recorded during PrepareDraw (e.g. dispatch buffer copying).
+    resourceRegistry->SubmitHgiWork();
 }
 
 void
@@ -303,7 +306,8 @@ HdStCommandBuffer::ExecuteDraw(
         unsigned const systemLimit = MAX(3, WorkGetConcurrencyLimit());
         
         // Limit the number of threads used to render with. Save two threads for the system
-        unsigned const maxRenderThreads = MIN(MIN(systemLimit - 2, 6), visibleBatches.size());
+        // unsigned const maxRenderThreads = MIN(MIN(systemLimit - 2, 6), visibleBatches.size());
+        unsigned const maxRenderThreads = 1;
         if (maxRenderThreads) {
             WorkSetConcurrencyLimit(maxRenderThreads);
 

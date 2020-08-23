@@ -465,13 +465,13 @@ HdxFullscreenShader::_CreateSampler()
     }
 
     HgiSamplerDesc sampDesc;
-    
+
     sampDesc.magFilter = HgiSamplerFilterLinear;
     sampDesc.minFilter = HgiSamplerFilterLinear;
 
     sampDesc.addressModeU = HgiSamplerAddressModeClampToEdge;
     sampDesc.addressModeV = HgiSamplerAddressModeClampToEdge;
-    
+
     _sampler = _hgi->CreateSampler(sampDesc);
 
     return true;

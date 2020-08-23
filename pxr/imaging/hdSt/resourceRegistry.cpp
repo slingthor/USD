@@ -41,12 +41,11 @@
 #include "pxr/imaging/hdSt/textureHandleRegistry.h"
 #include "pxr/imaging/hdSt/textureObjectRegistry.h"
 
+#include "pxr/imaging/hio/glslfx.h"
 #include "pxr/imaging/hgi/hgi.h"
 
-#include "pxr/imaging/hd/engine.h"
-#include "pxr/imaging/hd/tokens.h"
-
 #include "pxr/base/tf/envSetting.h"
+#include "pxr/base/tf/hash.h"
 
 // APPLE METAL: Remove once cast to HgiMetal is gone
 #include "pxr/imaging/hgiMetal/hgi.h"
@@ -124,6 +123,25 @@ HdStResourceRegistry::~HdStResourceRegistry() = default;
 void HdStResourceRegistry::InvalidateShaderRegistry()
 {
     _geometricShaderRegistry.Invalidate();
+    _glslfxFileRegistry.Invalidate();
+}
+
+
+void HdStResourceRegistry::ReloadResource(TfToken const& resourceType,
+                                          std::string const& path) 
+{
+    // find the file and invalidate it 
+    if (resourceType == HdResourceTypeTokens->shaderFile) {
+
+        size_t pathHash = TfHash()(path);
+        HdInstance<HioGlslfxSharedPtr> glslfxInstance = 
+                                                RegisterGLSLFXFile(pathHash);
+
+        // Reload the glslfx file.
+        HioGlslfxSharedPtr glslfxSharedPtr = glslfxInstance.GetValue();
+        glslfxSharedPtr.reset(new HioGlslfx(path));
+        glslfxInstance.SetValue(glslfxSharedPtr);
+    }
 }
 
 VtDictionary
@@ -605,6 +623,13 @@ HdStResourceRegistry::RegisterGLSLProgram(
     return _glslProgramRegistry.GetInstance(id);
 }
 
+HdInstance<HioGlslfxSharedPtr>
+HdStResourceRegistry::RegisterGLSLFXFile(
+        HdInstance<HioGlslfxSharedPtr>::ID id)
+{
+    return _glslfxFileRegistry.GetInstance(id);
+}
+
 HdInstance<HdStTextureResourceHandleSharedPtr>
 HdStResourceRegistry::RegisterTextureResourceHandle(
         HdInstance<HdStTextureResourceHandleSharedPtr>::ID id)
@@ -658,6 +683,9 @@ std::ostream &operator <<(
 HgiComputeCmds*
 HdStResourceRegistry::GetComputeCmds()
 {
+    // Metal can only have one encoder active per command buffer.
+    // Since BlitCmds and ComputeCmds use the same Metal command buffer we
+    // must submit any recorded blit work before starting compute work.
     if (_blitCmds) {
         _hgi->SubmitCmds(_blitCmds.get());
         _blitCmds.reset();
@@ -671,6 +699,9 @@ HdStResourceRegistry::GetComputeCmds()
 HgiBlitCmds*
 HdStResourceRegistry::GetBlitCmds()
 {
+    // Metal can only have one encoder active per command buffer.
+    // Since BlitCmds and ComputeCmds use the same Metal command buffer we
+    // must submit any recorded compute work before starting blit work.
     if (_computeCmds) {
         _hgi->SubmitCmds(_computeCmds.get());
         _computeCmds.reset();
@@ -683,7 +714,7 @@ HdStResourceRegistry::GetBlitCmds()
 
 void HdStResourceRegistry::SubmitHgiWork()
 {
-    // submit the work queued by the computations
+    // Submit the work queued by the computations
     if (_blitCmds) {
         _hgi->SubmitCmds(_blitCmds.get());
         _blitCmds.reset();
@@ -877,9 +908,8 @@ HdStResourceRegistry::_Commit()
         }
     }
 
-    // submit the GPU work queued
     SubmitHgiWork();
-    
+
     // release sources
     WorkParallelForEach(_pendingSources.begin(), _pendingSources.end(),
                         [](_PendingSource &ps) {
@@ -946,6 +976,7 @@ HdStResourceRegistry::_GarbageCollect()
     // Cleanup Shader registries
     _geometricShaderRegistry.GarbageCollect();
     _glslProgramRegistry.GarbageCollect();
+    _glslfxFileRegistry.GarbageCollect();
     _textureResourceHandleRegistry.GarbageCollect();
 
     // Cleanup Hgi resources bindings and pipelines
@@ -961,8 +992,7 @@ HdStResourceRegistry::_GarbageCollect()
     _uniformUboBufferArrayRegistry.GarbageCollect();
     _uniformSsboBufferArrayRegistry.GarbageCollect();
     _singleBufferArrayRegistry.GarbageCollect();
-    
-    // submit the GPU work queued
+
     SubmitHgiWork();
 }
 

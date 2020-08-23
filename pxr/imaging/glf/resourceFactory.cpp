@@ -112,9 +112,10 @@ GarchUdimTextureRefPtr GlfResourceFactory::NewUdimTexture(
                             TfToken const& imageFilePath,
                             GarchImage::ImageOriginLocation originLocation,
                             std::vector<std::tuple<int, TfToken>>&& tiles,
-                            const bool premultiplyAlpha) const
+                            const bool premultiplyAlpha,
+                            GarchImage::SourceColorSpace sourceColorSpace) const
 {
-    return TfCreateRefPtr(new GlfUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha));
+    return TfCreateRefPtr(new GlfUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha, sourceColorSpace));
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

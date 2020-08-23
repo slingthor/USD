@@ -87,8 +87,10 @@ protected:
     {
     public:
         /// Constructor.
-        _SimpleBufferArrayRange() :
-            _bufferArray(nullptr), _numElements(0) {
+        _SimpleBufferArrayRange(HdStResourceRegistry* resourceRegistry)
+            : HdStBufferArrayRange(resourceRegistry)
+            , _bufferArray(nullptr)
+            , _numElements(0) {
         }
 
         /// Returns true if this range is valid

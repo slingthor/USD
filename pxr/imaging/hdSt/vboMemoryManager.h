@@ -88,8 +88,9 @@ protected:
     class _StripedBufferArrayRange : public HdStBufferArrayRange {
     public:
         /// Constructor.
-        _StripedBufferArrayRange()
-         : _stripedBufferArray(nullptr),
+        _StripedBufferArrayRange(HdStResourceRegistry* resourceRegistry)
+         : HdStBufferArrayRange(resourceRegistry),
+           _stripedBufferArray(nullptr),
            _elementOffset(0),
            _numElements(0),
            _capacity(0)

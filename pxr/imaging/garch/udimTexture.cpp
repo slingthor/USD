@@ -37,7 +37,9 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-GarchUdimTexture::_MipDescArray GarchUdimTexture::_GetMipLevels(const TfToken& filePath)
+
+GarchUdimTexture::_MipDescArray GarchUdimTexture::_GetMipLevels(const TfToken& filePath,
+                                                                GarchImage::SourceColorSpace sourceColorSpace)
 {
     constexpr int maxMipReads = 32;
     _MipDescArray ret {};
@@ -45,7 +47,8 @@ GarchUdimTexture::_MipDescArray GarchUdimTexture::_GetMipLevels(const TfToken& f
     unsigned int prevWidth = std::numeric_limits<unsigned int>::max();
     unsigned int prevHeight = std::numeric_limits<unsigned int>::max();
     for (unsigned int mip = 0; mip < maxMipReads; ++mip) {
-        GarchImageSharedPtr image = GarchImage::OpenForReading(filePath, 0, mip);
+        GarchImageSharedPtr image = GarchImage::OpenForReading(filePath, 0, mip, 
+                                                           sourceColorSpace);
         if (image == nullptr) {
             break;
         }
@@ -75,9 +78,10 @@ GarchUdimTexture::GarchUdimTexture(
     TfToken const& imageFilePath,
     GarchImage::ImageOriginLocation originLocation,
     std::vector<std::tuple<int, TfToken>>&& tiles,
-    bool const premultiplyAlpha)
-    : GarchTexture(originLocation), _tiles(std::move(tiles)),
-	  _premultiplyAlpha(premultiplyAlpha)
+    bool const premultiplyAlpha,
+    GarchImage::SourceColorSpace sourceColorSpace) // APPLE METAL: GarchImage
+    : GarchTexture(originLocation), _tiles(std::move(tiles)), 
+      _premultiplyAlpha(premultiplyAlpha), _sourceColorSpace(sourceColorSpace)
 {
 }
 
@@ -90,9 +94,12 @@ GarchUdimTexture::New(
     TfToken const& imageFilePath,
     GarchImage::ImageOriginLocation originLocation,
     std::vector<std::tuple<int, TfToken>>&& tiles,
-    bool const premultiplyAlpha)
+    bool const premultiplyAlpha,
+    GarchImage::SourceColorSpace sourceColorSpace) // APPLE METAL: GarchImage
 {
-    return GarchResourceFactory::GetInstance()->NewUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha);
+    return GarchResourceFactory::GetInstance()->NewUdimTexture(
+        imageFilePath, originLocation, std::move(tiles), premultiplyAlpha,
+	    sourceColorSpace);
 }
 
 GarchTexture::BindingVector
@@ -141,12 +148,6 @@ GarchUdimTexture::GetTextureInfo(bool forceLoad)
     return ret;
 }
 
-void
-GarchUdimTexture::_OnMemoryRequestedDirty()
-{
-    _loaded = false;
-}
-
 // XXX: This code is duplicated in hdSt/textureObject.cpp, but will hopefully
 // be removed from this file when Storm begins using Hgi for UDIM textures
 namespace {
@@ -161,8 +162,6 @@ template<_ColorSpaceTransform colorSpaceTransform>
 static
 float _ConvertColorSpace(const float in)
 {
-    TRACE_FUNCTION();
-
     float out = in;
     if (colorSpaceTransform == _SRGBToLinear) {
         if (in <= 0.04045) {
@@ -262,7 +261,8 @@ GarchUdimTexture::_ReadImage()
         return;
     }
     
-    const _MipDescArray firstImageMips = _GetMipLevels(std::get<1>(_tiles[0]));
+    const _MipDescArray firstImageMips = _GetMipLevels(std::get<1>(_tiles[0]), 
+                                                       _sourceColorSpace);
     
     if (firstImageMips.empty()) {
         return;
@@ -398,7 +398,8 @@ GarchUdimTexture::_ReadImage()
         for (size_t tileId = begin; tileId < end; ++tileId) {
             std::tuple<int, TfToken> const& tile = _tiles[tileId];
             layoutData[std::get<0>(tile)] = tileId + 1;
-            _MipDescArray images = _GetMipLevels(std::get<1>(tile));
+            _MipDescArray images = _GetMipLevels(std::get<1>(tile), 
+                                                 _sourceColorSpace);
             if (images.empty()) { continue; }
             for (unsigned int mip = 0; mip < mipCount; ++mip) {
                 _TextureSize const& mipSize = mips[mip];
@@ -416,6 +417,10 @@ GarchUdimTexture::_ReadImage()
                                              { return mipSize.width <= i.size.width &&
                                                  mipSize.height <= i.size.height;});
                 (it == images.rend() ? images.front() : *it).image->Read(spec);
+
+                // XXX: Unfortunately, pre-multiplication is occurring after
+                // mip generation. However, it is still worth it to pre-multiply
+                // textures before texture filtering.
                 if (_premultiplyAlpha && (numChannels == 4)) {
                     const bool isSRGB = (internalFormat == GL_SRGB8_ALPHA8);
 
@@ -462,6 +467,13 @@ GarchUdimTexture::_ReadImage()
     
     _SetMemoryUsed(totalTextureMemory + _tiles.size() * sizeof(float));
 }
+
+void
+GarchUdimTexture::_OnMemoryRequestedDirty()
+{
+    _loaded = false;
+}
+
 void
 GarchUdimTexture::_ReadTexture()
 {

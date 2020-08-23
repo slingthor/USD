@@ -62,7 +62,19 @@ public:
         OriginUpperLeft, 
         OriginLowerLeft
     }; 
-   
+
+    // APPLE METAL: From glfImage
+    /// Specifies the source color space in which the texture is encoded, with
+    /// "Auto" indicating the texture reader should determine color space based
+    /// on hints from the image (e.g. file type, number of channels, image
+    /// metadata)
+    enum SourceColorSpace
+    {
+       Raw,
+       SRGB,
+       Auto
+    };
+
     /// \class StorageSpec
     ///
     /// Describes the memory layout and storage of a texture image
@@ -98,6 +110,8 @@ public:
     static GarchImageSharedPtr OpenForReading(std::string const & filename,
                                               int subimage = 0,
                                               int mip = 0,
+                                              SourceColorSpace sourceColorSpace =
+                                                  SourceColorSpace::Auto,
                                               bool suppressErrors = false);
 
     /// Reads the image file into \a storage.
@@ -167,6 +181,7 @@ protected:
     virtual bool _OpenForReading(std::string const & filename,
                                  int subimage,
                                  int mip,
+                                 SourceColorSpace sourceColorSpace,
                                  bool suppressErrors) = 0;
 
     virtual bool _OpenForWriting(std::string const & filename) = 0;

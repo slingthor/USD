@@ -76,7 +76,8 @@ HdStVBOSimpleMemoryManager::CreateBufferArray(
 HdBufferArrayRangeSharedPtr
 HdStVBOSimpleMemoryManager::CreateBufferArrayRange()
 {
-    return std::make_shared<HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange>();
+    return std::make_shared<HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange>
+                (_resourceRegistry);
 }
 
 HdAggregationStrategy::AggregationId
@@ -487,8 +488,9 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::CopyData(
 
     // APPLE METAL: Temp for triple buffering
     VBO->CopyDataIsHappening();
-
-    HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
+    
+    // APPLE METAL: No gl perf counters.
+    //HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
 
     HgiBufferCpuToGpuOp blitOp;
     blitOp.cpuSourceBuffer = bufferSource->GetData();

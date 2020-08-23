@@ -112,9 +112,10 @@ GarchUdimTextureRefPtr MtlfResourceFactory::NewUdimTexture(
                             TfToken const& imageFilePath,
                             GarchImage::ImageOriginLocation originLocation,
                             std::vector<std::tuple<int, TfToken>>&& tiles,
-                            bool premultiplyAlpha) const
+                            bool premultiplyAlpha,
+                            GarchImage::SourceColorSpace sourceColorSpace) const
 {
-    return TfCreateRefPtr(new MtlfUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha));
+    return TfCreateRefPtr(new MtlfUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha, sourceColorSpace));
 }
 
 

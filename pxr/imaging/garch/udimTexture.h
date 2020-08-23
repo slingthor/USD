@@ -66,7 +66,8 @@ public:
     
     using _MipDescArray = std::vector<_MipDesc>;
     
-    _MipDescArray _GetMipLevels(const TfToken& filePath);
+    _MipDescArray _GetMipLevels(const TfToken& filePath,
+                                GarchImage::SourceColorSpace sourceColorSpace);
 
     GARCH_API
     virtual ~GarchUdimTexture();
@@ -76,7 +77,8 @@ public:
         TfToken const& imageFilePath,
         GarchImage::ImageOriginLocation originLocation,
         std::vector<std::tuple<int, TfToken>>&& tiles,
-        bool const premultiplyAlpha = false);
+        bool const premultiplyAlpha = false,
+        GarchImage::SourceColorSpace sourceColorSpace = GarchImage::Raw); // APPLE METAL: GarchImage
 
     GARCH_API
     GarchTexture::BindingVector GetBindings(
@@ -104,7 +106,8 @@ protected:
         TfToken const& imageFilePath,
         GarchImage::ImageOriginLocation originLocation,
         std::vector<std::tuple<int, TfToken>>&& tiles,
-        bool const premultiplyAlpha);
+        bool const premultiplyAlpha,
+        GarchImage::SourceColorSpace sourceColorSpace); // APPLE METAL: GarchImage
 
     GARCH_API
     virtual void _ReadTexture() override;
@@ -134,6 +137,7 @@ protected:
     GarchTextureGPUHandle _layout;
     bool _loaded = false;
     bool _premultiplyAlpha = false;
+    GarchImage::SourceColorSpace _sourceColorSpace = GarchImage::Auto; // APPLE METAL: GarchImage
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

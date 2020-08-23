@@ -119,12 +119,6 @@ UsdImagingDrawModeAdapter::ShouldCullChildren() const
 }
 
 bool
-UsdImagingDrawModeAdapter::CanPopulateMaster() const
-{
-    return true;
-}
-
-bool
 UsdImagingDrawModeAdapter::IsSupported(
     UsdImagingIndexProxy const* index) const
 {

@@ -52,13 +52,6 @@ UsdImaging_GetUdimTiles(
     SdfLayerHandle const& layerHandle = SdfLayerHandle());
 
 USDIMAGING_API
-bool
-UsdImaging_UdimTilesExist(
-    std::string const& basePath,
-    int tileLimit,
-    SdfLayerHandle const& layerHandle = SdfLayerHandle());
-
-USDIMAGING_API
 HdTextureResource::ID
 UsdImaging_GetTextureResourceID(UsdPrim const& usdPrim,
                                   SdfPath const& usdPath,
