@@ -131,6 +131,41 @@ def GetXcodeDeveloperDirectory():
 
     return GetCommandOutput("xcode-select -p")
 
+def CheckCodeSignID():
+    SDKVersion  = GetCommandOutput('xcodebuild -version').strip()[6:10]
+    codeSignIDs = GetCommandOutput('security find-identity -v -p codesigning')
+    if codeSignIDs is None:
+        codeSignIDs = ""
+
+    codeSignID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
+    if codeSignID is not None:
+        # Edge case for ad-hoc codesigning in iOS, which requires setting 
+        # CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY = "" to generate an Xcode project
+        # while "-" is being used by the codesign command line tool
+        if codeSignID == "":
+            codeSignID = "-"
+    elif SDKVersion >= "11.0" and codeSignIDs.find("Apple Development") != -1:
+        codeSignID = "Apple Development"
+    elif codeSignIDs.find("Mac Developer") != -1:
+        codeSignID = "Mac Developer"
+    else:
+        PrintError("Unable to identify code signing identity. " +
+            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
+            "variable to the one you'd like to use. \n" +
+            "If you don't have a code signing identity, you can create one using Xcode:\n" +
+            "https://help.apple.com/xcode/mac/current/#/dev154b28f09 \n")
+        sys.exit(1)
+
+    # Validate that we have a codesign ID that both exists and isn't ambiguous
+    if codeSignIDs.count(codeSignID) != 1 and codeSignID != "-":
+        PrintError("Unable to identify code signing identity. " +
+            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
+            "variable to the one you'd like to use. Options are:\n" + codeSignIDs)
+        sys.exit(1)
+
+    os.environ['CODE_SIGN_ID'] = codeSignID
+    return codeSignID
+
 def GetVisualStudioCompilerAndVersion():
     """Returns a tuple containing the path to the Visual Studio compiler
     and a tuple for its version, e.g. (14, 0). If the compiler is not found
@@ -430,14 +465,11 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
                 '-DCMAKE_TOOLCHAIN_FILE={usdSrcDir}/cmake/toolchains/ios.toolchain.cmake '
                 .format(usdSrcDir=context.usdSrcDir))
 
-        CODE_SIGN_ID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
-        if CODE_SIGN_ID is None:
-            SDKVersion = GetCommandOutput('xcodebuild -version').strip()[6:10]
+        CODE_SIGN_ID = CheckCodeSignID
 
-            if SDKVersion >= "11.0":
-                CODE_SIGN_ID="Apple Development"
-            else:
-                CODE_SIGN_ID="iPhone Developer"
+        # Edge case for iOS
+        if CODE_SIGN_ID == "-":
+            CODE_SIGN_ID = ""
 
         extraArgs.append(
                 '-DIOS_PLATFORM=OS '
@@ -3073,38 +3105,7 @@ for dir in [context.usdInstDir, context.instDir, context.srcDir,
         sys.exit(1)
 
 if args.make_relocatable:
-    SDKVersion  = GetCommandOutput('xcodebuild -version').strip()[6:10]
-    codeSignIDs = GetCommandOutput('security find-identity -v -p codesigning')
-    if codeSignIDs is None:
-        codeSignIDs = ""
-
-    codeSignID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
-    if codeSignID is not None:
-        # Edge case for ad-hoc codesigning in iOS, which requires setting 
-        # CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY = "" to generate an Xcode project
-        # while "-" is being used by the codesign command line tool
-        if codeSignID == "":
-            codeSignID = "-"
-    elif SDKVersion >= "11.0" and codeSignIDs.find("Apple Development") != -1:
-        codeSignID = "Apple Development"
-    elif codeSignIDs.find("Mac Developer") != -1:
-        codeSignID = "Mac Developer"
-    else:
-        PrintError("Unable to identify code signing identity. " +
-            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
-            "variable to the one you'd like to use. \n" +
-            "If you don't have a code signing identity, you can create one using Xcode:\n" +
-            "https://help.apple.com/xcode/mac/current/#/dev154b28f09 \n")
-        sys.exit(1)
-
-    # Validate that we have a codesign ID that both exists and isn't ambiguous
-    if codeSignIDs.count(codeSignID) != 1 and codeSignID != "-":
-        PrintError("Unable to identify code signing identity. " +
-            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
-            "variable to the one you'd like to use. Options are:\n" + codeSignIDs)
-        sys.exit(1)
-
-    os.environ['CODE_SIGN_ID'] = codeSignID
+    CheckCodeSignID()
 
 # Output dependency order
 with open(context.usdInstDir + '/dependencies.txt', 'wt') as file:
