@@ -1188,6 +1188,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             lipoCommandsDebug = CreateUniversalBinaries(context, libNames, x86Dir, armDir)
         else:
             CopyFiles(context, "build/*_release/libtbb*.*", "lib")
+            CopyFiles(context, "build/*_debug/libtbb*.*", "lib")
 
         # Output paths that are of interest
         with open(os.path.join(context.usdInstDir, 'tbbBuild.txt'), 'wt') as file:
@@ -1200,7 +1201,6 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
                 file.write('LIPO_RELEASE:' + ','.join(lipoCommandsRelease) + '\n')
                 file.write('LIPO_DEBUG:' + ','.join(lipoCommandsDebug) + '\n')
 
-        CopyFiles(context, "build/*_debug/libtbb*.*", "lib")
         CopyDirectory(context, "include/serial", "include/serial")
         CopyDirectory(context, "include/tbb", "include/tbb")
         return os.getcwd()
