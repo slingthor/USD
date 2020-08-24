@@ -134,8 +134,10 @@ then build and install USD into ```/usr/local/USD```.
 
 ##### MacOS:
 
-In a terminal, run ```xcode-select``` to ensure command line developer tools are 
-installed. Set `XCODE_ATTRIBUTE_CODE_SIGN_ID` enviromental variable to your codesigning identity(e.g. Apple Development).
+1. In a terminal, run ```xcode-select``` to ensure command line developer tools are 
+installed.
+
+2. Set `XCODE_ATTRIBUTE_CODE_SIGN_ID` enviromental variable to your codesigning identity(e.g. Apple Development).
 
 If you have more than one codesigning identity you will see an error like this:
 
@@ -151,7 +153,7 @@ If you don't have a code signing identity, you can create one using Xcode: https
 
 Alternatively set `XCODE_ATTRIBUTE_CODE_SIGN_ID` to `"-"` to sign ad-hoc.
 
-Then run the script. For example, the following will download, build, and install USD's dependencies,
+3. Then run the script. For example, the following will download, build, and install USD's dependencies,
 then build and install USD into ```/opt/local/USD```.
 
 ```
