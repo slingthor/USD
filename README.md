@@ -166,9 +166,9 @@ Optional flag:
 
 
 ##### iOS:
-Similar instructions as for macOS. Additionally, the `--ios` flag needs to be used:
+Similar instructions as for macOS. Additionally, the `--iOS` flag needs to be used:
 ```
-> python USD/build_scripts/build_usd.py --ios /opt/local/USD-for-iOS
+> python USD/build_scripts/build_usd.py --iOS /opt/local/USD-for-iOS
 ```
 
 ##### Windows:

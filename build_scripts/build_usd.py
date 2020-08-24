@@ -465,7 +465,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
                 '-DCMAKE_TOOLCHAIN_FILE={usdSrcDir}/cmake/toolchains/ios.toolchain.cmake '
                 .format(usdSrcDir=context.usdSrcDir))
 
-        CODE_SIGN_ID = CheckCodeSignID
+        CODE_SIGN_ID = CheckCodeSignID()
 
         # Edge case for iOS
         if CODE_SIGN_ID == "-":
