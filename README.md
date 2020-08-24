@@ -135,13 +135,38 @@ then build and install USD into ```/usr/local/USD```.
 ##### MacOS:
 
 In a terminal, run ```xcode-select``` to ensure command line developer tools are 
-installed. Then run the script.
+installed. Set `XCODE_ATTRIBUTE_CODE_SIGN_ID` enviromental variable to your codesigning identity(e.g. Apple Development).
 
-For example, the following will download, build, and install USD's dependencies,
+If you have more than one codesigning identity you will see an error like this:
+
+```
+ERROR: Unable to identify code signing identity. Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID
+environment variable to the one you'd like to use. Options are:
+1) <A10DigitAlphanumericStringOne> "Apple Development: username1 (ABCDEFGH)"
+2) <A10DigitAlphanumericStringTwo> "Apple Development: username2 (STUVWXYZ)"
+```
+In this case set `XCODE_ATTRIBUTE_CODE_SIGN_ID` to one of the 10 Digit Alphanumeric Strings.
+
+If you don't have a code signing identity, you can create one using Xcode: https://help.apple.com/xcode/mac/current/#/dev154b28f09
+
+Alternatively set `XCODE_ATTRIBUTE_CODE_SIGN_ID` to `"-"` to sign ad-hoc.
+
+Then run the script. For example, the following will download, build, and install USD's dependencies,
 then build and install USD into ```/opt/local/USD```.
 
 ```
 > python USD/build_scripts/build_usd.py /opt/local/USD
+```
+
+Optional flag:
+`--universal/--no-universal` Used for building universal binaries (x86_64 and arm64) or device specific binaries
+
+
+
+##### iOS:
+Similar instructions as for macOS. Additionally, the `--ios` flag needs to be used:
+```
+> python USD/build_scripts/build_usd.py --ios /opt/local/USD-for-iOS
 ```
 
 ##### Windows:
