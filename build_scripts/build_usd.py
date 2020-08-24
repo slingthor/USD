@@ -3072,6 +3072,40 @@ for dir in [context.usdInstDir, context.instDir, context.srcDir,
                    .format(dir=dir))
         sys.exit(1)
 
+if args.make_relocatable:
+    SDKVersion  = GetCommandOutput('xcodebuild -version').strip()[6:10]
+    codeSignIDs = GetCommandOutput('security find-identity -v -p codesigning')
+    if codeSignIDs is None:
+        codeSignIDs = ""
+
+    codeSignID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
+    if codeSignID is not None:
+        # Edge case for ad-hoc codesigning in iOS, which requires setting 
+        # CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY = "" to generate an Xcode project
+        # while "-" is being used by the codesign command line tool
+        if codeSignID == "":
+            codeSignID = "-"
+    elif SDKVersion >= "11.0" and codeSignIDs.find("Apple Development") != -1:
+        codeSignID = "Apple Development"
+    elif codeSignIDs.find("Mac Developer") != -1:
+        codeSignID = "Mac Developer"
+    else:
+        PrintError("Unable to identify code signing identity. " +
+            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
+            "variable to the one you'd like to use. \n" +
+            "If you don't have a code signing identity, you can create one using Xcode:\n" +
+            "https://help.apple.com/xcode/mac/current/#/dev154b28f09 \n")
+        sys.exit(1)
+
+    # Validate that we have a codesign ID that both exists and isn't ambiguous
+    if codeSignIDs.count(codeSignID) != 1 and codeSignID != "-":
+        PrintError("Unable to identify code signing identity. " +
+            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
+            "variable to the one you'd like to use. Options are:\n" + codeSignIDs)
+        sys.exit(1)
+
+    os.environ['CODE_SIGN_ID'] = codeSignID
+
 # Output dependency order
 with open(context.usdInstDir + '/dependencies.txt', 'wt') as file:
     def GetName(dep):
@@ -3113,39 +3147,6 @@ if Windows():
     ])
 
 if args.make_relocatable:
-    SDKVersion  = GetCommandOutput('xcodebuild -version').strip()[6:10]
-    codeSignIDs = GetCommandOutput('security find-identity -v -p codesigning')
-    if codeSignIDs is None:
-        codeSignIDs = ""
-
-    codeSignID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
-    if codeSignID is not None:
-        # Edge case for ad-hoc codesigning in iOS, which requires setting 
-        # CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY = "" to generate an Xcode project
-        # while "-" is being used by the codesign command line tool
-        if codeSignID == "":
-            codeSignID = "-"
-    elif SDKVersion >= "11.0" and codeSignIDs.find("Apple Development") != -1:
-        codeSignID = "Apple Development"
-    elif codeSignIDs.find("Mac Developer") != -1:
-        codeSignID = "Mac Developer"
-    else:
-        PrintError("Unable to identify code signing identity. " +
-            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
-            "variable to the one you'd like to use. \n" +
-            "If you don't have a code signing identity, you can create one using Xcode:\n" +
-            "https://help.apple.com/xcode/mac/current/#/dev154b28f09 \n")
-        sys.exit(1)
-
-    # Validate that we have a codesign ID that both exists and isn't ambiguous
-    if codeSignIDs.count(codeSignID) != 1 and codeSignID != "-":
-        PrintError("Unable to identify code signing identity. " +
-            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
-            "variable to the one you'd like to use. Options are:\n" + codeSignIDs)
-        sys.exit(1)
-
-    os.environ['CODE_SIGN_ID'] = codeSignID
-
     from make_relocatable import make_relocatable
     make_relocatable(context.usdInstDir, context.buildPython, iOS(), verbosity > 1)
 
