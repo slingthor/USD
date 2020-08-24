@@ -1171,7 +1171,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         # location that can be shared by both release and debug USD
         # builds. Plus, the TBB build system builds both versions anyway.
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
-            x86Files = glob.glob(os.getcwd() + "/build/*x86_64*_release/libtbb*.*")
+            x86Files = glob.glob(os.getcwd() + "/build/*intel64*_release/libtbb*.*")
             armFiles = glob.glob(os.getcwd() + "/build/*arm64*_release/libtbb*.*")
             libNames = [os.path.basename(x) for x in x86Files]
             x86Dir = os.path.dirname(x86Files[0])
@@ -1179,7 +1179,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
 
             lipoCommandsRelease = CreateUniversalBinaries(context, libNames, x86Dir, armDir)
 
-            x86Files = glob.glob(os.getcwd() + "/build/*x86_64*_debug/libtbb*.*")
+            x86Files = glob.glob(os.getcwd() + "/build/*intel64*_debug/libtbb*.*")
             armFiles = glob.glob(os.getcwd() + "/build/*arm64*_debug/libtbb*.*")
             libNames = [os.path.basename(x) for x in x86Files]
             x86Dir = os.path.dirname(x86Files[0])
