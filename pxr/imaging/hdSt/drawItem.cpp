@@ -279,10 +279,6 @@ HdStDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
 void
 HdStDrawItem::CalculateCullingBounds() const
 {
-    if (_instancedCullingBoundsCalculated) {
-        return;
-    }
-    
     HdBufferArrayRangeSharedPtr const & instanceIndexRange = GetInstanceIndexRange();
     if (instanceIndexRange) {
         HdStBufferArrayRangeSharedPtr instanceIndexRangeGL = std::static_pointer_cast<HdStBufferArrayRange>(instanceIndexRange);
