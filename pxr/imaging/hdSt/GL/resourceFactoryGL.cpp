@@ -28,7 +28,6 @@
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
 #include "pxr/imaging/hdSt/GL/codeGenGLSL.h"
-#include "pxr/imaging/hdSt/GL/domeLightComputationsGL.h"
 #include "pxr/imaging/hdSt/GL/drawTargetTextureResourceGL.h"
 #include "pxr/imaging/hdSt/GL/glslProgramGL.h"
 #include "pxr/imaging/hdSt/GL/indirectDrawBatchGL.h"
@@ -120,18 +119,6 @@ HdStGLSLProgram *HdStResourceFactoryGL::NewProgram(
     TfToken const &role, HdStResourceRegistry *const registry) const
 {
     return new HdStglslProgramGLSL(role, registry);
-}
-
-HdSt_DomeLightComputationGPU*
-HdStResourceFactoryGL::NewDomeLightComputationGPU(
-    const TfToken & shaderToken,
-    HdStSimpleLightingShaderPtr const &lightingShader,
-    unsigned int numLevels,
-    unsigned int level,
-    float roughness) const
-{
-    return new HdSt_DomeLightComputationGPUGL(shaderToken,
-        lightingShader, numLevels, level, roughness);
 }
 
 HdStRenderPassShaderSharedPtr HdStResourceFactoryGL::NewRenderPassShader() const

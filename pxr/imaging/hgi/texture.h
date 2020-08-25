@@ -146,6 +146,60 @@ bool operator!=(
     const HgiTextureDesc& lhs,
     const HgiTextureDesc& rhs);
 
+/// \struct HgiTextureViewDesc
+///
+/// Describes the properties needed to create a GPU texture view from an
+/// existing GPU texture object
+///
+/// <ul>
+/// <li>debugName:
+///   This label can be applied as debug label for GPU debugging.</li>
+/// <li>format:
+///   The format of the texture.
+/// <li>layerCount:
+///   The number of layers (texture-arrays).</li>
+/// <li>mipLevels:
+///   The number of mips in texture.</li>
+/// <li>sourceTexture:
+///   Handle to the HgiTexture to be used as the source data backing.</li>
+/// <li>sourceFirstLayer:
+///   The layer index to use from the source texture as the first layer of the
+///   view.</li>
+/// <li>sourceFirstMip:
+///   The mip index to ues from the source texture as the first mip of the
+///   view.</li>
+///   </ul>
+///
+struct HgiTextureViewDesc
+{
+    HgiTextureViewDesc()
+    : format(HgiFormatInvalid)
+    , layerCount(1)
+    , mipLevels(1)
+    , sourceTexture(nullptr)
+    , sourceFirstLayer(0)
+    , sourceFirstMip(0)
+    {}
+
+    std::string debugName;
+    HgiFormat format;
+    uint16_t layerCount;
+    uint16_t mipLevels;
+    class HgiTexture *sourceTexture;
+    uint16_t sourceFirstLayer;
+    uint16_t sourceFirstMip;
+};
+
+HGI_API
+bool operator==(
+    const HgiTextureViewDesc& lhs,
+    const HgiTextureViewDesc& rhs);
+
+HGI_API
+bool operator!=(
+    const HgiTextureViewDesc& lhs,
+    const HgiTextureViewDesc& rhs);
+
 
 ///
 /// \class HgiTexture

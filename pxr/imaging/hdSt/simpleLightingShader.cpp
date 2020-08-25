@@ -425,7 +425,7 @@ HdStSimpleLightingShader::AddResourcesFromTextures(ResourceContext &ctx) const
     // Irriadiance map computations.
     ctx.AddComputation(
         nullptr,
-        HdSt_DomeLightComputationGPU::New(
+        std::make_shared<HdSt_DomeLightComputationGPU>(
             _tokens->domeLightIrradiance,
             thisShader));
     
@@ -438,8 +438,8 @@ HdStSimpleLightingShader::AddResourcesFromTextures(ResourceContext &ctx) const
 
         ctx.AddComputation(
             nullptr,
-            HdSt_DomeLightComputationGPU::New(
-                _tokens->domeLightPrefilter, 
+            std::make_shared<HdSt_DomeLightComputationGPU>(
+                _tokens->domeLightPrefilter,
                 thisShader,
                 numPrefilterLevels,
                 mipLevel,
@@ -449,7 +449,7 @@ HdStSimpleLightingShader::AddResourcesFromTextures(ResourceContext &ctx) const
     // Brdf map computation
     ctx.AddComputation(
         nullptr,
-        HdSt_DomeLightComputationGPU::New(
+        std::make_shared<HdSt_DomeLightComputationGPU>(
             _tokens->domeLightBRDF,
             thisShader));
 }

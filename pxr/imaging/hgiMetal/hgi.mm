@@ -163,6 +163,17 @@ HgiMetal::CreateTexture(HgiTextureDesc const & desc)
     return HgiTextureHandle(new HgiMetalTexture(this, desc), GetUniqueId());
 }
 
+HgiTextureHandle
+HgiMetal::CreateTextureView(
+    HgiTextureViewDesc const & desc)
+{
+    if (!desc.sourceTexture) {
+        TF_CODING_ERROR("Source texture is null");
+    }
+
+    return HgiTextureHandle(new HgiMetalTexture(this, desc), GetUniqueId());
+}
+
 void
 HgiMetal::DestroyTexture(HgiTextureHandle* texHandle)
 {

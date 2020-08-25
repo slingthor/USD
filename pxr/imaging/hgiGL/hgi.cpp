@@ -116,6 +116,16 @@ HgiGL::CreateTexture(HgiTextureDesc const & desc)
     return HgiTextureHandle(new HgiGLTexture(desc), GetUniqueId());
 }
 
+HgiTextureHandle
+HgiGL::CreateTextureView(HgiTextureViewDesc const & desc)
+{
+    if (!desc.sourceTexture) {
+        TF_CODING_ERROR("Source texture is null");
+    }
+
+    return HgiTextureHandle(new HgiGLTexture(desc), GetUniqueId());
+}
+
 void
 HgiGL::DestroyTexture(HgiTextureHandle* texHandle)
 {

@@ -48,7 +48,7 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     }
 
     MTLPixelFormat mtlFormat = HgiMetalConversions::GetPixelFormat(desc.format);
-    
+
     if (desc.usage & HgiTextureUsageBitsColorTarget) {
         usage = MTLTextureUsageRenderTarget;
     } else if (desc.usage & HgiTextureUsageBitsDepthTarget) {
@@ -145,6 +145,31 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     }
 
     HGIMETAL_DEBUG_LABEL(_textureId, _descriptor.debugName.c_str());
+}
+
+HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureViewDesc const & desc)
+    : HgiTexture(desc.sourceTexture->GetDescriptor())
+    , _textureId(nil)
+{
+    HgiMetalTexture* srcTexture =
+        static_cast<HgiMetalTexture*>(desc.sourceTexture);
+    NSRange levels = NSMakeRange(
+        desc.sourceFirstMip, desc.mipLevels);
+    NSRange slices = NSMakeRange(
+        desc.sourceFirstLayer, desc.layerCount);
+    MTLPixelFormat mtlFormat = HgiMetalConversions::GetPixelFormat(desc.format);
+
+    _textureId = [srcTexture->GetTextureId()
+                  newTextureViewWithPixelFormat:mtlFormat
+                  textureType:[srcTexture->GetTextureId() textureType]
+                  levels:levels
+                  slices:slices];
+    
+    // Update the texture descriptor to reflect the above
+    _descriptor.debugName = desc.debugName;
+    _descriptor.format = desc.format;
+    _descriptor.layerCount = desc.layerCount;
+    _descriptor.mipLevels = desc.mipLevels;
 }
 
 HgiMetalTexture::~HgiMetalTexture()
