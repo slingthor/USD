@@ -43,6 +43,7 @@
 
 #include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/hash.h"
+#include "pxr/base/tf/pathUtils.h"
 
 #include <memory>
 
@@ -935,14 +936,15 @@ _MakeMaterialParamsForTexture(
             } else if (v.IsHolding<std::string>() ||
                        v.IsHolding<SdfAssetPath>()) {
                 const std::string filePath = _ResolveAssetPath(v);
+                const std::string realFilePath = TfRealPath(filePath);
 
-                if (GarchIsSupportedUdimTexture(filePath)) {
+                if (GarchIsSupportedUdimTexture(realFilePath)) {
                     texParam.textureType = HdTextureType::Udim;
                 }
                 
                 useTexturePrimToFindTexture = false;
                 textureId = HdStTextureIdentifier(
-                    TfToken(filePath),
+                    TfToken(realFilePath),
                     _GetSubtextureIdentifier(
                         texParam.textureType, 
                         node.nodeTypeId, 
