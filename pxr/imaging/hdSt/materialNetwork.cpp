@@ -936,7 +936,7 @@ _MakeMaterialParamsForTexture(
             } else if (v.IsHolding<std::string>() ||
                        v.IsHolding<SdfAssetPath>()) {
                 const std::string filePath = _ResolveAssetPath(v);
-                const std::string realFilePath = TfRealPath(filePath);
+                const std::string realFilePath = TfRealPath(filePath, true);
 
                 if (GarchIsSupportedUdimTexture(realFilePath)) {
                     texParam.textureType = HdTextureType::Udim;
