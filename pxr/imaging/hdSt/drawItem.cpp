@@ -396,7 +396,7 @@ HdStDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
     
     if (instanceIndexWidth != 2) {
         // We use 64 bit read/writes below for a more efficient copy
-        TF_FATAL_CODING_ERROR("Only expected to find one instance level, found %d", instancerNumLevels);
+        //TF_FATAL_CODING_ERROR("Only expected to find one instance level, found %d", instancerNumLevels);
         return 0;
     }
 
