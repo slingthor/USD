@@ -279,6 +279,10 @@ HdStDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
 void
 HdStDrawItem::CalculateCullingBounds() const
 {
+    if (_instancedCullingBoundsCalculated) {
+       return;
+    }
+
     HdBufferArrayRangeSharedPtr const & instanceIndexRange = GetInstanceIndexRange();
     if (instanceIndexRange) {
         HdStBufferArrayRangeSharedPtr instanceIndexRangeGL = std::static_pointer_cast<HdStBufferArrayRange>(instanceIndexRange);
@@ -396,7 +400,7 @@ HdStDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
     
     if (instanceIndexWidth != 2) {
         // We use 64 bit read/writes below for a more efficient copy
-        //TF_FATAL_CODING_ERROR("Only expected to find one instance level, found %d", instancerNumLevels);
+        TF_FATAL_CODING_ERROR("Only expected to find one instance level, found %d", instancerNumLevels);
         return 0;
     }
 
