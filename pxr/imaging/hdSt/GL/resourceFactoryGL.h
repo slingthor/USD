@@ -67,15 +67,6 @@ public:
     HDST_API
     virtual HdSt_DrawBatchSharedPtr NewIndirectDrawBatch(
         HdStDrawItemInstance * drawItemInstance) const override;
-      
-    /// Creates a new HdSt_DomeLightComputationGPU computation
-    HDST_API
-    virtual HdSt_DomeLightComputationGPU *NewDomeLightComputationGPU(
-        const TfToken & shaderToken,
-        HdStSimpleLightingShaderPtr const &lightingShader,
-        unsigned int numLevels,
-        unsigned int level,
-        float roughness) const override;
 
     /// Creates a new render pass state for OpenGL
     HDST_API

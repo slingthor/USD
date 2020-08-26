@@ -28,7 +28,6 @@
 #include "pxr/imaging/hdSt/Metal/resourceFactoryMetal.h"
 
 #include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
-#include "pxr/imaging/hdSt/Metal/domeLightComputationsMetal.h"
 #include "pxr/imaging/hdSt/Metal/drawTargetTextureResourceMetal.h"
 #include "pxr/imaging/hdSt/Metal/indirectDrawBatchMetal.h"
 #include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
@@ -121,18 +120,6 @@ HdStGLSLProgram *HdStResourceFactoryMetal::NewProgram(
     TfToken const &role, HdStResourceRegistry *const registry) const
 {
     return new HdStGLSLProgramMSL(role, registry);
-}
-
-HdSt_DomeLightComputationGPU*
-HdStResourceFactoryMetal::NewDomeLightComputationGPU(
-    const TfToken & shaderToken,
-    HdStSimpleLightingShaderPtr const &lightingShader,
-    unsigned int numLevels,
-    unsigned int level,
-    float roughness) const
-{
-    return new HdSt_DomeLightComputationGPUMetal(shaderToken,
-        lightingShader, numLevels, level, roughness);
 }
 
 HdStRenderPassShaderSharedPtr HdStResourceFactoryMetal::NewRenderPassShader() const

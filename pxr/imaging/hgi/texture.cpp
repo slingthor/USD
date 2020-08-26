@@ -75,5 +75,23 @@ bool operator!=(const HgiTextureDesc& lhs,
     return !(lhs == rhs);
 }
 
+bool operator==(const HgiTextureViewDesc& lhs,
+    const HgiTextureViewDesc& rhs)
+{
+    return  lhs.debugName == rhs.debugName &&
+            lhs.format == rhs.format &&
+            lhs.layerCount == rhs.layerCount &&
+            lhs.mipLevels == rhs.mipLevels &&
+            lhs.sourceTexture == rhs.sourceTexture &&
+            lhs.sourceFirstLayer == rhs.sourceFirstLayer &&
+            lhs.sourceFirstMip == rhs.sourceFirstMip
+    ;
+}
+
+bool operator!=(const HgiTextureViewDesc& lhs,
+    const HgiTextureViewDesc& rhs)
+{
+    return !(lhs == rhs);
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE

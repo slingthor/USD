@@ -21,20 +21,20 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
-#include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/resourceFactory.h"
-
 #include "pxr/imaging/hdSt/domeLightComputations.h"
 #include "pxr/imaging/hdSt/simpleLightingShader.h"
 #include "pxr/imaging/hdSt/glslProgram.h"
-#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/textureObject.h"
 #include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/dynamicUvTextureObject.h"
+
+#include "pxr/imaging/hgi/computeCmds.h"
+#include "pxr/imaging/hgi/computePipeline.h"
+#include "pxr/imaging/hgi/shaderProgram.h"
+#include "pxr/imaging/hgi/tokens.h"
 
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hf/perfLog.h"
@@ -43,19 +43,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdSt_DomeLightComputationGPUSharedPtr
-HdSt_DomeLightComputationGPU::New(
-    const TfToken & shaderToken,
-    HdStSimpleLightingShaderPtr const &lightingShader,
-    unsigned int numLevels,
-    unsigned int level ,
-    float roughness)
-{
-    return HdSt_DomeLightComputationGPUSharedPtr(
-            HdStResourceFactory::GetInstance()->NewDomeLightComputationGPU(
-                shaderToken, lightingShader, numLevels, level,
-                roughness));
-}
 
 HdSt_DomeLightComputationGPU::HdSt_DomeLightComputationGPU(
     const TfToken &shaderToken,
@@ -63,7 +50,7 @@ HdSt_DomeLightComputationGPU::HdSt_DomeLightComputationGPU(
     const unsigned int numLevels,
     const unsigned int level, 
     const float roughness) 
-  : _shaderToken(shaderToken),
+  : _shaderToken(shaderToken), 
     _lightingShader(lightingShader),
     _numLevels(numLevels), 
     _level(level), 
@@ -71,19 +58,21 @@ HdSt_DomeLightComputationGPU::HdSt_DomeLightComputationGPU(
 {
 }
 
+static
 void
-HdSt_DomeLightComputationGPU::_FillPixelsByteSize(HgiTextureDesc * const desc)
+_FillPixelsByteSize(HgiTextureDesc * const desc)
 {
     const size_t s = HgiDataSizeOfFormat(desc->format);
     desc->pixelsByteSize =
         s * desc->dimensions[0] * desc->dimensions[1] * desc->dimensions[2];
 }
 
+static
 bool
-HdSt_DomeLightComputationGPU::_GetSrcTextureDimensionsAndGLName(
+_GetSrcTextureDimensionsAndName(
     HdStSimpleLightingShaderSharedPtr const &shader,
     GfVec3i * srcDim,
-    GarchTextureGPUHandle * srcGLTextureName)
+    HgiTextureHandle * srcTextureName)
 {
     // Get source texture, the dome light environment map
     HdStTextureHandleSharedPtr const &srcTextureHandle =
@@ -91,6 +80,7 @@ HdSt_DomeLightComputationGPU::_GetSrcTextureDimensionsAndGLName(
     if (!TF_VERIFY(srcTextureHandle)) {
         return false;
     }
+
     const HdStUvTextureObject * const srcTextureObject =
         dynamic_cast<HdStUvTextureObject*>(
             srcTextureHandle->GetTextureObject().get());
@@ -110,34 +100,163 @@ HdSt_DomeLightComputationGPU::_GetSrcTextureDimensionsAndGLName(
     if (!TF_VERIFY(srcTexture)) {
         return false;
     }
+
     *srcDim = srcTexture->GetDescriptor().dimensions;
-    *srcGLTextureName = _GetGlTextureName(srcTexture);
-    return srcGLTextureName->IsSet();
+    *srcTextureName = srcTextureObject->GetTexture();
+
+    return true;
 }
 
 void
-HdSt_DomeLightComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range,
-                                      HdResourceRegistry * const resourceRegistry)
+HdSt_DomeLightComputationGPU::Execute(
+    HdBufferArrayRangeSharedPtr const &range,
+    HdResourceRegistry * const resourceRegistry)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    bool hasDispatchCompute = GarchResourceFactory::GetInstance()->GetContextCaps().hasDispatchCompute;
-    if (!hasDispatchCompute) {
-        return;
-    }
-
-    HdStGLSLProgramSharedPtr const computeProgram = 
+    HdStResourceRegistry* hdStResourceRegistry =
+        static_cast<HdStResourceRegistry*>(resourceRegistry);
+    HdStGLSLProgramSharedPtr const computeProgram =
         HdStGLSLProgram::GetComputeProgram(
             HdStPackageDomeLightShader(), 
             _shaderToken,
             static_cast<HdStResourceRegistry*>(resourceRegistry));
+    if (!computeProgram) return;
 
-    if (!TF_VERIFY(computeProgram)) {
+    HdStSimpleLightingShaderSharedPtr const shader = _lightingShader.lock();
+    if (!TF_VERIFY(shader)) {
         return;
     }
 
-    _Execute(computeProgram);
+    // Size of source texture (the dome light environment map)
+    GfVec3i srcDim;
+    HgiTextureHandle srcTextureName;
+    if (!_GetSrcTextureDimensionsAndName(
+            shader, &srcDim, &srcTextureName)) {
+        return;
+    }
+
+    // Size of texture to be created.
+    const int width  = srcDim[0] / 2;
+    const int height = srcDim[1] / 2;
+
+    // Get texture object from lighting shader that this
+    // computation is supposed to populate
+    HdStTextureHandleSharedPtr const &dstTextureHandle =
+        shader->GetTextureHandle(_shaderToken);
+    if (!TF_VERIFY(dstTextureHandle)) {
+        return;
+    }
+
+    HdStDynamicUvTextureObject * const dstUvTextureObject =
+        dynamic_cast<HdStDynamicUvTextureObject*>(
+            dstTextureHandle->GetTextureObject().get());
+    if (!TF_VERIFY(dstUvTextureObject)) {
+        return;
+    }
+        
+    if (_level == 0) {
+        // Level zero is in charge of actually creating the
+        // GPU resource.
+        HgiTextureDesc desc;
+        desc.debugName = _shaderToken.GetText();
+        desc.format = HgiFormatFloat16Vec4;
+        desc.dimensions = GfVec3i(width, height, 1);
+        desc.layerCount = 1;
+        desc.mipLevels = _numLevels;
+        desc.usage =
+            HgiTextureUsageBitsShaderRead | HgiTextureUsageBitsShaderWrite;
+        _FillPixelsByteSize(&desc);
+        dstUvTextureObject->CreateTexture(desc);
+    }
+    
+    // Create a texture view for the layer we want to write to
+    HgiTextureViewDesc textureViewDesc;
+    textureViewDesc.layerCount = 1;
+    textureViewDesc.mipLevels = 1;
+    textureViewDesc.format = HgiFormatFloat16Vec4;
+    textureViewDesc.sourceFirstLayer = 0;
+    textureViewDesc.sourceFirstMip = _level;
+    textureViewDesc.sourceTexture = dstUvTextureObject->GetTexture().Get();
+
+    Hgi* hgi = hdStResourceRegistry->GetHgi();
+    HgiTextureHandle dstTextureView = hgi->CreateTextureView(textureViewDesc);
+    
+    HgiSamplerDesc samplerDesc;
+    samplerDesc.debugName = "DomeLightComputation";
+    samplerDesc.addressModeU = HgiSamplerAddressModeRepeat;
+    samplerDesc.addressModeV = HgiSamplerAddressModeRepeat;
+    samplerDesc.addressModeW = HgiSamplerAddressModeRepeat;
+    samplerDesc.minFilter = HgiSamplerFilterLinear;
+    samplerDesc.magFilter = HgiSamplerFilterLinear;
+    HgiSamplerHandle sampler = hgi->CreateSampler(samplerDesc);
+    
+    HgiResourceBindingsDesc resourceDesc;
+    resourceDesc.debugName = "DomeLightComputation";
+
+    HgiTextureBindDesc texBind0;
+    texBind0.bindingIndex = 0;
+    texBind0.stageUsage = HgiShaderStageCompute;
+    texBind0.textures.push_back(srcTextureName);
+    texBind0.samplers.push_back(sampler);
+    resourceDesc.textures.push_back(std::move(texBind0));
+
+    HgiTextureBindDesc texBind1;
+    texBind1.bindingIndex = 1;
+    texBind1.stageUsage = HgiShaderStageCompute;
+    texBind1.textures.push_back(dstTextureView);
+    texBind1.samplers.push_back(sampler);
+    resourceDesc.textures.push_back(std::move(texBind1));
+
+    HgiResourceBindingsHandle resourceBindings =
+        hgi->CreateResourceBindings(resourceDesc);
+    
+    // prepare uniform buffer for GPU computation
+    struct Uniform {
+        float roughness;
+    } uniform;
+
+    uniform.roughness = _roughness;
+
+    bool hasUniforms = uniform.roughness >= 0.0f;
+
+    HgiComputePipelineDesc desc;
+    desc.debugName = "DomeLightComputation";
+    desc.shaderProgram = computeProgram->GetProgram();
+    if (hasUniforms) {
+        desc.shaderConstantsDesc.byteSize = sizeof(uniform);
+    }
+    HgiComputePipelineHandle pipeline = hgi->CreateComputePipeline(desc);
+
+    HgiComputeCmds* computeCmds = hdStResourceRegistry->GetComputeCmds();
+    computeCmds->PushDebugGroup("DomeLightComputationCmds");
+    computeCmds->BindResources(resourceBindings);
+    computeCmds->BindPipeline(pipeline);
+
+    // if we are calculating the irradiance map we do not need to send over
+    // the roughness value to the shader
+    // flagged this with a negative roughness value
+    if (hasUniforms) {
+        computeCmds->SetConstantValues(pipeline, 0, sizeof(uniform), &uniform);
+    }
+
+    // dispatch compute kernel
+    // APPLE METAL: Temp - currently dispatch sizes are not abstracted yet
+    if (hgi->GetAPIName() == HgiTokens->Metal) {
+        computeCmds->Dispatch(width, height);
+    }
+    else {
+        computeCmds->Dispatch(width / 32, height / 32);
+    }
+    
+    computeCmds->PopDebugGroup();
+
+    // destroy the intermediate resources
+    hgi->DestroySampler(&sampler);
+    hgi->DestroyTexture(&dstTextureView);
+    hgi->DestroyComputePipeline(&pipeline);
+    hgi->DestroyResourceBindings(&resourceBindings);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
