@@ -21,12 +21,14 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#include "pxr/imaging/hdSt/hgiConversions.h"
 #include "pxr/imaging/hdSt/domeLightComputations.h"
 #include "pxr/imaging/hdSt/simpleLightingShader.h"
 #include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/tokens.h"
+#include "pxr/imaging/hdSt/samplerObject.h"
 #include "pxr/imaging/hdSt/textureObject.h"
 #include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/dynamicUvTextureObject.h"
@@ -48,11 +50,11 @@ HdSt_DomeLightComputationGPU::HdSt_DomeLightComputationGPU(
     const TfToken &shaderToken,
     HdStSimpleLightingShaderPtr const &lightingShader,
     const unsigned int numLevels,
-    const unsigned int level, 
+    const unsigned int level,
     const float roughness) 
   : _shaderToken(shaderToken), 
     _lightingShader(lightingShader),
-    _numLevels(numLevels), 
+    _numLevels(numLevels),
     _level(level), 
     _roughness(roughness)
 {
@@ -72,7 +74,8 @@ bool
 _GetSrcTextureDimensionsAndName(
     HdStSimpleLightingShaderSharedPtr const &shader,
     GfVec3i * srcDim,
-    HgiTextureHandle * srcTextureName)
+    HgiTextureHandle * srcTextureName,
+    HgiSamplerHandle * srcSamplerName)
 {
     // Get source texture, the dome light environment map
     HdStTextureHandleSharedPtr const &srcTextureHandle =
@@ -85,6 +88,13 @@ _GetSrcTextureDimensionsAndName(
         dynamic_cast<HdStUvTextureObject*>(
             srcTextureHandle->GetTextureObject().get());
     if (!TF_VERIFY(srcTextureObject)) {
+        return false;
+    }
+
+    const HdStUvSamplerObject * const srcSamplerObject =
+        dynamic_cast<HdStUvSamplerObject*>(
+            srcTextureHandle->GetSamplerObject().get());
+    if (!TF_VERIFY(srcSamplerObject)) {
         return false;
     }
 
@@ -103,6 +113,7 @@ _GetSrcTextureDimensionsAndName(
 
     *srcDim = srcTexture->GetDescriptor().dimensions;
     *srcTextureName = srcTextureObject->GetTexture();
+    *srcSamplerName = srcSamplerObject->GetSampler();
 
     return true;
 }
@@ -132,8 +143,9 @@ HdSt_DomeLightComputationGPU::Execute(
     // Size of source texture (the dome light environment map)
     GfVec3i srcDim;
     HgiTextureHandle srcTextureName;
+    HgiSamplerHandle srcSamplerName;
     if (!_GetSrcTextureDimensionsAndName(
-            shader, &srcDim, &srcTextureName)) {
+            shader, &srcDim, &srcTextureName, &srcSamplerName)) {
         return;
     }
 
@@ -182,16 +194,7 @@ HdSt_DomeLightComputationGPU::Execute(
 
     Hgi* hgi = hdStResourceRegistry->GetHgi();
     HgiTextureHandle dstTextureView = hgi->CreateTextureView(textureViewDesc);
-    
-    HgiSamplerDesc samplerDesc;
-    samplerDesc.debugName = "DomeLightComputation";
-    samplerDesc.addressModeU = HgiSamplerAddressModeRepeat;
-    samplerDesc.addressModeV = HgiSamplerAddressModeRepeat;
-    samplerDesc.addressModeW = HgiSamplerAddressModeRepeat;
-    samplerDesc.minFilter = HgiSamplerFilterLinear;
-    samplerDesc.magFilter = HgiSamplerFilterLinear;
-    HgiSamplerHandle sampler = hgi->CreateSampler(samplerDesc);
-    
+        
     HgiResourceBindingsDesc resourceDesc;
     resourceDesc.debugName = "DomeLightComputation";
 
@@ -199,14 +202,14 @@ HdSt_DomeLightComputationGPU::Execute(
     texBind0.bindingIndex = 0;
     texBind0.stageUsage = HgiShaderStageCompute;
     texBind0.textures.push_back(srcTextureName);
-    texBind0.samplers.push_back(sampler);
+    texBind0.samplers.push_back(srcSamplerName);
     resourceDesc.textures.push_back(std::move(texBind0));
 
     HgiTextureBindDesc texBind1;
     texBind1.bindingIndex = 1;
     texBind1.stageUsage = HgiShaderStageCompute;
     texBind1.textures.push_back(dstTextureView);
-    texBind1.samplers.push_back(sampler);
+    texBind1.samplers.push_back(srcSamplerName);
     resourceDesc.textures.push_back(std::move(texBind1));
 
     HgiResourceBindingsHandle resourceBindings =
@@ -253,7 +256,6 @@ HdSt_DomeLightComputationGPU::Execute(
     hgi->SubmitCmds(computeCmds.get());
 
     // destroy the intermediate resources
-    hgi->DestroySampler(&sampler);
     hgi->DestroyTexture(&dstTextureView);
     hgi->DestroyComputePipeline(&pipeline);
     hgi->DestroyResourceBindings(&resourceBindings);

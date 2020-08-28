@@ -179,10 +179,6 @@ vec3 ComputeIrradiance(vec3 inPos)
 
 };
 
-constexpr sampler inTexelSampler(address::repeat,
-                                  filter::linear,
-                              mip_filter::linear);
-
 kernel void computeEntryPoint(
     texture2d<float,access::sample> inTexture[[texture(0)]],
     texture2d<float,access::write> outTexture[[texture(1)]],
@@ -195,7 +191,7 @@ kernel void computeEntryPoint(
     ProgramScope scope;
     scope.inTexture = inTexture;
     scope._outDims = imageSize(outTexture);
-    scope.inSampler = inTexelSampler;
+    scope.inSampler = inSampler;
     vec2 texCoords = scope.GetTexCoords(outCoords);
     vec3 pos3D = scope.GetWorldPos(texCoords);
     vec4 outColor = vec4(scope.ComputeIrradiance(pos3D), 1.0);
@@ -280,10 +276,6 @@ vec3 PrefilterEnvMap(vec3 R, float roughness)
 
 };
 
-constexpr sampler inTexelSampler(address::repeat,
-                                  filter::linear,
-                              mip_filter::linear);
-
 kernel void computeEntryPoint(
     texture2d<float,access::sample> inTexture[[texture(0)]],
     texture2d<float,access::write> outTexture[[texture(1)]],
@@ -297,7 +289,7 @@ kernel void computeEntryPoint(
     ProgramScope scope;
     scope.inTexture = inTexture;
     scope._outDims = imageSize(outTexture);
-    scope.inSampler = inTexelSampler;
+    scope.inSampler = inSampler;
     vec2 texCoords = scope.GetTexCoords(outCoords);
     vec3 pos3D = scope.GetWorldPos(texCoords);
     vec3 R = normalize(pos3D);
@@ -373,10 +365,6 @@ vec2 ComputeBRDF(float NoV, float roughness)
 
 };
 
-constexpr sampler inTexelSampler(address::clamp_to_edge,
-                                  filter::linear,
-                              mip_filter::linear);
-
 kernel void computeEntryPoint(
     texture2d<float,access::sample> inTexture[[texture(0)]],
     texture2d<float,access::write> outTexture[[texture(1)]],
@@ -389,7 +377,7 @@ kernel void computeEntryPoint(
     ProgramScope scope;
     scope.inTexture = inTexture;
     scope._outDims = imageSize(outTexture);
-    scope.inSampler = inTexelSampler;
+    scope.inSampler = inSampler;
     vec2 texCoords = scope.GetTexCoords(outCoords);
     // texCoords.x represents N dot E and texCoords.y represents roughness
     vec4 outColor = vec4(scope.ComputeBRDF(texCoords.x, texCoords.y), 0.0, 1.0);

@@ -42,7 +42,6 @@
 #include "pxr/imaging/hf/perfLog.h"
 
 #include "pxr/imaging/hio/glslfx.h"
-#include "pxr/imaging/hgi/enums.h"
 
 #include "pxr/imaging/garch/bindingMap.h"
 #include "pxr/imaging/garch/simpleLightingContext.h"
@@ -369,8 +368,8 @@ HdStSimpleLightingShader::AllocateTextureHandles(HdSceneDelegate *const delegate
 	        /* sourceColorSpace = */ HdStTokens->colorSpaceAuto));
 
     static const HdSamplerParameters envSamplerParameters{
-        HdWrapRepeat, HdWrapRepeat, HdWrapRepeat,
-        HdMinFilterLinear, HdMagFilterLinear};
+        HdWrapClamp, HdWrapClamp, HdWrapClamp,
+        HdMinFilterLinearMipmapLinear, HdMagFilterLinear};
 
     _domeLightEnvironmentTextureHandle =
         resourceRegistry->AllocateTextureHandle(
