@@ -127,20 +127,39 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     _textureId = [hgi->GetPrimaryDevice() newTextureWithDescriptor:texDesc];
 
     if (desc.initialData && desc.pixelsByteSize > 0) {
-        // APPLE METAL: Fail silently if more mip levels have been defined.
-        // TF_VERIFY(desc.mipLevels == 1, "Mipmap upload not implemented");
-        if (desc.type == HgiTextureType2D) {
-            [_textureId replaceRegion:MTLRegionMake2D(0, 0, width, height)
-                          mipmapLevel:0
-                            withBytes:desc.initialData
-                          bytesPerRow:desc.pixelsByteSize / height];
-        }
-        else {
-            [_textureId 
-                replaceRegion:MTLRegionMake3D(0, 0, 0, width, height, depth)
-                  mipmapLevel:0 slice:0 withBytes:desc.initialData
-                  bytesPerRow:desc.pixelsByteSize / height / width
-                bytesPerImage:desc.pixelsByteSize / depth];
+        // Upload each (available) mip
+        const std::vector<HgiMipInfo> mipInfos =
+            HgiGetMipInfos(
+                desc.format,
+                desc.dimensions,
+                desc.pixelsByteSize);
+        const size_t mipLevels = std::min(
+            mipInfos.size(), size_t(desc.mipLevels));
+        const char * const initialData = reinterpret_cast<const char *>(
+            desc.initialData);
+
+        for (size_t mip = 0; mip < mipLevels; mip++) {
+            const HgiMipInfo &mipInfo = mipInfos[mip];
+
+            uint32_t width = mipInfo.dimensions[0];
+            uint32_t height = mipInfo.dimensions[1];
+
+            if (desc.type == HgiTextureType2D) {
+                [_textureId replaceRegion:MTLRegionMake2D(0, 0, width, height)
+                              mipmapLevel:mip
+                                withBytes:initialData + mipInfo.byteOffset
+                              bytesPerRow:desc.pixelsByteSize / height];
+            }
+            else {
+                uint32_t depth = mipInfo.dimensions[2];
+                [_textureId
+                    replaceRegion:MTLRegionMake3D(0, 0, 0, width, height, depth)
+                      mipmapLevel:0
+                            slice:0
+                        withBytes:initialData + mipInfo.byteOffset
+                      bytesPerRow:desc.pixelsByteSize / height / width
+                    bytesPerImage:desc.pixelsByteSize / depth];
+            }
         }
     }
 
