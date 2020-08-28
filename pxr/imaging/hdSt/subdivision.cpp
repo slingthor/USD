@@ -26,7 +26,6 @@
 #include "pxr/imaging/hdSt/subdivision.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/pxOsd/tokens.h"
-
 #include "pxr/imaging/hgiMetal/hgi.h"
 
 #include <opensubdiv/version.h>
@@ -184,12 +183,9 @@ HdSt_OsdRefineComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range,
     HdSt_Subdivision *subdivision = _topology->GetSubdivision();
     if (!TF_VERIFY(subdivision)) return;
 
-    // Flush Hgi work to GPU before calling into OpenSubdiv
+    // APPLE METAL: Flush the Metal command buffer
     HdStResourceRegistry* hdStResourceRegistry =
         static_cast<HdStResourceRegistry*>(resourceRegistry);
-    hdStResourceRegistry->SubmitHgiWork();
-    
-    // APPLE METAL: Flush the Metal command buffer
     HgiMetal* hgiMetal = static_cast<HgiMetal*>(hdStResourceRegistry->GetHgi());
     hgiMetal->CommitCommandBuffer(HgiMetal::CommitCommandBuffer_WaitUntilCompleted, true);
     

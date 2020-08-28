@@ -333,6 +333,7 @@ UsdImagingGLEngine::RenderBatch(
 
     // Forward scene materials enable option to delegate
     _sceneDelegate->SetSceneMaterialsEnabled(params.enableSceneMaterials);
+    _sceneDelegate->SetSceneLightsEnabled(params.enableSceneLights);
 
     VtValue selectionValue(_selTracker);
     _engine->SetTaskContextData(HdxTokens->selectionState, selectionValue);
@@ -692,6 +693,7 @@ UsdImagingGLEngine::TestIntersection(
 
     // Forward scene materials enable option to delegate
     _sceneDelegate->SetSceneMaterialsEnabled(params.enableSceneMaterials);
+    _sceneDelegate->SetSceneLightsEnabled(params.enableSceneLights);
 
     HdxPickHitVector allHits;
     HdxPickTaskContextParams pickParams;
@@ -1517,6 +1519,7 @@ UsdImagingGLEngine::_MakeHydraUsdImagingGLRenderParams(
     }
 
     params.enableSceneMaterials = renderParams.enableSceneMaterials;
+    params.enableSceneLights = renderParams.enableSceneLights;
 
     // We don't provide the following because task controller ignores them:
     // - params.camera

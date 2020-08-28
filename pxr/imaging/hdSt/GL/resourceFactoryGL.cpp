@@ -28,7 +28,6 @@
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
 #include "pxr/imaging/hdSt/GL/codeGenGLSL.h"
-#include "pxr/imaging/hdSt/GL/drawTargetTextureResourceGL.h"
 #include "pxr/imaging/hdSt/GL/glslProgramGL.h"
 #include "pxr/imaging/hdSt/GL/indirectDrawBatchGL.h"
 #include "pxr/imaging/hdSt/GL/renderPassStateGL.h"
@@ -61,12 +60,6 @@ HdSt_CodeGen *HdStResourceFactoryGL::NewCodeGen(
     HdStShaderCodeSharedPtrVector const &shaders) const
 {
     return new HdSt_CodeGenGLSL(shaders);
-}
-
-HdStTextureResourceSharedPtr
-HdStResourceFactoryGL::NewDrawTargetTextureResource() const
-{
-    return HdStTextureResourceSharedPtr(new HdSt_DrawTargetTextureResourceGL());
 }
 
 HdSt_DrawBatchSharedPtr HdStResourceFactoryGL::NewIndirectDrawBatch(

@@ -28,7 +28,6 @@
 #include "pxr/imaging/hdSt/Metal/resourceFactoryMetal.h"
 
 #include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
-#include "pxr/imaging/hdSt/Metal/drawTargetTextureResourceMetal.h"
 #include "pxr/imaging/hdSt/Metal/indirectDrawBatchMetal.h"
 #include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
 #include "pxr/imaging/hdSt/Metal/renderPassShaderMetal.h"
@@ -61,13 +60,6 @@ HdSt_CodeGen *HdStResourceFactoryMetal::NewCodeGen(
     HdStShaderCodeSharedPtrVector const &shaders) const
 {
     return new HdSt_CodeGenMSL(shaders);
-}
-
-HdStTextureResourceSharedPtr
-HdStResourceFactoryMetal::NewDrawTargetTextureResource() const
-{
-    return HdStTextureResourceSharedPtr(
-        new HdSt_DrawTargetTextureResourceMetal());
 }
 
 HdSt_DrawBatchSharedPtr HdStResourceFactoryMetal::NewIndirectDrawBatch(

@@ -577,10 +577,10 @@ HdxFullscreenShader::_Draw(
     GfVec4i vp = GfVec4i(0, 0, dimensions[0], dimensions[1]);
     gfxCmds->SetViewport(vp);
     if (_flipOnDraw) {
-        gfxCmds->DrawIndexed(_indexBuffer, 3, 0, 3, 1, 0);
+        gfxCmds->DrawIndexed(_indexBuffer, 3, 0, 3, 1);
     }
     else {
-        gfxCmds->DrawIndexed(_indexBuffer, 3, 0, 0, 1, 0);
+        gfxCmds->DrawIndexed(_indexBuffer, 3, 0, 0, 1);
     }
     gfxCmds->PopDebugGroup();
 

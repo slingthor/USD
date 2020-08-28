@@ -36,7 +36,6 @@
 #include "pxr/imaging/hdSt/light.h"
 
 #include "pxr/imaging/hdx/drawTargetTask.h"
-#include "pxr/imaging/hdx/drawTargetResolveTask.h"
 #include "pxr/imaging/hdx/pickTask.h"
 #include "pxr/imaging/hdx/renderTask.h"
 #include "pxr/imaging/hdx/selectionTask.h"
@@ -296,18 +295,12 @@ Hdx_UnitTestDelegate::SetDrawTarget(SdfPath const &id, TfToken const &key,
     } else if (key == HdStDrawTargetTokens->resolution) {
         GetRenderIndex().GetChangeTracker().MarkSprimDirty(
             id, HdStDrawTarget::DirtyDTResolution);
-    } else if (key == HdStDrawTargetTokens->attachments) {
-        GetRenderIndex().GetChangeTracker().MarkSprimDirty(
-            id, HdStDrawTarget::DirtyDTAttachment);
     } else if (key == HdStDrawTargetTokens->aovBindings) {
         GetRenderIndex().GetChangeTracker().MarkSprimDirty(
             id, HdStDrawTarget::DirtyDTAovBindings);
     } else if (key == HdStDrawTargetTokens->depthPriority) {
         GetRenderIndex().GetChangeTracker().MarkSprimDirty(
             id, HdStDrawTarget::DirtyDTDepthPriority);
-    } else if (key == HdStDrawTargetTokens->depthClearValue) {
-        GetRenderIndex().GetChangeTracker().MarkSprimDirty(
-            id, HdStDrawTarget::DirtyDTDepthClearValue);
     } else if (key == HdStDrawTargetTokens->collection) {
         GetRenderIndex().GetChangeTracker().MarkSprimDirty(
             id, HdStDrawTarget::DirtyDTCollection);
@@ -379,12 +372,6 @@ Hdx_UnitTestDelegate::AddDrawTargetTask(SdfPath const &id)
     HdxDrawTargetTaskParams params;
     params.enableLighting = true;
     cache[HdTokens->params] = params;
-}
-
-void
-Hdx_UnitTestDelegate::AddDrawTargetResolveTask(SdfPath const &id)
-{
-    GetRenderIndex().InsertTask<HdxDrawTargetResolveTask>(this, id);
 }
 
 void

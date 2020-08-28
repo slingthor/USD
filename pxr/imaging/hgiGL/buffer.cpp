@@ -32,6 +32,7 @@ HgiGLBuffer::HgiGLBuffer(HgiBufferDesc const & desc)
     : HgiBuffer(desc)
     , _bufferId(0)
     , _mapped(nullptr)
+    , _cpuStaging(nullptr)
 {
 
     if (desc.byteSize == 0) {
@@ -92,6 +93,11 @@ HgiGLBuffer::~HgiGLBuffer()
         _bufferId = 0;
     }
     
+    if (_cpuStaging) {
+        free(_cpuStaging);
+        _cpuStaging = nullptr;
+    }
+
     if (_cpuStaging) {
         free(_cpuStaging);
         _cpuStaging = nullptr;

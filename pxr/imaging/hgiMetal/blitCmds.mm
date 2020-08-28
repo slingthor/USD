@@ -123,7 +123,7 @@ HgiMetalBlitCmds::CopyTextureGpuToCpu(
     MTLResourceOptions options =
         _hgi->GetCapabilities().defaultStorageMode;
 
-    size_t bytesPerPixel = HgiDataSizeOfFormat(texDesc.format);
+    size_t bytesPerPixel = HgiGetDataSizeOfFormat(texDesc.format);
     id<MTLBuffer> cpuBuffer =
         [device newBufferWithBytesNoCopy:copyOp.cpuDestinationBuffer
                                   length:copyOp.destinationBufferByteSize
@@ -253,6 +253,11 @@ void HgiMetalBlitCmds::CopyBufferCpuToGpu(
 
     uint8_t *dst = static_cast<uint8_t*>([metalBuffer->GetBufferId() contents]);
     size_t dstOffset = copyOp.destinationByteOffset;
+
+    // If we used GetCPUStagingAddress as the cpuSourceBuffer when the copyOp
+    // was created, we can skip the memcpy since the src and dst buffer are
+    // the same and dst already contains the desired data.
+    // See also: QueueCopyBufferCpuToGpu.
     if (copyOp.cpuSourceBuffer != dst ||
         copyOp.sourceByteOffset != copyOp.destinationByteOffset) {
         // Offset into the src buffer

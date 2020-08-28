@@ -424,15 +424,10 @@ public:
     HdInstance<HgiComputePipelineSharedPtr>
     RegisterComputePipeline(HdInstance<HgiComputePipelineSharedPtr>::ID id);
 
-    /// Returns the global hgi compute command queue for registering
-    /// computation work.
-    HDST_API
-    HgiComputeCmds* GetComputeCmds();
-    
     /// Returns the global hgi blit command queue for registering blitting work.
     HDST_API
     HgiBlitCmds* GetBlitCmds();
-    
+
     /// Submits any queued compute/blit work for GPU execution.
     HDST_API
     void SubmitHgiWork();
@@ -646,7 +641,6 @@ private:
     HdInstanceRegistry<HgiComputePipelineSharedPtr>
         _computePipelineRegistry;
 
-    HgiComputeCmdsUniquePtr _computeCmds;
     HgiBlitCmdsUniquePtr _blitCmds;
 };
 

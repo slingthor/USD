@@ -87,6 +87,7 @@ public:
     float alphaThreshold; // threshold < 0 implies automatic
     ClipPlanesVector clipPlanes;
     bool enableSceneMaterials;
+    bool enableSceneLights;
     // Respect USD's model:drawMode attribute...
     bool enableUsdDrawModes;
     GfVec4f clearColor;
@@ -128,6 +129,7 @@ UsdImagingGLRenderParams::operator==(const UsdImagingGLRenderParams &other)
         && alphaThreshold              == other.alphaThreshold
         && clipPlanes                  == other.clipPlanes
         && enableSceneMaterials        == other.enableSceneMaterials
+        && enableSceneLights           == other.enableSceneLights
         && enableUsdDrawModes          == other.enableUsdDrawModes
         && clearColor                  == other.clearColor
         && colorCorrectionMode         == other.colorCorrectionMode

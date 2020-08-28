@@ -680,32 +680,9 @@ std::ostream &operator <<(
     return out;
 }
 
-HgiComputeCmds*
-HdStResourceRegistry::GetComputeCmds()
-{
-    // Metal can only have one encoder active per command buffer.
-    // Since BlitCmds and ComputeCmds use the same Metal command buffer we
-    // must submit any recorded blit work before starting compute work.
-    if (_blitCmds) {
-        _hgi->SubmitCmds(_blitCmds.get());
-        _blitCmds.reset();
-    }
-    if (!_computeCmds) {
-        _computeCmds = _hgi->CreateComputeCmds();
-    }
-    return _computeCmds.get();
-}
-
 HgiBlitCmds*
 HdStResourceRegistry::GetBlitCmds()
 {
-    // Metal can only have one encoder active per command buffer.
-    // Since BlitCmds and ComputeCmds use the same Metal command buffer we
-    // must submit any recorded compute work before starting blit work.
-    if (_computeCmds) {
-        _hgi->SubmitCmds(_computeCmds.get());
-        _computeCmds.reset();
-    }
     if (!_blitCmds) {
         _blitCmds = _hgi->CreateBlitCmds();
     }
@@ -714,14 +691,9 @@ HdStResourceRegistry::GetBlitCmds()
 
 void HdStResourceRegistry::SubmitHgiWork()
 {
-    // Submit the work queued by the computations
     if (_blitCmds) {
         _hgi->SubmitCmds(_blitCmds.get());
         _blitCmds.reset();
-    }
-    if (_computeCmds) {
-        _hgi->SubmitCmds(_computeCmds.get());
-        _computeCmds.reset();
     }
 }
 
@@ -887,10 +859,11 @@ HdStResourceRegistry::_Commit()
     }
 
     {
-        // HD_TRACE_SCOPE("Flush");
+        HD_TRACE_SCOPE("Flush");
         // 5. flush phase:
         //
         // flush cosolidated buffer updates
+        SubmitHgiWork();
     }
 
     {

@@ -84,10 +84,6 @@ public:
     virtual HdSt_CodeGen *NewCodeGen(
         HdStShaderCodeSharedPtrVector const &shaders) const = 0;
     
-    /// Creates a new draw target texture resource
-    HDST_API
-    virtual HdStTextureResourceSharedPtr NewDrawTargetTextureResource() const = 0;
-    
     /// Creates an indirect draw batch
     HDST_API
     virtual HdSt_DrawBatchSharedPtr NewIndirectDrawBatch(

@@ -134,6 +134,7 @@ UsdImagingDelegate::UsdImagingDelegate(
                            .HasAdapter(UsdImagingAdapterKeyTokens
                                        ->drawModeAdapterKey) )
     , _sceneMaterialsEnabled(true)
+    , _sceneLightsEnabled(true)
     , _appWindowPolicy(CameraUtilMatchVertically)
     , _coordSysEnabled(parentIndex
                        ->IsSprimTypeSupported(HdPrimTypeTokens->coordSys))
@@ -175,6 +176,17 @@ UsdImagingDelegate::~UsdImagingDelegate()
 bool
 UsdImagingDelegate::_IsDrawModeApplied(UsdPrim const& prim)
 {
+    // Optionally draw unloaded prims as bounds.
+    if (_displayUnloadedPrimsWithBounds && !prim.IsLoaded()) {
+        return true;
+    }
+
+    // Otherwise, only models with the GeomModel API schema applied can draw as
+    // cards...
+    if (!prim.IsModel() || !prim.HasAPI<UsdGeomModelAPI>()) {
+        return false;
+    }
+
     // Compute the inherited drawMode.
     TfToken drawMode = _GetModelDrawMode(prim);
     // If draw mode is "default", no draw mode is applied.
@@ -184,20 +196,15 @@ UsdImagingDelegate::_IsDrawModeApplied(UsdPrim const& prim)
 
     // Draw mode is only applied on models that are components, or which have
     // applyDrawMode = true.
-    UsdModelAPI model(prim);
-    bool applyDrawMode = false;
-    TfToken kind;
-    if (model.GetKind(&kind) && KindRegistry::IsA(kind, KindTokens->component))
-        applyDrawMode = true;
+    if (UsdModelAPI(prim).IsKind(KindTokens->component))
+        return true;
     else {
-        UsdGeomModelAPI geomModel(prim);
-        UsdAttribute attr = geomModel.GetModelApplyDrawModeAttr();
-        if (attr) {
-            attr.Get(&applyDrawMode);
-        }
+        bool applyDrawMode = false;
+        UsdGeomModelAPI(prim).GetModelApplyDrawModeAttr().Get(&applyDrawMode);
+        return applyDrawMode;
     }
 
-    return applyDrawMode;
+    return false;
 }
 
 
@@ -210,12 +217,6 @@ UsdImagingDelegate::_GetModelDrawMode(UsdPrim const& prim)
     if (_displayUnloadedPrimsWithBounds && !prim.IsLoaded()) {
         return UsdGeomTokens->bounds;
     }
-
-    // Draw modes can only be applied to models.
-    if (!prim.IsModel()) { return UsdGeomTokens->default_; }
-
-    // Draw modes can't be applied to the pseudo-root.
-    if (!prim.GetParent()) { return UsdGeomTokens->default_; }
 
     if (_IsEnabledDrawModeCache())
         return _drawModeCache.GetValue(prim);
@@ -1621,6 +1622,28 @@ UsdImagingDelegate::SetSceneMaterialsEnabled(bool enable)
 }
 
 void
+UsdImagingDelegate::SetSceneLightsEnabled(bool enable)
+{
+    if (_sceneLightsEnabled != enable)
+    {
+        _sceneLightsEnabled = enable;
+
+        UsdImagingIndexProxy indexProxy(this, nullptr);
+
+        // XXX: Need to unfortunately go through all prim info entries to
+        // propagate dirtyness to gprims.
+        for (auto& pair : _hdPrimInfoMap) {
+            const SdfPath &cachePath = pair.first;
+            _HdPrimInfo &primInfo = pair.second;
+            if (TF_VERIFY(primInfo.adapter, "%s", cachePath.GetText())) {
+                primInfo.adapter->MarkLightParamsDirty(primInfo.usdPrim, 
+                                                       cachePath, &indexProxy);
+            }
+        }
+    }
+}
+
+void
 UsdImagingDelegate::SetWindowPolicy(CameraUtilConformWindowPolicy policy)
 {
     if (_appWindowPolicy != policy) {
@@ -2742,6 +2765,18 @@ UsdImagingDelegate::GetLightParamValue(SdfPath const &id,
     } else if (paramName == HdTokens->shadowLink) {
         UsdCollectionAPI shadowLink = light.GetShadowLinkCollectionAPI();
         return VtValue(_collectionCache.GetIdForCollection(shadowLink));
+    } else if (paramName == HdLightTokens->intensity) {
+        // return 0.0 intensity if scene lights are not enabled
+        if (!_sceneLightsEnabled) {
+            return VtValue(0.0f);
+        }
+        // return 0.0 intensity if the scene lights are not visible
+        _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
+        if (TF_VERIFY(primInfo)) {
+            if (!primInfo->adapter->GetVisible(primInfo->usdPrim, _time)){
+                return VtValue(0.0f);
+            }
+        }
     }
 
     // Fallback to USD attributes.

@@ -57,12 +57,6 @@ public:
     virtual HdSt_CodeGen *NewCodeGen(
         HdStShaderCodeSharedPtrVector const &shaders) const override;
 
-    /// Creates a draw target texture resource for Metal
-    HDST_API
-    virtual HdStTextureResourceSharedPtr
-    NewDrawTargetTextureResource() const override;
-    
-
     /// Creates an indirect draw batch for Metal
     HDST_API
     virtual HdSt_DrawBatchSharedPtr NewIndirectDrawBatch(

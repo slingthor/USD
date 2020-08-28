@@ -128,6 +128,9 @@ public:
     virtual void SetHasShadow(bool hasShadow);
 
     GARCH_API
+    virtual bool HasIntensity() const;
+    GARCH_API
+    virtual void SetHasIntensity(bool hasIntensity);
     virtual bool IsCameraSpaceLight() const;
     GARCH_API
     virtual void SetIsCameraSpaceLight(bool isCameraSpaceLight);
@@ -169,6 +172,7 @@ private:
     float _spotFalloff;
     GfVec3f _attenuation;
     bool _isCameraSpaceLight;
+    bool _hasIntensity;
 
     bool _hasShadow;
     int _shadowResolution;
