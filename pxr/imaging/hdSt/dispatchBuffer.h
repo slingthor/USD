@@ -92,7 +92,7 @@ class HdStDispatchBuffer : public HdBufferArray {
 public:
     /// Constructor. commandNumUints is given in how many integers.
     HDST_API
-    HdStDispatchBuffer(HdStResourceRegistry* _resourceRegistry,
+    HdStDispatchBuffer(HdStResourceRegistry* resourceRegistry,
                        TfToken const &role,
                        int count,
                        unsigned int commandNumUints);
@@ -162,7 +162,7 @@ protected:
                                                int stride);
 
 private:
-    class HdStResourceRegistry *_resourceRegistry;
+    HdStResourceRegistry *_resourceRegistry;
     int _count;
     unsigned int _commandNumUints;
     HdStBufferResourceNamedList _resourceList;

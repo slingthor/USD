@@ -183,29 +183,31 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
             // Take a copy of the simple light into our temporary array and
             // update it with viewer-dependant values.
             VtValue vtLightParams = light->Get(HdLightTokens->params);
-                _simpleLights.push_back(
-                    vtLightParams.GetWithDefault<GarchSimpleLight>(GarchSimpleLight()));
+            GarchSimpleLight glfl = 
+                vtLightParams.GetWithDefault<GarchSimpleLight>(GarchSimpleLight());
 
-            // Get a reference to the light, so we can patch it.
-            GarchSimpleLight &garchl = _simpleLights.back();
+            // Skip lights with zero intensity
+            if (!glfl.HasIntensity()) {
+                continue;
+            }
 
             // XXX: Pass id of light to Glf simple light, so that
             // glim can get access back to the light prim.
-            garchl.SetID(light->GetId());
+            glfl.SetID(light->GetId());
 
             // If the light is in camera space we need to transform
             // the position and spot direction to world space for
             // HdStSimpleLightingShader.
-            if (garchl.IsCameraSpaceLight()) {
-                GfVec4f lightPos = garchl.GetPosition();
-                garchl.SetPosition(lightPos * viewInverseMatrix);
-                GfVec3f lightDir = garchl.GetSpotDirection();
-                garchl.SetSpotDirection(viewInverseMatrix.TransformDir(lightDir));
+            if (glfl.IsCameraSpaceLight()) {
+                GfVec4f lightPos = glfl.GetPosition();
+                glfl.SetPosition(lightPos * viewInverseMatrix);
+                GfVec3f lightDir = glfl.GetSpotDirection();
+                glfl.SetSpotDirection(viewInverseMatrix.TransformDir(lightDir));
 
                 // Since the light position has been transformed to world space,
                 // record that it's no longer a camera-space light for any
                 // downstream consumers of the lighting context.
-                garchl.SetIsCameraSpaceLight(false);
+                glfl.SetIsCameraSpaceLight(false);
             }
 
             VtValue vLightShadowParams = 
@@ -219,14 +221,14 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
             // doing so we guarantee that shadowIndex will be -1
             // which will not create memory for the shadow maps 
             if (!_enableShadows || !lightShadowParams.enabled) {
-                garchl.SetHasShadow(false);
+                glfl.SetHasShadow(false);
             } 
 
             // Setup the rest of the light parameters necessary 
             // to calculate shadows.
-            if (garchl.HasShadow()) {
+            if (glfl.HasShadow()) {
                 if (!TF_VERIFY(lightShadowParams.shadowMatrix)) {
-                    garchl.SetHasShadow(false);
+                    glfl.SetHasShadow(false);
                     continue;
                 }
 
@@ -235,24 +237,25 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
                                                             windowPolicy);
 
                 if (shadowMatrices.size() == 0) {
-                    garchl.SetHasShadow(false);
+                    glfl.SetHasShadow(false);
                     continue;
                 }
 
-                garchl.SetShadowIndexStart(shadowIndex + 1);
-                garchl.SetShadowIndexEnd(shadowIndex + shadowMatrices.size());
+                glfl.SetShadowIndexStart(shadowIndex + 1);
+                glfl.SetShadowIndexEnd(shadowIndex + shadowMatrices.size());
                 shadowIndex += shadowMatrices.size();
 
-                garchl.SetShadowMatrices(shadowMatrices);
-                garchl.SetShadowBias(lightShadowParams.bias);
-                garchl.SetShadowBlur(lightShadowParams.blur);
-                garchl.SetShadowResolution(lightShadowParams.resolution);
+                glfl.SetShadowMatrices(shadowMatrices);
+                glfl.SetShadowBias(lightShadowParams.bias);
+                glfl.SetShadowBlur(lightShadowParams.blur);
+                glfl.SetShadowResolution(lightShadowParams.resolution);
 
                 for (size_t i = 0; i < shadowMatrices.size(); ++i) {
                     shadowMapResolutions.push_back(
                         GfVec2i(lightShadowParams.resolution));
                 }
             }
+            _simpleLights.push_back(std::move(glfl));
         }
     }
 

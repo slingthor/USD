@@ -38,6 +38,7 @@ GarchSimpleLight::GarchSimpleLight(GfVec4f const & position) :
     _spotFalloff(0.0),
     _attenuation(1.0, 0.0, 0.0),
     _isCameraSpaceLight(false),
+    _hasIntensity(true),
     _hasShadow(false),
     _shadowResolution(512),
     _shadowBias(0.0),
@@ -161,6 +162,18 @@ void
 GarchSimpleLight::SetAttenuation(GfVec3f const & attenuation)
 {
     _attenuation = attenuation;
+}
+
+void
+GarchSimpleLight::SetHasIntensity(bool hasIntensity)
+{
+    _hasIntensity = hasIntensity;
+}
+
+bool
+GarchSimpleLight::HasIntensity() const
+{
+    return _hasIntensity;
 }
 
 bool
@@ -309,6 +322,7 @@ GarchSimpleLight::operator==(const GarchSimpleLight& other) const
         &&  _spotCutoff == other._spotCutoff
         &&  _spotFalloff == other._spotFalloff
         &&  _attenuation == other._attenuation
+        &&  _hasIntensity == other._hasIntensity
         &&  _hasShadow == other._hasShadow
         &&  _shadowResolution == other._shadowResolution
         &&  _shadowBias == other._shadowBias
@@ -339,6 +353,7 @@ std::ostream& operator<<(std::ostream& out, const GarchSimpleLight& v)
         << v._spotCutoff
         << v._spotFalloff
         << v._attenuation
+        << v._hasIntensity
         << v._hasShadow
         << v._shadowResolution
         << v._shadowBias

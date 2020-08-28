@@ -27,7 +27,6 @@ if (PXR_ENABLE_GL_SUPPORT)
     list(APPEND GFX     glf
     			        hgiGL)
     list(APPEND GFXADDITIONAL   GL/codeGenGLSL
-                        GL/drawTargetTextureResourceGL
                         GL/glslProgramGL
                         GL/indirectDrawBatchGL
                         GL/renderPassShaderGL
@@ -45,7 +44,6 @@ if (PXR_ENABLE_METAL_SUPPORT)
     list(APPEND GFX     mtlf
                         hgiMetal)
     list(APPEND GFXADDITIONAL  Metal/codeGenMSL
-                        Metal/drawTargetTextureResourceMetal
                         Metal/indirectDrawBatchMetal
                         Metal/metalConversions
                         Metal/glslProgramMetal
@@ -81,7 +79,6 @@ pxr_library(hdSt
         bufferArrayRange
         bufferResource
         commandBuffer
-        computeShader
         copyComputation
         debugCodes
         dispatchBuffer
@@ -89,8 +86,6 @@ pxr_library(hdSt
         drawItem
         drawItemInstance
         drawTarget
-        drawTargetAttachmentDesc
-        drawTargetAttachmentDescArray
         drawTargetRenderPassState
         dynamicUvTextureObject
         extComputation
@@ -160,9 +155,9 @@ pxr_library(hdSt
         basisCurvesShaderKey
         basisCurvesTopology
         codeGen
+        computeShader
         cullingShaderKey
         drawBatch
-        drawTargetTextureResource
         imageShaderShaderKey
         immediateDrawBatch
         indirectDrawBatch

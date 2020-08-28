@@ -57,11 +57,6 @@ public:
     HDST_API
     virtual HdSt_CodeGen *NewCodeGen(
         HdStShaderCodeSharedPtrVector const &shaders) const override;
-
-    /// Creates a draw target texture resource for OpenGL
-    HDST_API
-    virtual HdStTextureResourceSharedPtr
-        NewDrawTargetTextureResource() const override;
     
     /// Creates an indirect draw batch for OpenGL
     HDST_API

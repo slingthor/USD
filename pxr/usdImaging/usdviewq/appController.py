@@ -930,6 +930,9 @@ class AppController(QtCore.QObject):
             self._ui.actionEnable_Scene_Materials.triggered.connect(
                 self._toggleEnableSceneMaterials)
 
+            self._ui.actionEnable_Scene_Lights.triggered.connect(
+                self._toggleEnableSceneLights)
+
             self._ui.actionCull_Backfaces.triggered.connect(
                 self._toggleCullBackfaces)
 
@@ -2486,6 +2489,10 @@ class AppController(QtCore.QObject):
     def _toggleEnableSceneMaterials(self):
         self._dataModel.viewSettings.enableSceneMaterials = (
             self._ui.actionEnable_Scene_Materials.isChecked())
+
+    def _toggleEnableSceneLights(self):
+        self._dataModel.viewSettings.enableSceneLights = (
+            self._ui.actionEnable_Scene_Lights.isChecked())
 
     def _toggleCullBackfaces(self):
         self._dataModel.viewSettings.cullBackfaces = (
@@ -5046,6 +5053,8 @@ class AppController(QtCore.QObject):
     def _refreshViewMenu(self):
         self._ui.actionEnable_Scene_Materials.setChecked(
             self._dataModel.viewSettings.enableSceneMaterials)
+        self._ui.actionEnable_Scene_Lights.setChecked(
+            self._dataModel.viewSettings.enableSceneLights)
         self._ui.actionDisplay_PrimId.setChecked(
             self._dataModel.viewSettings.displayPrimId)
         self._ui.actionCull_Backfaces.setChecked(

@@ -124,9 +124,6 @@ HdStExtCompGpuComputation::Execute(
             "GPU computation '%s' executed for primvars: %s\n",
             _id.GetText(), _GetDebugPrimvarNames(_compPrimvars).c_str());
 
-    // XXX Submit any work recorded before this call since we are using raw gl
-    // calls below. If we don't submit Hgi work, things are out of order.
-    // Needs to be converted to Hgi.
     HdStResourceRegistry* hdStResourceRegistry =
         static_cast<HdStResourceRegistry*>(resourceRegistry);
     HdStGLSLProgramSharedPtr const &computeProgram = _resource->GetProgram();
@@ -139,8 +136,6 @@ HdStExtCompGpuComputation::Execute(
     // APPLE METAL: Temp until codeGen uses Hgi
     HdSt_ResourceBinderMetal const &rbm = static_cast<const HdSt_ResourceBinderMetal&>(binder);
     binder.IntrospectBindings(computeProgram);
-
-    HgiShaderProgramHandle const& hgiProgram = computeProgram->GetProgram();
 
     HdStBufferArrayRangeSharedPtr outputBar =
         std::static_pointer_cast<HdStBufferArrayRange>(outputRange);
@@ -170,9 +165,8 @@ HdStExtCompGpuComputation::Execute(
             _uniforms.push_back(buffer->GetOffset() / componentSize);
             // Assumes non-SSBO allocator for the stride
             _uniforms.push_back(buffer->GetStride() / componentSize);
-            
-            // APPLE METAL: FIX THIS UP WITH PROPER COMBINER
-            rbHash += TfHash::Combine(buffer->GetId().Get());
+
+            rbHash = TfHash::Combine(rbHash, buffer->GetId().Get());
         }
     }
 
@@ -198,19 +192,18 @@ HdStExtCompGpuComputation::Execute(
                 //    buffer->GetStride() / buffer->GetComponentSize());
                 // This is correct for the SSBO allocator only
                 _uniforms.push_back(HdGetComponentCount(tupleType.type));
-                
+
                 if (binding.GetType() != HdBinding::SSBO) {
                     TF_RUNTIME_ERROR(
                         "Unsupported binding type %d for ExtComputation",
                         binding.GetType());
                 }
 
-                // APPLE METAL: FIX THIS UP WITH PROPER COMBINER
-                rbHash += TfHash::Combine(buffer->GetId().Get());
+                rbHash = TfHash::Combine(rbHash, buffer->GetId().Get());
             }
         }
     }
-    
+
     Hgi* hgi = hdStResourceRegistry->GetHgi();
 
     // Prepare uniform buffer for GPU computation
@@ -240,28 +233,20 @@ HdStExtCompGpuComputation::Execute(
         HgiResourceBindingsDesc resourceDesc;
         resourceDesc.debugName = "ExtComputation";
 
-        for (HdExtComputationPrimvarDescriptor const &compPrimvar: _compPrimvars) {
-            TfToken const & name = compPrimvar.sourceComputationOutputName;
+        for (HdExtComputationPrimvarDescriptor const& compPvar: _compPrimvars) {
+            TfToken const & name = compPvar.sourceComputationOutputName;
             HdStBufferResourceSharedPtr const & buffer =
-                    outputBar->GetResource(compPrimvar.name);
+                    outputBar->GetResource(compPvar.name);
 
             HdBinding const &binding = binder.GetBinding(name);
             // These should all be valid as they are required outputs
             if (TF_VERIFY(binding.IsValid()) && TF_VERIFY(buffer->GetId())) {
-                size_t componentSize = HdDataSizeOfType(
-                    HdGetComponentType(buffer->GetTupleType().type));
-
-                uint32_t location = binding.GetLocation();
-
-                // APPLE METAL: Temp until codeGen uses Hgi
-                location = rbm.GetLocation(name);
-                
                 _AppendResourceBindings(
-                    &resourceDesc, buffer->GetId(), location);
+                    &resourceDesc, buffer->GetId(), binding.GetLocation());
             }
         }
 
-        for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
+    for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
             HdStBufferArrayRangeSharedPtr const & inputBar =
                 std::static_pointer_cast<HdStBufferArrayRange>(input);
 
@@ -273,17 +258,11 @@ HdStExtCompGpuComputation::Execute(
                 HdBinding const &binding = binder.GetBinding(name);
                 // These should all be valid as they are required inputs
                 if (TF_VERIFY(binding.IsValid())) {
-                    uint32_t location = binding.GetLocation();
-
-                    // APPLE METAL: Temp until codeGen uses Hgi
-                    location = rbm.GetLocation(name);
-                    
                     _AppendResourceBindings(
-                        &resourceDesc, buffer->GetId(), location);
+                        &resourceDesc, buffer->GetId(), binding.GetLocation());
                 }
             }
         }
-        
         HgiResourceBindingsSharedPtr rb =
             std::make_shared<HgiResourceBindingsHandle>(
                 hgi->CreateResourceBindings(resourceDesc));
@@ -294,8 +273,8 @@ HdStExtCompGpuComputation::Execute(
     HgiResourceBindingsSharedPtr const& resourceBindindsPtr =
         resourceBindingsInstance.GetValue();
     HgiResourceBindingsHandle resourceBindings = *resourceBindindsPtr.get();
+    HgiComputeCmdsUniquePtr computeCmds = hgi->CreateComputeCmds();
 
-    HgiComputeCmds* computeCmds = hdStResourceRegistry->GetComputeCmds();
     computeCmds->PushDebugGroup("ExtComputation");
     computeCmds->BindResources(resourceBindings);
     computeCmds->BindPipeline(pipeline);
@@ -311,6 +290,7 @@ HdStExtCompGpuComputation::Execute(
     computeCmds->Dispatch(GetDispatchCount(), 1);
 
     computeCmds->PopDebugGroup();
+    hgi->SubmitCmds(computeCmds.get());
 }
 
 void
@@ -355,7 +335,7 @@ HdStExtCompGpuComputation::CreateGpuComputation(
         std::dynamic_pointer_cast<HdStResourceRegistry>(
                               renderIndex.GetResourceRegistry());
 
-    HdStComputeShaderSharedPtr shader(new HdStComputeShader());
+    HdSt_ComputeShaderSharedPtr shader(new HdSt_ComputeShader());
     shader->SetComputeSource(sourceComp->GetGpuKernelSource());
 
     // Map the computation outputs onto the destination primvar types

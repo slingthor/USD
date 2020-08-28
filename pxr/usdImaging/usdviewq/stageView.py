@@ -1412,6 +1412,7 @@ class StageView(QtOpenGL.QGLWidget):
         self._renderParams.enableSampleAlphaToCoverage = not self._dataModel.viewSettings.displayPrimId
         self._renderParams.highlight = renderSelHighlights
         self._renderParams.enableSceneMaterials = self._dataModel.viewSettings.enableSceneMaterials
+        self._renderParams.enableSceneLights = self._dataModel.viewSettings.enableSceneLights
         self._renderParams.colorCorrectionMode = self._dataModel.viewSettings.colorCorrectionMode
         self._renderParams.clearColor = Gf.Vec4f(self._dataModel.viewSettings.clearColor)
 
@@ -2156,6 +2157,7 @@ class StageView(QtOpenGL.QGLWidget):
         self._renderParams.enableIdRender = True
         self._renderParams.enableSampleAlphaToCoverage = False
         self._renderParams.enableSceneMaterials = self._dataModel.viewSettings.enableSceneMaterials
+        self._renderParams.enableSceneLights = self._dataModel.viewSettings.enableSceneLights
 
         results = renderer.TestIntersection(
                 pickFrustum.ComputeViewMatrix(),

@@ -26,15 +26,12 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HgiBlitCmds::HgiBlitCmds()
-{
-}
+HgiBlitCmds::HgiBlitCmds() = default;
 
-HgiBlitCmds::~HgiBlitCmds()
-{
-}
+HgiBlitCmds::~HgiBlitCmds() = default;
 
-void HgiBlitCmds::QueueCopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp)
+void
+HgiBlitCmds::QueueCopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp)
 {
     if (copyOp.byteSize == 0 ||
         !copyOp.cpuSourceBuffer ||
@@ -57,8 +54,7 @@ void HgiBlitCmds::QueueCopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp)
         if (copyOp.destinationByteOffset == bufferEntry.end) {
             // Accumulate the copy
             bufferEntry.end += copyOp.byteSize;
-        }
-        else {
+        } else {
             // This buffer copy doesn't contiguously extend the queued copy
             // Submit the accumulated work to date
             HgiBufferCpuToGpuOp op;
@@ -73,17 +69,16 @@ void HgiBlitCmds::QueueCopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp)
             bufferEntry.start = copyOp.destinationByteOffset;
             bufferEntry.end = copyOp.destinationByteOffset + copyOp.byteSize;
         }
-    }
-    else
-    {
+    } else {
         uint64_t const start = copyOp.destinationByteOffset;
         uint64_t const end = copyOp.destinationByteOffset + copyOp.byteSize;
         queuedBuffers.emplace(copyOp.gpuDestinationBuffer.Get(),
             BufferFlushListEntry(copyOp.gpuDestinationBuffer, start, end));
     }
 }
-                                        
-void HgiBlitCmds::FlushQueuedCopies()
+
+void
+HgiBlitCmds::FlushQueuedCopies()
 {
     HgiBufferCpuToGpuOp op;
     for(auto &copy: queuedBuffers) {

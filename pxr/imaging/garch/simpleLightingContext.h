@@ -57,7 +57,7 @@ public:
     GARCH_API
     void SetLights(GarchSimpleLightVector const & lights);
     GARCH_API
-    GarchSimpleLightVector & GetLights();
+    GarchSimpleLightVector const & GetLights() const;
 
     // returns the effective number of lights taken into account
     // in composable/compatible shader constraints
@@ -72,7 +72,7 @@ public:
     GARCH_API
     void SetShadows(GarchSimpleShadowArrayRefPtr const & shadows);
     GARCH_API
-    GarchSimpleShadowArrayRefPtr const & GetShadows();
+    GarchSimpleShadowArrayRefPtr const & GetShadows() const;
 
     GARCH_API
     void SetMaterial(GarchSimpleMaterial const & material);

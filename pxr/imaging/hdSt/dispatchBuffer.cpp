@@ -219,7 +219,8 @@ HdStDispatchBuffer::CopyData(std::vector<GLuint> const &data)
     HD_PERF_COUNTER_INCR(HdStPerfTokens->copyBufferCpuToGpu);
 
     // Use blit op to copy over the data.
-    HgiBlitCmds* blitCmds = _resourceRegistry->GetBlitCmds();
+    Hgi* hgi = _resourceRegistry->GetHgi();
+    HgiBlitCmdsUniquePtr blitCmds = hgi->CreateBlitCmds();
     HgiBufferCpuToGpuOp blitOp;
     blitOp.byteSize = _entireResource->GetSize();
     blitOp.cpuSourceBuffer = data.data();
@@ -227,6 +228,7 @@ HdStDispatchBuffer::CopyData(std::vector<GLuint> const &data)
     blitOp.gpuDestinationBuffer = _entireResource->GetId();
     blitOp.destinationByteOffset = 0;
     blitCmds->CopyBufferCpuToGpu(blitOp);
+    hgi->SubmitCmds(blitCmds.get());
 }
 
 void

@@ -105,8 +105,8 @@ GarchSimpleLightingContext::SetLights(GarchSimpleLightVector const & lights)
     }
 }
 
-GarchSimpleLightVector &
-GarchSimpleLightingContext::GetLights()
+const GarchSimpleLightVector &
+GarchSimpleLightingContext::GetLights() const
 {
     return _lights;
 }
@@ -137,7 +137,7 @@ GarchSimpleLightingContext::SetShadows(GarchSimpleShadowArrayRefPtr const & shad
 }
 
 GarchSimpleShadowArrayRefPtr const &
-GarchSimpleLightingContext::GetShadows()
+GarchSimpleLightingContext::GetShadows() const
 {
     return _shadows;
 }

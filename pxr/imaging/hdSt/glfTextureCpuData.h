@@ -46,14 +46,16 @@ TF_DECLARE_REF_PTRS(GarchBaseTextureData);
 class HdStGlfTextureCpuData : public HdStTextureCpuData
 {
 public:
+    /// It is assumed that Read(...) has already been called
+    /// on textureData.
+
     HDST_API
     HdStGlfTextureCpuData(
         GarchBaseTextureDataRefPtr const &textureData,
         const std::string &debugName,
-        bool generateMips = false,
+        bool useOrGenerateMips = false,
         bool premultiplyAlpha = true,
         GarchImage::ImageOriginLocation originLoc = GarchImage::OriginUpperLeft);
-    
     HDST_API
     ~HdStGlfTextureCpuData();
     
@@ -61,31 +63,26 @@ public:
     const HgiTextureDesc &GetTextureDesc() const override;
 
     HDST_API
+    bool GetGenerateMipmaps() const override;
+
+    HDST_API
     bool IsValid() const override;
 
 private:
-    // Determine format for texture descriptor.
-    //
-    // If necessary, converts the RGB to RGBA data or pre-multiplies by alpha,
-    // updating _textureDesc.initialData to point to the newly allocated data
-    // (and dropping _textureData).
-    //
-    HgiFormat _DetermineFormatAndConvertIfNecessary(
-        const GLenum glFormat,
-        const GLenum glType,
-        const GLenum glInternalFormat,
-        const bool premultiplyAlpha);
-
     // The result, including a pointer to the potentially
     // converted texture data in _textureDesc.initialData.
     HgiTextureDesc _textureDesc;
+
+    // If true, initialData only contains mip level 0 data
+    // and the GPU is supposed to generate the other mip levels.
+    bool _generateMipmaps;
 
     // To avoid a copy, hold on to original data if we
     // can use them.
     GarchBaseTextureDataRefPtr _textureData;
 
     // Buffer if we had to convert the data.
-    std::unique_ptr<const unsigned char[]> _convertedRawData;
+    std::unique_ptr<const unsigned char[]> _convertedData;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

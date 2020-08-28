@@ -80,7 +80,7 @@ public:
     /// will cache and de-duplicate its compute shader instance with.
     HdStExtCompGpuComputationResource(
         HdBufferSpecVector const &outputBufferSpecs,
-        HdStComputeShaderSharedPtr const &kernel,
+        HdSt_ComputeShaderSharedPtr const &kernel,
         HdBufferArrayRangeSharedPtrVector const &inputs,
         HdStResourceRegistrySharedPtr const &registry
     );
@@ -116,7 +116,7 @@ public:
 
 private:
     HdBufferSpecVector                    _outputBufferSpecs;
-    HdStComputeShaderSharedPtr            _kernel;
+    HdSt_ComputeShaderSharedPtr            _kernel;
     HdStResourceRegistrySharedPtr         _registry;
     
     size_t                                _shaderSourceHash;

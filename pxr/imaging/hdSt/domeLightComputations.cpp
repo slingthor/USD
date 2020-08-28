@@ -62,7 +62,7 @@ static
 void
 _FillPixelsByteSize(HgiTextureDesc * const desc)
 {
-    const size_t s = HgiDataSizeOfFormat(desc->format);
+    const size_t s = HgiGetDataSizeOfFormat(desc->format);
     desc->pixelsByteSize =
         s * desc->dimensions[0] * desc->dimensions[1] * desc->dimensions[2];
 }
@@ -228,8 +228,7 @@ HdSt_DomeLightComputationGPU::Execute(
         desc.shaderConstantsDesc.byteSize = sizeof(uniform);
     }
     HgiComputePipelineHandle pipeline = hgi->CreateComputePipeline(desc);
-
-    HgiComputeCmds* computeCmds = hdStResourceRegistry->GetComputeCmds();
+    HgiComputeCmdsUniquePtr computeCmds = hgi->CreateComputeCmds();
     computeCmds->PushDebugGroup("DomeLightComputationCmds");
     computeCmds->BindResources(resourceBindings);
     computeCmds->BindPipeline(pipeline);
@@ -249,8 +248,9 @@ HdSt_DomeLightComputationGPU::Execute(
     else {
         computeCmds->Dispatch(width / 32, height / 32);
     }
-    
+
     computeCmds->PopDebugGroup();
+    hgi->SubmitCmds(computeCmds.get());
 
     // destroy the intermediate resources
     hgi->DestroySampler(&sampler);

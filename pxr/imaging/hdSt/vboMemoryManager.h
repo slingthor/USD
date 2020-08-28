@@ -235,7 +235,7 @@ protected:
     public:
         /// Constructor.
         HDST_API
-        _StripedBufferArray(HdStResourceRegistry* _resourceRegistry,
+        _StripedBufferArray(HdStResourceRegistry* resourceRegistry,
                             TfToken const &role,
                             HdBufferSpecVector const &bufferSpecs,
                             HdBufferArrayUsageHint usageHint);

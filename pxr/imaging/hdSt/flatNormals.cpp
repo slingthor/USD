@@ -300,8 +300,8 @@ HdSt_FlatNormalsComputationGPU::Execute(
         computePipelineInstance.GetValue();
     HgiComputePipelineHandle pipeline = *pipelinePtr.get();
 
-    HgiComputeCmds* computeCmds = hdStResourceRegistry->GetComputeCmds();
-    computeCmds->PushDebugGroup("Flat Normals Encoder");
+    HgiComputeCmdsUniquePtr computeCmds = hgi->CreateComputeCmds();
+    computeCmds->PushDebugGroup("Flat Normals Cmds");
     computeCmds->BindResources(resourceBindings);
     computeCmds->BindPipeline(pipeline);
 
@@ -318,6 +318,7 @@ HdSt_FlatNormalsComputationGPU::Execute(
 
     // submit the work
     computeCmds->PopDebugGroup();
+    hgi->SubmitCmds(computeCmds.get());
 }
 
 void

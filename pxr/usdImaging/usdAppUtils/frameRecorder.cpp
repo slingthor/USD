@@ -142,7 +142,7 @@ _ReadbackTexture(Hgi* const hgi,
                  std::vector<uint8_t>& buffer)
 {
     const HgiTextureDesc& textureDesc = textureHandle.Get()->GetDescriptor();
-    const size_t formatByteSize = HgiDataSizeOfFormat(textureDesc.format);
+    const size_t formatByteSize = HgiGetDataSizeOfFormat(textureDesc.format);
     const size_t width = textureDesc.dimensions[0];
     const size_t height = textureDesc.dimensions[1];
     const size_t dataByteSize = width * height * formatByteSize;
@@ -213,7 +213,7 @@ _WriteTextureToFile(HgiTextureDesc const& textureDesc,
                     std::string const& filename,
                     const bool flipped)
 {
-    const size_t formatByteSize = HgiDataSizeOfFormat(textureDesc.format);
+    const size_t formatByteSize = HgiGetDataSizeOfFormat(textureDesc.format);
     const size_t width = textureDesc.dimensions[0];
     const size_t height = textureDesc.dimensions[1];
     const size_t dataByteSize = width * height * formatByteSize;

@@ -93,7 +93,10 @@ public:
 protected:
     HGI_API
     HgiBlitCmds();
-    
+
+    /// Flush any queued buffer data copies to GPU.
+    /// This will copy the new buffer data from staging area to GPU.
+    HGI_API
     void FlushQueuedCopies();
 
 private:

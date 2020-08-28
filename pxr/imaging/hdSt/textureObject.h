@@ -160,6 +160,7 @@ protected:
     HdStTextureCpuData * _GetCpuData() const;
 
     void _CreateTexture(const HgiTextureDesc &desc);
+    void _GenerateMipmaps();
     void _DestroyTexture();
 
 private:
