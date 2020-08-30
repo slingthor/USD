@@ -319,11 +319,6 @@ _AssetCpuData::_AssetCpuData(
         return;
     }
 
-    // Read texture file
-    if (!textureData->Read(0, generateMips, originLocation)) {
-        return;
-    }
-
     // Sanity checks
     if (!_IsValid(textureData)) {
         return;
