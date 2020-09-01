@@ -33,7 +33,6 @@
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/simpleLightingShader.h"
-#include "pxr/imaging/glf/drawTarget.h"
 //#include "pxr/imaging/glf/diagnostic.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
