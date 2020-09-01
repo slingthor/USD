@@ -534,7 +534,7 @@ static HdSt_CodeGenMSL::TParam& _AddInputPtrParam(
 {
     return _AddInputPtrParam(inputParams,
                         bd.name, bd.dataType, attribute,
-                        bd.binding, arraySize, programScope);
+                        bd.binding, arraySize, programScope, bd.writable);
 }
 
 static void _EmitDeclaration(std::stringstream &str,
@@ -3525,7 +3525,7 @@ HdSt_CodeGenMSL::_GenerateBindingsCode()
             if (binDecl->binding.GetType() == HdBinding::SSBO)
             {
                 indexStr = "localIndex";
-                if (binDecl->typeIsAtomic)
+                if (binDecl->typeIsAtomic || binDecl->writable)
                 {
                     _EmitDeclarationMutablePtr(_genCommon, *binDecl);
                 }

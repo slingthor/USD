@@ -793,7 +793,7 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
                     auto tupleType = nameRes.second->GetTupleType().type;
                     auto glslTypename = HdStGLConversions::GetGLSLTypename(tupleType);
                     BindingDeclaration b(nameRes.first, glslTypename,
-                        binding, HdStGLConversions::TypeIsAtomic(tupleType));
+                        binding, HdStGLConversions::TypeIsAtomic(tupleType), it->isWritable());
                     metaDataOut->customBindings.push_back(b);
                     _bindingMap[nameRes.first] = binding;
                 }

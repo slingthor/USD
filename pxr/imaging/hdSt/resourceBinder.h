@@ -247,18 +247,20 @@ public:
             BindingDeclaration(TfToken const &name,
                          TfToken const &dataType,
                          HdBinding binding)
-            : name(name), dataType(dataType), binding(binding), typeIsAtomic(false) {}
+            : name(name), dataType(dataType), binding(binding), typeIsAtomic(false), writable(false) {}
             
             BindingDeclaration(TfToken const &name,
                                TfToken const &dataType,
                                HdBinding binding,
-                               bool isAtomic)
-            : name(name), dataType(dataType), binding(binding), typeIsAtomic(isAtomic) {}
+                               bool isAtomic,
+                               bool isWritable)
+            : name(name), dataType(dataType), binding(binding), typeIsAtomic(isAtomic), writable(isWritable) {}
             
             TfToken name;
             TfToken dataType;
             HdBinding binding;
             bool typeIsAtomic;
+            bool writable;
         };
 
         // -------------------------------------------------------------------
