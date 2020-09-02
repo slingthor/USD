@@ -1436,10 +1436,8 @@ class StageView(QtOpenGL.QGLWidget):
     def initializeGL(self):
         if not self.isValid():
             return
-        from pxr import Glf
-        if not Glf.GlewInit():
-            return
-        Glf.RegisterDefaultDebugOutputMessageCallback()
+        from pxr import Mtlf
+        Mtlf.RegisterDefaultDebugOutputMessageCallback()
 
     def updateGL(self):
         """We override this virtual so that we can make it a no-op during
