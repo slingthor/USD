@@ -260,7 +260,7 @@ HdSt_DomeLightComputationGPU::Execute(
     hgi->SubmitCmds(computeCmds.get());
 
     // destroy the intermediate resources
-    hgi->DestroyTexture(&dstTextureView);
+    hgi->DestroyTextureView(&dstTextureView);
     hgi->DestroyComputePipeline(&pipeline);
     hgi->DestroyResourceBindings(&resourceBindings);
 }

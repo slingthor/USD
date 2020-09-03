@@ -168,12 +168,6 @@ public:
     HGI_API
     virtual HgiTextureHandle CreateTexture(HgiTextureDesc const & desc) = 0;
 
-    /// Create a texture view in rendering backend.
-    /// Thread safety: Creation must happen on main thread. See notes above.
-    HGI_API
-    virtual HgiTextureHandle CreateTextureView(
-        HgiTextureViewDesc const & desc) = 0;
-    
     /// Destroy a texture in rendering backend.
     /// Thread safety: Destruction must happen on main thread. See notes above.
     HGI_API
