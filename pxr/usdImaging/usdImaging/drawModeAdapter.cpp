@@ -469,16 +469,8 @@ UsdImagingDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
         valueCache->GetTransform(cachePath) = GetTransform(prim, time);
     }
 
-    if (requestedBits & HdChangeTracker::DirtyVisibility) {
-        valueCache->GetVisible(cachePath) = GetVisible(prim, time);
-    }
-
     if (requestedBits & HdChangeTracker::DirtyDoubleSided) {
         valueCache->GetDoubleSided(cachePath) = false;
-    }
-
-    if (requestedBits & HdChangeTracker::DirtyCullStyle) {
-        valueCache->GetCullStyle(cachePath) = HdCullStyleBack;
     }
 
     if (requestedBits & HdChangeTracker::DirtyMaterialId) {
@@ -537,7 +529,7 @@ UsdImagingDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
         if (cardGeometryAttr)
             cardGeometryAttr.Get(&cardGeometry);
 
-        VtValue& topology = valueCache->GetTopology(cachePath);
+        VtValue topology;   // Removed from valueCache.
         VtValue& points = valueCache->GetPoints(cachePath);
         GfRange3d& extent = valueCache->GetExtent(cachePath);
 

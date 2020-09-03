@@ -163,21 +163,34 @@ HgiMetal::CreateTexture(HgiTextureDesc const & desc)
     return HgiTextureHandle(new HgiMetalTexture(this, desc), GetUniqueId());
 }
 
-HgiTextureHandle
-HgiMetal::CreateTextureView(
-    HgiTextureViewDesc const & desc)
+void
+HgiMetal::DestroyTexture(HgiTextureHandle* texHandle)
+{
+    _TrashObject(texHandle);
+}
+
+HgiTextureViewHandle
+HgiMetal::CreateTextureView(HgiTextureViewDesc const & desc)
 {
     if (!desc.sourceTexture) {
         TF_CODING_ERROR("Source texture is null");
     }
 
-    return HgiTextureHandle(new HgiMetalTexture(this, desc), GetUniqueId());
+    HgiTextureHandle src =
+        HgiTextureHandle(new HgiMetalTexture(this, desc), GetUniqueId());
+    HgiTextureView* view = new HgiTextureView(desc);
+    view->SetViewTexture(src);
+    return HgiTextureViewHandle(view, GetUniqueId());
 }
 
 void
-HgiMetal::DestroyTexture(HgiTextureHandle* texHandle)
+HgiMetal::DestroyTextureView(HgiTextureViewHandle* viewHandle)
 {
-    _TrashObject(texHandle);
+    // Trash the texture inside the view and invalidate the view handle.
+    HgiTextureHandle texHandle = (*viewHandle)->GetViewTexture();
+    _TrashObject(&texHandle);
+    delete viewHandle->Get();
+    (*viewHandle)->SetViewTexture(HgiTextureHandle());
 }
 
 HgiSamplerHandle

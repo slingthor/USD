@@ -81,8 +81,9 @@ public:
     /// expected to create one or more prims in the render index using the
     /// given proxy.
     virtual SdfPath Populate(UsdPrim const& prim,
-                UsdImagingIndexProxy* index,
-                UsdImagingInstancerContext const* instancerContext = NULL) = 0;
+                             UsdImagingIndexProxy* index,
+                             UsdImagingInstancerContext const*
+                                 instancerContext = nullptr) = 0;
 
     // Indicates whether population traversal should be pruned based on
     // prim-specific features (like whether it's imageable).
@@ -150,7 +151,7 @@ public:
                                   SdfPath const& cachePath,
                                   HdDirtyBits* timeVaryingBits,
                                   UsdImagingInstancerContext const* 
-                                      instancerContext = NULL) const = 0;
+                                      instancerContext = nullptr) const = 0;
 
     /// Populates the \p cache for the given \p prim, \p time and \p
     /// requestedBits.
@@ -161,7 +162,7 @@ public:
                                UsdTimeCode time,
                                HdDirtyBits requestedBits,
                                UsdImagingInstancerContext const* 
-                                   instancerContext = NULL) const = 0;
+                                   instancerContext = nullptr) const = 0;
 
     // ---------------------------------------------------------------------- //
     /// \name Change Processing 
@@ -384,7 +385,10 @@ public:
     /// visibility values. Inherited values are strongest, Usd has no notion of
     /// "super vis/invis".
     USDIMAGING_API
-    bool GetVisible(UsdPrim const& prim, UsdTimeCode time) const;
+    virtual bool GetVisible(
+        UsdPrim const& prim, 
+        SdfPath const& cachePath,
+        UsdTimeCode time) const;
 
     /// Returns the purpose token for \p prim. If an \p instancerContext is 
     /// provided and the prim doesn't have an explicitly authored or inherited 
@@ -411,18 +415,31 @@ public:
 
     /// Samples the transform for the given prim.
     USDIMAGING_API
-    virtual size_t
-    SampleTransform(UsdPrim const& prim,
-                    SdfPath const& cachePath,
-                    UsdTimeCode time,
-                    size_t maxNumSamples, 
-                    float *sampleTimes,
-                    GfMatrix4d *sampleValues);
+    virtual size_t SampleTransform(UsdPrim const& prim,
+                                   SdfPath const& cachePath,
+                                   UsdTimeCode time,
+                                   size_t maxNumSamples, 
+                                   float *sampleTimes,
+                                   GfMatrix4d *sampleValues);
+
+    /// Gets the value of the parameter named key for the given prim (which
+    /// has the given cache path) and given time.
+    USDIMAGING_API
+    virtual VtValue Get(UsdPrim const& prim,
+                        SdfPath const& cachePath,
+                        TfToken const& key,
+                        UsdTimeCode time) const;
+
+    /// Gets the cullstyle of a specific path in the scene graph.
+    USDIMAGING_API
+    virtual HdCullStyle GetCullStyle(UsdPrim const& prim,
+                                     SdfPath const& cachePath,
+                                     UsdTimeCode time) const;
 
     /// Gets the material path for the given prim, walking up namespace if
     /// necessary.  
     USDIMAGING_API
-    SdfPath GetMaterialUsdPath(UsdPrim const& prim) const; 
+    SdfPath GetMaterialUsdPath(UsdPrim const& prim) const;
 
     /// Gets the model:drawMode attribute for the given prim, walking up
     /// the namespace if necessary.
@@ -438,6 +455,15 @@ public:
     VtArray<VtIntArray> GetPerPrototypeIndices(UsdPrim const& prim,
                                                UsdTimeCode time) const;
 
+    /// Gets the topology object of a specific Usd prim. If the
+    /// adapter is a mesh it will return an HdMeshTopology,
+    /// if it is of type basis curves, it will return an HdBasisCurvesTopology.
+    /// If the adapter does not have a topology, it returns an empty VtValue.
+    USDIMAGING_API
+    virtual VtValue GetTopology(UsdPrim const& prim,
+                                SdfPath const& cachePath,
+                                UsdTimeCode time) const;
+
     // ---------------------------------------------------------------------- //
     /// \name Render Index Compatibility
     // ---------------------------------------------------------------------- //
@@ -448,7 +474,7 @@ public:
     }
 
 protected:
-    typedef UsdImagingValueCache::Key Keys;
+    using Keys = UsdImagingValueCache::Key;
 
     template <typename T>
     T _Get(UsdPrim const& prim, TfToken const& attrToken, 

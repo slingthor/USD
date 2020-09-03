@@ -31,7 +31,7 @@
 #include "pxr/base/gf/vec3i.h"
 #include "pxr/imaging/garch/api.h"
 #include "pxr/imaging/garch/image.h"
-#include "pxr/imaging/garch/baseTextureData.h"
+#include "pxr/imaging/garch/fieldTextureData.h"
 
 #include "pxr/base/gf/bbox3d.h"
 
@@ -48,7 +48,7 @@ class GarchVdbTextureData_DenseGridHolderBase;
 /// Implements GlfBaseTextureData to read grid with given name from
 /// OpenVDB file at given path.
 ///
-class GarchVdbTextureData : public GarchBaseTextureData {
+class GarchVdbTextureData final : public GarchFieldTextureData {
 public:
     GARCH_API
     static GarchVdbTextureDataRefPtr
@@ -56,8 +56,8 @@ public:
         std::string const &gridName,
         size_t targetMemory);
 
-    /// See GarchVdbTexture for details
-    const GfBBox3d &GetBoundingBox() const { return _boundingBox; }
+    GARCH_API
+    const GfBBox3d &GetBoundingBox() const override;
 
     GARCH_API
     int NumDimensions() const override;

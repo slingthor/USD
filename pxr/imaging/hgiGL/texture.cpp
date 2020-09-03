@@ -215,8 +215,6 @@ HgiGLTexture::HgiGLTexture(HgiTextureDesc const & desc)
     }
 
     if (desc.sampleCount == HgiSampleCount1) {
-        // XXX sampler state etc should all be set via tex descriptor.
-        //     (probably pass in HgiSamplerHandle in tex descriptor)
         glTextureParameteri(_textureId, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTextureParameteri(_textureId, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTextureParameteri(_textureId, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -307,8 +305,14 @@ HgiGLTexture::HgiGLTexture(HgiTextureViewDesc const & desc)
     : HgiTexture(desc.sourceTexture->GetDescriptor())
     , _textureId(0)
 {
+    // Update the texture descriptor to reflect the view desc
+    _descriptor.debugName = desc.debugName;
+    _descriptor.format = desc.format;
+    _descriptor.layerCount = desc.layerCount;
+    _descriptor.mipLevels = desc.mipLevels;
+
     HgiGLTexture* srcTexture =
-        static_cast<HgiGLTexture*>(desc.sourceTexture);
+        static_cast<HgiGLTexture*>(desc.sourceTexture.Get());
     GLenum glInternalFormat = 0;
 
     if (srcTexture->GetDescriptor().usage & HgiTextureUsageBitsDepthTarget) {
@@ -330,9 +334,22 @@ HgiGLTexture::HgiGLTexture(HgiTextureViewDesc const & desc)
             &glInternalFormat);
     }
 
+    // Note we must use glGenTextures, not glCreateTextures.
+    // glTextureView requires the textureId to be unbound and not given a type.
+    glGenTextures(1, &_textureId);
+
     GLenum textureType =
         HgiGLConversions::GetTextureType(srcTexture->GetDescriptor().type);
-    glCreateTextures(textureType, 1, &_textureId);
+
+    glTextureView(
+        _textureId,
+        textureType,
+        srcTexture->GetTextureId(),
+        glInternalFormat, 
+        desc.sourceFirstMip, 
+        desc.mipLevels,
+        desc.sourceFirstLayer,
+        desc.layerCount);
 
     if (!desc.debugName.empty()) {
         glObjectLabel(GL_TEXTURE, _textureId,-1, desc.debugName.c_str());

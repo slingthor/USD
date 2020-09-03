@@ -163,7 +163,7 @@ UsdSkelImagingSkeletonAdapter::Populate(
         SdfPath instancer = instancerContext ?
             instancerContext->instancerCachePath : SdfPath();
         index->InsertRprim(HdPrimTypeTokens->mesh, prim.GetPath(),
-                        instancer, prim, shared_from_this());
+                           instancer, prim, shared_from_this());
     }
 
     // Insert a computation for each skinned prim targeted by this
@@ -199,7 +199,8 @@ UsdSkelImagingSkeletonAdapter::Populate(
                                     skinnedPrim.GetPath(), instancerContext);
 
             _skinnedPrimDataCache[skinnedPrimPath] =
-                _SkinnedPrimData(skelData->skelQuery, query, skelRootPath);
+                _SkinnedPrimData(skelPath, skelData->skelQuery,
+                                 query, skelRootPath);
 
             SdfPath compPath = _GetSkinningComputationPath(skinnedPrimPath);
 
@@ -672,7 +673,6 @@ UsdSkelImagingSkeletonAdapter::MarkMaterialDirty(const UsdPrim& prim,
     // Nothing to do otherwise.
 }
 
-
 PxOsdSubdivTags
 UsdSkelImagingSkeletonAdapter::GetSubdivTags(UsdPrim const& usdPrim,
                                              SdfPath const& cachePath,
@@ -685,6 +685,31 @@ UsdSkelImagingSkeletonAdapter::GetSubdivTags(UsdPrim const& usdPrim,
     return UsdImagingPrimAdapter::GetSubdivTags(usdPrim, cachePath, time);
 }
 
+/*virtual*/ 
+VtValue
+UsdSkelImagingSkeletonAdapter::GetTopology(UsdPrim const& prim,
+                                           SdfPath const& cachePath,
+                                           UsdTimeCode time) const
+{
+    TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
+
+    if (_IsCallbackForSkeleton(prim)) {
+        // The bone mesh uses the fallback material.
+        _SkelData* skelData = _GetSkelData(cachePath);
+        if (!TF_VERIFY(skelData)) {
+            return VtValue();
+        }
+        return VtValue(skelData->ComputeTopologyAndRestState());
+
+    } else if ( _IsSkinnedPrimPath(cachePath)) {
+        // Since The SkeletonAdapter hijacks callbacks for the skinned prim,
+        // make sure to delegate to the actual adapter registered for the prim.
+        UsdImagingPrimAdapterSharedPtr adapter = _GetPrimAdapter(prim);
+        return adapter->GetTopology(prim, cachePath, time);
+    }
+    return VtValue();
+}
 
 namespace {
 
@@ -1071,12 +1096,9 @@ UsdSkelImagingSkeletonAdapter::_UpdateBoneMeshForTime(
     // the value cache with the necessary info.
     UsdImagingValueCache* valueCache = _GetValueCache();
 
-    if (requestedBits & HdChangeTracker::DirtyTopology) {
-        valueCache->GetTopology(cachePath) =
-            skelData->ComputeTopologyAndRestState();
-    }
-
     if (requestedBits & HdChangeTracker::DirtyPoints) {
+        // Necessary for ComputePoints to work correctly.
+        skelData->ComputeTopologyAndRestState();
         valueCache->GetPoints(cachePath) = skelData->ComputePoints(time);
     }
 
@@ -1088,10 +1110,6 @@ UsdSkelImagingSkeletonAdapter::_UpdateBoneMeshForTime(
         valueCache->GetExtent(cachePath) = _GetExtent(prim, time);
     }
 
-    if (requestedBits & HdChangeTracker::DirtyVisibility) {
-        valueCache->GetVisible(cachePath) = GetVisible(prim, time);
-    }
-    
     if (requestedBits & HdChangeTracker::DirtyPrimvar) {
 
         // Expose points as a primvar.
@@ -2063,13 +2081,13 @@ UsdSkelImagingSkeletonAdapter::_GetSkinnedPrimData(
     return it != _skinnedPrimDataCache.end() ? &it->second : nullptr;
 }
 
-
 UsdSkelImagingSkeletonAdapter::_SkinnedPrimData::_SkinnedPrimData(
+    const SdfPath& skelPath,
     const UsdSkelSkeletonQuery& skelQuery,
     const UsdSkelSkinningQuery& skinningQuery,
     const SdfPath& skelRootPath)
     : skinningQuery(skinningQuery),
-      skelPath(skelQuery.GetPrim().GetPath()),
+      skelPath(skelPath),
       skelRootPath(skelRootPath),
       hasJointInfluences(skinningQuery.HasJointInfluences())
 {

@@ -71,13 +71,16 @@ public:
 
     HGIGL_API
     HgiTextureHandle CreateTexture(HgiTextureDesc const & desc) override;
-    
-    HGIGL_API
-    HgiTextureHandle CreateTextureView(
-        HgiTextureViewDesc const & desc) override;
 
     HGIGL_API
     void DestroyTexture(HgiTextureHandle* texHandle) override;
+
+    HGIGL_API
+    HgiTextureViewHandle CreateTextureView(
+        HgiTextureViewDesc const& desc) override;
+
+    HGIGL_API
+    void DestroyTextureView(HgiTextureViewHandle* viewHandle) override;
 
     HGIGL_API
     HgiSamplerHandle CreateSampler(HgiSamplerDesc const & desc) override;
