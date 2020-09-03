@@ -94,4 +94,22 @@ bool operator!=(const HgiTextureViewDesc& lhs,
     return !(lhs == rhs);
 }
 
+HgiTextureView::HgiTextureView(HgiTextureViewDesc const& desc)
+{
+}
+
+HgiTextureView::~HgiTextureView() = default;
+
+void
+HgiTextureView::SetViewTexture(HgiTextureHandle const& handle)
+{
+    _viewTexture = handle;
+}
+
+HgiTextureHandle const&
+HgiTextureView::GetViewTexture() const
+{
+    return _viewTexture;
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE

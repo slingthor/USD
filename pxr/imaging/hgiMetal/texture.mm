@@ -141,8 +141,8 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
         for (size_t mip = 0; mip < mipLevels; mip++) {
             const HgiMipInfo &mipInfo = mipInfos[mip];
 
-            uint32_t width = mipInfo.dimensions[0];
-            uint32_t height = mipInfo.dimensions[1];
+            const uint32_t width = mipInfo.dimensions[0];
+            const uint32_t height = mipInfo.dimensions[1];
 
             if (desc.type == HgiTextureType2D) {
                 [_textureId replaceRegion:MTLRegionMake2D(0, 0, width, height)
@@ -151,7 +151,7 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
                               bytesPerRow:desc.pixelsByteSize / height];
             }
             else {
-                uint32_t depth = mipInfo.dimensions[2];
+                const uint32_t depth = mipInfo.dimensions[2];
                 [_textureId
                     replaceRegion:MTLRegionMake3D(0, 0, 0, width, height, depth)
                       mipmapLevel:0
@@ -171,7 +171,7 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureViewDesc const & desc)
     , _textureId(nil)
 {
     HgiMetalTexture* srcTexture =
-        static_cast<HgiMetalTexture*>(desc.sourceTexture);
+        static_cast<HgiMetalTexture*>(desc.sourceTexture.Get());
     NSRange levels = NSMakeRange(
         desc.sourceFirstMip, desc.mipLevels);
     NSRange slices = NSMakeRange(

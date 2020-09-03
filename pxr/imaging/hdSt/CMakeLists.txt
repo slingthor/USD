@@ -95,6 +95,7 @@ pxr_library(hdSt
         extCompGpuPrimvarBufferSource
         fallbackLightingShader
         field
+        fieldSubtextureIdentifier
         flatNormals
         geometricShader
         glConversions

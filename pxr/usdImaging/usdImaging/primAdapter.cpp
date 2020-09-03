@@ -1097,18 +1097,46 @@ UsdImagingPrimAdapter::SampleTransform(
     return 1;
 }
 
-bool
-UsdImagingPrimAdapter::GetVisible(UsdPrim const& prim, UsdTimeCode time) const
+VtValue
+UsdImagingPrimAdapter::Get(
+    UsdPrim const& prim,
+    SdfPath const& cachePath,
+    TfToken const &key,
+    UsdTimeCode time) const
 {
-    HD_TRACE_FUNCTION();
+    // XXX: This does not work for point instancer child
+    // prims; while we do not hit this code path given the
+    // current state of the universe, we need to rethink
+    // UsdImagingDelegate::Get().
+    //
+    // XXX(UsdImaging): We use cachePath directly as
+    // usdPath here, but should do the proper
+    // transformation.  Maybe we can use the
+    // primInfo.usdPrim?
 
-    if (_delegate->IsInInvisedPaths(prim.GetPath())) return false;
+    UsdAttribute const &attr = prim.GetAttribute(key);
+    VtValue value;
+    TF_VERIFY(attr && attr.Get(&value, time),
+              "%s, %s\n", cachePath.GetText(), key.GetText());
+
+    return value;
+}
+
+bool
+UsdImagingPrimAdapter::GetVisible(
+    UsdPrim const& prim, 
+    SdfPath const& cachePath, 
+    UsdTimeCode time) const
+{
+    TRACE_FUNCTION();
+
+    if (_delegate->IsInInvisedPaths(prim.GetPath())) {
+        return false;
+    }
 
     UsdImaging_VisCache &visCache = _delegate->_visCache;
-    if (_IsEnabledVisCache() && visCache.GetTime() == time)
-    {
-        return visCache.GetValue(prim)
-                    == UsdGeomTokens->inherited;
+    if (_IsEnabledVisCache() && visCache.GetTime() == time) {
+        return visCache.GetValue(prim) == UsdGeomTokens->inherited;
     } else {
         return UsdImaging_VisStrategy::ComputeVisibility(prim, time)
                     == UsdGeomTokens->inherited;
@@ -1151,6 +1179,14 @@ UsdImagingPrimAdapter::GetInheritablePurpose(UsdPrim const& prim) const
     return purposeInfo.GetInheritablePurpose();
 }
 
+HdCullStyle 
+UsdImagingPrimAdapter::GetCullStyle(UsdPrim const& prim,
+                                    SdfPath const& cachePath,
+                                    UsdTimeCode time) const
+{
+    return HdCullStyleDontCare;
+}
+
 SdfPath
 UsdImagingPrimAdapter::GetMaterialUsdPath(UsdPrim const& prim) const
 {
@@ -1170,6 +1206,15 @@ TfToken
 UsdImagingPrimAdapter::GetModelDrawMode(UsdPrim const& prim)
 {
     return _delegate->_GetModelDrawMode(prim);
+}
+
+/*virtual*/ 
+VtValue 
+UsdImagingPrimAdapter::GetTopology(UsdPrim const& prim,
+                                   SdfPath const& cachePath,
+                                   UsdTimeCode time) const
+{
+    return VtValue();
 }
 
 VtArray<VtIntArray>

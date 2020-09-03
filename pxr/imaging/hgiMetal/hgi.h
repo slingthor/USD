@@ -81,6 +81,13 @@ public:
     void DestroyTexture(HgiTextureHandle* texHandle) override;
 
     HGIMETAL_API
+    HgiTextureViewHandle CreateTextureView(
+        HgiTextureViewDesc const& desc) override;
+
+    HGIMETAL_API
+    void DestroyTextureView(HgiTextureViewHandle* viewHandle) override;
+
+    HGIMETAL_API
     HgiSamplerHandle CreateSampler(HgiSamplerDesc const & desc) override;
 
     HGIMETAL_API

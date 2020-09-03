@@ -1707,6 +1707,49 @@ UsdImagingInstanceAdapter::GetSubdivTags(UsdPrim const& usdPrim,
     return UsdImagingPrimAdapter::GetSubdivTags(usdPrim, cachePath, time);
 }
 
+VtValue
+UsdImagingInstanceAdapter::GetTopology(UsdPrim const& usdPrim,
+                                       SdfPath const& cachePath,
+                                       UsdTimeCode time) const
+{
+    if (_IsChildPrim(usdPrim, cachePath)) {
+        // Note that the proto group in this proto has not yet been
+        // updated with new instances at this point.
+        UsdImagingInstancerContext instancerContext;
+        _ProtoPrim const& proto = _GetProtoPrim(usdPrim.GetPath(),
+                                                cachePath,
+                                                &instancerContext);
+        if (!TF_VERIFY(proto.adapter, "%s", cachePath.GetText())) {
+            return VtValue();
+        }
+        return proto.adapter->GetTopology(
+                _GetPrim(proto.path), cachePath, time);
+    }
+    return UsdImagingPrimAdapter::GetTopology(usdPrim, cachePath, time);
+}
+
+/*virtual*/
+HdCullStyle 
+UsdImagingInstanceAdapter::GetCullStyle(UsdPrim const& usdPrim,
+                                        SdfPath const& cachePath,
+                                        UsdTimeCode time) const
+{
+    if (_IsChildPrim(usdPrim, cachePath)) {
+        // Note that the proto group in this proto has not yet been
+        // updated with new instances at this point.
+        UsdImagingInstancerContext instancerContext;
+        _ProtoPrim const& proto = _GetProtoPrim(usdPrim.GetPath(),
+                                                cachePath,
+                                                &instancerContext);
+        if (!TF_VERIFY(proto.adapter, "%s", cachePath.GetText())) {
+            return HdCullStyleDontCare;
+        }
+        return proto.adapter->GetCullStyle(
+                _GetPrim(proto.path), cachePath, time);
+    }
+    return UsdImagingPrimAdapter::GetCullStyle(usdPrim, cachePath, time);
+}
+
 void
 UsdImagingInstanceAdapter::_ResyncInstancer(SdfPath const& instancerPath,
                                             UsdImagingIndexProxy* index,
@@ -1882,7 +1925,7 @@ struct UsdImagingInstanceAdapter::_ComputeInstanceMapVariabilityFn
         // is not variable.
         UsdTimeCode time = adapter->_GetTimeWithOffset(0.0);
         for (UsdPrim const& prim : instanceContext) {
-            if (!adapter->GetVisible(prim, time)) {
+            if (!adapter->GetVisible(prim, prim.GetPath(), time)) {
                 return false;
             }
         }
@@ -1986,7 +2029,7 @@ struct UsdImagingInstanceAdapter::_ComputeInstanceMapFn
     bool GetVisible(const std::vector<UsdPrim>& instanceContext)
     {
         for (UsdPrim const& prim : instanceContext) {
-            if (!adapter->GetVisible(prim, time)) {
+            if (!adapter->GetVisible(prim, prim.GetPath(), time)) {
                 return false;
             }
         }

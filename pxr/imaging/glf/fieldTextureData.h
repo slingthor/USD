@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,36 +21,40 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#ifndef PXR_IMAGING_GLF_FIELD_TEXTURE_DATA_H
+#define PXR_IMAGING_GLF_FIELD_TEXTURE_DATA_H
+
+/// \file glf/fieldTextureData.h
+
 #include "pxr/pxr.h"
-#include "pxr/usd/sdf/timeCode.h"
+#include "pxr/base/gf/matrix4d.h"
+#include "pxr/base/gf/vec3i.h"
+#include "pxr/imaging/glf/api.h"
+#include "pxr/imaging/glf/image.h"
+#include "pxr/imaging/garch/baseTextureData.h"
 
-#include "pxr/base/tf/registryManager.h"
-#include "pxr/base/tf/type.h"
-
-#include "pxr/base/vt/array.h"
-#include "pxr/base/vt/value.h"
-
-#include <ostream>
+#include "pxr/base/gf/bbox3d.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-// Register this class with the TfType registry
-// Array registration included to facilitate Sdf/Types and Sdf/ParserHelpers
-TF_REGISTRY_FUNCTION(TfType)
-{
-    TfType::Define<SdfTimeCode>();
-    TfType::Define< VtArray<SdfTimeCode> >();
-}
+TF_DECLARE_WEAK_AND_REF_PTRS(GlfFieldTextureData);
 
-TF_REGISTRY_FUNCTION(VtValue)
+/// \class GlfFieldTextureData
+///
+/// An interface class for reading volume files having a
+/// transformation.
+///
+class GlfFieldTextureData : public GarchBaseTextureData
 {
-    VtValue::RegisterSimpleBidirectionalCast<double, SdfTimeCode>();
-}
+public:
+    using Base = GarchBaseTextureData;
 
-std::ostream& 
-operator<<(std::ostream& out, const SdfTimeCode& ap)
-{
-    return out << ap.GetValue();
-}
+    /// Bounding box describing how 3d texture maps into
+    /// world space.
+    ///
+    virtual const GfBBox3d &GetBoundingBox() const = 0;
+};
 
 PXR_NAMESPACE_CLOSE_SCOPE
+
+#endif

@@ -96,10 +96,6 @@ public:
             static TfToken attr("doubleSided");
             return Key(path, attr);
         }
-        static Key CullStyle(SdfPath const& path) {
-            static TfToken attr("cullStyle");
-            return Key(path, attr);
-        }
         static Key Extent(SdfPath const& path) {
             static TfToken attr("extent");
             return Key(path, attr);
@@ -122,10 +118,6 @@ public:
         }
         static Key Primvars(SdfPath const& path) {
             static TfToken attr("primvars");
-            return Key(path, attr);
-        }
-        static Key Topology(SdfPath const& path) {
-            static TfToken attr("topology");
             return Key(path, attr);
         }
         static Key Transform(SdfPath const& path) {
@@ -300,11 +292,9 @@ public:
         _Erase<VtValue>(Key::Color(path));
         _Erase<VtValue>(Key::Opacity(path));
         _Erase<bool>(Key::DoubleSided(path));
-        _Erase<HdCullStyle>(Key::CullStyle(path));
         _Erase<GfRange3d>(Key::Extent(path));
         _Erase<VtValue>(Key::InstanceIndices(path));
         _Erase<TfToken>(Key::Purpose(path));
-        _Erase<VtValue>(Key::Topology(path));
         _Erase<GfMatrix4d>(Key::Transform(path));
         _Erase<bool>(Key::Visible(path));
         _Erase<VtValue>(Key::Points(path));
@@ -376,9 +366,6 @@ public:
     bool& GetDoubleSided(SdfPath const& path) const {
         return _Get<bool>(Key::DoubleSided(path));
     }
-    HdCullStyle& GetCullStyle(SdfPath const& path) const {
-        return _Get<HdCullStyle>(Key::CullStyle(path));
-    }
     GfRange3d& GetExtent(SdfPath const& path) const {
         return _Get<GfRange3d>(Key::Extent(path));
     }
@@ -397,14 +384,8 @@ public:
     HdPrimvarDescriptorVector& GetPrimvars(SdfPath const& path) const {
         return _Get<HdPrimvarDescriptorVector>(Key::Primvars(path));
     }
-    VtValue& GetTopology(SdfPath const& path) const {
-        return _Get<VtValue>(Key::Topology(path));
-    }
     GfMatrix4d& GetTransform(SdfPath const& path) const {
         return _Get<GfMatrix4d>(Key::Transform(path));
-    }
-    bool& GetVisible(SdfPath const& path) const {
-        return _Get<bool>(Key::Visible(path));
     }
     VtValue& GetWidths(SdfPath const& path) const {
         return _Get<VtValue>(Key::Widths(path));
@@ -465,9 +446,6 @@ public:
     bool FindDoubleSided(SdfPath const& path, bool* value) const {
         return _Find(Key::DoubleSided(path), value);
     }
-    bool FindCullStyle(SdfPath const& path, HdCullStyle* value) const {
-        return _Find(Key::CullStyle(path), value);
-    }
     bool FindExtent(SdfPath const& path, GfRange3d* value) const {
         return _Find(Key::Extent(path), value);
     }
@@ -486,14 +464,8 @@ public:
     bool FindPrimvars(SdfPath const& path, HdPrimvarDescriptorVector* value) const {
         return _Find(Key::Primvars(path), value);
     }
-    bool FindTopology(SdfPath const& path, VtValue* value) const {
-        return _Find(Key::Topology(path), value);
-    }
     bool FindTransform(SdfPath const& path, GfMatrix4d* value) const {
         return _Find(Key::Transform(path), value);
-    }
-    bool FindVisible(SdfPath const& path, bool* value) const {
-        return _Find(Key::Visible(path), value);
     }
     bool FindWidths(SdfPath const& path, VtValue* value) const {
         return _Find(Key::Widths(path), value);
@@ -550,9 +522,6 @@ public:
     bool ExtractDoubleSided(SdfPath const& path, bool* value) {
         return _Extract(Key::DoubleSided(path), value);
     }
-    bool ExtractCullStyle(SdfPath const& path, HdCullStyle* value) {
-        return _Extract(Key::CullStyle(path), value);
-    }
     bool ExtractExtent(SdfPath const& path, GfRange3d* value) {
         return _Extract(Key::Extent(path), value);
     }
@@ -571,14 +540,8 @@ public:
     bool ExtractPrimvars(SdfPath const& path, HdPrimvarDescriptorVector* value) {
         return _Extract(Key::Primvars(path), value);
     }
-    bool ExtractTopology(SdfPath const& path, VtValue* value) {
-        return _Extract(Key::Topology(path), value);
-    }
     bool ExtractTransform(SdfPath const& path, GfMatrix4d* value) {
         return _Extract(Key::Transform(path), value);
-    }
-    bool ExtractVisible(SdfPath const& path, bool* value) {
-        return _Extract(Key::Visible(path), value);
     }
     bool ExtractWidths(SdfPath const& path, VtValue* value) {
         return _Extract(Key::Widths(path), value);
@@ -635,7 +598,6 @@ public:
         _GarbageCollect(_tokenCache);
         _GarbageCollect(_tokenVectorCache);
         _GarbageCollect(_rangeCache);
-        _GarbageCollect(_cullStyleCache);
         _GarbageCollect(_matrixCache);
         _GarbageCollect(_vec4Cache);
         _GarbageCollect(_valueCache);
@@ -651,7 +613,7 @@ public:
 private:
     bool _locked;
 
-    // visible, doubleSided
+    // doubleSided
     typedef _TypedCache<bool> _BoolCache;
     mutable _BoolCache _boolCache;
 
@@ -667,10 +629,6 @@ private:
     typedef _TypedCache<GfRange3d> _RangeCache;
     mutable _RangeCache _rangeCache;
 
-    // cullstyle
-    typedef _TypedCache<HdCullStyle> _CullStyleCache;
-    mutable _CullStyleCache _cullStyleCache;
-
     // transform
     typedef _TypedCache<GfMatrix4d> _MatrixCache;
     mutable _MatrixCache _matrixCache;
@@ -683,7 +641,7 @@ private:
     typedef _TypedCache<SdfPath> _SdfPathCache;
     mutable _SdfPathCache _sdfPathCache;
 
-    // primvars, topology, materialResources, extCompInputs
+    // primvars, materialResources, extCompInputs
     typedef _TypedCache<VtValue> _ValueCache;
     mutable _ValueCache _valueCache;
 
@@ -716,9 +674,6 @@ private:
     }
     void _GetCache(_RangeCache **cache) const {
         *cache = &_rangeCache;
-    }
-    void _GetCache(_CullStyleCache **cache) const {
-        *cache = &_cullStyleCache;
     }
     void _GetCache(_MatrixCache **cache) const {
         *cache = &_matrixCache;

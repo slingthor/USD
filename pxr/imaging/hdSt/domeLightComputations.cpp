@@ -21,14 +21,15 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/hdSt/hgiConversions.h"
+#include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/hdSt/domeLightComputations.h"
+#include "pxr/imaging/hdSt/hgiConversions.h"
 #include "pxr/imaging/hdSt/simpleLightingShader.h"
 #include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/package.h"
-#include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/samplerObject.h"
+#include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/textureObject.h"
 #include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/dynamicUvTextureObject.h"
@@ -167,7 +168,7 @@ HdSt_DomeLightComputationGPU::Execute(
     if (!TF_VERIFY(dstUvTextureObject)) {
         return;
     }
-        
+
     if (_level == 0) {
         // Level zero is in charge of actually creating the
         // GPU resource.
@@ -182,19 +183,19 @@ HdSt_DomeLightComputationGPU::Execute(
         _FillPixelsByteSize(&desc);
         dstUvTextureObject->CreateTexture(desc);
     }
-    
+
     // Create a texture view for the layer we want to write to
-    HgiTextureViewDesc textureViewDesc;
-    textureViewDesc.layerCount = 1;
-    textureViewDesc.mipLevels = 1;
-    textureViewDesc.format = HgiFormatFloat16Vec4;
-    textureViewDesc.sourceFirstLayer = 0;
-    textureViewDesc.sourceFirstMip = _level;
-    textureViewDesc.sourceTexture = dstUvTextureObject->GetTexture().Get();
+    HgiTextureViewDesc texViewDesc;
+    texViewDesc.layerCount = 1;
+    texViewDesc.mipLevels = 1;
+    texViewDesc.format = HgiFormatFloat16Vec4;
+    texViewDesc.sourceFirstLayer = 0;
+    texViewDesc.sourceFirstMip = _level;
+    texViewDesc.sourceTexture = dstUvTextureObject->GetTexture();
 
     Hgi* hgi = hdStResourceRegistry->GetHgi();
-    HgiTextureHandle dstTextureView = hgi->CreateTextureView(textureViewDesc);
-        
+    HgiTextureViewHandle dstTextureView = hgi->CreateTextureView(texViewDesc);
+
     HgiResourceBindingsDesc resourceDesc;
     resourceDesc.debugName = "DomeLightComputation";
 
@@ -203,20 +204,22 @@ HdSt_DomeLightComputationGPU::Execute(
     texBind0.stageUsage = HgiShaderStageCompute;
     texBind0.textures.push_back(srcTextureName);
     texBind0.samplers.push_back(srcSamplerName);
+    texBind0.resourceType = HgiBindResourceTypeSamplerImage;
     resourceDesc.textures.push_back(std::move(texBind0));
 
     HgiTextureBindDesc texBind1;
     texBind1.bindingIndex = 1;
     texBind1.stageUsage = HgiShaderStageCompute;
-    texBind1.textures.push_back(dstTextureView);
+    texBind1.textures.push_back(dstTextureView->GetViewTexture());
     texBind1.samplers.push_back(srcSamplerName);
+    texBind1.resourceType = HgiBindResourceTypeStorageImage;
     resourceDesc.textures.push_back(std::move(texBind1));
 
     HgiResourceBindingsHandle resourceBindings =
         hgi->CreateResourceBindings(resourceDesc);
     
     // prepare uniform buffer for GPU computation
-    struct Uniform {
+    struct Uniforms {
         float roughness;
     } uniform;
 
@@ -231,6 +234,7 @@ HdSt_DomeLightComputationGPU::Execute(
         desc.shaderConstantsDesc.byteSize = sizeof(uniform);
     }
     HgiComputePipelineHandle pipeline = hgi->CreateComputePipeline(desc);
+
     HgiComputeCmdsUniquePtr computeCmds = hgi->CreateComputeCmds();
     computeCmds->PushDebugGroup("DomeLightComputationCmds");
     computeCmds->BindResources(resourceBindings);
