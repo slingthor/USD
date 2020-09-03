@@ -137,8 +137,21 @@ HdStBufferResource::SetAllocations(HgiBufferHandle const& id0,
     id<MTLBuffer> b = HgiMetalBuffer::MTLBuffer(_ids[1]);
     _firstFrameBeingFilled = b != nil;
 #else
-    for (int32_t i = 0; i < MULTIBUFFERING; i++) {
-        _gpuAddr[i] = 0;
+    GlfContextCaps const & caps = GlfContextCaps::GetInstance();
+    // note: gpu address remains valid until the buffer object is deleted,
+    // or when the data store is respecified via BufferData/BufferStorage.
+    // It doesn't change even when we make the buffer resident or non-resident.
+    // https://www.opengl.org/registry/specs/NV/shader_buffer_load.txt
+    if (id && caps.bindlessBufferEnabled) {
+        for (int32_t i = 0; i < MULTIBUFFERING; i++) {
+            glGetNamedBufferParameterui64vNV(
+                ids[i]->GetRawResource(),
+                GL_BUFFER_GPU_ADDRESS_NV, (GLuint64EXT*)&_gpuAddr[i]);
+        }
+    } else {
+        for (int32_t i = 0; i < MULTIBUFFERING; i++) {
+            _gpuAddr[i] = 0;
+        }
     }
     _activeBuffer = 0;
     _firstFrameBeingFilled = false;
