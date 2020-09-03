@@ -141,6 +141,12 @@ HgiMetal::CreateGraphicsCmds(
 
     // TEMP
     _encoder = encoder;
+    if (_encoder->_descriptor.colorTextures.size()) {
+        _sampleCount = _encoder->_descriptor.colorTextures[0]->GetDescriptor().sampleCount;
+    }
+    else if (_encoder->_descriptor.depthTexture) {
+        _sampleCount = _encoder->_descriptor.depthTexture->GetDescriptor().sampleCount;
+    }
     
     return HgiGraphicsCmdsUniquePtr(encoder);
 }
@@ -278,6 +284,12 @@ HgiMetal::GetAPIName() const {
 void
 HgiMetal::StartFrame()
 {
+    StartFrame(false);
+}
+
+void
+HgiMetal::StartFrame(bool capture)
+{
     _encoder = nil;
 
     if (_frameDepth++ == 0) {
@@ -292,7 +304,9 @@ HgiMetal::StartFrame()
 #endif
         }
 
-        [_captureScopeFullFrame beginScope];
+        if (capture) {
+            [_captureScopeFullFrame beginScope];
+        }
 
         if ([[MTLCaptureManager sharedCaptureManager] isCapturing]) {
             // We need to grab a new command buffer otherwise the previous one
@@ -310,7 +324,9 @@ HgiMetal::EndFrame()
 {
     if (--_frameDepth == 0) {
         [_captureScopeFullFrame endScope];
-//        [[MTLCaptureManager sharedCaptureManager] stopCapture];
+        if ([[MTLCaptureManager sharedCaptureManager] isCapturing]) {
+            [[MTLCaptureManager sharedCaptureManager] stopCapture];
+        }
     }
 }
 

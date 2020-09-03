@@ -112,8 +112,9 @@ HdSt_UnitTestWindow::OnInitializeGL()
     attachmentDesc.push_back(
         GarchDrawTarget::AttachmentDesc("color", GL_RGBA, GL_FLOAT, GL_RGBA));
     attachmentDesc.push_back(
-        GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
-                                        GL_DEPTH24_STENCIL8));
+        GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_COMPONENT, GL_FLOAT,
+                                        GL_FLOAT));
+
     _drawTarget->SetAttachments(attachmentDesc);
     _drawTarget->Bind();
     _unitTest->InitTest();

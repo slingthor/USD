@@ -153,6 +153,9 @@ HgiMetalGraphicsCmds::HgiMetalGraphicsCmds(
         }
     }
 
+    // APPLE METAL: Mtlf handoff
+    _hgi->renderPassDescriptor = [renderPassDescriptor copy];
+
     _encoder = [_hgi->GetCommandBuffer(false)
         renderCommandEncoderWithDescriptor:renderPassDescriptor];
     [renderPassDescriptor release];

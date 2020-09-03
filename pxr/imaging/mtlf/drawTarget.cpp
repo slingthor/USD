@@ -30,6 +30,7 @@
 #include "pxr/imaging/mtlf/utils.h"
 
 #include "pxr/imaging/hgiMetal/hgi.h"
+#include "pxr/imaging/hgiMetal/texture.h"
 
 #include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/garch/utils.h"
@@ -65,7 +66,6 @@ MtlfDrawTarget::New( GfVec2i const & size, bool requestMSAA )
 }
 
 MtlfDrawTarget::MtlfDrawTarget( GfVec2i const & size, bool requestMSAA /* =false */) :
-    _mtlRenderPassDescriptor(nil),
     _bindDepth(0),
     _size(size),
     _numSamples(1)
@@ -76,6 +76,8 @@ MtlfDrawTarget::MtlfDrawTarget( GfVec2i const & size, bool requestMSAA /* =false
         _numSamples = _GetNumSamples();
     }
 
+    rpd = [[MTLRenderPassDescriptor alloc] init];
+    
     _GenFrameBuffer();
 }
 
@@ -88,7 +90,6 @@ MtlfDrawTarget::New( MtlfDrawTargetPtr const & drawtarget )
 // clone constructor : generates a new GL framebuffer, but share the texture
 // attachments.
 MtlfDrawTarget::MtlfDrawTarget( GarchDrawTargetPtr const & drawtarget ) :
-    _mtlRenderPassDescriptor(nil),
     _bindDepth(0),
     _size(drawtarget->GetSize()),
     _numSamples(drawtarget->GetNumSamples())
@@ -110,7 +111,9 @@ MtlfDrawTarget::MtlfDrawTarget( GarchDrawTargetPtr const & drawtarget ) :
 
 MtlfDrawTarget::~MtlfDrawTarget( )
 {
-    _DeleteAttachments( );
+    _DeleteAttachments();
+    [rpd release];
+    rpd = nil;
 }
 
 void
@@ -248,7 +251,7 @@ static int _GetMaxAttachments( )
 void 
 MtlfDrawTarget::_GenFrameBuffer()
 {
-    _mtlRenderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
+    _desc.reset(new HgiGraphicsCmdsDesc);
 }
 
 // Attach a texture to one of the attachment points of the framebuffer.
@@ -256,40 +259,47 @@ MtlfDrawTarget::_GenFrameBuffer()
 void
 MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
 {
-    id<MTLTexture> tid = a->GetTextureName();
-    id<MTLTexture> tidMS = a->GetTextureMSName();
+    HgiTextureHandle tid = a->GetHgiTextureName();
+    HgiTextureHandle tidMS = a->GetTextureMSName();
 
     int attach = a->GetAttach();
+    HgiAttachmentDesc attachmentDesc;
+
+    _desc->width = tid->GetDescriptor().dimensions[0];
+    _desc->height = tid->GetDescriptor().dimensions[1];
 
     if (a->GetFormat()==GL_DEPTH_COMPONENT || a->GetFormat()==GL_DEPTH_STENCIL) {
-        MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptor.depthAttachment;
+        
         if (HasMSAA()) {
-            depthAttachment.texture = tidMS;
+            _desc->depthTexture = tidMS;
+            _desc->depthResolveTexture = tid;
         } else {
-            depthAttachment.texture = tid;
+            _desc->depthTexture = tid;
         }
+        attachmentDesc.format = tid->GetDescriptor().format;
         
         // make sure to clear every frame for best performance
-        depthAttachment.loadAction = MTLLoadActionClear;
-        depthAttachment.clearDepth = 1.0f;
+        attachmentDesc.loadOp = HgiAttachmentLoadOpClear;
+        attachmentDesc.clearValue = GfVec4f(1.0f);
         
         // store only attachments that will be presented to the screen, as in this case
-        depthAttachment.storeAction = MTLStoreActionStore;
+        attachmentDesc.storeOp = HgiAttachmentStoreOpStore;
         
-        if (a->GetFormat()==GL_DEPTH_STENCIL) {
-            MTLRenderPassStencilAttachmentDescriptor *stencilAttachment = _mtlRenderPassDescriptor.stencilAttachment;
-            
-            if (HasMSAA()) {
-                stencilAttachment.texture = a->GetStencilTextureMSName();
-            } else {
-                stencilAttachment.texture = a->GetStencilTextureName();
-            }
-            
-            // make sure to clear every frame for best performance
-            stencilAttachment.loadAction = MTLLoadActionClear;
-            stencilAttachment.clearStencil = 0;
-            stencilAttachment.storeAction = MTLStoreActionStore;
-        }
+//        if (a->GetFormat()==GL_DEPTH_STENCIL) {
+//            MTLRenderPassStencilAttachmentDescriptor *stencilAttachment = _mtlRenderPassDescriptor.stencilAttachment;
+//
+//            if (HasMSAA()) {
+//                stencilAttachment.texture = a->GetStencilTextureMSName();
+//            } else {
+//                stencilAttachment.texture = a->GetStencilTextureName();
+//            }
+//
+//            // make sure to clear every frame for best performance
+//            stencilAttachment.loadAction = MTLLoadActionClear;
+//            stencilAttachment.clearStencil = 0;
+//            stencilAttachment.storeAction = MTLStoreActionStore;
+//        }
+        _desc->depthAttachmentDesc = std::move(attachmentDesc);
     } else {
         if (attach < 0) {
             TF_CODING_ERROR("Attachment index cannot be negative");
@@ -298,22 +308,31 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
 
         TF_VERIFY( attach < _GetMaxAttachments(),
             "Exceeding number of Attachments available ");
-
-        MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptor.colorAttachments[attach];
-        if (HasMSAA()) {
-            colorAttachment.texture = tidMS;
-            colorAttachment.resolveTexture = tid;
-            
-            colorAttachment.storeAction = MTLStoreActionStoreAndMultisampleResolve;
-        } else {
-            colorAttachment.texture = tid;
-            
-            colorAttachment.storeAction = MTLStoreActionStore;
+        
+        if (attach >= _desc->colorTextures.size()) {
+            _desc->colorTextures.resize(attach + 1);
+            _desc->colorAttachmentDescs.resize(attach + 1);
+            if (HasMSAA()) {
+                _desc->colorResolveTextures.resize(attach + 1);
+            }
         }
         
+        if (HasMSAA()) {
+            _desc->colorTextures[attach] = tidMS;
+            _desc->colorResolveTextures[attach] = tid;
+        } else {
+            _desc->colorTextures[attach] = tid;
+        }
+        
+        attachmentDesc.format = tid->GetDescriptor().format;
+
+        attachmentDesc.storeOp = HgiAttachmentStoreOpStore;
+
         // make sure to clear every frame for best performance
-        colorAttachment.loadAction = MTLLoadActionClear;
-        colorAttachment.clearColor = MTLClearColorMake(1.0f, 1.0f, 1.0f, 1.0f);
+        attachmentDesc.loadOp = HgiAttachmentLoadOpClear;
+        attachmentDesc.clearValue = GfVec4f(1.0f, 1.0f, 1.0f, 1.0f);
+        
+        _desc->colorAttachmentDescs[attach] = attachmentDesc;
     }
 }
 
@@ -329,8 +348,66 @@ MtlfDrawTarget::Bind()
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
    
-    context->SetDrawTarget(this);
-    context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
+    // Begin rendering
+    _gfxCmds = context->GetHgi()->CreateGraphicsCmds(*_desc.get());
+
+    // Set the render pass descriptor to use for the render encoders
+    [rpd init];
+
+    MTLPixelFormat colorFormat = MTLPixelFormatInvalid;
+    MTLPixelFormat depthFormat = MTLPixelFormatInvalid;
+    size_t i;
+    bool resolve = !_desc->colorResolveTextures.empty();
+    for (i=0; i<_desc->colorTextures.size(); i++) {
+        HgiMetalTexture *metalTexture =
+            static_cast<HgiMetalTexture*>(_desc->colorTextures[i].Get());
+        rpd.colorAttachments[i].texture = metalTexture->GetTextureId();
+        colorFormat = rpd.colorAttachments[i].texture.pixelFormat;
+
+        if (resolve) {
+            metalTexture =
+                static_cast<HgiMetalTexture*>(_desc->colorResolveTextures[i].Get());
+            rpd.colorAttachments[i].resolveTexture = metalTexture->GetTextureId();
+            rpd.colorAttachments[i].storeAction = MTLStoreActionStoreAndMultisampleResolve;
+        }
+        else {
+            rpd.colorAttachments[i].storeAction = MTLStoreActionStore;
+        }
+        rpd.colorAttachments[i].loadAction = MTLLoadActionClear;
+        GfVec4f const& clearColor = _desc->colorAttachmentDescs[i].clearValue;
+        rpd.colorAttachments[i].clearColor =
+            MTLClearColorMake(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+    }
+    while (i<8) {
+        rpd.colorAttachments[i].texture = nil;
+        rpd.colorAttachments[i].resolveTexture = nil;
+        i++;
+    }
+    if (_desc->depthTexture) {
+        HgiMetalTexture *metalTexture =
+            static_cast<HgiMetalTexture*>(_desc->depthTexture.Get());
+        rpd.depthAttachment.texture = metalTexture->GetTextureId();
+        depthFormat = rpd.depthAttachment.texture.pixelFormat;
+            
+        if (resolve) {
+            metalTexture =
+                static_cast<HgiMetalTexture*>(_desc->depthResolveTexture.Get());
+            rpd.depthAttachment.resolveTexture = metalTexture->GetTextureId();
+            rpd.depthAttachment.storeAction = MTLStoreActionStoreAndMultisampleResolve;
+        }
+        else {
+            rpd.depthAttachment.storeAction = MTLStoreActionStore;
+        }
+        
+        rpd.depthAttachment.loadAction = MTLLoadActionClear;
+        rpd.depthAttachment.clearDepth = _desc->depthAttachmentDesc.clearValue[0];
+    }
+    else {
+        rpd.depthAttachment.texture = nil;
+        rpd.depthAttachment.resolveTexture = nil;
+    }
+    context->SetRenderPassDescriptor(rpd);
+    context->SetOutputPixelFormats(colorFormat, depthFormat);
 }
 
 void
@@ -358,8 +435,12 @@ MtlfDrawTarget::Unbind()
         return;
     }
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    context->SetDrawTarget(NULL);
-        
+    
+    // Used to dirty the descriptor state
+    context->DirtyDrawTargets();
+  
+    context->GetHgi()->SubmitCmds(_gfxCmds.get());
+
     TouchContents();
 }
 
@@ -590,10 +671,6 @@ MtlfDrawTarget::MtlfAttachment::New(uint32_t attachmentIndex, GLenum format,
 MtlfDrawTarget::MtlfAttachment::MtlfAttachment(uint32_t attachmentIndex, GLenum format,
                                                GLenum type, GfVec2i size,
                                                uint32_t numSamples) :
-    _textureName(0),
-    _textureNameMS(0),
-    _stencilTextureName(0),
-    _stencilTextureNameMS(0),
     _format(format),
     _type(type),
     _internalFormat(MTLPixelFormatInvalid),
@@ -621,7 +698,7 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
     if (_format==GL_DEPTH_COMPONENT) {
         if (type!=GL_FLOAT) {
             TF_CODING_ERROR("Only GL_FLOAT textures can be used for the"
-            " depth attachment point");
+                            " depth attachment point");
             type = GL_FLOAT;
         }
     }
@@ -629,16 +706,19 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
     int numChannel;
     bool depth24stencil8 = false;
     uint32_t bytesPerValue = 1;
+    
+    HgiTextureDesc texDesc;
+    texDesc.usage = HgiTextureUsageBitsColorTarget;
 
-    MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
+    HgiFormat hgiFormat = HgiFormatInvalid;
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
     switch (_format)
     {
         case GL_RG:
             numChannel = 2;
             if (type == GL_FLOAT) {
-                mtlFormat = MTLPixelFormatRG16Float;
+                hgiFormat = HgiFormatFloat16Vec2;
                 bytesPerValue = 2;
             }
             break;
@@ -650,43 +730,30 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
         case GL_RGBA:
             numChannel = 4;
             if (type == GL_FLOAT) {
-                mtlFormat = MTLPixelFormatRGBA16Float;
+                hgiFormat = HgiFormatFloat16Vec4;
                 bytesPerValue = 2;
             }
             else if (type == GL_UNSIGNED_BYTE) {
-                mtlFormat = MTLPixelFormatRGBA8Unorm;
+                hgiFormat = HgiFormatUNorm8Vec4;
             }
             break;
 
         default:
             numChannel = 1;
             if (type == GL_FLOAT) {
-                if (_format==GL_DEPTH_COMPONENT)
-                    mtlFormat = MTLPixelFormatDepth32Float;
-                else
-                    mtlFormat = MTLPixelFormatR32Float;
+                hgiFormat = HgiFormatFloat32;
                 bytesPerValue = 4;
-            }
-            else if (type == GL_UNSIGNED_INT_24_8) {
-#if defined(ARCH_OS_MACOS)
-//                if([device isDepth24Stencil8PixelFormatSupported]) {
-//                    mtlFormat = MTLPixelFormatDepth24Unorm_Stencil8;
-//                    depth24stencil8 = true;
-//                }
-//                else
-#endif
-                    mtlFormat = MTLPixelFormatDepth32Float_Stencil8;
-                bytesPerValue = 5;
+                texDesc.usage = HgiTextureUsageBitsDepthTarget;
             }
             else if (type == GL_UNSIGNED_BYTE) {
-                mtlFormat = MTLPixelFormatR8Unorm;
+                hgiFormat = HgiFormatUNorm8;
             }
             break;
     }
     
     _bytesPerPixel = numChannel * bytesPerValue;
 
-    if (mtlFormat == MTLPixelFormatInvalid) {
+    if (hgiFormat == HgiFormatInvalid) {
         TF_FATAL_CODING_ERROR("Unsupported render target format");
     }
 
@@ -694,21 +761,16 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
                                     _size[0]       *
                                     _size[1]);
 
-    MTLTextureDescriptor* desc =
-        [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:mtlFormat
-                                                           width:_size[0]
-                                                          height:_size[1]
-                                                       mipmapped:NO];
-    desc.usage = MTLTextureUsageRenderTarget;
-    desc.resourceOptions = MTLResourceStorageModePrivate;
-    _textureName = [device newTextureWithDescriptor:desc];
+    texDesc.type = HgiTextureType2D;
+    texDesc.dimensions = GfVec3i(_size[0], _size[1], 0);
+    texDesc.format = hgiFormat;
+    _textureName = context->GetHgi()->CreateTexture(texDesc);
 
     memoryUsed += baseImageSize;
 
     if (_numSamples > 1) {
-        desc.sampleCount = _numSamples;
-        desc.textureType = MTLTextureType2DMultisample;
-        _textureNameMS = [device newTextureWithDescriptor:desc];
+        texDesc.sampleCount = HgiSampleCount(_numSamples);
+        _textureNameMS = context->GetHgi()->CreateTexture(texDesc);
         memoryUsed = baseImageSize * _numSamples;
     }
     
@@ -724,26 +786,13 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
 void
 MtlfDrawTarget::MtlfAttachment::_DeleteTexture()
 {
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     if (_textureName) {
-        [_textureName release];
-        _textureName = nil;
+        context->GetHgi()->DestroyTexture(&_textureName);
     }
 
     if (_textureNameMS) {
-        [_textureNameMS release];
-        _textureNameMS = nil;
-    }
-    
-    if (_format != GL_DEPTH_STENCIL) {
-        if (_stencilTextureName) {
-            [_stencilTextureName release];
-            _stencilTextureName = nil;
-        }
-    
-        if (_stencilTextureNameMS) {
-            [_stencilTextureNameMS release];
-            _stencilTextureNameMS = nil;
-        }
+        context->GetHgi()->DestroyTexture(&_textureNameMS);
     }
 }
 
