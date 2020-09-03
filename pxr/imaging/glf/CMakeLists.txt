@@ -120,7 +120,6 @@ else()
 
         PUBLIC_HEADERS
             api.h
-            fieldTextureData.h
 
         PYTHON_CPPFILES
             moduleDeps.cpp

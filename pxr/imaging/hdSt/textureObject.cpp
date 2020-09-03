@@ -34,7 +34,7 @@
 #include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/garch/uvTextureData.h"
-#include "pxr/imaging/glf/fieldTextureData.h"
+#include "pxr/imaging/garch/fieldTextureData.h"
 #ifdef PXR_OPENVDB_SUPPORT_ENABLED
 #include "pxr/imaging/garch/vdbTextureData.h"
 #endif
@@ -473,7 +473,7 @@ _ComputeSamplingTransform(const GfBBox3d &bbox)
 }
 
 static
-GlfFieldTextureDataRefPtr
+GarchFieldTextureDataRefPtr
 _ComputeFieldTexData(
     const HdStTextureIdentifier &textureId,
     const size_t targetMemory)
@@ -521,7 +521,7 @@ HdStFieldTextureObject::_Load()
 {
     TRACE_FUNCTION();
 
-    GlfFieldTextureDataRefPtr const texData = _ComputeFieldTexData(
+    GarchFieldTextureDataRefPtr const texData = _ComputeFieldTexData(
         GetTextureIdentifier(),
         GetTargetMemory());
 

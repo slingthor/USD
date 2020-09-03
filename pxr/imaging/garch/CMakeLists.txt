@@ -106,6 +106,7 @@ pxr_library(garch
 
     PUBLIC_HEADERS
         api.h
+        fieldTextureData.h
         gl.h
         glPlatformContext.h
         ${GARCH_GLPLATFORMCONTEXT}.h
