@@ -72,20 +72,21 @@ struct GarchTextureGPUHandle {
         handle = NULL;
     }
 
+    GarchTextureGPUHandle(uint64_t const _handle) {
+        handle = (void*)_handle;
+    }
+    GarchTextureGPUHandle& operator =(uint64_t const _handle) {
+        handle = (void*)_handle;
+        return *this;
+    }
+
     // OpenGL
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GarchTextureGPUHandle(GLuint const _handle) {
         handle = (void*)uint64_t(_handle);
     }
-    GarchTextureGPUHandle(GLuint64 const _handle) {
-        handle = (void*)uint64_t(_handle);
-    }
     GarchTextureGPUHandle& operator =(GLuint const _handle) {
         handle = (void*)uint64_t(_handle);
-        return *this;
-    }
-    GarchTextureGPUHandle& operator =(GLuint64 const _handle) {
-        handle = (void*)_handle;
         return *this;
     }
     operator GLuint() const { return (GLuint)uint64_t(handle); }
