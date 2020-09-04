@@ -78,7 +78,7 @@ HdStInterleavedMemoryManager::GetResourceAllocation(
     HdBufferArraySharedPtr const &bufferArray, 
     VtDictionary &result) const 
 { 
-    std::set<HdResourceGPUHandle> idSet;
+    std::set<uint64_t> idSet;
     size_t gpuMemoryUsed = 0;
 
     _StripedInterleavedBufferSharedPtr bufferArray_ =
@@ -90,7 +90,7 @@ HdStInterleavedMemoryManager::GetResourceAllocation(
         HgiBufferHandle buffer = resource->GetId();
 
         // XXX avoid double counting of resources shared within a buffer
-        HdResourceGPUHandle id(buffer ? buffer->GetRawResource() : 0);
+        uint64_t id = buffer ? buffer->GetRawResource() : 0;
         if (idSet.count(id) == 0) {
             idSet.insert(id);
 
