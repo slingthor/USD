@@ -51,6 +51,12 @@
 #include "pxr/imaging/hgiGL/graphicsCmds.h"
 #endif
 
+// APPLE METAL:
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/hgiMetal/hgi.h"
+#include "pxr/imaging/hgiMetal/texture.h"
+
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 void
@@ -175,6 +181,28 @@ HdSt_ImageShaderRenderPass::_Execute(
 
     if (gfxCmds) {
         gfxCmds->PushDebugGroup(__ARCH_PRETTY_FUNCTION__);
+        
+        // APPLE METAL: Handoff a render descriptor to Mtlf
+        if (!HdStResourceFactory::GetInstance()->IsOpenGL()) {
+            if (desc.width) {
+                // Set the render pass descriptor for Mtlf to use with the render encoders
+                MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+                MTLRenderPassDescriptor* rpd = context->GetHgi()->renderPassDescriptor;
+                
+                MTLPixelFormat colorFormat = MTLPixelFormatInvalid;
+                MTLPixelFormat depthFormat = MTLPixelFormatInvalid;
+                if (desc.colorTextures.size()) {
+                    colorFormat = rpd.colorAttachments[0].texture.pixelFormat;
+                }
+                if (desc.depthTexture) {
+                    depthFormat = rpd.depthAttachment.texture.pixelFormat;
+                }
+
+                context->SetRenderPassDescriptor(rpd);
+                context->SetOutputPixelFormats(colorFormat, depthFormat);
+            }
+
+        }
     }
 
     // Draw

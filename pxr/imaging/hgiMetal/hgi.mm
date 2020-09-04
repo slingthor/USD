@@ -371,7 +371,6 @@ bool
 HgiMetal::BeginMtlf()
 {
     // SOOOO TEMP and specialised!
-    _sampleCount = 1;
     _needsFlip = false;
 
     if (_encoder) {
