@@ -43,7 +43,7 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GarchVdbTextureData);
 
 class GarchVdbTextureData_DenseGridHolderBase;
 
-/// \class GlfVdbTextureData
+/// \class GarchVdbTextureData
 ///
 /// Implements GlfBaseTextureData to read grid with given name from
 /// OpenVDB file at given path.

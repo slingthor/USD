@@ -484,7 +484,7 @@ _ComputeFieldTexData(
 #ifdef PXR_OPENVDB_SUPPORT_ENABLED
     if (const HdStOpenVDBAssetSubtextureIdentifier * const vdbSubId =
             dynamic_cast<const HdStOpenVDBAssetSubtextureIdentifier*>(subId)) {
-        return GlfVdbTextureData::New(
+        return GarchVdbTextureData::New(
             textureId.GetFilePath().GetString(),
             vdbSubId->GetFieldName(), targetMemory);
     }

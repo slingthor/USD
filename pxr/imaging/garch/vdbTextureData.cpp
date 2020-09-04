@@ -65,11 +65,11 @@ GarchVdbTextureData::GarchVdbTextureData(
 GarchVdbTextureData::~GarchVdbTextureData() = default;
 
 const GfBBox3d &
-GlfVdbTextureData::GetBoundingBox() const
+GarchVdbTextureData::GetBoundingBox() const
 {
     return _boundingBox;
 }
-
+ 
 int
 GarchVdbTextureData::NumDimensions() const
 {
