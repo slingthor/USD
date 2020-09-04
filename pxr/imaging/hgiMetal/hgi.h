@@ -206,16 +206,20 @@ private:
     bool _useInterop;
     bool _workToFlush;
     
-    // TEMP for Mtlf handoff
+    // APPLE METAL: TEMP for Mtlf handoff
 public:
     
     HGIMETAL_API
     bool BeginMtlf();
     
     class HgiMetalGraphicsCmds* _encoder;
+    MTLRenderPassDescriptor *renderPassDescriptor;
     
     int _sampleCount;
     bool _needsFlip;
+    
+    HGIMETAL_API
+    void StartFrame(bool capture);
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -92,7 +92,8 @@ class HgiMetal;
 #define METAL_FEATURESET_FOR_DISPATCHTHREADS MTLFeatureSet_macOS_GPUFamily1_v1
 #endif
 
-class MtlfDrawTarget;
+#define METAL_MAX_COLOR_ATTACHMENTS 8 // Do not change - part of Metal spec.
+
 typedef std::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
 
 /// \class MtlfMetalContext
@@ -212,15 +213,7 @@ public:
     
     MTLF_API
     void SetOutputPixelFormats(MTLPixelFormat pixelFormat, MTLPixelFormat depthFormat);
-    
-    MTLF_API
-    void SetDrawTarget(MtlfDrawTarget *drawTarget);
-    
-    MTLF_API
-    MtlfDrawTarget *GetDrawTarget() const {
-        return drawTarget;
-    }
-    
+
     MTLF_API
     void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, bool _enableMVA);
     
@@ -295,6 +288,9 @@ public:
     
     MTLF_API
     MTLRenderPassDescriptor* GetRenderPassDescriptor();
+    
+    MTLF_API
+    void DirtyDrawTargets();
     
     MTLF_API
     void SetRenderEncoderState();
@@ -576,8 +572,6 @@ protected:
         MTLCompareFunction depthCompareFunction;
     } depthState;
     
-    MtlfDrawTarget *drawTarget;
-
 private:
     const static uint64_t endOfQueueEventValue = 0xFFFFFFFFFFFFFFFF;
     

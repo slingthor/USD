@@ -53,7 +53,6 @@ _MetalDeviceDescriptor(id<MTLDevice> device)
 
 HdStRenderDelegateMetal::HdStRenderDelegateMetal()
     : HdStRenderDelegate()
-    , _mtlRenderPassDescriptorForInterop(nil)
     , _mtlRenderPassDescriptor(nil)
 {
 //    _Initialize();
@@ -61,7 +60,6 @@ HdStRenderDelegateMetal::HdStRenderDelegateMetal()
 
 HdStRenderDelegateMetal::HdStRenderDelegateMetal(HdRenderSettingsMap const& settingsMap)
     : HdStRenderDelegate(settingsMap)
-    , _mtlRenderPassDescriptorForInterop(nil)
     , _mtlRenderPassDescriptor(nil)
 {
 }
@@ -139,6 +137,9 @@ VtValue HdStRenderDelegateMetal::GetRenderSetting(TfToken const& key) const
 
 HdStRenderDelegateMetal::~HdStRenderDelegateMetal()
 {
+    if (_mtlRenderPassDescriptor) {
+        [_mtlRenderPassDescriptor release];
+    }
 }
 
 bool
@@ -158,72 +159,16 @@ void HdStRenderDelegateMetal::PrepareRender(
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
-//    context->mtlSampleCount = params.sampleCount;
-
     _renderOutput = params.renderOutput;
 
     context->StartFrame();
     context->StartFrameForThread();
 
-    if (_mtlRenderPassDescriptorForInterop == nil)
-        _mtlRenderPassDescriptorForInterop =
+    if (_mtlRenderPassDescriptor == nil)
+    {
+        _mtlRenderPassDescriptor =
             [[MTLRenderPassDescriptor alloc] init];
-
-    // create a color attachment every frame since we have to
-    // recreate the texture every frame
-    MTLRenderPassColorAttachmentDescriptor *colorAttachment =
-        _mtlRenderPassDescriptorForInterop.colorAttachments[0];
-    
-    // make sure to clear every frame for best performance
-    colorAttachment.loadAction = MTLLoadActionClear;
-    
-    // store only attachments that will be presented to the
-    // screen, as in this case
-    colorAttachment.storeAction = MTLStoreActionStore;
-    
-    MTLRenderPassDepthAttachmentDescriptor *depthAttachment =
-        _mtlRenderPassDescriptorForInterop.depthAttachment;
-    depthAttachment.loadAction = MTLLoadActionClear;
-    depthAttachment.storeAction = MTLStoreActionStore;
-    depthAttachment.clearDepth = 1.0f;
-
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    if (_renderOutput == DelegateParams::RenderOutput::OpenGL)
-    {
-        GLfloat clearColor[4];
-        glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
-        clearColor[3] = 0.0f;
-        
-        colorAttachment.clearColor = MTLClearColorMake(clearColor[0],
-                                                       clearColor[1],
-                                                       clearColor[2],
-                                                       clearColor[3]);
     }
-    else
-#endif
-    if (_renderOutput == DelegateParams::RenderOutput::Metal &&
-        context->GetDrawTarget())
-    {
-        auto& attachments = context->GetDrawTarget()->GetAttachments();
-        {
-            auto const it = attachments.find("color");
-            MtlfDrawTarget::MtlfAttachment::MtlfAttachmentRefPtr const & a =
-                TfStatic_cast<TfRefPtr<MtlfDrawTarget::MtlfAttachment>>(it->second);
-
-            colorAttachment.texture = a->GetTextureName();
-            colorAttachment.clearColor = MTLClearColorMake(0.0f, 0.0f, 0.0f, 0.0f);
-        }
-        {
-            auto const it = attachments.find("depth");
-            MtlfDrawTarget::MtlfAttachment::MtlfAttachmentRefPtr const & a =
-                TfStatic_cast<TfRefPtr<MtlfDrawTarget::MtlfAttachment>>(it->second);
-
-            depthAttachment.texture = a->GetTextureName();
-        }
-    }
-    
-    _mtlRenderPassDescriptor = _mtlRenderPassDescriptorForInterop;
-
 
     // Set the render pass descriptor to use for the render encoders
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);

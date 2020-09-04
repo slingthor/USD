@@ -250,17 +250,14 @@ HdStCommandBuffer::ExecuteDraw(
            context->GPUTimerEndTimer(frameNumber);
         }];
 
-        int numAttachments = 1;
-        if (context->GetDrawTarget()) {
-            numAttachments = context->GetDrawTarget()->GetAttachments().size();
-        }
-
         if (context->GetHgi()->BeginMtlf()) {
             renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionLoad;
-            renderPassDescriptor.stencilAttachment.loadAction = MTLLoadActionLoad;
+//            renderPassDescriptor.stencilAttachment.loadAction = MTLLoadActionLoad;
 
-            for (int i = 0; i < numAttachments; i++) {
-                renderPassDescriptor.colorAttachments[i].loadAction = MTLLoadActionLoad;
+            for (int i = 0; i < METAL_MAX_COLOR_ATTACHMENTS; i++) {
+                if (renderPassDescriptor.colorAttachments[i].loadAction == MTLLoadActionClear) {
+                    renderPassDescriptor.colorAttachments[i].loadAction = MTLLoadActionLoad;
+                }
             }
         }
         else {

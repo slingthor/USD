@@ -28,6 +28,7 @@
 
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/capabilities.h"
+#include "pxr/imaging/hgiMetal/graphicsCmds.h"
 #include "pxr/imaging/hgi/texture.h"
 
 #import <simd/simd.h>
@@ -305,7 +306,6 @@ void MtlfMetalContext::Init()
     depthState.depthWriteEnable = true;
     depthState.depthCompareFunction = MTLCompareFunctionLessEqual;
     
-    drawTarget = NULL;
     outputPixelFormat = MTLPixelFormatInvalid;
     outputDepthFormat = MTLPixelFormatInvalid;
     
@@ -918,12 +918,6 @@ void MtlfMetalContext::SetTexture(int index, id<MTLTexture> const texture, const
     threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_TEXTURE;
 }
 
-void MtlfMetalContext::SetDrawTarget(MtlfDrawTarget *dt)
-{
-    drawTarget = dt;
-    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_DRAW_TARGET;
-}
-
 size_t MtlfMetalContext::HashVertexDescriptor()
 {
     size_t hashVal = 0;
@@ -956,42 +950,8 @@ void MtlfMetalContext::SetRenderPipelineState()
     if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_DRAW_TARGET) {
         size_t hashVal = 0;
 
-        if (drawTarget) {
-            auto& attachments = drawTarget->GetAttachments();
-            for(auto it : attachments) {
-                MtlfDrawTarget::MtlfAttachment* attachment = ((MtlfDrawTarget::MtlfAttachment*)&(*it.second));
-                MTLPixelFormat depthFormat = [attachment->GetTextureName() pixelFormat];
-
-                if(attachment->GetFormat() == GL_DEPTH_COMPONENT || attachment->GetFormat() == GL_DEPTH_STENCIL) {
-                    boost::hash_combine(hashVal, depthFormat);
-                    if(attachment->GetFormat() == GL_DEPTH_STENCIL) {
-                        boost::hash_combine(hashVal, depthFormat); // again
-                    }
-                }
-                else {
-                    id<MTLTexture> texture = attachment->GetTextureName();
-                    MTLPixelFormat pixelFormat = [texture pixelFormat];
-                    int idx = attachment->GetAttach();
-                    
-                    boost::hash_combine(hashVal, pixelFormat);
-                }
-            }
-        }
-        else {
-//            if (gpus.mtlColorTexture != nil) {
-//                boost::hash_combine(hashVal, gpus.mtlColorTexture.pixelFormat);
-//            }
-//            else {
-                boost::hash_combine(hashVal, outputPixelFormat);
-//            }
-            
-//            if (gpus.mtlDepthTexture != nil) {
-//                boost::hash_combine(hashVal, gpus.mtlDepthTexture.pixelFormat);
-//            }
-//            else {
-                boost::hash_combine(hashVal, outputDepthFormat);
-//            }
-        }
+        boost::hash_combine(hashVal, outputPixelFormat);
+        boost::hash_combine(hashVal, outputDepthFormat);
 
         // Update colour attachments hash
         wq->currentColourAttachmentsHash = hashVal;
@@ -1077,72 +1037,38 @@ void MtlfMetalContext::SetRenderPipelineState()
     
         if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_DRAW_TARGET) {
             threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_DRAW_TARGET;
-            
-            if (drawTarget) {
-                auto& attachments = drawTarget->GetAttachments();
-                for(auto it : attachments) {
-                    MtlfDrawTarget::MtlfAttachment* attachment = ((MtlfDrawTarget::MtlfAttachment*)&(*it.second));
-                    MTLPixelFormat depthFormat = [attachment->GetTextureName() pixelFormat];
-                    
-                    if(attachment->GetFormat() == GL_DEPTH_COMPONENT || attachment->GetFormat() == GL_DEPTH_STENCIL) {
-                        renderPipelineStateDescriptor.depthAttachmentPixelFormat = depthFormat;
-                        if(attachment->GetFormat() == GL_DEPTH_STENCIL) {
-                            renderPipelineStateDescriptor.stencilAttachmentPixelFormat = depthFormat; //Do not use the stencil pixel format (X32_S8)
-                        }
-                    }
-                    else {
-                        id<MTLTexture> texture = attachment->GetTextureName();
-                        MTLPixelFormat pixelFormat = [texture pixelFormat];
-                        int idx = attachment->GetAttach();
-                        
-                        renderPipelineStateDescriptor.colorAttachments[idx].blendingEnabled = NO;
-                        renderPipelineStateDescriptor.colorAttachments[idx].pixelFormat = pixelFormat;
-                    }
-                }
+
+            if (blendState.alphaCoverageEnable) {
+                renderPipelineStateDescriptor.alphaToCoverageEnabled = YES;
             }
             else {
-                if (blendState.blendEnable) {
-                    renderPipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
-                }
-                else {
-                    renderPipelineStateDescriptor.colorAttachments[0].blendingEnabled = NO;
-                }
-                if (blendState.alphaCoverageEnable) {
-                    renderPipelineStateDescriptor.alphaToCoverageEnabled = YES;
-                }
-                else {
-                    renderPipelineStateDescriptor.alphaToCoverageEnabled = NO;
-                }
-                
-                renderPipelineStateDescriptor.colorAttachments[0].rgbBlendOperation = blendState.rgbBlendOp;
-                renderPipelineStateDescriptor.colorAttachments[0].alphaBlendOperation = blendState.alphaBlendOp;
-
-                renderPipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = blendState.sourceColorFactor;
-                renderPipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = blendState.sourceAlphaFactor;
-                renderPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = blendState.destColorFactor;
-                renderPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = blendState.destAlphaFactor;
-                
-//                if (gpus.mtlMultisampleColorTexture != nil) {
-//                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat =
-//                        gpus.mtlMultisampleColorTexture.pixelFormat;
-//                }
-//                else if (gpus.mtlColorTexture != nil) {
-//                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat =
-//                        gpus.mtlColorTexture.pixelFormat;
-//                }
-//                else {
-                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = outputPixelFormat;
-//                }
-                
-//                if (gpus.mtlDepthTexture != nil) {
-//                    renderPipelineStateDescriptor.depthAttachmentPixelFormat =
-//                        gpus.mtlDepthTexture.pixelFormat;
-//                }
-//                else {
-                    renderPipelineStateDescriptor.depthAttachmentPixelFormat = outputDepthFormat;
-//                    renderPipelineStateDescriptor.stencilAttachmentPixelFormat = outputDepthFormat;
-//                }
+                renderPipelineStateDescriptor.alphaToCoverageEnabled = NO;
             }
+            
+            for (int i = 0; i < METAL_MAX_COLOR_ATTACHMENTS; i++) {
+                if (!wq->currentRenderPassDescriptor.colorAttachments[i].texture) {
+                    break;
+                }
+                
+                if (blendState.blendEnable) {
+                    renderPipelineStateDescriptor.colorAttachments[i].blendingEnabled = YES;
+                }
+                else {
+                    renderPipelineStateDescriptor.colorAttachments[i].blendingEnabled = NO;
+                }
+
+                renderPipelineStateDescriptor.colorAttachments[i].rgbBlendOperation = blendState.rgbBlendOp;
+                renderPipelineStateDescriptor.colorAttachments[i].alphaBlendOperation = blendState.alphaBlendOp;
+
+                renderPipelineStateDescriptor.colorAttachments[i].sourceRGBBlendFactor = blendState.sourceColorFactor;
+                renderPipelineStateDescriptor.colorAttachments[i].sourceAlphaBlendFactor = blendState.sourceAlphaFactor;
+                renderPipelineStateDescriptor.colorAttachments[i].destinationRGBBlendFactor = blendState.destColorFactor;
+                renderPipelineStateDescriptor.colorAttachments[i].destinationAlphaBlendFactor = blendState.destAlphaFactor;
+                
+                renderPipelineStateDescriptor.colorAttachments[i].pixelFormat = outputPixelFormat;
+            }
+            
+            renderPipelineStateDescriptor.depthAttachmentPixelFormat = outputDepthFormat;
         }
 
         NSError *error = NULL;
@@ -1742,9 +1668,14 @@ void MtlfMetalContext::SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPa
         ReleaseEncoder(true);
     }
     
+    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_DRAW_TARGET;
     wq->currentRenderPassDescriptor = renderPassDescriptor;
 }
 
+void MtlfMetalContext::DirtyDrawTargets()
+{
+    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_DRAW_TARGET;
+}
 
 void MtlfMetalContext::ReleaseEncoder(bool endEncoding, MetalWorkQueueType workQueueType)
 {
