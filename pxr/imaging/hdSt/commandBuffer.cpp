@@ -254,7 +254,7 @@ HdStCommandBuffer::ExecuteDraw(
             renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionLoad;
 //            renderPassDescriptor.stencilAttachment.loadAction = MTLLoadActionLoad;
 
-            for (int i = 0; i < 8; i++) {
+            for (int i = 0; i < METAL_MAX_COLOR_ATTACHMENTS; i++) {
                 if (renderPassDescriptor.colorAttachments[i].loadAction == MTLLoadActionClear) {
                     renderPassDescriptor.colorAttachments[i].loadAction = MTLLoadActionLoad;
                 }

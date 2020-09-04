@@ -92,6 +92,8 @@ class HgiMetal;
 #define METAL_FEATURESET_FOR_DISPATCHTHREADS MTLFeatureSet_macOS_GPUFamily1_v1
 #endif
 
+#define METAL_MAX_COLOR_ATTACHMENTS 8 // Do not change - part of Metal spec.
+
 typedef std::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
 
 /// \class MtlfMetalContext

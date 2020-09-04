@@ -1045,8 +1045,7 @@ void MtlfMetalContext::SetRenderPipelineState()
                 renderPipelineStateDescriptor.alphaToCoverageEnabled = NO;
             }
             
-            int attachments = 8;
-            for (int i = 0; i < 8; i++) {
+            for (int i = 0; i < METAL_MAX_COLOR_ATTACHMENTS; i++) {
                 if (!wq->currentRenderPassDescriptor.colorAttachments[i].texture) {
                     break;
                 }
