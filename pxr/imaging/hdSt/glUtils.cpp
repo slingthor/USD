@@ -71,28 +71,27 @@ HdStBufferRelocator::AddRange(GLintptr readOffset,
 void
 HdStBufferRelocator::Commit(HgiBlitCmds* blitCmds)
 {
-    // APPLE METAL: We need to do this copy host side, otherwise later
-    // cpu copies into OTHER parts of this destination buffer see some of
-    // our GPU copied range trampled by alignment of the blit. The Metal
-    // spec says bytes outside of the range may be copied when calling
-    // didModifyRange
+    HgiBufferGpuToGpuOp blitOp;
+    blitOp.gpuSourceBuffer = _srcBuffer;
+    blitOp.gpuDestinationBuffer = _dstBuffer;
 
-//    HgiBufferGpuToGpuOp blitOp;
-//    blitOp.gpuSourceBuffer = _srcBuffer;
-//    blitOp.gpuDestinationBuffer = _dstBuffer;
-//
     TF_FOR_ALL (it, _queue) {
-//        blitOp.sourceByteOffset = it->readOffset;
-//        blitOp.byteSize = it->copySize;
-//        blitOp.destinationByteOffset = it->writeOffset;
-//
-//        blitCmds->CopyBufferGpuToGpu(blitOp);
+        blitOp.sourceByteOffset = it->readOffset;
+        blitOp.byteSize = it->copySize;
+        blitOp.destinationByteOffset = it->writeOffset;
 
+        blitCmds->CopyBufferGpuToGpu(blitOp);
+
+        // APPLE METAL: We need to do this copy host side, otherwise later
+        // cpu copies into OTHER parts of this destination buffer see some of
+        // our GPU copied range trampled by alignment of the blit. The Metal
+        // spec says bytes outside of the range may be copied when calling
+        // didModifyRange
         memcpy((char*)_dstBuffer->GetCPUStagingAddress() + it->writeOffset,
                (char*)_srcBuffer->GetCPUStagingAddress() + it->readOffset,
                it->copySize);
-        id<MTLBuffer> buffer = id<MTLBuffer>(_dstBuffer->GetRawResource());
-        [buffer didModifyRange:NSMakeRange(it->writeOffset, it->copySize)];
+//        id<MTLBuffer> buffer = id<MTLBuffer>(_dstBuffer->GetRawResource());
+//        [buffer didModifyRange:NSMakeRange(it->writeOffset, it->copySize)];
 
     }
     HD_PERF_COUNTER_ADD(HdStPerfTokens->copyBufferGpuToGpu,
