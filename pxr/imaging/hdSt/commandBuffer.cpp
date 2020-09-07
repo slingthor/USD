@@ -675,32 +675,34 @@ HdStCommandBuffer::FrustumCull(
         bvh.BuildBVH(&_drawItemInstances);
     }
 
-    uint64_t timeStart = ArchGetTickTime();
+    if (bvh.populated) {
+        uint64_t timeStart = ArchGetTickTime();
 
 
-    bvh.PerformCulling(simdViewProjMatrix, dimensions);
-    
-    MtlfMetalContext::GetMetalContext()->FlushBuffers();
+        bvh.PerformCulling(simdViewProjMatrix, dimensions);
+        
+        MtlfMetalContext::GetMetalContext()->FlushBuffers();
 
-    uint64_t timeDiff = ArchGetTickTime() - timeStart;
-    
-    static uint64_t fastestTime = 0xffffffffffffffff;
+        uint64_t timeDiff = ArchGetTickTime() - timeStart;
+        
+        static uint64_t fastestTime = 0xffffffffffffffff;
 
-//    fastestTime = std::min(fastestTime, timeDiff);
-//    NSLog(@"HdStCommandBuffer::FrustumCull: %.2fms (%.2fms fastest)",
-//          ArchTicksToNanoseconds(timeDiff) / 1000.0f / 1000.0f,
-//          ArchTicksToNanoseconds(fastestTime) / 1000.0f / 1000.0f);
+    //    fastestTime = std::min(fastestTime, timeDiff);
+    //    NSLog(@"HdStCommandBuffer::FrustumCull: %.2fms (%.2fms fastest)",
+    //          ArchTicksToNanoseconds(timeDiff) / 1000.0f / 1000.0f,
+    //          ArchTicksToNanoseconds(fastestTime) / 1000.0f / 1000.0f);
 
-    if (primCount.load()) {
-        NSLog(@"Scene prims: %lu", primCount.load());
+        if (primCount.load()) {
+            NSLog(@"Scene prims: %lu", primCount.load());
+        }
+        
+        _visibleSize = 0;
+    //    for (auto const& instance : _drawItemInstances) {
+    //        if (instance.IsVisible()) {
+    //            ++_visibleSize;
+    //        }
+    //    }
     }
-    
-    _visibleSize = 0;
-//    for (auto const& instance : _drawItemInstances) {
-//        if (instance.IsVisible()) {
-//            ++_visibleSize;
-//        }
-//    }
 }
 
 void
