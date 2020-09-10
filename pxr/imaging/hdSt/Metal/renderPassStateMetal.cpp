@@ -109,6 +109,21 @@ HdStRenderPassStateMetal::Bind()
     
     context->SetDepthComparisonFunction(HdStMetalConversions::GetGlDepthFunc(_depthFunc));
     context->SetDepthWriteEnable(_depthMaskEnabled);
+    
+    if (!_colorMaskUseDefault) {
+        switch(_colorMask) {
+            case HdStRenderPassState::ColorMaskNone:
+                context->SetColorWriteMask(MTLColorWriteMaskNone);
+                break;
+            case HdStRenderPassState::ColorMaskRGB:
+                context->SetColorWriteMask(
+                    MTLColorWriteMaskRed|MTLColorWriteMaskGreen|MTLColorWriteMaskBlue);
+                break;
+            case HdStRenderPassState::ColorMaskRGBA:
+                context->SetColorWriteMask(MTLColorWriteMaskAll);
+                break;
+        }
+    }
 /*
     // Apply polygon offset to whole pass.
     if (!_depthBiasUseDefault) {
@@ -196,7 +211,7 @@ HdStRenderPassStateMetal::Unbind()
                              MTLBlendFactorOne, MTLBlendFactorZero);
 
     context->SetDepthWriteEnable(true);
-
+    context->SetColorWriteMask(MTLColorWriteMaskAll);
 /*
     glDisable(GL_POLYGON_OFFSET_FILL);
     glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);

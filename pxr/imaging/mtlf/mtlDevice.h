@@ -275,6 +275,9 @@ public:
     void SetBlendColor(GfVec4f const &blendColor);
 
     MTLF_API
+    void SetColorWriteMask(MTLColorWriteMask mask);
+    
+    MTLF_API
     void SetDepthWriteEnable(bool depthWriteEnable);
     
     MTLF_API
@@ -563,6 +566,7 @@ protected:
         MTLBlendFactor destColorFactor;
         MTLBlendFactor sourceAlphaFactor;
         MTLBlendFactor destAlphaFactor;
+        MTLColorWriteMask writeMask;
         GfVec4f blendColor;
         size_t hashValue;
     } blendState;

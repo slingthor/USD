@@ -302,6 +302,7 @@ void MtlfMetalContext::Init()
     blendState.sourceAlphaFactor = MTLBlendFactorSourceAlpha;
     blendState.destAlphaFactor = MTLBlendFactorOneMinusSourceAlpha;
     blendState.blendColor = GfVec4f(1.0f);
+    blendState.writeMask = MTLColorWriteMaskAll;
     
     depthState.depthWriteEnable = true;
     depthState.depthCompareFunction = MTLCompareFunctionLessEqual;
@@ -690,21 +691,29 @@ void MtlfMetalContext::SetAlphaBlendingEnable(bool _blendEnable)
     blendState.blendEnable = _blendEnable;
 }
 
-void MtlfMetalContext::SetBlendOps(MTLBlendOperation _rgbBlendOp, MTLBlendOperation _alphaBlendOp) {
+void MtlfMetalContext::SetBlendOps(MTLBlendOperation _rgbBlendOp, MTLBlendOperation _alphaBlendOp)
+{
     blendState.rgbBlendOp = _rgbBlendOp;
     blendState.alphaBlendOp = _alphaBlendOp;
 }
 
 void MtlfMetalContext::SetBlendFactors(MTLBlendFactor _sourceColorFactor, MTLBlendFactor _destColorFactor,
-                                       MTLBlendFactor _sourceAlphaFactor, MTLBlendFactor _destAlphaFactor) {
+                                       MTLBlendFactor _sourceAlphaFactor, MTLBlendFactor _destAlphaFactor)
+{
     blendState.sourceColorFactor = _sourceColorFactor;
     blendState.destColorFactor = _destColorFactor;
     blendState.sourceAlphaFactor = _sourceAlphaFactor;
     blendState.destAlphaFactor = _destAlphaFactor;
 }
 
-void MtlfMetalContext::SetBlendColor(GfVec4f const &_blendColor) {
-    blendState.blendColor = _blendColor;
+void MtlfMetalContext::SetBlendColor(GfVec4f const &blendColor)
+{
+    blendState.blendColor = blendColor;
+}
+
+void MtlfMetalContext::SetColorWriteMask(MTLColorWriteMask mask)
+{
+    blendState.writeMask = mask;
 }
 
 void MtlfMetalContext::SetDepthWriteEnable(bool depthWriteEnable)
@@ -937,7 +946,7 @@ void MtlfMetalContext::SetRenderPipelineState()
     MetalWorkQueue *wq = threadState.currentWorkQueue;
     
     if (wq->currentEncoderType != MTLENCODERTYPE_RENDER || !wq->encoderInUse || !wq->currentRenderEncoder) {
-        TF_FATAL_CODING_ERROR("Not valid to call SetPipelineState() without an active render encoder");
+        TF_FATAL_CODING_ERROR("Not valid to call SetRenderPipelineState() without an active render encoder");
     }
     
     if (!threadState.enableMVA) {
@@ -976,6 +985,7 @@ void MtlfMetalContext::SetRenderPipelineState()
     boost::hash_combine(hashVal, blendState.sourceAlphaFactor);
     boost::hash_combine(hashVal, blendState.destColorFactor);
     boost::hash_combine(hashVal, blendState.destAlphaFactor);
+    boost::hash_combine(hashVal, blendState.writeMask);
     boost::hash_combine(hashVal, sampleCount);
 
     // If this matches the current pipeline state then we should already have the correct pipeline bound
@@ -1057,6 +1067,7 @@ void MtlfMetalContext::SetRenderPipelineState()
                     renderPipelineStateDescriptor.colorAttachments[i].blendingEnabled = NO;
                 }
 
+                renderPipelineStateDescriptor.colorAttachments[i].writeMask = blendState.writeMask;
                 renderPipelineStateDescriptor.colorAttachments[i].rgbBlendOperation = blendState.rgbBlendOp;
                 renderPipelineStateDescriptor.colorAttachments[i].alphaBlendOperation = blendState.alphaBlendOp;
 
@@ -1102,7 +1113,7 @@ void MtlfMetalContext::SetDepthStencilState()
     MetalWorkQueue *wq = threadState.currentWorkQueue;
     
     if (wq->currentEncoderType != MTLENCODERTYPE_RENDER || !wq->encoderInUse || !wq->currentRenderEncoder) {
-        TF_FATAL_CODING_ERROR("Not valid to call SetPipelineState() without an active render encoder");
+        TF_FATAL_CODING_ERROR("Not valid to call SetRenderPipelineState() without an active render encoder");
     }
     
     size_t hashVal = 0;
