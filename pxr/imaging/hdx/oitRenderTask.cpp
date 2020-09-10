@@ -129,15 +129,14 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
         return;
     }
     
-    // We render into a SSBO -- not MSSA compatible. On Metal we do not need to worry about setting/clearing MSAA
-    // state because Multisampling is not global state but is instead a property of every attachment.
+    // We render into a SSBO -- not MSSA compatible
+    bool oldMSAA = renderPassState->GetUseAovMultiSample();
+    renderPassState->SetUseAovMultiSample(false);
+
 #if defined(PXR_OPENGL_SUPPORT_ENABLED) && !defined(PXR_METAL_SUPPORT_ENABLED)
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
-    bool oldMSAA = false;
     bool oldPointSmooth = false;
     if (isOpenGL) {
-        oldMSAA = glIsEnabled(GL_MULTISAMPLE);
-        glDisable(GL_MULTISAMPLE);
         // XXX When rendering HdStPoints we set GL_POINTS and assume that
         //     GL_POINT_SMOOTH is enabled by default. This renders circles instead
         //     of squares. However, when toggling MSAA off (above) we see GL_POINTS
@@ -179,12 +178,10 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     // Post Execute Restore
     //
 
+    renderPassState->SetUseAovMultiSample(oldMSAA);
+    
 #if defined(PXR_OPENGL_SUPPORT_ENABLED) && !defined(PXR_METAL_SUPPORT_ENABLED)
     if (isOpenGL) {
-        if (oldMSAA) {
-            glEnable(GL_MULTISAMPLE);
-        }
-
         if (!oldPointSmooth) {
             glDisable(GL_POINT_SMOOTH);
         }

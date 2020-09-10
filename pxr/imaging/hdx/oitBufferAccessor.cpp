@@ -43,6 +43,7 @@
 #include "pxr/imaging/hgiGL/buffer.h"
 #endif
 #if defined(PXR_METAL_SUPPORT_ENABLED)
+#include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/buffer.h"
 #endif
 
@@ -189,15 +190,14 @@ HdxOitBufferAccessor::InitializeOitBuffersIfNecessary()
     uint8_t clearCounter = 255; // -1
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    id<MTLBuffer> mtlBuffer = HgiMetalBuffer::MTLBuffer(stCounterResource->GetId());
 
-    id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
+    id<MTLCommandBuffer> commandBuffer = context->GetHgi()->GetCommandBuffer();
     id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
 
+    id<MTLBuffer> mtlBuffer = HgiMetalBuffer::MTLBuffer(stCounterResource->GetId());
     [blitEncoder fillBuffer:mtlBuffer range:NSMakeRange(0, mtlBuffer.length) value:clearCounter];
 
     [blitEncoder endEncoding];
-    [commandBuffer commit];
 
 #elif defined(PXR_OPENGL_SUPPORT_ENABLED)
     const GLint clearCounter = -1;

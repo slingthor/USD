@@ -50,7 +50,7 @@
 #include "pxr/base/tf/iterator.h"
 
 // APPLE METAL:
-#import <Metal/Metal.h>
+#import "pxr/imaging/hgiMetal/buffer.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -87,12 +87,12 @@ HdStBufferRelocator::Commit(HgiBlitCmds* blitCmds)
         // our GPU copied range trampled by alignment of the blit. The Metal
         // spec says bytes outside of the range may be copied when calling
         // didModifyRange
-        memcpy((char*)_dstBuffer->GetCPUStagingAddress() + it->writeOffset,
-               (char*)_srcBuffer->GetCPUStagingAddress() + it->readOffset,
-               it->copySize);
-//        id<MTLBuffer> buffer = id<MTLBuffer>(_dstBuffer->GetRawResource());
-//        [buffer didModifyRange:NSMakeRange(it->writeOffset, it->copySize)];
-
+        HgiMetalBuffer* buffer = static_cast<HgiMetalBuffer*>(_srcBuffer.Get());
+        if ([buffer->GetBufferId() storageMode] == MTLStorageModeManaged) {
+            memcpy((char*)_dstBuffer->GetCPUStagingAddress() + it->writeOffset,
+                   (char*)_srcBuffer->GetCPUStagingAddress() + it->readOffset,
+                   it->copySize);
+        }
     }
     HD_PERF_COUNTER_ADD(HdStPerfTokens->copyBufferGpuToGpu,
                         (double)_queue.size());

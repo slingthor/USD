@@ -264,6 +264,9 @@ HdStCommandBuffer::ExecuteDraw(
             mtBatchDrawing = false;
         }
     }
+    else {
+        context->GetHgi()->BeginMtlf();
+    }
 
     uint64_t timeStart = ArchGetTickTime();
 
@@ -297,11 +300,10 @@ HdStCommandBuffer::ExecuteDraw(
 
 //        NSLog(@"Culled from %lu batches to %lu", _drawBatches.size(), visibleBatches.size());
         
-        unsigned const systemLimit = MAX(3, WorkGetConcurrencyLimit());
+        uint32_t const systemLimit = MAX(3, WorkGetConcurrencyLimit());
         
         // Limit the number of threads used to render with. Save two threads for the system
-        // unsigned const maxRenderThreads = MIN(MIN(systemLimit - 2, 6), visibleBatches.size());
-        unsigned const maxRenderThreads = 1;
+        uint32_t const maxRenderThreads = MIN(MIN(systemLimit - 2, 6), visibleBatches.size());
         if (maxRenderThreads) {
             WorkSetConcurrencyLimit(maxRenderThreads);
 
@@ -623,8 +625,8 @@ HdStCommandBuffer::FrustumCull(
         renderTargetWidth = 2048;
         renderTargetHeight = 2048;
     }
-    dimensions.x = 4.0f / renderTargetWidth;
-    dimensions.y = 4.0f / renderTargetHeight;
+    dimensions.x = 6.0f / renderTargetWidth;
+    dimensions.y = 6.0f / renderTargetHeight;
     
     MtlfMetalContext::GetMetalContext()->PrepareBufferFlush();
     

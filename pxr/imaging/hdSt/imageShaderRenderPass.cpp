@@ -165,9 +165,8 @@ HdSt_ImageShaderRenderPass::_Execute(
         std::dynamic_pointer_cast<HdStResourceRegistry>(
         GetRenderIndex()->GetResourceRegistry());
     TF_VERIFY(resourceRegistry);
-
+    
 	MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    context->StartFrameForThread();
 	
     // Create graphics work to render into aovs.
     const HgiGraphicsCmdsDesc desc =
@@ -186,7 +185,6 @@ HdSt_ImageShaderRenderPass::_Execute(
         if (!HdStResourceFactory::GetInstance()->IsOpenGL()) {
             if (desc.width) {
                 // Set the render pass descriptor for Mtlf to use with the render encoders
-                MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
                 MTLRenderPassDescriptor* rpd = context->GetHgi()->renderPassDescriptor;
                 
                 MTLPixelFormat colorFormat = MTLPixelFormatInvalid;
@@ -200,8 +198,9 @@ HdSt_ImageShaderRenderPass::_Execute(
 
                 context->SetRenderPassDescriptor(rpd);
                 context->SetOutputPixelFormats(colorFormat, depthFormat);
-            }
 
+                context->GetHgi()->BeginMtlf();
+            }
         }
     }
 
@@ -231,9 +230,7 @@ HdSt_ImageShaderRenderPass::_Execute(
     }
     
     if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
-        context->CommitCommandBufferForThread(true);
-        
-        context->EndFrameForThread();
+        context->CommitCommandBufferForThread(false);
     }
     
     if (gfxCmds) {
