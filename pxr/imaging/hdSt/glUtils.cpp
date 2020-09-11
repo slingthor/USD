@@ -81,18 +81,6 @@ HdStBufferRelocator::Commit(HgiBlitCmds* blitCmds)
         blitOp.destinationByteOffset = it->writeOffset;
 
         blitCmds->CopyBufferGpuToGpu(blitOp);
-
-        // APPLE METAL: We need to do this copy host side, otherwise later
-        // cpu copies into OTHER parts of this destination buffer see some of
-        // our GPU copied range trampled by alignment of the blit. The Metal
-        // spec says bytes outside of the range may be copied when calling
-        // didModifyRange
-        HgiMetalBuffer* buffer = static_cast<HgiMetalBuffer*>(_srcBuffer.Get());
-        if ([buffer->GetBufferId() storageMode] == MTLStorageModeManaged) {
-            memcpy((char*)_dstBuffer->GetCPUStagingAddress() + it->writeOffset,
-                   (char*)_srcBuffer->GetCPUStagingAddress() + it->readOffset,
-                   it->copySize);
-        }
     }
     HD_PERF_COUNTER_ADD(HdStPerfTokens->copyBufferGpuToGpu,
                         (double)_queue.size());
