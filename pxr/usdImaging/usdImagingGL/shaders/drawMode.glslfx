@@ -70,9 +70,10 @@
         "textureZNegOpacity" : {
             "default": [1.0]
         },
-         "activeTexCard" : {
-             "default": 0}
-     }
+        "activeTexCard" : {
+            "default": 0
+        }
+    }
 }
 
 --- --------------------------------------------------------------------------
@@ -124,4 +125,3 @@ vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
     color.a = diffuse.a;
     return color;
 }
-

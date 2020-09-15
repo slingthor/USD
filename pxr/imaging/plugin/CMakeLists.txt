@@ -1,5 +1,5 @@
 if (${PXR_ENABLE_GL_SUPPORT})
-	add_subdirectory(hdStormGL)
+#	add_subdirectory(hdStormGL)
 endif()
 if (${PXR_ENABLE_METAL_SUPPORT})
 	add_subdirectory(hdStormMetal)

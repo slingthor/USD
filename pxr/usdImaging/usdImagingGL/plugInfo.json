@@ -1,10 +1,15 @@
 {
     "Plugins": [
         {
-        	"Info": {
-			    "Types": {
-	                    }
-		          },
+            "Info": {
+                "Types": {
+                    "UsdImagingGLDrawModeAdapter" : {
+                        "bases": ["UsdImagingPrimAdapter"],
+                        "isInternal": true,
+                        "primTypeName": "__drawModeAdapter"
+                    }
+                }
+            },
             "LibraryPath": "@PLUG_INFO_LIBRARY_PATH@",
             "Name": "usdImagingGL",
             "ResourcePath": "@PLUG_INFO_RESOURCE_PATH@",

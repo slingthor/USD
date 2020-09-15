@@ -32,7 +32,7 @@
 #include "pxr/imaging/hd/material.h"
 
 #include "pxr/imaging/hio/glslfx.h"
-#include "pxr/imaging/glf/image.h"
+#include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/pxOsd/tokens.h"
 
 #include "pxr/usd/usdGeom/modelAPI.h"
@@ -1167,7 +1167,7 @@ UsdImagingGLDrawModeAdapter::_GetMatrixFromImageMetadata(
         file = asset.GetAssetPath();
     }
 
-    GlfImageSharedPtr img = GlfImage::OpenForReading(file);
+    GarchImageSharedPtr img = GarchImage::OpenForReading(file);
     if (!img) {
         return false;
     }
