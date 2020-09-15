@@ -1682,41 +1682,22 @@ UsdImagingDelegate::SetDisplayUnloadedPrimsWithBounds(bool displayUnloaded)
 GfInterval 
 UsdImagingDelegate::GetCurrentTimeSamplingInterval()
 {
+    TRACE_FUNCTION();
+
     float shutterOpen = 0.0f;
     float shutterClose = 0.0f;
 
     if (!_cameraPathForSampling.IsEmpty()) {
-        VtValue vShutterOpen;
-        VtValue vShutterClose;
-
-        if (!_valueCache.FindCameraParam(
-                _cameraPathForSampling, 
-                HdCameraTokens->shutterOpen, 
-                &vShutterOpen)) {
-            _UpdateSingleValue(_cameraPathForSampling, HdCamera::DirtyParams);
-
-            _valueCache.FindCameraParam(
-                _cameraPathForSampling, 
-                HdCameraTokens->shutterOpen, 
-                &vShutterOpen);
-        }
-
+        const VtValue vShutterOpen = GetCameraParamValue(
+            _cameraPathForSampling, 
+            HdCameraTokens->shutterOpen);
         if (vShutterOpen.IsHolding<double>()) {
             shutterOpen = vShutterOpen.Get<double>();
         }
 
-        if (!_valueCache.FindCameraParam(
-                _cameraPathForSampling, 
-                HdCameraTokens->shutterClose, 
-                &vShutterClose)) {
-            _UpdateSingleValue(_cameraPathForSampling, HdCamera::DirtyParams);
-
-            _valueCache.FindCameraParam(
-                _cameraPathForSampling, 
-                HdCameraTokens->shutterClose, 
-                &vShutterClose);
-        }
-
+        const VtValue vShutterClose = GetCameraParamValue(
+            _cameraPathForSampling, 
+            HdCameraTokens->shutterClose);
         if (vShutterClose.IsHolding<double>()) {
             shutterClose = vShutterClose.Get<double>();
         }
@@ -1737,12 +1718,18 @@ UsdImagingDelegate::SetCameraForSampling(SdfPath const& usdPath)
 TfToken
 UsdImagingDelegate::GetRenderTag(SdfPath const& id)
 {
+    TRACE_FUNCTION();
+
     SdfPath cachePath = ConvertIndexPathToCachePath(id);
+    _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
 
     // Check the purpose of the rpim
     TfToken purpose = UsdGeomTokens->default_;
-    TF_VERIFY(_valueCache.FindPurpose(cachePath, &purpose), "%s", 
-              cachePath.GetText());
+
+    if (TF_VERIFY(primInfo)) {
+        purpose = primInfo->adapter->GetPurpose(primInfo->usdPrim, cachePath,
+                    TfToken());
+    }
 
     if (purpose == UsdGeomTokens->default_) {
         // Simple mapping so all render tags in multiple delegates match
@@ -1775,7 +1762,9 @@ UsdImagingDelegate::GetBasisCurvesTopology(SdfPath const& id)
             primInfo->usdPrim, 
             cachePath, 
             _time);
-        return topology.Get<HdBasisCurvesTopology>();
+        if (topology.IsHolding<HdBasisCurvesTopology>()) {
+            return topology.Get<HdBasisCurvesTopology>();
+        }
     }
 
     return HdBasisCurvesTopology();
@@ -1795,7 +1784,9 @@ UsdImagingDelegate::GetMeshTopology(SdfPath const& id)
             primInfo->usdPrim, 
             cachePath, 
             _time);
-        return topology.Get<HdMeshTopology>();
+        if (topology.IsHolding<HdMeshTopology>()) {
+            return topology.Get<HdMeshTopology>();
+        }
     }
 
     return HdMeshTopology();
@@ -1805,7 +1796,7 @@ UsdImagingDelegate::GetMeshTopology(SdfPath const& id)
 UsdImagingDelegate::SubdivTags 
 UsdImagingDelegate::GetSubdivTags(SdfPath const& id)
 {
-    HD_TRACE_FUNCTION();
+    TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
     SdfPath cachePath = ConvertIndexPathToCachePath(id);
@@ -1821,18 +1812,16 @@ UsdImagingDelegate::GetSubdivTags(SdfPath const& id)
 GfRange3d 
 UsdImagingDelegate::GetExtent(SdfPath const& id)
 {
-    HD_TRACE_FUNCTION();
+    TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
+
     SdfPath cachePath = ConvertIndexPathToCachePath(id);
-    GfRange3d extent;
-    if (_valueCache.ExtractExtent(cachePath, &extent)) {
-        return extent;
+    _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
+    if (TF_VERIFY(primInfo)) {
+        return primInfo->adapter->GetExtent(
+            primInfo->usdPrim, cachePath, _time);
     }
-    // Slow path, we should not hit this.
-    TF_DEBUG(HD_SAFE_MODE).Msg("WARNING: Slow extent fetch for %s\n", 
-                               id.GetText());
-    _UpdateSingleValue(cachePath, HdChangeTracker::DirtyExtent);
-    TF_VERIFY(_valueCache.ExtractExtent(cachePath, &extent));
-    return extent;
+    return GfRange3d();
 }
 
 /*virtual*/ 
@@ -1841,11 +1830,13 @@ UsdImagingDelegate::GetDoubleSided(SdfPath const& id)
 {
     bool doubleSided = false;
     SdfPath cachePath = ConvertIndexPathToCachePath(id);
-    if (_valueCache.ExtractDoubleSided(cachePath, &doubleSided))
-        return doubleSided; 
+    _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
 
-    _UpdateSingleValue(cachePath, HdChangeTracker::DirtyDoubleSided);
-    TF_VERIFY(_valueCache.ExtractDoubleSided(cachePath, &doubleSided));
+    if (TF_VERIFY(primInfo)) {
+        doubleSided = primInfo->adapter->GetDoubleSided(
+            primInfo->usdPrim, cachePath, _time);
+    }
+    
     return doubleSided;
 }
 
@@ -2780,6 +2771,8 @@ VtValue
 UsdImagingDelegate::GetCameraParamValue(SdfPath const &id, 
                                         TfToken const &paramName)
 {
+    TRACE_FUNCTION();
+
     if (paramName == HdCameraTokens->windowPolicy) {
         // Hydra expects the window policy to be authored on the camera.
         // Since UsdGeomCamera doesn't have this property, we store the app
@@ -2788,24 +2781,15 @@ UsdImagingDelegate::GetCameraParamValue(SdfPath const &id,
     }
 
     SdfPath cachePath = ConvertIndexPathToCachePath(id);
-    VtValue value;
-    HdDirtyBits dirtyBit = HdCamera::Clean;
-    if (paramName == HdCameraTokens->worldToViewMatrix) {
-        dirtyBit = HdCamera::DirtyViewMatrix;
-    } else if (paramName == HdCameraTokens->projectionMatrix) {
-        dirtyBit = HdCamera::DirtyProjMatrix;
-    } else if (paramName == HdCameraTokens->clipPlanes) {
-        dirtyBit = HdCamera::DirtyClipPlanes;
-    } else {
-        dirtyBit = HdCamera::DirtyParams;
+    _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
+    if (TF_VERIFY(primInfo)) {
+        return primInfo->adapter->Get(
+            primInfo->usdPrim, 
+            cachePath, 
+            paramName,
+            _time);
     }
-    
-    _UpdateSingleValue(cachePath, dirtyBit);
-    if (!_valueCache.FindCameraParam(cachePath, paramName, &value)) {
-        // Fallback to USD attributes.
-        value = _GetUsdPrimAttribute(cachePath, paramName);
-    }
-    return value;
+    return VtValue();
 }
 
 HdVolumeFieldDescriptorVector
@@ -2830,21 +2814,12 @@ UsdImagingDelegate::GetExtComputationSceneInputNames(
     HD_TRACE_FUNCTION();
 
     SdfPath cachePath = ConvertIndexPathToCachePath(computationId);
-
-    TfTokenVector inputNames;
-    if (!_valueCache.ExtractExtComputationSceneInputNames(
-            cachePath, &inputNames)) {
-
-        TF_DEBUG(HD_SAFE_MODE).Msg("WARNING: Slow extComputation input "
-                                   "descriptor fetch for %s\n", 
-                                   computationId.GetText());
-        
-        _UpdateSingleValue(cachePath, HdExtComputation::DirtyInputDesc);
-        TF_VERIFY(_valueCache.ExtractExtComputationSceneInputNames(
-                      cachePath, &inputNames));
+    _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
+    if (TF_VERIFY(primInfo)) {
+        return primInfo->adapter
+            ->GetExtComputationSceneInputNames(computationId, cachePath);
     }
-
-    return inputNames;
+    return TfTokenVector();
 }
 
 HdExtComputationInputDescriptorVector

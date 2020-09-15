@@ -299,9 +299,8 @@ protected:
         HDST_API
         HdBufferSpecVector GetBufferSpecs() const;
         
-        /// APPLE METAL: HGI accessors needed for _StripedBufferArrayRange::CopyData()
+        /// APPLE METAL: HGI accessors needed for _StripedBufferArrayRange::ReadData()
         Hgi* GetHgi() { return _resourceRegistry->GetHgi(); }
-        HgiBlitCmds* GetBlitCmds() { return _resourceRegistry->GetBlitCmds(); }
 
     protected:
         HDST_API

@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/garch/textureRegistry.h"
 
 #include "pxr/base/work/loops.h"
@@ -114,7 +113,7 @@ HdStResourceRegistry::HdStResourceRegistry(Hgi * const hgi)
     // default aggregation strategy for single buffers (for nested instancer)
     , _singleAggregationStrategy(
         std::make_unique<HdStVBOSimpleMemoryManager>(this))
-    , _textureHandleRegistry(std::make_unique<HdSt_TextureHandleRegistry>(hgi))
+    , _textureHandleRegistry(std::make_unique<HdSt_TextureHandleRegistry>(this))
 {
 }
 
@@ -467,19 +466,15 @@ HdStResourceRegistry::AddSource(HdBufferSourceSharedPtr const &source)
 
 void
 HdStResourceRegistry::AddComputation(HdBufferArrayRangeSharedPtr const &range,
-                                   HdComputationSharedPtr const &computation)
+                                   HdComputationSharedPtr const &computation,
+                                   HdStComputeQueue const queue)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    // if the computation is buffer source computation, it will be appended
-    // into pendingBufferSourceComputations, which is executed right after
-    // the first buffer source transfers. Those computations produce
-    // buffer sources as results of computation, so the registry also invokes
-    // another transfers for such buffers. The computation isn't marked
-    // as a buffer source computation will be executed at the end.
-
-    _pendingComputations.emplace_back(range, computation);
+    if (TF_VERIFY(queue < HdStComputeQueueCount)) {
+        _pendingComputations[queue].emplace_back(range, computation);
+    }
 }
 
 /// ------------------------------------------------------------------------
@@ -681,7 +676,7 @@ std::ostream &operator <<(
 }
 
 HgiBlitCmds*
-HdStResourceRegistry::GetBlitCmds()
+HdStResourceRegistry::GetGlobalBlitCmds()
 {
     if (!_blitCmds) {
         _blitCmds = _hgi->CreateBlitCmds();
@@ -689,11 +684,30 @@ HdStResourceRegistry::GetBlitCmds()
     return _blitCmds.get();
 }
 
-void HdStResourceRegistry::SubmitHgiWork()
+HgiComputeCmds*
+HdStResourceRegistry::GetGlobalComputeCmds()
+{
+    if (!_computeCmds) {
+        _computeCmds = _hgi->CreateComputeCmds();
+    }
+    return _computeCmds.get();
+}
+
+void
+HdStResourceRegistry::SubmitBlitWork()
 {
     if (_blitCmds) {
         _hgi->SubmitCmds(_blitCmds.get());
         _blitCmds.reset();
+    }
+}
+
+void
+HdStResourceRegistry::SubmitComputeWork()
+{
+    if (_computeCmds) {
+        _hgi->SubmitCmds(_computeCmds.get());
+        _computeCmds.reset();
     }
 }
 
@@ -711,6 +725,9 @@ HdStResourceRegistry::_CommitTextures()
     for (HdStShaderCodeSharedPtr const & shaderCode : shaderCodes) {
         shaderCode->AddResourcesFromTextures(ctx);
     }
+
+    // MipMap generation for textures requires us to submit blit work.
+    SubmitBlitWork();
 }
 
 void
@@ -782,31 +799,29 @@ HdStResourceRegistry::_Commit()
         // for each gpu computation, make sure its destination buffer to be
         // allocated.
         //
-        for (_PendingComputation &pendingComp : _pendingComputations) {
-            HdComputationSharedPtr const &comp = pendingComp.computation;
-            HdBufferArrayRangeSharedPtr &dstRange = pendingComp.range;
-            if (dstRange) {
-                // ask the size of destination buffer of the gpu computation
-                int numElements = comp->GetNumOutputElements();
-                if (numElements > 0) {
-                    // We call BufferArray->Reallocate() later so that
-                    // the reallocation happens only once per BufferArray.
-                    //
-                    // if the range is already larger than the current one,
-                    // leave it as it is (there is a possibilty that GPU
-                    // computation generates less data than it was).
-                    int currentNumElements = dstRange->GetNumElements();
-                    if (currentNumElements < numElements) {
-                        dstRange->Resize(numElements);
-                    }
-                 }
+        for (_PendingComputationList& compVec : _pendingComputations) {
+            for (_PendingComputation &pendingComp : compVec) {
+                HdComputationSharedPtr const &comp = pendingComp.computation;
+                HdBufferArrayRangeSharedPtr &dstRange = pendingComp.range;
+                if (dstRange) {
+                    // ask the size of destination buffer of the gpu computation
+                    int numElements = comp->GetNumOutputElements();
+                    if (numElements > 0) {
+                        // We call BufferArray->Reallocate() later so that
+                        // the reallocation happens only once per BufferArray.
+                        //
+                        // if the range is already larger than the current one,
+                        // leave it as it is (there is a possibilty that GPU
+                        // computation generates less data than it was).
+                        int currentNumElements = dstRange->GetNumElements();
+                        if (currentNumElements < numElements) {
+                            dstRange->Resize(numElements);
+                        }
+                     }
+                }
             }
         }
     }
-
-    // APPLE METAL: Only here to ensure Mtlf flushes it's buffer updates
-//    HgiMetal* hgiMetal = static_cast<HgiMetal*>(_hgi);
-//    hgiMetal->CommitCommandBuffer(HgiMetal::CommitCommandBuffer_NoWait, true);
 
     {
         HD_TRACE_SCOPE("Reallocate buffer arrays");
@@ -828,7 +843,7 @@ HdStResourceRegistry::_Commit()
         // Ideally we wouldn't have requested the GPU copy at all (as it's
         // redundant) but we did, so we need to ensure these operations are
         // completed before we issue the CPU to GPU updates.
-        SubmitHgiWork();
+        SubmitBlitWork();
     }
 
     {
@@ -866,8 +881,15 @@ HdStResourceRegistry::_Commit()
         HD_TRACE_SCOPE("Flush");
         // 5. flush phase:
         //
-        // flush cosolidated buffer updates
-        SubmitHgiWork();
+        // flush consolidated / staging buffer updates
+
+        _nonUniformAggregationStrategy->Flush();
+        _nonUniformImmutableAggregationStrategy->Flush();
+        _uniformUboAggregationStrategy->Flush();
+        _uniformSsboAggregationStrategy->Flush();
+        _singleAggregationStrategy->Flush();
+
+        SubmitBlitWork();
     }
 
     {
@@ -878,16 +900,22 @@ HdStResourceRegistry::_Commit()
         // they are registered.
         //   e.g. smooth normals -> quadrangulation.
         //
-        for (_PendingComputation &pendingComp : _pendingComputations) {
-            HdComputationSharedPtr const &comp = pendingComp.computation;
-            HdBufferArrayRangeSharedPtr &dstRange = pendingComp.range;
-            comp->Execute(dstRange, this);
+        for (_PendingComputationList& compVec : _pendingComputations) {
+            for (_PendingComputation &pendingComp : compVec) {
+                HdComputationSharedPtr const &comp = pendingComp.computation;
+                HdBufferArrayRangeSharedPtr &dstRange = pendingComp.range;
+                comp->Execute(dstRange, this);
+                HD_PERF_COUNTER_INCR(HdPerfTokens->computationsCommited);
+            }
 
-            HD_PERF_COUNTER_INCR(HdPerfTokens->computationsCommited);
+            // Submit Hgi work between each computation queue to ensure
+            // synchronization (barriers) happens.
+            // Some computations may use BlitCmds (CopyComputation) so we must
+            // submit blit and compute work.
+            SubmitBlitWork();
+            SubmitComputeWork();
         }
     }
-
-    SubmitHgiWork();
 
     // release sources
     WorkParallelForEach(_pendingSources.begin(), _pendingSources.end(),
@@ -898,7 +926,9 @@ HdStResourceRegistry::_Commit()
 
     _pendingSources.clear();
     _numBufferSourcesToResolve = 0;
-    _pendingComputations.clear();
+    for (_PendingComputationList& compVec : _pendingComputations) {
+        compVec.clear();
+    }
 }
 
 void
@@ -972,7 +1002,8 @@ HdStResourceRegistry::_GarbageCollect()
     _uniformSsboBufferArrayRegistry.GarbageCollect();
     _singleBufferArrayRegistry.GarbageCollect();
 
-    SubmitHgiWork();
+    // Garbage collection may reallocate buffers, so we must submit blit work.
+    SubmitBlitWork();
 }
 
 void
@@ -1058,7 +1089,8 @@ HdStResourceRegistry::_UpdateBufferArrayRange(
     for (const auto& spec : migrateSpecs) {
         AddComputation(/*dstRange*/newRange,
                        std::make_shared<HdStCopyComputationGPU>(
-                           /*src=*/curRange, spec.name));
+                           /*src=*/curRange, spec.name),
+                       /*CopyComp queue*/HdStComputeQueueZero);
     }
 
     // Increment version of the underlying bufferArray to notify

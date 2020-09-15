@@ -960,9 +960,7 @@ HdSt_IndirectDrawBatch::PrepareDraw(
         }
     }
     
-    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-    
-    _PrepareDraw(gpuCulling, freezeCulling);
+    _PrepareDraw(resourceRegistry, gpuCulling, freezeCulling);
 }
 
 void

@@ -144,6 +144,7 @@ HgiGL::DestroyTextureView(HgiTextureViewHandle* viewHandle)
     _TrashObject(&texHandle, _garbageCollector.GetTextureList());
     (*viewHandle)->SetViewTexture(HgiTextureHandle());
     delete viewHandle->Get();
+    *viewHandle = HgiTextureViewHandle();
 }
 
 HgiSamplerHandle

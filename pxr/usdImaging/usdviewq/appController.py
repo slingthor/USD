@@ -344,6 +344,13 @@ class AppController(QtCore.QObject):
             settings2Path = os.path.join(settingsPathDir, "state.json")
             self._settings2 = settings2.Settings(SETTINGS_VERSION, settings2Path)
 
+    def _setupCustomFont(self):
+        fontResourceDir = os.path.join(os.path.dirname(
+            os.path.realpath(__file__)), "fonts")
+        from glob import glob
+        for fontFile in glob(os.path.join(fontResourceDir, "*", "*.ttf")):
+            fontFilePath = os.path.join(fontResourceDir, fontFile)
+            QtGui.QFontDatabase.addApplicationFont(fontFilePath)
 
     def _setStyleSheetUsingState(self):
         # We use a style file that is actually a template, which we fill
@@ -357,12 +364,7 @@ class AppController(QtCore.QObject):
         fontSize = self._dataModel.viewSettings.fontSize
         baseFontSizeStr = "%spt" % str(fontSize)
         
-        # The choice of 8 for smallest smallSize is for performance reasons,
-        # based on the "Gotham Rounded" font used by usdviewstyle.qss . If we
-        # allow it to float, we get a 2-3 hundred millisecond hit in startup
-        # time as Qt (apparently) manufactures a suitably sized font.  
-        # Mysteriously, we don't see this cost for larger font sizes.
-        smallSize = 8 if fontSize < 12 else int(round(fontSize * 0.8))
+        smallSize = int(round(fontSize * 0.8))
         smallFontSizeStr = "%spt" % str(smallSize)
 
         # Apply the style sheet to it
@@ -370,7 +372,7 @@ class AppController(QtCore.QObject):
         sheetString = sheet.read() % {
             'RESOURCE_DIR'  : resourceDir,
             'BASE_FONT_SZ'  : baseFontSizeStr,
-            'SMALL_FONT_SZ' : smallFontSizeStr }
+            'SMALL_FONT_SZ' : smallFontSizeStr}
 
         app = QtWidgets.QApplication.instance()
         app.setStyleSheet(sheetString)
@@ -430,6 +432,9 @@ class AppController(QtCore.QObject):
 
             self._dataModel = UsdviewDataModel(
                 self._printTiming, self._settings2)
+
+            # Setup Default bundled fonts (Roboto)
+            self._setupCustomFont()
 
             # Now that we've read in our state and applied parserData
             # overrides, we can process our styleSheet... *before* we
@@ -2428,9 +2433,6 @@ class AppController(QtCore.QObject):
     def _toggleAutoComputeClippingPlanes(self):
         autoClip = self._ui.actionAuto_Compute_Clipping_Planes.isChecked()
         self._dataModel.viewSettings.autoComputeClippingPlanes = autoClip
-        if autoClip:
-            self._stageView.detachAndReClipFromCurrentCamera()
-        
 
     def _setUseExtentsHint(self):
         self._dataModel.useExtentsHint = self._ui.useExtentsHint.isChecked()

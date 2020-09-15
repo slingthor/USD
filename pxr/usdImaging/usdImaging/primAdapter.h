@@ -390,14 +390,15 @@ public:
         SdfPath const& cachePath,
         UsdTimeCode time) const;
 
-    /// Returns the purpose token for \p prim. If an \p instancerContext is 
-    /// provided and the prim doesn't have an explicitly authored or inherited 
-    /// purpose, it may inherit the instancerContext's purpose if the instance
-    /// has an explicit purpose.
+    /// Returns the purpose token for \p prim. If a non-empty \p
+    /// instanceInheritablePurpose is specified and the prim doesn't have an 
+    /// explicitly authored or inherited purpose, it may inherit the 
+    /// instancer's purpose if the instance has an explicit purpose.
     USDIMAGING_API
-    TfToken GetPurpose(
+    virtual TfToken GetPurpose(
         UsdPrim const& prim, 
-        UsdImagingInstancerContext const* instancerContext) const;
+        SdfPath const& cachePath,
+        TfToken const& instanceInheritablePurpose) const;
 
     /// Returns the purpose token for \p prim, but only if it is inheritable 
     /// by child prims (i.e. it is an explicitly authored purpose on the prim
@@ -463,6 +464,28 @@ public:
     virtual VtValue GetTopology(UsdPrim const& prim,
                                 SdfPath const& cachePath,
                                 UsdTimeCode time) const;
+
+    /// Reads the extent from the given prim. If the extent is not authored,
+    /// an empty GfRange3d is returned, the extent will not be computed.
+    USDIMAGING_API
+    virtual GfRange3d GetExtent(UsdPrim const& prim, 
+                                SdfPath const& cachePath, 
+                                UsdTimeCode time) const;
+
+    /// Reads double-sided from the given prim. If not authored, returns false
+    USDIMAGING_API
+    virtual bool GetDoubleSided(UsdPrim const& prim, 
+                        SdfPath const& cachePath, 
+                        UsdTimeCode time) const;
+
+
+    // ---------------------------------------------------------------------- //
+    /// \name ExtComputations
+    // ---------------------------------------------------------------------- //
+    USDIMAGING_API
+    virtual const TfTokenVector &GetExtComputationSceneInputNames(
+        SdfPath const& computationPath,
+        SdfPath const& cachePath) const;
 
     // ---------------------------------------------------------------------- //
     /// \name Render Index Compatibility

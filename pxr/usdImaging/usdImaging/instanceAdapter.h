@@ -91,7 +91,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 class UsdImagingInstanceAdapter : public UsdImagingPrimAdapter
 {
 public:
-    typedef UsdImagingPrimAdapter BaseAdapter;
+    using BaseAdapter = UsdImagingPrimAdapter;
 
     UsdImagingInstanceAdapter();
     virtual ~UsdImagingInstanceAdapter();
@@ -126,7 +126,8 @@ public:
 
     virtual HdDirtyBits ProcessPropertyChange(UsdPrim const& prim,
                                               SdfPath const& cachePath,
-                                              TfToken const& propertyName) override;
+                                              TfToken const& propertyName) 
+                                                  override;
 
     virtual void ProcessPrimResync(SdfPath const& cachePath,
                                    UsdImagingIndexProxy* index) override;
@@ -167,8 +168,6 @@ public:
                                      SdfPath const& cachePath,
                                      UsdImagingIndexProxy* index) override;
 
-
-
     // ---------------------------------------------------------------------- //
     /// \name Instancing
     // ---------------------------------------------------------------------- //
@@ -201,6 +200,11 @@ public:
                   float *sampleTimes,
                   VtValue *sampleValues) override;
 
+    TfToken GetPurpose(
+        UsdPrim const& usdPrim, 
+        SdfPath const& cachePath,
+        TfToken const& instanceInheritablePurpose) const override;
+
     PxOsdSubdivTags GetSubdivTags(UsdPrim const& usdPrim,
                                   SdfPath const& cachePath,
                                   UsdTimeCode time) const override;
@@ -212,6 +216,18 @@ public:
     HdCullStyle GetCullStyle(UsdPrim const& prim,
                              SdfPath const& cachePath,
                              UsdTimeCode time) const override;
+
+    GfRange3d GetExtent(UsdPrim const& usdPrim, 
+                        SdfPath const& cachePath, 
+                        UsdTimeCode time) const override;
+
+    bool GetVisible(UsdPrim const& usdPrim, 
+                    SdfPath const& cachePath,
+                    UsdTimeCode time) const override;
+
+    bool GetDoubleSided(UsdPrim const& prim, 
+                        SdfPath const& cachePath, 
+                        UsdTimeCode time) const override;
 
     // ---------------------------------------------------------------------- //
     /// \name Nested instancing support

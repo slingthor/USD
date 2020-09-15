@@ -102,6 +102,11 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
     # emitted when any view setting which may affect the rendered image changes
     signalVisibleSettingChanged = QtCore.Signal()
 
+    # emitted when autoClipping changes value, so that clients can initialize
+    # it efficiently.  This signal will be emitted *before* 
+    # signalVisibleSettingChanged when autoClipping changes.
+    signalAutoComputeClippingPlanesChanged = QtCore.Signal()
+
     # emitted when any aspect of the defaultMaterial changes
     signalDefaultMaterialChanged = QtCore.Signal()
 
@@ -385,6 +390,7 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
     @visibleViewSetting
     def autoComputeClippingPlanes(self, value):
         self._autoComputeClippingPlanes = value
+        self.signalAutoComputeClippingPlanesChanged.emit()
 
     @property
     def showBBoxPlayback(self):

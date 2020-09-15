@@ -170,6 +170,21 @@ public:
     static SdfPath _ResolveCachePath(SdfPath const& usdPath,
             UsdImagingInstancerContext const* instancerContext);
 
+    /// Reads the extent from the given prim. If the extent is not authored,
+    /// an empty GfRange3d is returned, the extent will not be computed.
+    USDIMAGING_API
+    GfRange3d GetExtent(UsdPrim const& prim, 
+                        SdfPath const& cachePath, 
+                        UsdTimeCode time) const override;
+
+    /// Reads double-sided from the given prim. If not authored, returns false
+    USDIMAGING_API
+    bool GetDoubleSided(UsdPrim const& prim, 
+                        SdfPath const& cachePath, 
+                        UsdTimeCode time) const override;
+
+
+
 protected:
 
     USDIMAGING_API
@@ -186,14 +201,6 @@ protected:
     UsdGeomPrimvar _GetInheritedPrimvar(UsdPrim const& prim,
                                         TfToken const& primvarName) const;
 
-private:
-
-    /// Reads the extent from the given prim. If the extent is not authored,
-    /// an empty GfRange3d is returned, the extent will not be computed.
-    GfRange3d _GetExtent(UsdPrim const& prim, UsdTimeCode time) const;
-
-    /// Returns the doubleSided state for a given prim.
-    bool _GetDoubleSided(UsdPrim const& prim) const;
 };
 
 

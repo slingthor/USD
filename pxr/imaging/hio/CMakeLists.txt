@@ -21,11 +21,9 @@ pxr_library(hio
 
     PRIVATE_CLASSES
         debugCodes
+        dictionary
 
     PUBLIC_HEADERS
         api.h
-
-    CPPFILES
-        dictionary.cpp
 
 )

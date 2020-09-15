@@ -39,6 +39,7 @@
 #include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
+#include "pxr/imaging/hdSt/surfaceShader.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hd/binding.h"
@@ -2722,7 +2723,7 @@ HdSt_CodeGenMSL::GetComputeHeader()
     
     // XXX: this macro is still used in GlobalUniform.
     header  << "#define MAT4 mat4\n";
-    
+
     // a trick to tightly pack vec3 into SSBO/UBO.
     header  << _GetPackedTypeDefinitions();
     
@@ -3424,6 +3425,17 @@ HdSt_CodeGenMSL::_GenerateCommonDefinitions()
 void
 HdSt_CodeGenMSL::_GenerateCommonCode()
 {
+    // check if surface shader has masked material tag
+    for (auto const& shader : _shaders) {
+        if (HdStSurfaceShaderSharedPtr surfaceShader =
+            std::dynamic_pointer_cast<HdStSurfaceShader>(shader)) {
+            if (surfaceShader->GetMaterialTag() ==
+                HdStMaterialTagTokens->masked) {
+                _genCommon << "#define HD_MATERIAL_TAG_MASKED 1\n";
+            }
+        }
+    }
+
     _genCommon  << "class ProgramScope<st> {\n"
                 << "public:\n";
 

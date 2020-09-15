@@ -26,6 +26,7 @@
 #include "pxr/imaging/hdSt/textureObject.h"
 
 #include "pxr/imaging/hdSt/glfTextureCpuData.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/textureCpuData.h"
 #include "pxr/imaging/hdSt/textureObjectRegistry.h"
 #include "pxr/imaging/hdSt/subtextureIdentifier.h"
@@ -38,6 +39,7 @@
 #ifdef PXR_OPENVDB_SUPPORT_ENABLED
 #include "pxr/imaging/garch/vdbTextureData.h"
 #endif
+#include "pxr/imaging/garch/field3DTextureDataBase.h"
 #include "pxr/imaging/garch/ptexTexture.h"
 #include "pxr/imaging/garch/udimTexture.h"
 
@@ -70,14 +72,29 @@ HdStTextureObject::SetTargetMemory(const size_t targetMemory)
     _textureObjectRegistry->MarkTextureObjectDirty(shared_from_this());
 }
 
-Hgi *
-HdStTextureObject::_GetHgi() const
+HdStResourceRegistry*
+HdStTextureObject::_GetResourceRegistry() const
 {
     if (!TF_VERIFY(_textureObjectRegistry)) {
         return nullptr;
     }
 
-    Hgi * const hgi = _textureObjectRegistry->GetHgi();
+    HdStResourceRegistry* const registry =
+        _textureObjectRegistry->GetResourceRegistry();
+    TF_VERIFY(registry);
+
+    return registry;
+}
+
+Hgi *
+HdStTextureObject::_GetHgi() const
+{
+    HdStResourceRegistry* const registry = _GetResourceRegistry();
+    if (!TF_VERIFY(registry)) {
+        return nullptr;
+    }
+
+    Hgi * const hgi = registry->GetHgi();
     TF_VERIFY(hgi);
 
     return hgi;
@@ -280,8 +297,8 @@ HdStUvTextureObject::_CreateTexture(const HgiTextureDesc &desc)
 void
 HdStUvTextureObject::_GenerateMipmaps()
 {
-    Hgi * const hgi = _GetHgi();
-    if (!TF_VERIFY(hgi)) {
+    HdStResourceRegistry * const registry = _GetResourceRegistry();
+    if (!TF_VERIFY(registry)) {
         return;
     }
 
@@ -289,9 +306,8 @@ HdStUvTextureObject::_GenerateMipmaps()
         return;
     }
 
-    HgiBlitCmdsUniquePtr const blitCmds = hgi->CreateBlitCmds();
+    HgiBlitCmds* const blitCmds = registry->GetGlobalBlitCmds();
     blitCmds->GenerateMipMaps(_gpuTexture);
-    hgi->SubmitCmds(blitCmds.get());
 }
 
 void
@@ -478,22 +494,38 @@ _ComputeFieldTexData(
     const HdStTextureIdentifier &textureId,
     const size_t targetMemory)
 {
+    const std::string &filePath = textureId.GetFilePath().GetString();
     const HdStSubtextureIdentifier * const subId =
         textureId.GetSubtextureIdentifier();
 
 #ifdef PXR_OPENVDB_SUPPORT_ENABLED
     if (const HdStOpenVDBAssetSubtextureIdentifier * const vdbSubId =
             dynamic_cast<const HdStOpenVDBAssetSubtextureIdentifier*>(subId)) {
+        if (vdbSubId->GetFieldIndex() != 0) {
+            TF_WARN("Support of field index when reading OpenVDB file not yet "
+                    "implemented (file: %s, field name: %s, field index: %d",
+                    filePath.c_str(),
+                    vdbSubId->GetFieldName().GetText(),
+                    vdbSubId->GetFieldIndex());
+        }
         return GarchVdbTextureData::New(
-            textureId.GetFilePath().GetString(),
-            vdbSubId->GetFieldName(), targetMemory);
+            filePath, vdbSubId->GetFieldName(), targetMemory);
     }
 #endif
 
     if (const HdStField3DAssetSubtextureIdentifier * const f3dSubId =
             dynamic_cast<const HdStField3DAssetSubtextureIdentifier*>(subId)) {
-        TF_WARN("No Field3D support yet.");
-        return TfNullPtr;
+        GarchField3DTextureDataBaseRefPtr const texData =
+            GarchField3DTextureDataBase::New(
+                filePath,
+                f3dSubId->GetFieldName(),
+                f3dSubId->GetFieldIndex(),
+                f3dSubId->GetFieldPurpose(),
+                targetMemory);
+        if (!texData) {
+            TF_WARN("Could not find plugin to load Field3D file.");
+        }
+        return texData;
     }
 
     TF_CODING_ERROR("Unsupported field subtexture identifier");

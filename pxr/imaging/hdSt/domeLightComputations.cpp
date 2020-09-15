@@ -235,19 +235,20 @@ HdSt_DomeLightComputationGPU::Execute(
     }
     HgiComputePipelineHandle pipeline = hgi->CreateComputePipeline(desc);
 
-    HgiComputeCmdsUniquePtr computeCmds = hgi->CreateComputeCmds();
+    HgiComputeCmds* computeCmds = hdStResourceRegistry->GetGlobalComputeCmds();
     computeCmds->PushDebugGroup("DomeLightComputationCmds");
     computeCmds->BindResources(resourceBindings);
     computeCmds->BindPipeline(pipeline);
 
-    // if we are calculating the irradiance map we do not need to send over
+    // Queue transfer uniform buffer.
+    // If we are calculating the irradiance map we do not need to send over
     // the roughness value to the shader
     // flagged this with a negative roughness value
     if (hasUniforms) {
         computeCmds->SetConstantValues(pipeline, 0, sizeof(uniform), &uniform);
     }
 
-    // dispatch compute kernel
+    // Queue compute work
     // APPLE METAL: Temp - currently dispatch sizes are not abstracted yet
     if (hgi->GetAPIName() == HgiTokens->Metal) {
         computeCmds->Dispatch(width, height);
@@ -257,9 +258,8 @@ HdSt_DomeLightComputationGPU::Execute(
     }
 
     computeCmds->PopDebugGroup();
-    hgi->SubmitCmds(computeCmds.get());
 
-    // destroy the intermediate resources
+    // Garbage collect the intermediate resources (destroyed at end of frame).
     hgi->DestroyTextureView(&dstTextureView);
     hgi->DestroyComputePipeline(&pipeline);
     hgi->DestroyResourceBindings(&resourceBindings);

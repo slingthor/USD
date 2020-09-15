@@ -156,9 +156,6 @@ public:
     void Render(const UsdPrim& root, 
                 const UsdImagingGLRenderParams &params);
 
-    USDIMAGINGGL_API
-    void InvalidateBuffers();
-
     /// Returns true if the resulting image is fully converged.
     /// (otherwise, caller may need to call Render() again to refine the result)
     USDIMAGINGGL_API
@@ -285,7 +282,8 @@ public:
     ///
     /// Returns whether a hit occurred and if so, \p outHitPoint will contain
     /// the intersection point in world space (i.e. \p projectionMatrix and
-    /// \p viewMatrix factored back out of the result).
+    /// \p viewMatrix factored back out of the result), and \p outHitNormal
+    /// will contain the world space normal at that point.
     ///
     /// \p outHitPrimPath will point to the gprim selected by the pick.
     /// \p outHitInstancerPath will point to the point instancer (if applicable)
@@ -299,6 +297,7 @@ public:
         const UsdPrim& root,
         const UsdImagingGLRenderParams &params,
         GfVec3d *outHitPoint,
+        GfVec3d *outHitNormal,
         SdfPath *outHitPrimPath = NULL,
         SdfPath *outHitInstancerPath = NULL,
         int *outHitInstanceIndex = NULL,
@@ -489,17 +488,15 @@ protected:
     void _Execute(const UsdImagingGLRenderParams &params,
                   HdTaskSharedPtrVector tasks);
 
-    // These functions factor batch preparation into separate steps so they
-    // can be reused by both the vectorized and non-vectorized API.
     USDIMAGINGGL_API
-    bool _CanPrepareBatch(const UsdPrim& root, 
-        const UsdImagingGLRenderParams& params);
+    bool _CanPrepare(const UsdPrim& root);
     USDIMAGINGGL_API
-    void _PreSetTime(const UsdPrim& root, 
-        const UsdImagingGLRenderParams& params);
+    void _PreSetTime(const UsdImagingGLRenderParams& params);
     USDIMAGINGGL_API
-    void _PostSetTime(const UsdPrim& root, 
-        const UsdImagingGLRenderParams& params);
+    void _PostSetTime(const UsdImagingGLRenderParams& params);
+
+    USDIMAGINGGL_API
+    void _PrepareRender(const UsdImagingGLRenderParams& params);
 
     // Create a hydra collection given root paths and render params.
     // Returns true if the collection was updated.

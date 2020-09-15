@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdSt/copyComputation.h"
@@ -116,10 +115,8 @@ HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
         blitOp.byteSize = copySize;
         blitOp.destinationByteOffset = writeOffset;
 
-        Hgi* hgi = hdStResourceRegistry->GetHgi();
-        HgiBlitCmdsUniquePtr blitCmds = hgi->CreateBlitCmds();
+        HgiBlitCmds* blitCmds = hdStResourceRegistry->GetGlobalBlitCmds();
         blitCmds->CopyBufferGpuToGpu(blitOp);
-        hgi->SubmitCmds(blitCmds.get());
     }
 
     GLF_POST_PENDING_GL_ERRORS();

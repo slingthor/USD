@@ -421,9 +421,44 @@ UsdImagingGLDrawModeAdapter::GetTopology(UsdPrim const& prim,
     GfRange3d extent;
     _ComputeGeometryData(prim, cachePath, time, drawMode, &topology, 
         &points, &extent, &uv, &assign);
-
     return topology;
 }
+
+/*virtual*/
+GfRange3d 
+UsdImagingGLDrawModeAdapter::GetExtent(UsdPrim const& prim, 
+                                       SdfPath const& cachePath, 
+                                       UsdTimeCode time) const
+{
+    TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
+
+    TfToken drawMode = UsdGeomTokens->default_;
+    _DrawModeMap::const_iterator it = _drawModeMap.find(cachePath);
+    if (TF_VERIFY(it != _drawModeMap.end())) {
+        drawMode = it->second;
+    }
+
+    VtValue topology;
+    VtValue points;
+    VtValue uv;
+    VtValue assign;
+    GfRange3d extent;
+    _ComputeGeometryData(prim, cachePath, time, drawMode, &topology, 
+        &points, &extent, &uv, &assign);
+    return extent;
+}
+
+
+/*virtual*/
+bool
+UsdImagingGLDrawModeAdapter::GetDoubleSided(UsdPrim const& prim, 
+                                            SdfPath const& cachePath, 
+                                            UsdTimeCode time) const
+{
+    return false;
+}
+
 
 void
 UsdImagingGLDrawModeAdapter::_CheckForTextureVariability(
@@ -461,12 +496,6 @@ UsdImagingGLDrawModeAdapter::TrackVariability(UsdPrim const& prim,
         return;
     }
 
-    // WARNING: This method is executed from multiple threads, the value cache
-    // has been carefully pre-populated to avoid mutating the underlying
-    // container during update.
-
-    UsdImagingValueCache* valueCache = _GetValueCache();
-
     // Discover time-varying transforms. If this card is instantiated on an
     // instance, skip since the instance adapter will handle transforms
     // and master roots always have identity transform.
@@ -485,7 +514,6 @@ UsdImagingGLDrawModeAdapter::TrackVariability(UsdPrim const& prim,
             timeVaryingBits,
             true);
 
-    valueCache->GetPurpose(cachePath) = GetPurpose(prim, instancerContext);
 }
 
 void
@@ -654,10 +682,6 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
         }
     }
 
-    if (requestedBits & HdChangeTracker::DirtyDoubleSided) {
-        valueCache->GetDoubleSided(cachePath) = false;
-    }
-
     if (requestedBits & HdChangeTracker::DirtyMaterialId) {
         SdfPath materialPath = _GetMaterialPath(prim);
         valueCache->GetMaterialId(cachePath) = materialPath;
@@ -709,8 +733,8 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
         }
 
         VtValue topology;
+        GfRange3d extent;
         VtValue& points = valueCache->GetPoints(cachePath);
-        GfRange3d& extent = valueCache->GetExtent(cachePath);
         VtValue& uv = valueCache->GetPrimvar(cachePath, _tokens->cardsUv);
         VtValue& assign = valueCache->GetPrimvar(cachePath, 
             _tokens->cardsTexAssign);

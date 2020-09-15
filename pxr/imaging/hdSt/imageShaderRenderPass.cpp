@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
@@ -43,7 +42,6 @@
 #include "pxr/imaging/hgi/graphicsCmdsDesc.h"
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
-#include "pxr/imaging/glf/diagnostic.h"
 
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
 // XXX We do not want to include specific HgiXX backends, but we need to do
@@ -125,7 +123,6 @@ HdSt_ImageShaderRenderPass::_Prepare(TfTokenVector const &renderTags)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
-    GLF_GROUP_FUNCTION();
 
     HdStResourceRegistrySharedPtr const& resourceRegistry = 
         std::dynamic_pointer_cast<HdStResourceRegistry>(

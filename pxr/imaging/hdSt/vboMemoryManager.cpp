@@ -328,7 +328,7 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
     _totalCapacity = totalNumElements;
     
     Hgi* hgi = _resourceRegistry->GetHgi();
-    HgiBlitCmds* blitCmds = _resourceRegistry->GetBlitCmds();
+    HgiBlitCmds* blitCmds = _resourceRegistry->GetGlobalBlitCmds();
 
     // resize each BufferResource
     HdStBufferResourceNamedList const& resources = GetResources();
@@ -703,7 +703,7 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::CopyData(
     blitOp.byteSize = srcSize;
     blitOp.destinationByteOffset = vboOffset;
 
-    HgiBlitCmds* blitCmds = _stripedBufferArray->GetBlitCmds();
+    HgiBlitCmds* blitCmds = GetResourceRegistry()->GetGlobalBlitCmds();
     blitCmds->CopyBufferCpuToGpu(blitOp);
 }
 

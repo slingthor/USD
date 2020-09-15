@@ -197,6 +197,7 @@ HgiMetal::DestroyTextureView(HgiTextureViewHandle* viewHandle)
     _TrashObject(&texHandle);
     (*viewHandle)->SetViewTexture(HgiTextureHandle());
     delete viewHandle->Get();
+    *viewHandle = HgiTextureViewHandle();
 }
 
 HgiSamplerHandle

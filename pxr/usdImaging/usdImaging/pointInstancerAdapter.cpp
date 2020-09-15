@@ -1647,6 +1647,31 @@ UsdImagingPointInstancerAdapter::GetVisible(UsdPrim const& prim,
 }
 
 /*virtual*/
+TfToken 
+UsdImagingPointInstancerAdapter::GetPurpose(
+    UsdPrim const& usdPrim, 
+    SdfPath const& cachePath,
+    TfToken const& instanceInheritablePurpose) const
+{
+    if (IsChildPath(cachePath)) {
+        // Delegate to prototype adapter and USD prim
+        _ProtoPrim const& proto = _GetProtoPrim(usdPrim.GetPath(), cachePath);
+        UsdPrim protoUsdPrim = _GetProtoUsdPrim(proto);
+
+        UsdPrim instanceProxyPrim = _GetPrim(_GetPrimPathFromInstancerChain(
+                proto.paths));
+
+        TfToken const& inheritablePurpose = 
+                    GetInheritablePurpose(instanceProxyPrim);
+
+        return proto.adapter->GetPurpose(protoUsdPrim, cachePath, 
+                                         inheritablePurpose);
+    }
+    return BaseAdapter::GetPurpose(usdPrim, cachePath, TfToken());
+
+}
+
+/*virtual*/
 PxOsdSubdivTags
 UsdImagingPointInstancerAdapter::GetSubdivTags(UsdPrim const& usdPrim,
                                                SdfPath const& cachePath,
@@ -1654,12 +1679,11 @@ UsdImagingPointInstancerAdapter::GetSubdivTags(UsdPrim const& usdPrim,
 {
     if (IsChildPath(cachePath)) {
         // Delegate to prototype adapter and USD prim.
-        _ProtoPrim const& proto = _GetProtoPrim(usdPrim.GetPath(),
-                                                   cachePath);
+        _ProtoPrim const& proto = _GetProtoPrim(usdPrim.GetPath(), cachePath);
         UsdPrim protoPrim = _GetProtoUsdPrim(proto);
         return proto.adapter->GetSubdivTags(protoPrim, cachePath, time);
     }
-    return UsdImagingPrimAdapter::GetSubdivTags(usdPrim, cachePath, time);
+    return BaseAdapter::GetSubdivTags(usdPrim, cachePath, time);
 }
 
 /*virtual*/
@@ -1670,12 +1694,11 @@ UsdImagingPointInstancerAdapter::GetTopology(UsdPrim const& usdPrim,
 {
     if (IsChildPath(cachePath)) {
         // Delegate to prototype adapter and USD prim.
-        _ProtoPrim const& proto = _GetProtoPrim(usdPrim.GetPath(),
-                                                   cachePath);
+        _ProtoPrim const& proto = _GetProtoPrim(usdPrim.GetPath(), cachePath);
         UsdPrim protoPrim = _GetProtoUsdPrim(proto);
         return proto.adapter->GetTopology(protoPrim, cachePath, time);
     }
-    return UsdImagingPrimAdapter::GetTopology(usdPrim, cachePath, time);
+    return BaseAdapter::GetTopology(usdPrim, cachePath, time);
 }
 
 /*virtual*/
@@ -1686,12 +1709,42 @@ UsdImagingPointInstancerAdapter::GetCullStyle(UsdPrim const& usdPrim,
 {
     if (IsChildPath(cachePath)) {
         // Delegate to prototype adapter and USD prim.
-        _ProtoPrim const& proto = _GetProtoPrim(usdPrim.GetPath(),
-                                                   cachePath);
+        _ProtoPrim const& proto = _GetProtoPrim(usdPrim.GetPath(), cachePath);
         UsdPrim protoPrim = _GetProtoUsdPrim(proto);
         return proto.adapter->GetCullStyle(protoPrim, cachePath, time);
     }
-    return UsdImagingPrimAdapter::GetCullStyle(usdPrim, cachePath, time);
+    return BaseAdapter::GetCullStyle(usdPrim, cachePath, time);
+}
+
+/*virtual*/
+GfRange3d 
+UsdImagingPointInstancerAdapter::GetExtent(UsdPrim const& usdPrim, 
+                                           SdfPath const& cachePath, 
+                                           UsdTimeCode time) const
+{
+    if (IsChildPath(cachePath)) {
+        // Delegate to prototype adapter and USD prim.
+        _ProtoPrim const& proto = _GetProtoPrim(usdPrim.GetPath(), cachePath);
+        UsdPrim protoPrim = _GetProtoUsdPrim(proto);
+        return proto.adapter->GetExtent(protoPrim, cachePath, time);
+    }
+    return BaseAdapter::GetExtent(usdPrim, cachePath, time);
+}
+
+
+/*virtual*/
+bool 
+UsdImagingPointInstancerAdapter::GetDoubleSided(UsdPrim const& usdPrim, 
+                                                SdfPath const& cachePath, 
+                                                UsdTimeCode time) const
+{
+    if (IsChildPath(cachePath)) {
+        // Delegate to prototype adapter and USD prim.
+        _ProtoPrim const& proto = _GetProtoPrim(usdPrim.GetPath(), cachePath);
+        UsdPrim protoPrim = _GetProtoUsdPrim(proto);
+        return proto.adapter->GetDoubleSided(protoPrim, cachePath, time);
+    }
+    return BaseAdapter::GetDoubleSided(usdPrim, cachePath, time);
 }
 
 /*virtual*/

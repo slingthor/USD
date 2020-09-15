@@ -1686,6 +1686,29 @@ UsdImagingInstanceAdapter::SamplePrimvar(
     return numSamples;
 }
 
+TfToken 
+UsdImagingInstanceAdapter::GetPurpose(
+    UsdPrim const& usdPrim, 
+    SdfPath const& cachePath,
+    TfToken const& instanceInheritablePurpose) const
+{
+    if (_IsChildPrim(usdPrim, cachePath)) {
+        // Note that the proto group in this proto has not yet been
+        // updated with new instances at this point.
+        UsdImagingInstancerContext instancerContext;
+        _ProtoPrim const& proto = _GetProtoPrim(usdPrim.GetPath(),
+                                                   cachePath,
+                                                   &instancerContext);
+        if (!TF_VERIFY(proto.adapter, "%s", cachePath.GetText())) {
+            return UsdGeomTokens->default_;
+        }
+
+        return proto.adapter->GetPurpose(_GetPrim(proto.path), cachePath, 
+                                instancerContext.instanceInheritablePurpose);
+    }
+    return UsdImagingPrimAdapter::GetPurpose(usdPrim, cachePath, TfToken());
+}
+
 PxOsdSubdivTags
 UsdImagingInstanceAdapter::GetSubdivTags(UsdPrim const& usdPrim,
                                          SdfPath const& cachePath,
@@ -1704,7 +1727,7 @@ UsdImagingInstanceAdapter::GetSubdivTags(UsdPrim const& usdPrim,
         return proto.adapter->GetSubdivTags(
                 _GetPrim(proto.path), cachePath, time);
     }
-    return UsdImagingPrimAdapter::GetSubdivTags(usdPrim, cachePath, time);
+    return BaseAdapter::GetSubdivTags(usdPrim, cachePath, time);
 }
 
 VtValue
@@ -1725,7 +1748,7 @@ UsdImagingInstanceAdapter::GetTopology(UsdPrim const& usdPrim,
         return proto.adapter->GetTopology(
                 _GetPrim(proto.path), cachePath, time);
     }
-    return UsdImagingPrimAdapter::GetTopology(usdPrim, cachePath, time);
+    return BaseAdapter::GetTopology(usdPrim, cachePath, time);
 }
 
 /*virtual*/
@@ -1747,7 +1770,68 @@ UsdImagingInstanceAdapter::GetCullStyle(UsdPrim const& usdPrim,
         return proto.adapter->GetCullStyle(
                 _GetPrim(proto.path), cachePath, time);
     }
-    return UsdImagingPrimAdapter::GetCullStyle(usdPrim, cachePath, time);
+    return BaseAdapter::GetCullStyle(usdPrim, cachePath, time);
+}
+
+/*virtual*/
+GfRange3d 
+UsdImagingInstanceAdapter::GetExtent(UsdPrim const& usdPrim, 
+                                     SdfPath const& cachePath, 
+                                     UsdTimeCode time) const
+{
+    if (_IsChildPrim(usdPrim, cachePath)) {
+        UsdImagingInstancerContext instancerContext;
+        _ProtoPrim const& proto = _GetProtoPrim(usdPrim.GetPath(),
+                                                cachePath,
+                                                &instancerContext);
+        if (!TF_VERIFY(proto.adapter, "%s", cachePath.GetText())) {
+            return GfRange3d();
+        }
+        return proto.adapter->GetExtent(
+                _GetPrim(proto.path), cachePath, time);
+    }
+    return BaseAdapter::GetExtent(usdPrim, cachePath, time);
+}
+
+/*virtual*/
+bool 
+UsdImagingInstanceAdapter::GetVisible(UsdPrim const& usdPrim, 
+                                      SdfPath const& cachePath,
+                                      UsdTimeCode time) const
+{
+    if (_IsChildPrim(usdPrim, cachePath)) {
+        UsdImagingInstancerContext instancerContext;
+        _ProtoPrim const& proto = _GetProtoPrim(usdPrim.GetPath(),
+                                                cachePath,
+                                                &instancerContext);
+        if (!TF_VERIFY(proto.adapter, "%s", cachePath.GetText())) {
+            return false;
+        }
+        return proto.adapter->GetVisible(
+                _GetPrim(proto.path), cachePath, time);
+    }
+    return BaseAdapter::GetVisible(usdPrim, cachePath, time);
+}
+
+/*virtual*/
+bool
+UsdImagingInstanceAdapter::GetDoubleSided(UsdPrim const& usdPrim, 
+                                          SdfPath const& cachePath, 
+                                          UsdTimeCode time) const
+{
+    if (_IsChildPrim(usdPrim, cachePath)) {
+        UsdImagingInstancerContext instancerContext;
+        _ProtoPrim const& proto = _GetProtoPrim(usdPrim.GetPath(),
+                                                cachePath,
+                                                &instancerContext);
+        if (!TF_VERIFY(proto.adapter, "%s", cachePath.GetText())) {
+            return false;
+        }
+        return proto.adapter->GetDoubleSided(
+                _GetPrim(proto.path), cachePath, time);
+    }
+
+    return BaseAdapter::GetDoubleSided(usdPrim, cachePath, time);
 }
 
 void

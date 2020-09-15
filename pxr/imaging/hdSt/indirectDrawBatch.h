@@ -110,7 +110,10 @@ protected:
         std::vector<HdStBufferArrayRangeSharedPtr> const& instanceBars) const;
     
     HDST_API
-    virtual void _PrepareDraw(bool gpuCulling, bool freezeCulling) = 0;
+    virtual void _PrepareDraw(
+                        HdStResourceRegistrySharedPtr const &resourceRegistry,
+                        bool gpuCulling,
+                        bool freezeCulling) = 0;
 
     HDST_API
     virtual void _ExecuteDraw(_DrawingProgram &program, int batchCount) = 0;

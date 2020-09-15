@@ -197,12 +197,6 @@ UsdImagingGprimAdapter::TrackVariability(UsdPrim const& prim,
                                          UsdImagingInstancerContext const* 
                                              instancerContext) const
 {
-    // WARNING: This method is executed from multiple threads, the value cache
-    // has been carefully pre-populated to avoid mutating the underlying
-    // container during update.
-    
-    UsdImagingValueCache* valueCache = _GetValueCache();
-
     // See if any of the inherited primvars are time-dependent.
     UsdImaging_InheritedPrimvarStrategy::value_type inheritedPrimvarRecord =
         _GetInheritedPrimvars(prim.GetParent());
@@ -268,10 +262,6 @@ UsdImagingGprimAdapter::TrackVariability(UsdPrim const& prim,
                UsdImagingTokens->usdVaryingTopology,
                timeVaryingBits,
                false);
-
-    // XXX: We need to populate purpose here, since it's fetched by hydra
-    // before we call UpdateForTime().
-    valueCache->GetPurpose(cachePath) = GetPurpose(prim, instancerContext);
 }
 
 void
@@ -431,16 +421,8 @@ UsdImagingGprimAdapter::UpdateForTime(UsdPrim const& prim,
         }
     }
 
-    if (requestedBits & HdChangeTracker::DirtyDoubleSided){
-        valueCache->GetDoubleSided(cachePath) = _GetDoubleSided(prim);
-    }
-
     if (requestedBits & HdChangeTracker::DirtyTransform) {
         valueCache->GetTransform(cachePath) = GetTransform(prim, time);
-    }
-
-    if (requestedBits & HdChangeTracker::DirtyExtent) {
-        valueCache->GetExtent(cachePath) = _GetExtent(prim, time);
     }
 
     if (requestedBits & HdChangeTracker::DirtyMaterialId){
@@ -580,14 +562,20 @@ UsdImagingGprimAdapter::GetPoints(UsdPrim const& prim,
     return VtValue(_Get<VtVec3fArray>(prim, UsdGeomTokens->points, time));
 }
 
-// -------------------------------------------------------------------------- //
-
+/*virtual*/
 GfRange3d 
-UsdImagingGprimAdapter::_GetExtent(UsdPrim const& prim, UsdTimeCode time) const
+UsdImagingGprimAdapter::GetExtent(UsdPrim const& prim, 
+                                  SdfPath const& cachePath, 
+                                  UsdTimeCode time) const
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
     UsdGeomGprim gprim(prim);
+
+    if (!TF_VERIFY(gprim)) {
+        return GfRange3d();
+    }
+
     VtVec3fArray extent;
     if (gprim.GetExtentAttr().Get(&extent, time) && extent.size() == 2) {
         // Note:
@@ -602,6 +590,27 @@ UsdImagingGprimAdapter::_GetExtent(UsdPrim const& prim, UsdTimeCode time) const
         return GfRange3d();
     }
 }
+
+/*virtual*/
+bool
+UsdImagingGprimAdapter::GetDoubleSided(UsdPrim const& prim, 
+                                       SdfPath const& cachePath, 
+                                       UsdTimeCode time) const
+{
+    HD_TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
+    UsdGeomGprim gprim(prim);
+
+    if (!TF_VERIFY(gprim)) {
+        return false;
+    }
+
+    bool doubleSided = false;
+    gprim.GetDoubleSidedAttr().Get(&doubleSided, time);
+    return doubleSided;
+}
+
+// -------------------------------------------------------------------------- //
 
 /* static */
 bool
@@ -802,19 +811,6 @@ UsdImagingGprimAdapter::_GetInheritedPrimvar(UsdPrim const& prim,
         }
     }
     return UsdGeomPrimvar();
-}
-
-bool 
-UsdImagingGprimAdapter::_GetDoubleSided(UsdPrim const& prim) const
-{
-    HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
-
-    if(!TF_VERIFY(prim.IsA<UsdGeomGprim>(), "%s\n",
-                prim.GetPath().GetText()))
-        return false;
-
-    return _Get<bool>(prim, UsdGeomTokens->doubleSided, UsdTimeCode::Default());
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

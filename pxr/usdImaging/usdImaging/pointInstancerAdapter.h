@@ -122,30 +122,27 @@ public:
     /// \name Instancing
     // ---------------------------------------------------------------------- //
 
-    virtual size_t
-    SampleInstancerTransform(UsdPrim const& instancerPrim,
-                             SdfPath const& instancerPath,
-                             UsdTimeCode time,
-                             size_t maxNumSamples,
-                             float *sampleTimes,
-                             GfMatrix4d *sampleValues) override;
+    size_t SampleInstancerTransform(UsdPrim const& instancerPrim,
+                                    SdfPath const& instancerPath,
+                                    UsdTimeCode time,
+                                    size_t maxNumSamples,
+                                    float *sampleTimes,
+                                    GfMatrix4d *sampleValues) override;
 
-    virtual size_t
-    SampleTransform(UsdPrim const& prim, 
-                    SdfPath const& cachePath,
-                    UsdTimeCode time, 
-                    size_t maxNumSamples, 
-                    float *sampleTimes,
-                    GfMatrix4d *sampleValues) override;
+    size_t SampleTransform(UsdPrim const& prim, 
+                           SdfPath const& cachePath,
+                           UsdTimeCode time, 
+                           size_t maxNumSamples, 
+                           float  *sampleTimes,
+                           GfMatrix4d *sampleValues) override;
 
-    virtual size_t
-    SamplePrimvar(UsdPrim const& usdPrim,
-                  SdfPath const& cachePath,
-                  TfToken const& key,
-                  UsdTimeCode time,
-                  size_t maxNumSamples, 
-                  float *sampleTimes,
-                  VtValue *sampleValues) override;
+    size_t SamplePrimvar(UsdPrim const& usdPrim,
+                         SdfPath const& cachePath,
+                         TfToken const& key,
+                         UsdTimeCode time,
+                         size_t maxNumSamples, 
+                         float *sampleTimes,
+                         VtValue *sampleValues) override;
 
     PxOsdSubdivTags GetSubdivTags(UsdPrim const& usdPrim,
                                   SdfPath const& cachePath,
@@ -155,6 +152,11 @@ public:
                     SdfPath const& cachePath,
                     UsdTimeCode time) const override;
 
+    TfToken GetPurpose(
+        UsdPrim const& usdPrim, 
+        SdfPath const& cachePath,
+        TfToken const& instanceInheritablePurpose) const override;
+
     VtValue GetTopology(UsdPrim const& prim,
                         SdfPath const& cachePath,
                         UsdTimeCode time) const override;
@@ -162,6 +164,14 @@ public:
     HdCullStyle GetCullStyle(UsdPrim const& prim,
                              SdfPath const& cachePath,
                              UsdTimeCode time) const override;
+
+    GfRange3d GetExtent(UsdPrim const& usdPrim, 
+                        SdfPath const& cachePath, 
+                        UsdTimeCode time) const override;
+
+    bool GetDoubleSided(UsdPrim const& usdPrim, 
+                   SdfPath const& cachePath, 
+                   UsdTimeCode time) const override;
 
     // ---------------------------------------------------------------------- //
     /// \name Nested instancing support

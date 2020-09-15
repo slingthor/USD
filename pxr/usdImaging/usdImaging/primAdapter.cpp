@@ -1144,8 +1144,10 @@ UsdImagingPrimAdapter::GetVisible(
 }
 
 TfToken 
-UsdImagingPrimAdapter::GetPurpose(UsdPrim const& prim, 
-    UsdImagingInstancerContext const* instancerContext) const
+UsdImagingPrimAdapter::GetPurpose(
+    UsdPrim const& prim, 
+    SdfPath const& cachePath,
+    TfToken const& instanceInheritablePurpose) const
 {
     HD_TRACE_FUNCTION();
 
@@ -1157,9 +1159,8 @@ UsdImagingPrimAdapter::GetPurpose(UsdPrim const& prim,
     // Inherit the instance's purpose if our prim has a fallback purpose and
     // there's an instance that provide a purpose to inherit.
     if (!purposeInfo.isInheritable &&
-        instancerContext &&
-        !instancerContext->instanceInheritablePurpose.IsEmpty()) {
-        return instancerContext->instanceInheritablePurpose;
+        !instanceInheritablePurpose.IsEmpty()) {
+        return instanceInheritablePurpose;
     }
 
     return purposeInfo.purpose.IsEmpty() ? 
@@ -1215,6 +1216,34 @@ UsdImagingPrimAdapter::GetTopology(UsdPrim const& prim,
                                    UsdTimeCode time) const
 {
     return VtValue();
+}
+
+/*virtual*/
+GfRange3d 
+UsdImagingPrimAdapter::GetExtent(UsdPrim const& prim, 
+                                 SdfPath const& cachePath, 
+                                 UsdTimeCode time) const
+{
+    return GfRange3d();
+}
+
+/*virtual*/
+bool
+UsdImagingPrimAdapter::GetDoubleSided(UsdPrim const& prim, 
+                                      SdfPath const& cachePath, 
+                                      UsdTimeCode time) const
+{
+    return false;
+}
+
+/*virtual*/
+const TfTokenVector &
+UsdImagingPrimAdapter::GetExtComputationSceneInputNames(
+    SdfPath const& computationPath,
+    SdfPath const& cachePath) const
+{
+    static TfTokenVector emptyTokenVector;
+    return emptyTokenVector;
 }
 
 VtArray<VtIntArray>

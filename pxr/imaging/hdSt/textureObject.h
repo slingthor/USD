@@ -51,6 +51,7 @@ using HgiTextureHandle = HgiHandle<class HgiTexture>;
 class HdSt_TextureObjectRegistry;
 struct HgiTextureDesc;
 class HdStTextureCpuData;
+class HdStResourceRegistry;
 
 using HdStTextureObjectSharedPtr = std::shared_ptr<class HdStTextureObject>;
 
@@ -101,6 +102,10 @@ protected:
         const HdStTextureIdentifier &textureId,
         HdSt_TextureObjectRegistry * textureObjectRegistry);
 
+    HDST_API
+    HdStResourceRegistry* _GetResourceRegistry() const;
+
+    HDST_API
     Hgi* _GetHgi() const;
 
     /// Load texture to CPU (thread-safe)

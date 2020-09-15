@@ -393,8 +393,8 @@ _GridHolder<openvdb::Vec3fGrid>::GetMetadata(int *bytesPerPixel,
                                              GLenum *glType) const
 {
     *bytesPerPixel = sizeof(float);
-    *glInternalFormat = GL_RED;
-    *glFormat = GL_RED;
+    *glInternalFormat = GL_RGB;
+    *glFormat = GL_RGB;
     *glType = GL_FLOAT;
 }
 
@@ -406,8 +406,8 @@ _GridHolder<openvdb::Vec3dGrid>::GetMetadata(int *bytesPerPixel,
                                              GLenum *glType) const
 {
     *bytesPerPixel = sizeof(double);
-    *glInternalFormat = GL_RED;
-    *glFormat = GL_RED;
+    *glInternalFormat = GL_RGB;
+    *glFormat = GL_RGB;
     *glType = GL_DOUBLE;
 }
 

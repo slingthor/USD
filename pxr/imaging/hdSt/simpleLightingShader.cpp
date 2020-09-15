@@ -327,7 +327,7 @@ _MakeNamedTextureHandle(
     return { name,
              HdTextureType::Uv,
              textureHandle,
-             SdfPath::AbsoluteRootPath().AppendChild(name) };
+             name.Hash() };
 }
 
 void
@@ -426,7 +426,8 @@ HdStSimpleLightingShader::AddResourcesFromTextures(ResourceContext &ctx) const
         nullptr,
         std::make_shared<HdSt_DomeLightComputationGPU>(
             _tokens->domeLightIrradiance,
-            thisShader));
+            thisShader),
+        HdStComputeQueueZero);
     
     static const GLuint numPrefilterLevels = 5;
 
@@ -442,7 +443,8 @@ HdStSimpleLightingShader::AddResourcesFromTextures(ResourceContext &ctx) const
                 thisShader,
                 numPrefilterLevels,
                 mipLevel,
-                roughness));
+                roughness),
+            HdStComputeQueueZero);
     }
 
     // Brdf map computation
@@ -450,7 +452,8 @@ HdStSimpleLightingShader::AddResourcesFromTextures(ResourceContext &ctx) const
         nullptr,
         std::make_shared<HdSt_DomeLightComputationGPU>(
             _tokens->domeLightBRDF,
-            thisShader));
+            thisShader),
+        HdStComputeQueueZero);
 }
 
 HdStShaderCode::NamedTextureHandleVector const &

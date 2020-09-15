@@ -237,6 +237,7 @@ HgiMetalBlitCmds::CopyBufferGpuToGpu(
                destinationOffset:copyOp.destinationByteOffset
                             size:copyOp.byteSize];
     
+#if defined(ARCH_OS_MACOS)
     // APPLE METAL: We need to do this copy host side, otherwise later
     // cpu copies into OTHER parts of this destination buffer see some of
     // our GPU copied range trampled by alignment of the blit. The Metal
@@ -247,6 +248,7 @@ HgiMetalBlitCmds::CopyBufferGpuToGpu(
                (char*)srcBuffer->GetCPUStagingAddress() + copyOp.sourceByteOffset,
                copyOp.byteSize);
     }
+#endif
 }
 
 void HgiMetalBlitCmds::CopyBufferCpuToGpu(
@@ -268,7 +270,7 @@ void HgiMetalBlitCmds::CopyBufferCpuToGpu(
     // If we used GetCPUStagingAddress as the cpuSourceBuffer when the copyOp
     // was created, we can skip the memcpy since the src and dst buffer are
     // the same and dst already contains the desired data.
-    // See also: QueueCopyBufferCpuToGpu.
+    // See also: HgiBuffer::GetCPUStagingAddress.
     if (copyOp.cpuSourceBuffer != dst ||
         copyOp.sourceByteOffset != copyOp.destinationByteOffset) {
         // Offset into the src buffer
@@ -309,12 +311,8 @@ HgiMetalBlitCmds::_Submit(Hgi* hgi)
         [_blitEncoder endEncoding];
         _blitEncoder = nil;
 
-        FlushQueuedCopies();
-
         return true;
     }
-
-    FlushQueuedCopies();
 
     return false;
 }

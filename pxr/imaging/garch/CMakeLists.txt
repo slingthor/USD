@@ -79,6 +79,7 @@ pxr_library(garch
         baseTextureData
         contextCaps
         drawTarget
+        field3DTextureDataBase
         image
         imageRegistry
         glDebugWindow

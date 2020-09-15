@@ -45,7 +45,8 @@ else:
     from pxr import Mtlf as _gfxAPI
 
 from .common import (RenderModes, ColorCorrectionModes, ShadedRenderModes, Timer,
-                     ReportMetricSize, SelectionHighlightModes, DEBUG_CLIPPING)
+                     ReportMetricSize, SelectionHighlightModes, DEBUG_CLIPPING,
+                     DefaultFontFamily)
 from .rootDataModel import RootDataModel
 from .selectionDataModel import ALL_INSTANCES, SelectionDataModel
 from .viewSettingsDataModel import ViewSettingsDataModel
@@ -479,7 +480,8 @@ class HUD():
     def __init__(self):
         self._pixelRatio = QtWidgets.QApplication.instance().devicePixelRatio()
         self._HUDLineSpacing = 15
-        self._HUDFont = QtGui.QFont("Menv Mono Numeric", 9*self._pixelRatio)
+        self._HUDFont = QtGui.QFont(DefaultFontFamily.MONOSPACE_FONT_FAMILY, 
+                9*self._pixelRatio)
         self._groups = {}
         self._glslProgram = None
         self._glMajorVersion = 0
@@ -844,6 +846,9 @@ class StageView(QtOpenGL.QGLWidget):
         # is changed.
         self._dataModel.viewSettings.signalVisibleSettingChanged.connect(
             self.update)
+
+        self._dataModel.viewSettings.signalAutoComputeClippingPlanesChanged\
+                                    .connect(self._onAutoComputeClippingChanged)
 
         self._dataModel.signalStageReplaced.connect(self._stageReplaced)
         self._dataModel.selection.signalPrimSelectionChanged.connect(
@@ -2078,14 +2083,15 @@ class StageView(QtOpenGL.QGLWidget):
                 1-max(-0.5,min(0.5,(event.angleDelta().y()/1000.))))
         self.updateGL()
 
-    def detachAndReClipFromCurrentCamera(self):
+    def _onAutoComputeClippingChanged(self):
         """If we are currently rendering from a prim camera, switch to the
         FreeCamera.  Then reset the near/far clipping planes based on
-        distance to closest geometry."""
-        if not self._dataModel.viewSettings.freeCamera:
-            self.switchToFreeCamera()
-        else:
-            self.computeAndSetClosestDistance()
+        distance to closest geometry.  But only when autoClip has turned on!"""
+        if self._dataModel.viewSettings.autoComputeClippingPlanes:
+            if not self._dataModel.viewSettings.freeCamera:
+                self.switchToFreeCamera()
+            else:
+                self.computeAndSetClosestDistance()
 
     def computeAndSetClosestDistance(self):
         '''Using the current FreeCamera's frustum, determine the world-space
@@ -2109,28 +2115,28 @@ class StageView(QtOpenGL.QGLWidget):
         cameraFrustum.nearFar = \
             Gf.Range1d(smallNear, smallNear*FreeCamera.maxSafeZResolution)
         pickResults = self.pick(cameraFrustum)
-        if pickResults[0] is None or pickResults[1] == Sdf.Path.emptyPath:
+        if pickResults[0] is None or pickResults[2] == Sdf.Path.emptyPath:
             cameraFrustum.nearFar = \
                 Gf.Range1d(trueFar/FreeCamera.maxSafeZResolution, trueFar)
             pickResults = self.pick(cameraFrustum)
             if Tf.Debug.IsDebugSymbolNameEnabled(DEBUG_CLIPPING):
                 print("computeAndSetClosestDistance: Needed to call pick() a second time")
 
-        if pickResults[0] is not None and pickResults[1] != Sdf.Path.emptyPath:
+        if pickResults[0] is not None and pickResults[2] != Sdf.Path.emptyPath:
             self._dataModel.viewSettings.freeCamera.setClosestVisibleDistFromPoint(pickResults[0])
             self.updateView()
 
     def pick(self, pickFrustum):
         '''
         Find closest point in scene rendered through 'pickFrustum'.
-        Returns a quintuple:
-          selectedPoint, selectedPrimPath, selectedInstancerPath,
-          selectedInstanceIndex, selectedInstancerContext
+        Returns a sextuple:
+          selectedPoint, selectedNormal, selectedPrimPath,
+          selectedInstancerPath, selectedInstanceIndex, selectedInstancerContext
         '''
         renderer = self._getRenderer()
         if not self._dataModel.stage or not renderer:
             # error has already been issued
-            return None, Sdf.Path.emptyPath, None, None, None
+            return None, None, Sdf.Path.emptyPath, None, None, None
 
         # this import is here to make sure the create_first_image stat doesn't
         # regress..
@@ -2209,15 +2215,15 @@ class StageView(QtOpenGL.QGLWidget):
             (inImageBounds, pickFrustum) = self.computePickFrustum(x,y)
 
             if inImageBounds:
-                selectedPoint, selectedPrimPath, \
+                selectedPoint, selectedNormal, selectedPrimPath, \
                 selectedInstanceIndex, selectedTLPath, selectedTLIndex = \
                 self.pick(pickFrustum)
             else:
                 # If we're picking outside the image viewport (maybe because
                 # camera guides are on), treat that as a de-select.
-                selectedPoint, selectedPrimPath, \
+                selectedPoint, selectedNormal, selectedPrimPath, \
                 selectedInstanceIndex, selectedTLPath, selectedTLIndex = \
-                    None, Sdf.Path.emptyPath, -1, Sdf.Path.emptyPath, -1
+                    None, None, Sdf.Path.emptyPath, -1, Sdf.Path.emptyPath, -1
         
             # Correct for high DPI displays
             coord = self._scaleMouseCoords( \

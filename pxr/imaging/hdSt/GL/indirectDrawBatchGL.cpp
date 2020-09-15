@@ -90,7 +90,10 @@ HdSt_IndirectDrawBatch::_CullingProgram *HdSt_IndirectDrawBatchGL::NewCullingPro
 }
 
 void
-HdSt_IndirectDrawBatchGL::_PrepareDraw(bool gpuCulling, bool freezeCulling)
+HdSt_IndirectDrawBatchGL::_PrepareDraw(
+    HdStResourceRegistrySharedPtr const &resourceRegistry,
+    bool gpuCulling,
+    bool freezeCulling)
 {
     if (!glBindBuffer) return; // glew initialized
 
@@ -167,7 +170,7 @@ HdSt_IndirectDrawBatchGL::_PrepareDraw(bool gpuCulling, bool freezeCulling)
 
     if (gpuCulling && !freezeCulling) {
         if (caps.IsEnabledGPUCountVisibleInstances()) {
-            _EndGPUCountVisibleInstances(_cullResultSync, &_numVisibleItems);
+            _EndGPUCountVisibleInstances(resourceRegistry, _cullResultSync, &_numVisibleItems);
             glDeleteSync(_cullResultSync);
             _cullResultSync = 0;
         }
@@ -323,21 +326,9 @@ HdSt_IndirectDrawBatchGL::_BeginGPUCountVisibleInstances(
     }
 
     // Reset visible item count
-//    if (_resultBuffer->GetMappedAddress()) {
-//        *((GLint *)_resultBuffer->GetMappedAddress()) = 0;
-//    } else {
-    {
-        GLint count = 0;
-        GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-        if (caps.directStateAccessEnabled) {
-            glNamedBufferSubData(_resultBuffer->GetBuffer()->GetRawResource(), 0,
-                                 sizeof(count), &count);
-        } else {
-            glBindBuffer(GL_ARRAY_BUFFER, _resultBuffer->GetBuffer()->GetRawResource());
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(count), &count);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-        }
-    }
+    int32_t count = 0;
+    glNamedBufferSubData(_resultBuffer->GetBuffer()->GetRawResource(), 0,
+        sizeof(count), &count);
 
     // XXX: temporarily hack during refactoring.
     // we'd like to use the same API as other buffers.
@@ -348,8 +339,17 @@ HdSt_IndirectDrawBatchGL::_BeginGPUCountVisibleInstances(
 }
 
 void
-HdSt_IndirectDrawBatchGL::_EndGPUCountVisibleInstances(GLsync resultSync, size_t * result)
+HdSt_IndirectDrawBatchGL::_EndGPUCountVisibleInstances(
+    HdStResourceRegistrySharedPtr const &resourceRegistry,
+    GLsync resultSync,
+    size_t * result)
 {
+    // XXX Submit any work recorded before this call since we are using raw gl
+    // calls below. If we don't submit Hgi work, things are out of order.
+    // Code below needs to be converted to Hgi and the SubmitWork calls removed.
+    resourceRegistry->SubmitBlitWork();
+    resourceRegistry->SubmitComputeWork();
+
     GLenum status = glClientWaitSync(resultSync,
             GL_SYNC_FLUSH_COMMANDS_BIT, HD_CULL_RESULT_TIMEOUT_NS);
 
@@ -361,23 +361,10 @@ HdSt_IndirectDrawBatchGL::_EndGPUCountVisibleInstances(GLsync resultSync, size_t
     }
 
     // Return visible item count
-    HgiBufferHandle const & hgiBuffer = _resultBuffer->GetBuffer();
-//    if (_resultBuffer->GetMappedAddress()) {
-//        *result = *((GLint *)_resultBuffer->GetMappedAddress());
-//    } else {
-    {
-        GLint count = 0;
-        GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-        if (caps.directStateAccessEnabled) {
-            glGetNamedBufferSubData(_resultBuffer->GetBuffer()->GetRawResource(), 0,
-                                    sizeof(count), &count);
-        } else {
-            glBindBuffer(GL_ARRAY_BUFFER, _resultBuffer->GetBuffer()->GetRawResource());
-            glGetBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(count), &count);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-        }
-        *result = count;
-    }
+    int32_t count = 0;
+    glGetNamedBufferSubData(_resultBuffer->GetBuffer()->GetRawResource(), 0,
+                            sizeof(count), &count);
+    *result = count;
 
     // XXX: temporarily hack during refactoring.
     // we'd like to use the same API as other buffers.

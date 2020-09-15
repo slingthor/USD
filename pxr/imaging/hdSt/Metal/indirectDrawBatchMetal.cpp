@@ -87,7 +87,10 @@ HdSt_IndirectDrawBatch::_CullingProgram *HdSt_IndirectDrawBatchMetal::NewCulling
 }
 
 void
-HdSt_IndirectDrawBatchMetal::_PrepareDraw(bool gpuCulling, bool freezeCulling)
+HdSt_IndirectDrawBatchMetal::_PrepareDraw(
+    HdStResourceRegistrySharedPtr const &resourceRegistry,
+    bool gpuCulling,
+    bool freezeCulling)
 {
     if (gpuCulling && !freezeCulling) {
         GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();

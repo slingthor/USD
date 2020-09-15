@@ -273,7 +273,8 @@ HdStExtCompGpuComputation::Execute(
     HgiResourceBindingsSharedPtr const& resourceBindindsPtr =
         resourceBindingsInstance.GetValue();
     HgiResourceBindingsHandle resourceBindings = *resourceBindindsPtr.get();
-    HgiComputeCmdsUniquePtr computeCmds = hgi->CreateComputeCmds();
+
+    HgiComputeCmds* computeCmds = hdStResourceRegistry->GetGlobalComputeCmds();
 
     computeCmds->PushDebugGroup("ExtComputation");
     computeCmds->BindResources(resourceBindings);
@@ -286,11 +287,10 @@ HdStExtCompGpuComputation::Execute(
     }
     computeCmds->SetConstantValues(pipeline, slotIndex, uboSize, &_uniforms[0]);
 
-    // dispatch compute kernel
+    // Queue compute work
     computeCmds->Dispatch(GetDispatchCount(), 1);
 
     computeCmds->PopDebugGroup();
-    hgi->SubmitCmds(computeCmds.get());
 }
 
 void
@@ -399,7 +399,7 @@ HdSt_GetExtComputationPrimvarsComputations(
     HdBufferSourceSharedPtrVector *sources,
     HdBufferSourceSharedPtrVector *reserveOnlySources,
     HdBufferSourceSharedPtrVector *separateComputationSources,
-    HdComputationSharedPtrVector *computations)
+    HdStComputationSharedPtrVector *computations)
 {
     TF_VERIFY(sources);
     TF_VERIFY(reserveOnlySources);
@@ -455,7 +455,10 @@ HdSt_GetExtComputationPrimvarsComputations(
 
                         separateComputationSources->push_back(
                                                         gpuComputationSource);
-                        computations->push_back(gpuComputation);
+                        // Assume there are no dependencies between ExtComp so
+                        // put all of them in queue zero.
+                        computations->emplace_back(
+                            gpuComputation, HdStComputeQueueZero);
                     }
 
                     // Create a primvar buffer source for the computation

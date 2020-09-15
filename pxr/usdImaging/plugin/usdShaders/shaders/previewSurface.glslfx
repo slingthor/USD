@@ -89,6 +89,7 @@ surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
     float metallic           = GETVALUE(HdGet_metallic);
     float occlusion          = GETVALUE(HdGet_occlusion);
     float opacity            = GETVALUE(HdGet_opacity);
+    float opacityThreshold   = GETVALUE(HdGet_opacityThreshold);
     float roughness          = GETVALUE(HdGet_roughness);
     vec3 specularColor       = HdGet_specularColor().xyz;
     bool useSpecularWorkflow = (GETVALUE(HdGet_useSpecularWorkflow) == 1);
@@ -102,6 +103,13 @@ surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 #endif
     vec3 clearcoatColor      = vec3(1.0);
     float specularAmount     = 1.0;
+
+#ifdef HD_MATERIAL_TAG_MASKED   
+    if (opacity < opacityThreshold) {
+        discard;
+    } 
+    opacity = 1.0;
+#endif            
 
     // Selection highlighting.
     vec4 colorAndOpacity = vec4(diffuseColor, opacity);
