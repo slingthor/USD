@@ -2562,6 +2562,20 @@ HdSt_CodeGenMSL::Compile(HdStResourceRegistry* const registry)
     _ParseGLSL(_genVS, _mslVSInputParams, _mslVSOutputParams);
     _ParseGLSL(_genFS, _mslPSInputParams, _mslPSOutputParams);
     _ParseGLSL(_genCommon, _mslVSInputParams, _mslVSOutputParams);
+    
+    {
+        // TEMP: Metal compiler doesn't like missing function definitions even in
+        // code that isn't called, so we hack a fix in here until the Storm shader
+        // source/logic is correctly fixed at some future point
+        std::string result = _genFS.str();
+        if (result.find("\nintegrateLights(", 0) == std::string::npos &&
+            result.find("//integrateLights(", 0) != std::string::npos) {
+                _genFS << "LightingContribution\n"
+                          "integrateLights(vec4 Peye, vec3 Neye, LightingInterfaceProperties props){\n"
+                          "  return integrateLightsDefault(Peye, Neye, props);\n"
+                          "}\n";
+        }
+    }
 
     // MSL<->Metal API plumbing
     std::stringstream glueVS, gluePS, glueGS, glueCS;
@@ -2747,6 +2761,7 @@ HdSt_CodeGenMSL::GetComputeHeader()
 
             << "constexpr sampler texelSampler(address::clamp_to_edge,\n"
             << "                               filter::linear);\n";
+        
     
     // wrapper for type float and int to deal with .x accessors and the like that are valid in GLSL
     header  << "struct wrapped_float {\n"
@@ -3203,7 +3218,7 @@ static void _EmitTextureAccessors(
             << "  " << _GetUnpackedType(dataType, false)
             << "  result = is_null_texture(tex) ? 0.0f :"
             << _GetPackedTypeAccessor(dataType, false)
-            << "(HdGetSampler_" << name << "().sample(sampleCoord)"
+            << "(tex.sample(samplerBind_" << name << ", sampleCoord)"
             << swizzle << ");\n";
     }
 
@@ -3392,7 +3407,7 @@ HdSt_CodeGenMSL::_GenerateCommonDefinitions()
 
         HdBinding::Type bindingType = it->first.GetType();
         if (bindingType != HdBinding::PRIMVAR_REDIRECT) {
-            _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
+            _genDefinitions << "#define HD_HAS_" << it->second.name << " 1\n";
         }
     }
     

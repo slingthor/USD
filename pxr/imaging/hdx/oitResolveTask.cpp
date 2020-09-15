@@ -261,7 +261,7 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
             HdBlendFactor::HdBlendFactorOne,
             HdBlendFactor::HdBlendFactorOneMinusSrcAlpha);
 
-        _renderPassShader = std::make_shared<HdStRenderPassShader>(
+        _renderPassShader = HdStResourceFactory::GetInstance()->NewRenderPassShader(
             HdxPackageOitResolveImageShader());
         _renderPassState->SetRenderPassShader(_renderPassShader);
 

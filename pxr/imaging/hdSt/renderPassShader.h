@@ -47,10 +47,6 @@ using HdStRenderPassShaderSharedPtr =
 ///
 class HdStRenderPassShader : public HdStShaderCode {
 public:
-    HDST_API
-    HdStRenderPassShader();
-    HDST_API
-    HdStRenderPassShader(TfToken const &glslfxFile);
 
     virtual ~HdStRenderPassShader() override;
 
@@ -102,6 +98,20 @@ public:
     }
 
 protected:
+
+    HDST_API
+    HdStRenderPassShader();
+    HDST_API
+    HdStRenderPassShader(TfToken const &glslfxFile);
+
+    TfToken
+    _GetReadbackName(const TfToken &aovName);
+
+    virtual void _BindTexture(HdStGLSLProgram const &program,
+                              const struct HdRenderPassAovBinding &aov,
+                              const TfToken &bindName,
+                              const HdBinding &binding) = 0;
+    virtual void _UnbindTexture(const HdBinding &binding) = 0;
 
     TfToken _glslfxFile;
     std::unique_ptr<HioGlslfx> _glslfx;

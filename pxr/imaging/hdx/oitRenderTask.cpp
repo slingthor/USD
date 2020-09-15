@@ -49,10 +49,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdxOitRenderTask::HdxOitRenderTask(HdSceneDelegate* delegate, SdfPath const& id)
     : HdxRenderTask(delegate, id)
     , _oitTranslucentRenderPassShader(
-        std::make_shared<HdStRenderPassShader>(
+        HdStResourceFactory::GetInstance()->NewRenderPassShader(
             HdxPackageRenderPassOitShader()))
     , _oitOpaqueRenderPassShader(
-        std::make_shared<HdStRenderPassShader>(
+        HdStResourceFactory::GetInstance()->NewRenderPassShader(
             HdxPackageRenderPassOitOpaqueShader()))
     , _isOitEnabled(HdxOitBufferAccessor::IsOitEnabled())
 {

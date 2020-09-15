@@ -3197,7 +3197,6 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "(vec3 coord) {\n"
-                << "    return vec3(\n"
                 // If field exists, use it
                 << "#if defined(HD_HAS_"
                 << fieldName << HdSt_ResourceBindingSuffixTokens->texture

@@ -31,26 +31,22 @@
 #include "pxr/imaging/hd/renderBuffer.h"
 #include "pxr/imaging/hd/renderPassState.h"
 #include "pxr/imaging/hgiMetal/texture.h"
+#include "pxr/imaging/hgiMetal/sampler.h"
 #include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/Metal/renderPassShaderMetal.h"
+#include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
 
 #include "pxr/imaging/hio/glslfx.h"
 
 #include <boost/functional/hash.hpp>
 
+#include "pxr/imaging/hgiMetal/hgi.h"
+#include "pxr/imaging/mtlf/mtlDevice.h"
+
 #include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-// Name shader uses to read AOV, i.e., shader calls
-// HdGet_AOVNAMEReadback().
-static
-TfToken
-_GetReadbackName(const TfToken &aovName)
-{
-    return TfToken(aovName.GetString() + "Readback");
-}
 
 HdStRenderPassShaderMetal::HdStRenderPassShaderMetal()
     : HdStRenderPassShader()
@@ -70,11 +66,11 @@ HdStRenderPassShaderMetal::~HdStRenderPassShaderMetal()
 
 // Helper to bind texture from given AOV to GLSL program identified
 // by \p program.
-static
 void
-_BindTexture(HdStGLSLProgram const &program,
-             const HdRenderPassAovBinding &aov,
-             const HdBinding &binding)
+HdStRenderPassShaderMetal::_BindTexture(HdStGLSLProgram const &program,
+                                        const HdRenderPassAovBinding &aov,
+                                        const TfToken &bindName,
+                                        const HdBinding &binding)
 {
     if (binding.GetType() != HdBinding::TEXTURE_2D) {
         TF_CODING_ERROR("When binding readback for aov '%s', binding is "
@@ -100,69 +96,36 @@ _BindTexture(HdStGLSLProgram const &program,
 
     if (!texture) {
         TF_CODING_ERROR("When binding readback for aov '%s', AOV is not backed "
-                        "by HgiGLTexture.", aov.aovName.GetString().c_str());
+                        "by HgiMetalTexture.", aov.aovName.GetString().c_str());
         return;
+    }
+    
+    if (!_sampler) {
+        HgiSamplerDesc sampDesc;
+
+        sampDesc.magFilter = HgiSamplerFilterLinear;
+        sampDesc.minFilter = HgiSamplerFilterLinear;
+
+        sampDesc.addressModeU = HgiSamplerAddressModeClampToEdge;
+        sampDesc.addressModeV = HgiSamplerAddressModeClampToEdge;
+
+        _sampler = MtlfMetalContext::GetMetalContext()->GetHgi()->CreateSampler(sampDesc);
     }
 
     // Get Metal texture Id.
     id<MTLTexture> textureId = texture->GetTextureId();
+    id<MTLSamplerState> samplerId =
+        dynamic_cast<HgiMetalSampler*>(_sampler.Get())->GetSamplerId();
 
-    // Sampler unit was determined during binding resolution.
-    // Use it to bind texture.
-    const int samplerUnit = binding.GetTextureUnit();
-    
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    
-    /*
-    glActiveTexture(GL_TEXTURE0 + samplerUnit);
-    glBindTexture(GL_TEXTURE_2D, (GLuint) textureId);
-    glBindSampler(samplerUnit, 0);
-
-    // Set uniform sampler2D to sampler unit.
-    glProgramUniform1i(program, binding.GetLocation(),
-                       samplerUnit);
-     */
-}
-
-/*virtual*/
-void
-HdStRenderPassShaderMetal::BindResources(HdStGLSLProgram const &program,
-                                         HdSt_ResourceBinder const &binder,
-                                         HdRenderPassState const &state)
-{
-    TF_FOR_ALL(it, _customBuffers) {
-        binder.Bind(it->second);
-    }
-
-    // set fallback states (should be moved to HdRenderPassState::Bind)
-    unsigned int cullStyle = _cullStyle;
-    binder.BindUniformui(HdShaderTokens->cullStyle, 1, &cullStyle);
-
-    // Count how many textures we bind for check at the end.
-    size_t numFulfilled = 0;
-
-    // Loop over all AOVs for which a read back was requested.
-    for (const HdRenderPassAovBinding &aovBinding : state.GetAovBindings()) {
-        const TfToken &aovName = aovBinding.aovName;
-        if (_aovReadbackRequests.count(aovName) > 0) {
-            // Bind the texture.
-            _BindTexture(program,
-                         aovBinding,
-                         binder.GetBinding(_GetReadbackName(aovName)));
-
-            numFulfilled++;
-        }
-    }
-
-    if (numFulfilled != _aovReadbackRequests.size()) {
-        TF_CODING_ERROR("AOV bindings missing for requested readbacks.");
-    }
+    HdStGLSLProgramMSL const &mslProgram(
+        static_cast<HdStGLSLProgramMSL const&>(program));
+    mslProgram.BindTexture(bindName, textureId);
+    mslProgram.BindSampler(bindName, samplerId);
 }
 
 // Helper to unbind what was bound with _BindTexture.
-static
 void
-_UnbindTexture(const HdBinding &binding)
+HdStRenderPassShaderMetal::_UnbindTexture(const HdBinding &binding)
 {
     if (binding.GetType() != HdBinding::TEXTURE_2D) {
         // Coding error already issued in _BindTexture.
@@ -177,25 +140,5 @@ _UnbindTexture(const HdBinding &binding)
     glBindSampler(samplerUnit, 0);
  */
 }    
-
-
-/*virtual*/
-void
-HdStRenderPassShaderMetal::UnbindResources(HdStGLSLProgram const &program,
-                                           HdSt_ResourceBinder const &binder,
-                                           HdRenderPassState const &state)
-{
-    TF_FOR_ALL(it, _customBuffers) {
-        binder.Unbind(it->second);
-    }
-
-    // Unbind all textures that were requested for AOV read back
-    for (const HdRenderPassAovBinding &aovBinding : state.GetAovBindings()) {
-        const TfToken &aovName = aovBinding.aovName;
-        if (_aovReadbackRequests.count(aovName) > 0) {
-            _UnbindTexture(binder.GetBinding(_GetReadbackName(aovName)));
-        }
-    }
-}
 
 PXR_NAMESPACE_CLOSE_SCOPE

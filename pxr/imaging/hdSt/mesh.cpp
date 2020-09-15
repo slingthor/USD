@@ -23,14 +23,13 @@
 //
 #include "pxr/pxr.h"
 
-#include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/hdSt/bufferArrayRange.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/extCompGpuComputation.h"
 #include "pxr/imaging/hdSt/flatNormals.h"
 #include "pxr/imaging/hdSt/geometricShader.h"
+#include "pxr/imaging/hdSt/glUtils.h"
 #include "pxr/imaging/hdSt/instancer.h"
 #include "pxr/imaging/hdSt/material.h"
 #include "pxr/imaging/hdSt/mesh.h"
@@ -39,7 +38,6 @@
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/quadrangulate.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
-#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/rprimUtils.h"
 #include "pxr/imaging/hdSt/smoothNormals.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"

@@ -48,7 +48,7 @@ HdxOitVolumeRenderTask::HdxOitVolumeRenderTask(
                 HdSceneDelegate* delegate, SdfPath const& id)
     : HdxRenderTask(delegate, id)
     , _oitVolumeRenderPassShader(
-        std::make_shared<HdStRenderPassShader>(
+        HdStResourceFactory::GetInstance()->NewRenderPassShader(
             HdxPackageRenderPassOitVolumeShader()))
     , _isOitEnabled(HdxOitBufferAccessor::IsOitEnabled())
 {

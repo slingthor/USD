@@ -44,15 +44,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-// Name shader uses to read AOV, i.e., shader calls
-// HdGet_AOVNAMEReadback().
-static
-TfToken
-_GetReadbackName(const TfToken &aovName)
-{
-    return TfToken(aovName.GetString() + "Readback");
-}
-
 HdStRenderPassShaderGL::HdStRenderPassShaderGL()
     : HdStRenderPassShader()
 {
@@ -71,10 +62,11 @@ HdStRenderPassShaderGL::~HdStRenderPassShaderGL()
 
 // Helper to bind texture from given AOV to GLSL program identified
 // by \p program.
-static
 void
-_BindTexture(const HdRenderPassAovBinding &aov,
-             const HdBinding &binding)
+HdStRenderPassShaderGL::_BindTexture(HdStGLSLProgram const &program,
+                                     const HdRenderPassAovBinding &aov,
+                                     const TfToken &bindName,
+                                     const HdBinding &binding)
 {
     if (binding.GetType() != HdBinding::TEXTURE_2D) {
         TF_CODING_ERROR("When binding readback for aov '%s', binding is "
@@ -118,38 +110,9 @@ _BindTexture(const HdRenderPassAovBinding &aov,
     glBindSampler(samplerUnit, 0);
 }
 
-/*virtual*/
-void
-HdStRenderPassShaderGL::BindResources(HdStGLSLProgram const &program,
-                                      HdSt_ResourceBinder const &binder,
-                                      HdRenderPassState const &state)
-{
-    HdStRenderPassShader::BindResources(program, binder, state);
-
-    // Count how many textures we bind for check at the end.
-    size_t numFulfilled = 0;
-
-    // Loop over all AOVs for which a read back was requested.
-    for (const HdRenderPassAovBinding &aovBinding : state.GetAovBindings()) {
-        const TfToken &aovName = aovBinding.aovName;
-        if (_aovReadbackRequests.count(aovName) > 0) {
-            // Bind the texture.
-            _BindTexture(aovBinding,
-                         binder.GetBinding(_GetReadbackName(aovName)));
-
-            numFulfilled++;
-        }
-    }
-
-    if (numFulfilled != _aovReadbackRequests.size()) {
-        TF_CODING_ERROR("AOV bindings missing for requested readbacks.");
-    }
-}
-
 // Helper to unbind what was bound with _BindTexture.
-static
 void
-_UnbindTexture(const HdBinding &binding)
+HdStRenderPassShaderGL::_UnbindTexture(const HdBinding &binding)
 {
     if (binding.GetType() != HdBinding::TEXTURE_2D) {
         // Coding error already issued in _BindTexture.
@@ -166,19 +129,10 @@ _UnbindTexture(const HdBinding &binding)
 /*virtual*/
 void
 HdStRenderPassShaderGL::UnbindResources(HdStGLSLProgram const &program,
-                                      HdSt_ResourceBinder const &binder,
-                                      HdRenderPassState const &state)
+                                        HdSt_ResourceBinder const &binder,
+                                        HdRenderPassState const &state)
 {
     HdStRenderPassShader::UnbindResources(program, binder, state);
-
-    // Unbind all textures that were requested for AOV read back
-    for (const HdRenderPassAovBinding &aovBinding : state.GetAovBindings()) {
-        const TfToken &aovName = aovBinding.aovName;
-        if (_aovReadbackRequests.count(aovName) > 0) {
-            _UnbindTexture(binder.GetBinding(_GetReadbackName(aovName)));
-        }
-    }    
-
     glActiveTexture(GL_TEXTURE0);
 }
 

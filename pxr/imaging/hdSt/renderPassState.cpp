@@ -62,7 +62,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 
 HdStRenderPassState::HdStRenderPassState()
-    : HdStRenderPassState(std::make_shared<HdStRenderPassShader>())
+    : HdStRenderPassState(HdStResourceFactory::GetInstance()->NewRenderPassShader())
 {
 }
 
