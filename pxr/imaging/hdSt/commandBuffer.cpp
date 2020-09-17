@@ -605,8 +605,7 @@ HdStCommandBuffer::FrustumCull(
 {
     HD_TRACE_FUNCTION();
     
-    const bool
-    skipCull = false;
+    const bool skipCull = false;
     
     if (skipCull) {
         return;
