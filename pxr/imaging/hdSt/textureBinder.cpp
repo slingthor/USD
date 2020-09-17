@@ -125,7 +125,7 @@ public:
                 _Concat(
                     name,
                     HdSt_ResourceBindingSuffixTokens->samplingTransform),
-                VtValue(texture.GetSamplingTransform())));
+                texture.GetSamplingTransform()));
 
         if (useBindlessHandles) {
             sources->push_back(

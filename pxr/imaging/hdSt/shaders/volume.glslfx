@@ -367,7 +367,11 @@ float
 NDCtoEyeZ(float z)
 {
     const MAT4 m = inverse(GetProjectionMatrix());
+#if defined(ARCH_GFX_METAL)
     return (m[2][2] * z + m[3][2]) / (m[2][3] * z + m[3][3]);
+#else
+    return (m[2][2] * z + m[3][2]) / min(m[2][3] * z + m[3][3], M_E_F); // Protect against division by zero
+#endif
 }
 
 // Compute the z-value of the near clipping plane in eye space.
@@ -493,9 +497,13 @@ sampleZBuffer(vec2 fragcoord)
 {
 #ifdef HD_HAS_depthReadback
     // Sample the z-Buffer at the frag coordinate.
+    // APPLE METAL: We can't use .z to access the result (because it's a float)
+//    const float bufferVal = texelFetch(HdGetSampler_depthReadback(),
+//                                       ivec2(fragcoord),
+//                                       /* lod = */ 0).z;
     const float bufferVal = texelFetch(HdGetSampler_depthReadback(),
                                        ivec2(fragcoord),
-                                       /* lod = */ 0).z;
+                                       /* lod = */ 0);
 #else
     // Assume far-plane if we cannot sample the z-Buffer.
     const float bufferVal = 1.0;

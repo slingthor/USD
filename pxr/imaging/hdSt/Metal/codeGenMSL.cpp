@@ -579,7 +579,7 @@ static void _EmitDeclarationMutablePtr(std::stringstream &str,
 
 {
     TfToken ptrName(std::string("*") + name.GetString());
-    str << "device ";
+    str << "device VTXCONST ";
     if (programScope) {
         str << "ProgramScope<st>::";
     }
@@ -1402,14 +1402,13 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                     vsInputCode << "    scope." << name << " = "
                                 << name << ";\n";
                     
-                vsFuncDef   << "\n    , " << (isPtrParam ? ((inputIsAtomic || isShaderWritable) ? "device " : "device const ") : "")
+                vsFuncDef   << "\n    , device const "
                             << (inProgramScope ? "ProgramScope_Vert::" : "")
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
                 
-                bool isMutable = (input.usage & HdSt_CodeGenMSL::TParam::Mutable);
                 csFuncDef   << "\n    , " << (isPtrParam ? "device " : "")
-                            << ((isMutable || isShaderWritable) ? "" : "const ")
+                            << "const "
                             << (inProgramScope ? "ProgramScope_Compute::" : "")
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
@@ -1417,14 +1416,14 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 if(availableInMI_EP) {
                     //The MI entry point needs these too in identical form.
                     vsMI_EP_FuncDefParams << "\n    , "
-                            << (isPtrParam ? ((inputIsAtomic || isShaderWritable) ? "device " : "device const ") : "")
+                            << (isPtrParam ? "device const " : "")
                             << (inProgramScope ? "ProgramScope_Vert::" : "")
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
                 }
                 
                 //MI wrapper code can't use "attrib" attribute specifier.
-                vsMI_FuncDef << "\n    , " << (isPtrParam ? ((inputIsAtomic || isShaderWritable) ? "device " : "device const ") : "")
+                vsMI_FuncDef << "\n    , " << (isPtrParam ? "device const " : "")
                              << (inProgramScope ? "ProgramScope_Vert::" : "")
                              << dataType << (isPtrParam ? "* " : " ")
                              << name;
@@ -3154,12 +3153,17 @@ static void _EmitTextureAccessors(
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     TfToken const &name = acc.name;
+    
+    char const* textureStr = "texture";
+    if (name == TfToken("depthReadback")) {
+        textureStr = "depth";
+    }
 
     if (!isBindless) {
         // a function returning sampler requires bindless_texture
         if (caps.bindlessTextureEnabled) {
             accessors
-                << "texture" << dim << "d<float>\n"
+                << textureStr << dim << "d<float>\n"
                 << "HdGetSampler_" << name << "() {\n"
                 << "  return textureBind_" << name << ";"
                 << "}\n";
@@ -3201,7 +3205,7 @@ static void _EmitTextureAccessors(
 
     if (hasTextureScaleAndBias) {
         accessors
-            << "  texture" << dim << "d<float> tex = HdGetSampler_" << name << "();\n"
+            << "  " << textureStr << dim << "d<float> tex = HdGetSampler_" << name << "();\n"
             << "  " << _GetUnpackedType(dataType, false)
             << "  result = is_null_texture(tex) ? 0.0f:"
             << _GetPackedTypeAccessor(dataType, false)
@@ -3215,7 +3219,7 @@ static void _EmitTextureAccessors(
             << ")" << swizzle << ");\n";
     } else {
         accessors
-            << "  texture" << dim << "d<float> tex = HdGetSampler_" << name << "();\n"
+            << "  " << textureStr << dim << "d<float> tex = HdGetSampler_" << name << "();\n"
             << "  " << _GetUnpackedType(dataType, false)
             << "  result = is_null_texture(tex) ? 0.0f :"
             << _GetPackedTypeAccessor(dataType, false)
@@ -3499,10 +3503,13 @@ HdSt_CodeGenMSL::_GenerateCommonCode()
     }
 
     _genCommon  << "#if defined(HD_VERTEX_SHADER)\n"
+                << "#define VTXCONST const\n"
                 << "#if !defined(HD_NUM_clipPlanes)\n"
                 << "#define HD_NUM_clipPlanes 1\n"
                 << "#endif\n"
                 << "float gl_ClipDistance[HD_NUM_clipPlanes];\n"
+                << "#else\n"
+                << "#define VTXCONST\n"
                 << "#endif\n";
     
     {
@@ -5155,13 +5162,20 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             
             isTextureSource = true;
         } else if (bindingType == HdBinding::TEXTURE_2D) {
+            char const* textureStr = "texture";
+            TfToken textureTypeStr = TfToken("texture2d<float>");
+            if (it->second.name == TfToken("depthReadback")) {
+                textureStr = "depth";
+                textureTypeStr = TfToken("depth2d<float>");
+            }
+
             declarations
                 << "sampler samplerBind_" << it->second.name << ";\n"
-                << "texture2d<float> textureBind_" << it->second.name << ";\n";
+                << textureStr << "2d<float> textureBind_" << it->second.name << ";\n";
             
             _AddInputParam(_mslPSInputParams, TfToken("samplerBind_" + it->second.name.GetString()), TfToken("sampler"), TfToken()).usage
                 |= HdSt_CodeGenMSL::TParam::Sampler;
-            _AddInputParam(_mslPSInputParams, TfToken("textureBind_" + it->second.name.GetString()), TfToken("texture2d<float>"), TfToken()).usage
+            _AddInputParam(_mslPSInputParams, TfToken("textureBind_" + it->second.name.GetString()), textureTypeStr, TfToken()).usage
                 |= HdSt_CodeGenMSL::TParam::Texture;
 
             _EmitTextureAccessors(
@@ -5170,82 +5184,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 /* hasTextureTransform = */ false,
                 /* hasTextureScaleAndBias = */ true,
                 /* isBindless = */ false);
-            /*
-            // a function returning sampler requires bindless_texture
-            if (caps.bindlessTextureEnabled) {
-                accessors
-                    << "texture2d<float>\n"
-                    << "HdGetSampler_" << it->second.name << "() {\n"
-                    << "  return textureBind_" << it->second.name << ";"
-                    << "}\n";
-            } else {
-                accessors
-                    << "#define HdGetSampler_" << it->second.name << "()"
-                    << " textureBind_" << it->second.name << "\n";
-            }
-            // vec4 HdGet_name(vec2 coord)
-            accessors
-                << _GetUnpackedType(it->second.dataType, false)
-                << " HdGet_" << it->second.name << "(vec2 coord) {\n"
-                << "  " << _GetUnpackedType(it->second.dataType, false)
-                << " result = is_null_texture(textureBind_" << it->second.name
-                << ") ? 0:"
-                << _GetPackedTypeAccessor(it->second.dataType, false)
-                << "(textureBind_" << it->second.name << ".sample(samplerBind_"
-                << it->second.name << ", coord)"
-                << swizzle << ");\n";
 
-            if (it->second.processTextureFallbackValue) {
-                // Check whether texture is valid (using NAME_valid)
-                //
-                accessors
-                    << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
-                    << "  if (materialParams[shaderCoord]."
-                    << it->second.name
-                    << HdSt_ResourceBindingSuffixTokens->valid
-                    << ") {\n"
-                    << "    return result;\n"
-                    << "  } else {\n"
-                    << "    return "
-                    << _GetPackedTypeAccessor(it->second.dataType, false)
-                    << "(materialParams[shaderCoord]."
-                    << it->second.name
-                    << HdSt_ResourceBindingSuffixTokens->fallback
-                    << swizzle << ");\n"
-                    << "  }\n";
-            } else {
-                accessors
-                    << "  return result;\n";
-            }
-            
-            accessors
-                << "}\n";
-
-            // vec4 HdGet_name(int localIndex)
-            accessors
-                << _GetUnpackedType(it->second.dataType, false)
-                << " HdGet_" << it->second.name
-                << "(int localIndex) { return HdGet_" << it->second.name << "(";
-            if (!it->second.inPrimvars.empty()) {
-                accessors
-                    << "\n"
-                    << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
-                    << "HdGet_" << it->second.inPrimvars[0]
-                    << "(localIndex).xy\n"
-                    << "#else\n"
-                    << "vec2(0.0, 0.0)\n"
-                    << "#endif\n";
-            } else {
-                accessors
-                    << "vec2(0.0, 0.0)";
-            }
-            accessors << "); }\n";
-            // vec4 HdGet_name()
-            accessors
-                << _GetUnpackedType(it->second.dataType, false)
-                << " HdGet_" << it->second.name
-                << "() { return HdGet_" << it->second.name << "(0); }\n";
-             */
             isTextureSource = true;
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_FIELD) {
 

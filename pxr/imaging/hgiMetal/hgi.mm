@@ -298,7 +298,7 @@ HgiMetal::GetAPIName() const {
 void
 HgiMetal::StartFrame()
 {
-    StartFrame(false);
+    StartFrame(true);
 }
 
 void

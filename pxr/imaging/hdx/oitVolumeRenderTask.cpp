@@ -174,6 +174,7 @@ HdxOitVolumeRenderTask::Execute(HdTaskContext* ctx)
     //
     extendedState->SetRenderPassShader(_oitVolumeRenderPassShader);
     renderPassState->SetEnableDepthMask(false);
+    renderPassState->SetColorMaskUseDefault(false);
     renderPassState->SetColorMask(HdRenderPassState::ColorMaskNone);
     HdxRenderTask::Execute(ctx);
 

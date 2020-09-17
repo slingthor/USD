@@ -40,7 +40,11 @@ HgiMetalGraphicsCmds::HgiMetalGraphicsCmds(
     HgiGraphicsCmdsDesc const& desc)
     : HgiGraphicsCmds()
     , _hgi(hgi)
+    , _renderPassDescriptor(nil)
+    , _encoder(nil)
     , _descriptor(desc)
+    , _debugLabel(nil)
+    , _viewportSet(false)
 {
     TF_VERIFY(desc.width>0 && desc.height>0);
     TF_VERIFY(desc.colorTextures.size() == desc.colorAttachmentDescs.size());
@@ -57,17 +61,21 @@ HgiMetalGraphicsCmds::HgiMetalGraphicsCmds(
         return;
     }
 
-    MTLRenderPassDescriptor *renderPassDescriptor =
-        [[MTLRenderPassDescriptor alloc] init];
+    _renderPassDescriptor = [[MTLRenderPassDescriptor alloc] init];
 
     // Color attachments
     bool resolvingColor = !desc.colorResolveTextures.empty();
+    bool hasClear = false;
     for (size_t i=0; i<desc.colorAttachmentDescs.size(); i++) {
         HgiAttachmentDesc const &hgiColorAttachment =
             desc.colorAttachmentDescs[i];
         MTLRenderPassColorAttachmentDescriptor *metalColorAttachment =
-            renderPassDescriptor.colorAttachments[i];
+            _renderPassDescriptor.colorAttachments[i];
 
+        if (hgiColorAttachment.loadOp == HgiAttachmentLoadOpClear) {
+            hasClear = true;
+        }
+        
         if (@available(macos 100.100, ios 8.0, *)) {
             metalColorAttachment.loadAction = MTLLoadActionLoad;
         }
@@ -117,11 +125,15 @@ HgiMetalGraphicsCmds::HgiMetalGraphicsCmds(
         HgiAttachmentDesc const &hgiDepthAttachment =
             desc.depthAttachmentDesc;
         MTLRenderPassDepthAttachmentDescriptor *metalDepthAttachment =
-            renderPassDescriptor.depthAttachment;
+            _renderPassDescriptor.depthAttachment;
+
+        if (hgiDepthAttachment.loadOp == HgiAttachmentLoadOpClear) {
+            hasClear = true;
+        }
 
         metalDepthAttachment.loadAction =
             HgiMetalConversions::GetAttachmentLoadOp(
-                hgiDepthAttachment.loadOp);;
+                hgiDepthAttachment.loadOp);
         metalDepthAttachment.storeAction =
             HgiMetalConversions::GetAttachmentStoreOp(
                 hgiDepthAttachment.storeOp);
@@ -152,18 +164,39 @@ HgiMetalGraphicsCmds::HgiMetalGraphicsCmds(
             }
         }
     }
+    
+    if (hasClear) {
+        _CreateEncoder();
+    }
 
     // APPLE METAL: Mtlf handoff
-    _hgi->renderPassDescriptor = [renderPassDescriptor copy];
-
-    _encoder = [_hgi->GetCommandBuffer(false)
-        renderCommandEncoderWithDescriptor:renderPassDescriptor];
-    [renderPassDescriptor release];
+    _hgi->renderPassDescriptor = [_renderPassDescriptor copy];
 }
 
 HgiMetalGraphicsCmds::~HgiMetalGraphicsCmds()
 {
     TF_VERIFY(_encoder == nil, "Encoder created, but never commited.");
+    
+    [_renderPassDescriptor release];
+    if (_debugLabel) {
+        [_debugLabel release];
+    }
+}
+
+void
+HgiMetalGraphicsCmds::_CreateEncoder()
+{
+    if (!_encoder) {
+        _encoder = [_hgi->GetCommandBuffer(false)
+            renderCommandEncoderWithDescriptor:_renderPassDescriptor];
+        
+        if (_debugLabel) {
+            [_encoder setLabel:_debugLabel];
+        }
+        if (_viewportSet) {
+            [_encoder setViewport:_viewport];
+        }
+    }
 }
 
 void
@@ -173,7 +206,13 @@ HgiMetalGraphicsCmds::SetViewport(GfVec4i const& vp)
     double y = vp[1];
     double w = vp[2];
     double h = vp[3];
-    [_encoder setViewport:(MTLViewport){x, y, w, h, 0.0, 1.0}];
+    if (_encoder) {
+        [_encoder setViewport:(MTLViewport){x, y, w, h, 0.0, 1.0}];
+    }
+    else {
+        _viewport = (MTLViewport){x, y, w, h, 0.0, 1.0};
+    }
+    _viewportSet = true;
 }
 
 void
@@ -183,12 +222,17 @@ HgiMetalGraphicsCmds::SetScissor(GfVec4i const& sc)
     uint32_t y = sc[1];
     uint32_t w = sc[2];
     uint32_t h = sc[3];
+    
+    _CreateEncoder();
+    
     [_encoder setScissorRect:(MTLScissorRect){x, y, w, h}];
 }
 
 void
 HgiMetalGraphicsCmds::BindPipeline(HgiGraphicsPipelineHandle pipeline)
 {
+    _CreateEncoder();
+
     _primitiveType = pipeline->GetDescriptor().primitiveType;
     if (HgiMetalGraphicsPipeline* p =
         static_cast<HgiMetalGraphicsPipeline*>(pipeline.Get())) {
@@ -199,6 +243,8 @@ HgiMetalGraphicsCmds::BindPipeline(HgiGraphicsPipelineHandle pipeline)
 void
 HgiMetalGraphicsCmds::BindResources(HgiResourceBindingsHandle r)
 {
+    _CreateEncoder();
+
     if (HgiMetalResourceBindings* rb=
         static_cast<HgiMetalResourceBindings*>(r.Get()))
     {
@@ -214,6 +260,8 @@ HgiMetalGraphicsCmds::SetConstantValues(
     uint32_t byteSize,
     const void* data)
 {
+    _CreateEncoder();
+
     if (stages & HgiShaderStageVertex) {
         [_encoder setVertexBytes:data
                           length:byteSize
@@ -234,6 +282,8 @@ HgiMetalGraphicsCmds::BindVertexBuffers(
 {
     TF_VERIFY(byteOffsets.size() == vertexBuffers.size());
     TF_VERIFY(byteOffsets.size() == vertexBuffers.size());
+
+    _CreateEncoder();
 
     for (size_t i=0; i<vertexBuffers.size(); i++) {
         HgiBufferHandle bufHandle = vertexBuffers[i];
@@ -258,6 +308,8 @@ HgiMetalGraphicsCmds::DrawIndexed(
 {
     TF_VERIFY(instanceCount>0);
 
+    _CreateEncoder();
+
     HgiMetalBuffer* indexBuf = static_cast<HgiMetalBuffer*>(indexBuffer.Get());
     HgiBufferDesc const& indexDesc = indexBuf->GetDescriptor();
 
@@ -281,12 +333,21 @@ HgiMetalGraphicsCmds::DrawIndexed(
 void
 HgiMetalGraphicsCmds::PushDebugGroup(const char* label)
 {
-    HGIMETAL_DEBUG_LABEL(_encoder, label)
+    if (_encoder) {
+        HGIMETAL_DEBUG_LABEL(_encoder, label)
+    }
+    else if (HgiMetalDebugEnabled()) {
+        _debugLabel = [@(label) copy];
+    }
 }
 
 void
 HgiMetalGraphicsCmds::PopDebugGroup()
 {
+    if (_debugLabel) {
+        [_debugLabel release];
+        _debugLabel = nil;
+    }
 }
 
 bool

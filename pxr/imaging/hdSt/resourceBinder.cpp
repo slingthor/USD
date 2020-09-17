@@ -1162,7 +1162,7 @@ HdSt_ResourceBinder::GetBufferSpecs(
                 _Concat(
                     texture.name,
                     HdSt_ResourceBindingSuffixTokens->samplingTransform),
-                HdTupleType{HdTypeDoubleMat4, 1});
+                HdTupleType{HdTypeFloatMat4, 1});
             break;
         case HdTextureType::Ptex:
             if (useBindlessHandles) {
