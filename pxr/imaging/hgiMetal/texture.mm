@@ -152,15 +152,15 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
             }
             else {
                 const uint32_t depth = mipInfo.dimensions[2];
-                const size_t imageBytes = desc.pixelsByteSize / depth;
+                const size_t imageBytes = mipInfo.byteSize / depth;
                 for (size_t d = 0; d < depth; d++) {
                     const size_t offset = d * imageBytes;
                     [_textureId
                         replaceRegion:MTLRegionMake3D(0, 0, d, width, height, 1)
-                          mipmapLevel:0
+                          mipmapLevel:mip
                                 slice:0
                             withBytes:initialData + mipInfo.byteOffset + offset
-                          bytesPerRow:desc.pixelsByteSize / height / width
+                          bytesPerRow:imageBytes / height
                         bytesPerImage:0];
                 }
             }
