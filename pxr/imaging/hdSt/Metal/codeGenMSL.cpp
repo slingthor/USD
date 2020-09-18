@@ -3508,6 +3508,8 @@ HdSt_CodeGenMSL::_GenerateCommonCode()
                 << "#define HD_NUM_clipPlanes 1\n"
                 << "#endif\n"
                 << "float gl_ClipDistance[HD_NUM_clipPlanes];\n"
+                << "#elif defined(HD_GEOMETRY_SHADER)\n"
+                << "#define VTXCONST const\n"
                 << "#else\n"
                 << "#define VTXCONST\n"
                 << "#endif\n";
