@@ -351,7 +351,7 @@ HgiMetal::CommitCommandBuffer(CommitCommandBufferWaitType waitType,
     if (!_workToFlush && !forceNewBuffer) {
         return;
     }
-    
+
     [_commandBuffer commit];
     if (waitType == CommitCommandBuffer_WaitUntilScheduled) {
         [_commandBuffer waitUntilScheduled];
@@ -381,7 +381,7 @@ HgiMetal::BeginMtlf()
         else if (_encoder->_descriptor.depthTexture) {
             _sampleCount = _encoder->_descriptor.depthTexture->GetDescriptor().sampleCount;
         }
-        _encoder->_Submit(this);
+        _encoder->_Submit(this, HgiSubmitWaitTypeNoWait);
         CommitCommandBuffer();
         return true;
     }
@@ -390,15 +390,25 @@ HgiMetal::BeginMtlf()
 }
 
 bool
-HgiMetal::_SubmitCmds(HgiCmds* cmds)
+HgiMetal::_SubmitCmds(HgiCmds* cmds, HgiSubmitWaitType wait)
 {
     TRACE_FUNCTION();
 
     if (cmds) {
-        _workToFlush = Hgi::_SubmitCmds(cmds);
+        _workToFlush = Hgi::_SubmitCmds(cmds, wait);
     }
 
-    CommitCommandBuffer();
+    CommitCommandBufferWaitType waitType;
+    switch(wait) {
+        case HgiSubmitWaitTypeNoWait:
+            waitType = CommitCommandBuffer_NoWait;
+            break;
+        case HgiSubmitWaitTypeWaitUntilCompleted:
+            waitType = CommitCommandBuffer_WaitUntilCompleted;
+            break;
+    }
+
+    CommitCommandBuffer(waitType);
 
     return _workToFlush;
 }

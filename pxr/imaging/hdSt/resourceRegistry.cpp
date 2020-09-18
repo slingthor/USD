@@ -25,12 +25,11 @@
 
 #include "pxr/base/work/loops.h"
 
-
+#include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hdSt/copyComputation.h"
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
 #include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/interleavedMemoryManager.h"
-#include "pxr/imaging/hdSt/persistentBuffer.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/textureResource.h"
@@ -478,7 +477,7 @@ HdStResourceRegistry::AddComputation(HdBufferArrayRangeSharedPtr const &range,
 }
 
 /// ------------------------------------------------------------------------
-/// Dispatch & persistent buffer API
+/// Dispatch & misc buffer API
 /// ------------------------------------------------------------------------
 HdStDispatchBufferSharedPtr
 HdStResourceRegistry::RegisterDispatchBuffer(
@@ -493,15 +492,25 @@ HdStResourceRegistry::RegisterDispatchBuffer(
     return result;
 }
 
-HdStPersistentBufferSharedPtr
-HdStResourceRegistry::RegisterPersistentBuffer(
-        TfToken const &role, size_t dataSize, void *data)
+HdStBufferResourceSharedPtr
+HdStResourceRegistry::RegisterBufferResource(
+    TfToken const &role, 
+    HdTupleType tupleType)
 {
-    HdStPersistentBufferSharedPtr const result =
-        std::make_shared<HdStPersistentBuffer>(
-            _hgi, role, dataSize, data);
+    HdStBufferResourceSharedPtr const result =
+        std::make_shared<HdStBufferResource>(
+            role, tupleType, /*offset*/ 0, /*stride*/ 0);
 
-    _persistentBufferRegistry.push_back(result);
+    size_t byteSize = HdDataSizeOfTupleType(tupleType);
+
+    HgiBufferDesc bufDesc;
+    bufDesc.usage= HgiBufferUsageUniform;
+    bufDesc.byteSize= byteSize;
+    HgiBufferHandle newId = _hgi->CreateBuffer(bufDesc);
+
+    result->SetAllocation(newId, byteSize);
+
+    _bufferResourceRegistry.push_back(result);
 
     return result;
 }
@@ -520,16 +529,16 @@ HdStResourceRegistry::GarbageCollectDispatchBuffers()
 }
 
 void
-HdStResourceRegistry::GarbageCollectPersistentBuffers()
+HdStResourceRegistry::GarbageCollectBufferResources()
 {
     HD_TRACE_FUNCTION();
 
-    _persistentBufferRegistry.erase(
+    _bufferResourceRegistry.erase(
         std::remove_if(
-            _persistentBufferRegistry.begin(), _persistentBufferRegistry.end(),
-            std::bind(&HdStPersistentBufferSharedPtr::unique,
+            _bufferResourceRegistry.begin(), _bufferResourceRegistry.end(),
+            std::bind(&HdStBufferResourceSharedPtr::unique,
                       std::placeholders::_1)),
-        _persistentBufferRegistry.end());
+        _bufferResourceRegistry.end());
 }
 
 /// ------------------------------------------------------------------------
@@ -694,19 +703,19 @@ HdStResourceRegistry::GetGlobalComputeCmds()
 }
 
 void
-HdStResourceRegistry::SubmitBlitWork()
+HdStResourceRegistry::SubmitBlitWork(HgiSubmitWaitType wait)
 {
     if (_blitCmds) {
-        _hgi->SubmitCmds(_blitCmds.get());
+        _hgi->SubmitCmds(_blitCmds.get(), wait);
         _blitCmds.reset();
     }
 }
 
 void
-HdStResourceRegistry::SubmitComputeWork()
+HdStResourceRegistry::SubmitComputeWork(HgiSubmitWaitType wait)
 {
     if (_computeCmds) {
-        _hgi->SubmitCmds(_computeCmds.get());
+        _hgi->SubmitCmds(_computeCmds.get(), wait);
         _computeCmds.reset();
     }
 }
@@ -939,7 +948,7 @@ HdStResourceRegistry::_GarbageCollect()
     // to other objects which will be subsequently cleaned up.
 
     GarbageCollectDispatchBuffers();
-    GarbageCollectPersistentBuffers();
+    GarbageCollectBufferResources();
 
     {
         size_t count = _meshTopologyRegistry.GarbageCollect();
@@ -1128,8 +1137,8 @@ HdStResourceRegistry::_TallyResourceAllocation(VtDictionary *result) const
         gpuMemoryUsed += size;
     }
 
-    // persistent buffers
-    for (auto const & buffer: _persistentBufferRegistry) {
+    // misc buffers
+    for (auto const & buffer: _bufferResourceRegistry) {
         if (!TF_VERIFY(buffer)) {
             continue;
         }

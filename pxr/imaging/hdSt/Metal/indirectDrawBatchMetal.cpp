@@ -41,7 +41,6 @@
 
 #include "pxr/imaging/hdSt/Metal/indirectDrawBatchMetal.h"
 #include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
-#include "pxr/imaging/hdSt/persistentBuffer.h"
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
@@ -49,6 +48,9 @@
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
+
+#include "pxr/imaging/hgi/blitCmds.h"
+#include "pxr/imaging/hgi/blitCmdsOps.h"
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/iterator.h"
@@ -96,7 +98,6 @@ HdSt_IndirectDrawBatchMetal::_PrepareDraw(
         GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
         if (caps.IsEnabledGPUCountVisibleInstances()) {
 //            _EndGPUCountVisibleInstances(_cullResultSync, &_numVisibleItems);
-//            glDeleteSync(_cullResultSync);
 //            _cullResultSync = 0;
         }
     }
@@ -153,6 +154,7 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumInstanceCullingExecute(
     
     if (caps.IsEnabledGPUCountVisibleInstances()) {
         _BeginGPUCountVisibleInstances(resourceRegistry);
+        binder.BindBuffer(_tokens->drawIndirectResult, _resultBuffer);
     }
 
     TF_FATAL_CODING_ERROR("Not Implemented");
@@ -195,6 +197,7 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumNonInstanceCullingExecute(
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     if (caps.IsEnabledGPUCountVisibleInstances()) {
         _BeginGPUCountVisibleInstances(resourceRegistry);
+        binder.BindBuffer(_tokens->drawIndirectResult, _resultBuffer);
     }
 
 //    TF_FATAL_CODING_ERROR("Not Implemented");
@@ -225,14 +228,29 @@ HdSt_IndirectDrawBatchMetal::_BeginGPUCountVisibleInstances(
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     if (!_resultBuffer) {
-        // APPLE METAL: Removed dynamic cast
-        _resultBuffer = resourceRegistry->RegisterPersistentBuffer(
-                _tokens->drawIndirectResult, sizeof(GLint), 0);
+        HdTupleType tupleType;
+        tupleType.type = HdTypeInt32;
+        tupleType.count = 1;
+
+        _resultBuffer = resourceRegistry->RegisterBufferResource(
+                _tokens->drawIndirectResult, tupleType);
     }
 
     // Reset visible item count
-    // APPLE METAL: Don't understand how this was
-    //*((GLint *)_resultBuffer->GetMappedAddress()) = 0;
+    static const int32_t count = 0;
+    HgiBlitCmds* blitCmds = resourceRegistry->GetGlobalBlitCmds();
+    HgiBufferCpuToGpuOp op;
+    op.cpuSourceBuffer = &count;
+    op.sourceByteOffset = 0;
+    op.gpuDestinationBuffer = _resultBuffer->GetId();
+    op.destinationByteOffset = 0;
+    op.byteSize = sizeof(count);
+    blitCmds->CopyBufferCpuToGpu(op);
+
+    // For now we need to submit here, because there are raw gl calls after
+    // _BeginGPUCountVisibleInstances that rely on this having executed on GPU.
+    // XXX Remove this once the rest of indirectDrawBatch is using Hgi.
+    resourceRegistry->SubmitBlitWork();
 }
 
 void

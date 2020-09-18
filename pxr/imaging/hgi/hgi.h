@@ -121,7 +121,9 @@ public:
     /// the main thread so we can continue to support the OpenGL platform. 
     /// See notes above.
     HGI_API
-    void SubmitCmds(HgiCmds* cmds);
+    void SubmitCmds(
+        HgiCmds* cmds, 
+        HgiSubmitWaitType wait = HgiSubmitWaitTypeNoWait);
 
     /// *** DEPRECATED *** Please use: CreatePlatformDefaultHgi
     HGI_API
@@ -300,7 +302,8 @@ protected:
     // Derived classes can override this function if they need customize the
     // command submission. The default implementation calls cmds->_Submit().
     HGI_API
-    virtual bool _SubmitCmds(HgiCmds* cmds);
+    virtual bool _SubmitCmds(
+        HgiCmds* cmds, HgiSubmitWaitType wait);
 
 private:
     Hgi & operator=(const Hgi&) = delete;

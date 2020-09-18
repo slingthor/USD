@@ -101,6 +101,7 @@ pxr_library(hdSt
         glConversions
         glfTextureCpuData
         glslfxShader
+        glslProgram
         glUtils
         hgiConversions
         imageShaderRenderPass
@@ -113,9 +114,7 @@ pxr_library(hdSt
         mesh
         mixinShader
         package
-        persistentBuffer
         points
-        glslProgram
         renderBuffer
         renderDelegate
         renderPass

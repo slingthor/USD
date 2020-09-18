@@ -92,11 +92,6 @@ HgiGLBuffer::~HgiGLBuffer()
         glDeleteBuffers(1, &_bufferId);
         _bufferId = 0;
     }
-    
-    if (_cpuStaging) {
-        free(_cpuStaging);
-        _cpuStaging = nullptr;
-    }
 
     if (_cpuStaging) {
         free(_cpuStaging);

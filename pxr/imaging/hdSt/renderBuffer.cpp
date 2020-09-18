@@ -217,7 +217,7 @@ HdStRenderBuffer::Map()
         blitCmds->CopyTextureGpuToCpu(copyOp);
     }
         
-    hgi->SubmitCmds(blitCmds.get());
+    hgi->SubmitCmds(blitCmds.get(), HgiSubmitWaitTypeWaitUntilCompleted);
 
     return _mappedBuffer.data();
 }

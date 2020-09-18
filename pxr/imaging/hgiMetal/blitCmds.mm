@@ -162,8 +162,21 @@ HgiMetalBlitCmds::CopyTextureGpuToCpu(
         [_blitEncoder performSelector:@selector(synchronizeResource:)
                            withObject:cpuBuffer];
     }
-    memcpy(copyOp.cpuDestinationBuffer,
-        [cpuBuffer contents], copyOp.destinationBufferByteSize);
+    
+    // Offset into the dst buffer
+    char* dst = ((char*) copyOp.cpuDestinationBuffer) +
+        copyOp.destinationByteOffset;
+    
+    // Offset into the src buffer
+    const char* src = (const char*) [cpuBuffer contents];
+
+    // bytes to copy
+    size_t byteSize = copyOp.destinationBufferByteSize;
+
+    [_hgi->GetCommandBuffer() addCompletedHandler:^(id<MTLCommandBuffer> buffer)
+        {
+            memcpy(dst, src, byteSize);
+        }];
     [cpuBuffer release];
 }
 
@@ -294,6 +307,41 @@ void HgiMetalBlitCmds::CopyBufferCpuToGpu(
 }
 
 void
+HgiMetalBlitCmds::CopyBufferGpuToCpu(HgiBufferGpuToCpuOp const& copyOp)
+{
+    if (copyOp.byteSize == 0 ||
+        !copyOp.cpuDestinationBuffer ||
+        !copyOp.gpuSourceBuffer)
+    {
+        return;
+    }
+
+    HgiMetalBuffer* metalBuffer = static_cast<HgiMetalBuffer*>(
+        copyOp.gpuSourceBuffer.Get());
+
+    if (@available(macOS 10.11, ios 100.100, *)) {
+        [_blitEncoder performSelector:@selector(synchronizeResource:)
+                           withObject:metalBuffer->GetBufferId()];
+    }
+    
+    // Offset into the dst buffer
+    char* dst = ((char*) copyOp.cpuDestinationBuffer) +
+        copyOp.destinationByteOffset;
+    
+    // Offset into the src buffer
+    const char* src = ((const char*) metalBuffer->GetCPUStagingAddress()) +
+        copyOp.sourceByteOffset;
+
+    // bytes to copy
+    size_t size = copyOp.byteSize;
+
+    [_hgi->GetCommandBuffer() addCompletedHandler:^(id<MTLCommandBuffer> buffer)
+        {
+            memcpy(dst, src, size);
+        }];
+}
+
+void
 HgiMetalBlitCmds::GenerateMipMaps(HgiTextureHandle const& texture)
 {
     HgiMetalTexture* metalTex = static_cast<HgiMetalTexture*>(texture.Get());
@@ -305,15 +353,13 @@ HgiMetalBlitCmds::GenerateMipMaps(HgiTextureHandle const& texture)
 }
 
 bool
-HgiMetalBlitCmds::_Submit(Hgi* hgi)
+HgiMetalBlitCmds::_Submit(Hgi* hgi, HgiSubmitWaitType wait)
 {
     if (_blitEncoder) {
         [_blitEncoder endEncoding];
         _blitEncoder = nil;
-
         return true;
     }
-
     return false;
 }
 

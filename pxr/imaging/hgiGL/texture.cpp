@@ -354,13 +354,7 @@ HgiGLTexture::HgiGLTexture(HgiTextureViewDesc const & desc)
     if (!desc.debugName.empty()) {
         glObjectLabel(GL_TEXTURE, _textureId,-1, desc.debugName.c_str());
     }
-    
-    glTextureView(_textureId, textureType, srcTexture->GetTextureId(),
-        glInternalFormat, desc.sourceFirstLayer, desc.mipLevels,
-        desc.sourceFirstLayer, desc.layerCount);
 
-    // XXX sampler state etc should all be set via tex descriptor.
-    //     (probably pass in HgiSamplerHandle in tex descriptor)
     glTextureParameteri(_textureId, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(_textureId, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTextureParameteri(_textureId, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -377,12 +371,6 @@ HgiGLTexture::HgiGLTexture(HgiTextureViewDesc const & desc)
     glTextureParameteri(_textureId, GL_TEXTURE_MAX_LEVEL, /*hi-mip*/mips-1);
 
     HGIGL_POST_PENDING_GL_ERRORS();
-
-    // Update the texture descriptor to reflect the above
-    _descriptor.debugName = desc.debugName;
-    _descriptor.format = desc.format;
-    _descriptor.layerCount = desc.layerCount;
-    _descriptor.mipLevels = desc.mipLevels;
 }
 
 HgiGLTexture::~HgiGLTexture()

@@ -93,7 +93,7 @@ private:
     
     void _EndGPUCountVisibleInstances(GLsync resultSync, size_t * result);
     
-    HdStPersistentBufferSharedPtr _resultBuffer;
+    HdStBufferResourceSharedPtr _resultBuffer;
 };
 
 

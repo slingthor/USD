@@ -214,15 +214,17 @@ HgiGLOps::CopyBufferGpuToGpu(HgiBufferGpuToGpuOp const& copyOp)
 {
     return [copyOp] {
         HgiBufferHandle const& srcBufHandle = copyOp.gpuSourceBuffer;
+        HgiGLBuffer* srcBuffer = static_cast<HgiGLBuffer*>(srcBufHandle.Get());
 
-        if (!TF_VERIFY(srcBufHandle && srcBufHandle->GetRawResource(),
+        if (!TF_VERIFY(srcBuffer && srcBuffer->GetBufferId(),
             "Invalid source buffer handle")) {
             return;
         }
 
         HgiBufferHandle const& dstBufHandle = copyOp.gpuDestinationBuffer;
+        HgiGLBuffer* dstBuffer = static_cast<HgiGLBuffer*>(dstBufHandle.Get());
 
-        if (!TF_VERIFY(dstBufHandle && dstBufHandle->GetRawResource(),
+        if (!TF_VERIFY(dstBuffer && dstBuffer->GetBufferId(),
             "Invalid destination buffer handle")) {
             return;
         }
@@ -232,8 +234,8 @@ HgiGLOps::CopyBufferGpuToGpu(HgiBufferGpuToGpuOp const& copyOp)
             return;
         }
 
-        glCopyNamedBufferSubData(srcBufHandle->GetRawResource(),
-                                 dstBufHandle->GetRawResource(),
+        glCopyNamedBufferSubData(srcBuffer->GetBufferId(),
+                                 dstBuffer->GetBufferId(),
                                  copyOp.sourceByteOffset,
                                  copyOp.destinationByteOffset,
                                  copyOp.byteSize);
@@ -250,8 +252,9 @@ HgiGLOps::CopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp)
         {
             return;
         }
-        
-        HgiBufferHandle const& dstBufHandle = copyOp.gpuDestinationBuffer;
+
+        HgiGLBuffer* glBuffer = static_cast<HgiGLBuffer*>(
+            copyOp.gpuDestinationBuffer.Get());
 
         // Offset into the src buffer
         const char* src = ((const char*) copyOp.cpuSourceBuffer) +
@@ -261,7 +264,7 @@ HgiGLOps::CopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp)
         GLintptr dstOffset = copyOp.destinationByteOffset;
 
         glNamedBufferSubData(
-            dstBufHandle->GetRawResource(),
+            glBuffer->GetBufferId(),
             dstOffset,
             copyOp.byteSize,
             src);
@@ -272,6 +275,37 @@ HgiGLOps::CopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp)
         // regressions. If we do need this barrier in the future, we need to
         // find a Hgi way of expressing when the barrier should be inserted.
         // glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+
+        HGIGL_POST_PENDING_GL_ERRORS();
+    };
+}
+
+HgiGLOpsFn 
+HgiGLOps::CopyBufferGpuToCpu(HgiBufferGpuToCpuOp const& copyOp)
+{
+    return [copyOp] {
+        if (copyOp.byteSize == 0 ||
+            !copyOp.cpuDestinationBuffer ||
+            !copyOp.gpuSourceBuffer)
+        {
+            return;
+        }
+
+        HgiGLBuffer* glBuffer = static_cast<HgiGLBuffer*>(
+            copyOp.gpuSourceBuffer.Get());
+
+        // Offset into the dst buffer
+        const char* dst = ((const char*) copyOp.cpuDestinationBuffer) +
+            copyOp.destinationByteOffset;
+
+        // Offset into the src buffer
+        GLintptr srcOffset = copyOp.sourceByteOffset;
+
+        glGetNamedBufferSubData(
+            glBuffer->GetBufferId(),
+            srcOffset,
+            copyOp.byteSize,
+            (void*)dst);
 
         HGIGL_POST_PENDING_GL_ERRORS();
     };
@@ -384,14 +418,15 @@ HgiGLOps::BindVertexBuffers(
 
         // XXX use glBindVertexBuffers to bind all VBs in one go.
         for (size_t i=0; i<vertexBuffers.size(); i++) {
-            HgiBufferHandle const& bufHandle = vertexBuffers[i];
-            HgiBufferDesc const& desc = bufHandle->GetDescriptor();
+            HgiBufferHandle bufHandle = vertexBuffers[i];
+            HgiGLBuffer* buf = static_cast<HgiGLBuffer*>(bufHandle.Get());
+            HgiBufferDesc const& desc = buf->GetDescriptor();
 
             TF_VERIFY(desc.usage & HgiBufferUsageVertex);
 
             glBindVertexBuffer(
                 firstBinding + i,
-                bufHandle->GetRawResource(),
+                buf->GetBufferId(),
                 byteOffsets[i],
                 desc.vertexStride);
         }
@@ -413,12 +448,13 @@ HgiGLOps::DrawIndexed(
             vertexOffset, instanceCount] {
         TF_VERIFY(instanceCount>0);
 
-        HgiBufferDesc const& indexDesc = indexBuffer->GetDescriptor();
+        HgiGLBuffer* indexBuf = static_cast<HgiGLBuffer*>(indexBuffer.Get());
+        HgiBufferDesc const& indexDesc = indexBuf->GetDescriptor();
 
         // We assume 32bit indices: GL_UNSIGNED_INT
         TF_VERIFY(indexDesc.usage & HgiBufferUsageIndex32);
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer->GetRawResource());
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuf->GetBufferId());
 
         glDrawElementsInstancedBaseVertex(
             HgiGLConversions::GetPrimitiveType(primitiveType),

@@ -25,7 +25,6 @@
 #define HDST_INDIRECT_DRAW_BATCH_GL_H
 
 #include "pxr/imaging/hdSt/indirectDrawBatch.h"
-#include "pxr/imaging/hdSt/persistentBuffer.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -94,16 +93,11 @@ private:
     void _BeginGPUCountVisibleInstances(
 		HdStResourceRegistrySharedPtr const &resourceRegistry);
 
-    // GLsync is not defined in gl.h. It's defined in spec as an opaque pointer:
-    typedef struct __GLsync *GLsync;
     void _EndGPUCountVisibleInstances(
         HdStResourceRegistrySharedPtr const &resourceRegistry,
-        GLsync resultSync,
         size_t * result);
 
-    HdStPersistentBufferSharedPtr _resultBuffer;
-
-    GLsync _cullResultSync;
+    HdStBufferResourceSharedPtr _resultBuffer;
 };
 
 

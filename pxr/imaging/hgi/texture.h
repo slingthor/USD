@@ -146,6 +146,7 @@ bool operator!=(
     const HgiTextureDesc& lhs,
     const HgiTextureDesc& rhs);
 
+
 ///
 /// \class HgiTexture
 ///
