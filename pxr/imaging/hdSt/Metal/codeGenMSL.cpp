@@ -1294,7 +1294,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                         << "\n    MSLVsInputs input //[[stage_in]]";
     vsMI_EP_FuncDef     << "vertex MSLVsOutputs vertexEntryPoint("
                         << "\n      uint _vertexID[[vertex_id]]";
-    csFuncDef           << "kernel void computeEntryPoint("
+    csFuncDef           << "kernel void computeEntryPoint(\n"
                         << "    uint _threadPositionInGrid[[thread_position_in_grid]]\n";
 
     if (_buildTarget != kMSL_BuildTarget_MVA_ComputeGS)
@@ -1327,7 +1327,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
             bool usesPackedNormals = (input.name == _tokens->packedSmoothNormals) || (input.name == _tokens->packedFlatNormals);
             
             bool inputIsAtomic = (input.dataType.GetString().find("atomic") != std::string::npos);
-            bool isShaderWritable = (input.usage & HdSt_CodeGenMSL::TParam::Usage::Writable);
+            bool isShaderWritable = (input.usage & (HdSt_CodeGenMSL::TParam::Usage::Mutable | HdSt_CodeGenMSL::TParam::Usage::Writable));
             
             if (input.usage & HdSt_CodeGenMSL::TParam::Uniform) {
                 //This input param is a uniform
@@ -1408,7 +1408,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                             << name << attrib;
                 
                 csFuncDef   << "\n    , " << (isPtrParam ? "device " : "")
-                            << "const "
+                            << (isShaderWritable ? "" : "const ")
                             << (inProgramScope ? "ProgramScope_Compute::" : "")
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
@@ -1416,14 +1416,14 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 if(availableInMI_EP) {
                     //The MI entry point needs these too in identical form.
                     vsMI_EP_FuncDefParams << "\n    , "
-                            << (isPtrParam ? "device const " : "")
+                            << (isPtrParam ? (isShaderWritable ? "device " : "device const ") : "")
                             << (inProgramScope ? "ProgramScope_Vert::" : "")
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
                 }
                 
                 //MI wrapper code can't use "attrib" attribute specifier.
-                vsMI_FuncDef << "\n    , " << (isPtrParam ? "device const " : "")
+                vsMI_FuncDef << "\n    , " << (isPtrParam ? (isShaderWritable ? "device " : "device const ") : "")
                              << (inProgramScope ? "ProgramScope_Vert::" : "")
                              << dataType << (isPtrParam ? "* " : " ")
                              << name;
@@ -1687,6 +1687,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
             
             bool isPtr = false;
             if(name.at(0) == '*') { name = name.substr(1, name.length() - 1); isPtr = true; }
+            bool isWritable = (it->usage & TParam::Usage::Writable);
             
             if(isVPrimVar || isDrawingCoord || isVertexData) {
                 bool isFlat = attribute == "[[flat]]";
@@ -1717,7 +1718,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                     isPresentInVS = true;
                 }
                 if(!isPresentInVS) {
-                    cs_EP_FuncDef   << "\n    , " << (isPtr ? "device const " : "")
+                    cs_EP_FuncDef   << "\n    , " << (isPtr ? (isWritable ? "device " : "device const ") : "")
                                     << (prefixScope ? "ProgramScope_Geometry::" : "")
                                     << _GetPackedMSLType(_GetPackedType(it->dataType, true))
                                     << (isPtr ? "* " : " ")
@@ -2808,7 +2809,8 @@ HdSt_CodeGenMSL::CompileComputeProgram(HdStResourceRegistry* const registry)
     std::stringstream declarations;
     std::stringstream accessors;
     
-    _genCommon  << "class ProgramScope<st> {\n"
+    _genCommon  << "#define VTXCONST\n"
+                << "class ProgramScope<st> {\n"
                 << "public:\n";
 
     uniforms << "// Uniform block\n";
