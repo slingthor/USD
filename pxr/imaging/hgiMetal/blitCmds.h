@@ -26,6 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hgiMetal/api.h"
+#include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgi/blitCmds.h"
 
 PXR_NAMESPACE_OPEN_SCOPE

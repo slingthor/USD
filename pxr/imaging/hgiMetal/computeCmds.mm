@@ -21,6 +21,7 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#include "pxr/imaging/hgiMetal/blitCmds.h"
 #include "pxr/imaging/hgiMetal/buffer.h"
 #include "pxr/imaging/hgiMetal/computeCmds.h"
 #include "pxr/imaging/hgiMetal/computePipeline.h"
@@ -38,8 +39,9 @@ HgiMetalComputeCmds::HgiMetalComputeCmds(HgiMetal* hgi)
     : HgiComputeCmds()
     , _hgi(hgi)
     , _pipelineState(nullptr)
+    , _encoder(nil)
 {
-    _encoder = [_hgi->GetCommandBuffer(false) computeCommandEncoder];
+    _CreateEncoder();
 }
 
 HgiMetalComputeCmds::~HgiMetalComputeCmds()
@@ -48,8 +50,23 @@ HgiMetalComputeCmds::~HgiMetalComputeCmds()
 }
 
 void
+HgiMetalComputeCmds::_CreateEncoder()
+{
+    if (!_encoder) {
+        HgiMetalBlitCmds* blitCmds = _hgi->GetActiveBlitEncoder();
+        if (blitCmds) {
+            _hgi->SubmitCmds(blitCmds);
+        }
+        _encoder = [_hgi->GetCommandBuffer(true) computeCommandEncoder];
+        _hgi->SetActiveComputeEncoder(this);
+        _ResetSubmitted();
+    }
+}
+
+void
 HgiMetalComputeCmds::BindPipeline(HgiComputePipelineHandle pipeline)
 {
+    _CreateEncoder();
     _pipelineState = static_cast<HgiMetalComputePipeline*>(pipeline.Get());
     _pipelineState->BindPipeline(_encoder);
 }
@@ -60,6 +77,7 @@ HgiMetalComputeCmds::BindResources(HgiResourceBindingsHandle r)
     if (HgiMetalResourceBindings* rb=
         static_cast<HgiMetalResourceBindings*>(r.Get()))
     {
+        _CreateEncoder();
         rb->BindResources(_encoder);
     }
 }
@@ -71,6 +89,7 @@ HgiMetalComputeCmds::SetConstantValues(
     uint32_t byteSize,
     const void* data)
 {
+    _CreateEncoder();
     [_encoder setBytes:data
                 length:byteSize
                atIndex:bindIndex];
@@ -104,6 +123,7 @@ HgiMetalComputeCmds::Dispatch(int dimX, int dimY)
 void
 HgiMetalComputeCmds::PushDebugGroup(const char* label)
 {
+    _CreateEncoder();
     HGIMETAL_DEBUG_LABEL(_encoder, label)
 }
 

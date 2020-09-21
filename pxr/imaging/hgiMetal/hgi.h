@@ -33,7 +33,9 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class HgiMetalBlitCmds;
 class HgiMetalCapabilities;
+class HgiMetalComputeCmds;
 
 enum {
     APIVersion_Metal1_0 = 0,
@@ -178,6 +180,18 @@ public:
         CommitCommandBufferWaitType waitType = CommitCommandBuffer_NoWait,
         bool forceNewBuffer = false);
 
+    HGIMETAL_API
+    void SetActiveComputeEncoder(HgiMetalComputeCmds* encoder);
+
+    HGIMETAL_API
+    HgiMetalComputeCmds* GetActiveComputeEncoder();
+
+    HGIMETAL_API
+    void SetActiveBlitEncoder(HgiMetalBlitCmds* encoder);
+
+    HGIMETAL_API
+    HgiMetalBlitCmds* GetActiveBlitEncoder();
+
 protected:
     HGIMETAL_API
     bool _SubmitCmds(HgiCmds* cmds, HgiSubmitWaitType wait) override;
@@ -198,6 +212,9 @@ private:
     id<MTLCommandQueue> _commandQueue;
     id<MTLCommandBuffer> _commandBuffer;
     id<MTLCaptureScope> _captureScopeFullFrame;
+    HgiMetalComputeCmds* _currentCmdEncoder;
+    HgiMetalBlitCmds* _currentBlitEncoder;
+
 
     std::unique_ptr<HgiMetalCapabilities> _capabilities;
 

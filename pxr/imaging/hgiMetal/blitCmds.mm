@@ -27,6 +27,7 @@
 #include "pxr/imaging/hgiMetal/blitCmds.h"
 #include "pxr/imaging/hgiMetal/buffer.h"
 #include "pxr/imaging/hgiMetal/capabilities.h"
+#include "pxr/imaging/hgiMetal/computeCmds.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
 #include "pxr/imaging/hgiMetal/texture.h"
@@ -58,12 +59,18 @@ void
 HgiMetalBlitCmds::_CreateEncoder()
 {
     if (!_blitEncoder) {
+        HgiMetalComputeCmds* computeCmds = _hgi->GetActiveComputeEncoder();
+        if (computeCmds) {
+            _hgi->SubmitCmds(computeCmds);
+        }
         _blitEncoder = [_hgi->GetCommandBuffer() blitCommandEncoder];
+        _hgi->SetActiveBlitEncoder(this);
         if (_label) {
             if (HgiMetalDebugEnabled()) {
                 _blitEncoder.label = _label;
             }
         }
+        _ResetSubmitted();
     }
 }
 

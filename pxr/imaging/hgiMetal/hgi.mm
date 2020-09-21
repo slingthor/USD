@@ -67,6 +67,8 @@ static int _GetAPIVersion()
 
 HgiMetal::HgiMetal(id<MTLDevice> device)
 : _device(device)
+, _currentCmdEncoder(nil)
+, _currentBlitEncoder(nil)
 , _frameDepth(0)
 , _apiVersion(_GetAPIVersion())
 , _useInterop(false)
@@ -154,13 +156,15 @@ HgiMetal::CreateGraphicsCmds(
 HgiComputeCmdsUniquePtr
 HgiMetal::CreateComputeCmds()
 {
-    return HgiComputeCmdsUniquePtr(new HgiMetalComputeCmds(this));
+    _currentCmdEncoder = new HgiMetalComputeCmds(this);
+    return HgiComputeCmdsUniquePtr(_currentCmdEncoder);
 }
 
 HgiBlitCmdsUniquePtr
 HgiMetal::CreateBlitCmds()
 {
-    return HgiBlitCmdsUniquePtr(new HgiMetalBlitCmds(this));
+    _currentBlitEncoder = new HgiMetalBlitCmds(this);
+    return HgiBlitCmdsUniquePtr(_currentBlitEncoder);
 }
 
 HgiTextureHandle
@@ -397,6 +401,8 @@ HgiMetal::_SubmitCmds(HgiCmds* cmds, HgiSubmitWaitType wait)
     if (cmds) {
         _workToFlush = Hgi::_SubmitCmds(cmds, wait);
     }
+    _currentCmdEncoder = nullptr;
+    _currentBlitEncoder = nullptr;
 
     CommitCommandBufferWaitType waitType;
     switch(wait) {
@@ -411,6 +417,29 @@ HgiMetal::_SubmitCmds(HgiCmds* cmds, HgiSubmitWaitType wait)
     CommitCommandBuffer(waitType);
 
     return _workToFlush;
+}
+
+void
+HgiMetal::SetActiveComputeEncoder(HgiMetalComputeCmds* encoder)
+{
+    _currentCmdEncoder = encoder;
+}
+
+HgiMetalComputeCmds*
+HgiMetal::GetActiveComputeEncoder()
+{
+    return _currentCmdEncoder;
+}
+
+void
+HgiMetal::SetActiveBlitEncoder(HgiMetalBlitCmds* encoder)
+{
+    _currentBlitEncoder = encoder;
+}
+
+HgiMetalBlitCmds* HgiMetal::GetActiveBlitEncoder()
+{
+    return _currentBlitEncoder;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

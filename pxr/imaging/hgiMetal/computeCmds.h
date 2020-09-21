@@ -82,6 +82,8 @@ private:
     HgiMetalComputeCmds & operator=(const HgiMetalComputeCmds&) = delete;
     HgiMetalComputeCmds(const HgiMetalComputeCmds&) = delete;
 
+    void _CreateEncoder();
+    
     HgiMetal* _hgi;
     HgiMetalComputePipeline* _pipelineState;
     id<MTLComputeCommandEncoder> _encoder;
