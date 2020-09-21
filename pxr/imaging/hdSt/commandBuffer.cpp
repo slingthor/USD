@@ -621,6 +621,9 @@ HdStCommandBuffer::FrustumCull(
     // Temp workaround for selection rendertargets being small, and small object
     // culling resulting in object selection not working
     if (renderTargetWidth <= 256 && renderTargetHeight <= 256) {
+        // skip the cull and render everything
+        return;
+
         renderTargetWidth = 2048;
         renderTargetHeight = 2048;
     }
