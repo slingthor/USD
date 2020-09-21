@@ -102,6 +102,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((_double, "double"))
     ((_float, "float"))
     ((_int, "int"))
+    ((_bool, "bool"))
     (wrapped_float)
     (wrapped_int)
     (hd_vec2)
@@ -453,7 +454,10 @@ _GetFlatType(TfToken const &token)
         return _tokens->_float;
     } else if (token == _tokens->dmat4) {
         return _tokens->_float;
+    } else if (token == _tokens->_bool) {
+        return _tokens->_int;
     }
+
     return token;
 }
 
