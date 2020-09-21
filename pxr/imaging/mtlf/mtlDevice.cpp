@@ -289,8 +289,8 @@ void MtlfMetalContext::Init()
     gpus.dummySampler = [currentDevice newSamplerStateWithDescriptor:samplerDescriptor];
     [samplerDescriptor release];
 
-    windingOrder = MTLWindingClockwise;
-    cullMode = MTLCullModeBack;
+    windingOrder = MTLWindingCounterClockwise;
+    cullMode = MTLCullModeNone;
     fillMode = MTLTriangleFillModeFill;
     
     blendState.blendEnable = false;
