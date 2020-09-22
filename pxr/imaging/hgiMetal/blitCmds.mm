@@ -27,7 +27,6 @@
 #include "pxr/imaging/hgiMetal/blitCmds.h"
 #include "pxr/imaging/hgiMetal/buffer.h"
 #include "pxr/imaging/hgiMetal/capabilities.h"
-#include "pxr/imaging/hgiMetal/computeCmds.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
 #include "pxr/imaging/hgiMetal/texture.h"
@@ -40,6 +39,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 HgiMetalBlitCmds::HgiMetalBlitCmds(HgiMetal *hgi)
     : _hgi(hgi)
+    , _commandBuffer(nil)
     , _blitEncoder(nil)
     , _label(nil)
 {
@@ -59,18 +59,18 @@ void
 HgiMetalBlitCmds::_CreateEncoder()
 {
     if (!_blitEncoder) {
-        HgiMetalComputeCmds* computeCmds = _hgi->GetActiveComputeEncoder();
-        if (computeCmds) {
-            _hgi->SubmitCmds(computeCmds);
+        id<MTLCommandBuffer> commandBuffer = _hgi->GetPrimaryCommandBuffer();
+        if (commandBuffer == nil) {
+            _commandBuffer = _hgi->GetSecondaryCommandBuffer();
+            commandBuffer = _commandBuffer;
         }
-        _blitEncoder = [_hgi->GetCommandBuffer() blitCommandEncoder];
-        _hgi->SetActiveBlitEncoder(this);
+        _blitEncoder = [commandBuffer blitCommandEncoder];
+
         if (_label) {
             if (HgiMetalDebugEnabled()) {
                 _blitEncoder.label = _label;
             }
         }
-        _ResetSubmitted();
     }
 }
 
@@ -180,7 +180,7 @@ HgiMetalBlitCmds::CopyTextureGpuToCpu(
     // bytes to copy
     size_t byteSize = copyOp.destinationBufferByteSize;
 
-    [_hgi->GetCommandBuffer() addCompletedHandler:^(id<MTLCommandBuffer> buffer)
+    [_commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> buffer)
         {
             memcpy(dst, src, byteSize);
         }];
@@ -342,7 +342,7 @@ HgiMetalBlitCmds::CopyBufferGpuToCpu(HgiBufferGpuToCpuOp const& copyOp)
     // bytes to copy
     size_t size = copyOp.byteSize;
 
-    [_hgi->GetCommandBuffer() addCompletedHandler:^(id<MTLCommandBuffer> buffer)
+    [_commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> buffer)
         {
             memcpy(dst, src, size);
         }];
@@ -362,12 +362,36 @@ HgiMetalBlitCmds::GenerateMipMaps(HgiTextureHandle const& texture)
 bool
 HgiMetalBlitCmds::_Submit(Hgi* hgi, HgiSubmitWaitType wait)
 {
+    bool submittedWork = false;
     if (_blitEncoder) {
         [_blitEncoder endEncoding];
         _blitEncoder = nil;
-        return true;
+        submittedWork = true;
+
+        HgiMetal::CommitCommandBufferWaitType waitType;
+        switch(wait) {
+            case HgiSubmitWaitTypeNoWait:
+                waitType = HgiMetal::CommitCommandBuffer_NoWait;
+                break;
+            case HgiSubmitWaitTypeWaitUntilCompleted:
+                waitType = HgiMetal::CommitCommandBuffer_WaitUntilCompleted;
+                break;
+        }
+
+        if (_commandBuffer) {
+            _hgi->CommitSecondaryCommandBuffer(_commandBuffer, waitType);
+        }
+        else {
+            _hgi->CommitPrimaryCommandBuffer(waitType);
+        }
     }
-    return false;
+    
+    if (_commandBuffer) {
+        _hgi->ReleaseSecondaryCommandBuffer(_commandBuffer);
+        _commandBuffer = nil;
+    }
+
+    return submittedWork;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

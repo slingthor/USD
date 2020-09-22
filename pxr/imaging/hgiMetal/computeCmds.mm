@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/hgiMetal/blitCmds.h"
 #include "pxr/imaging/hgiMetal/buffer.h"
 #include "pxr/imaging/hgiMetal/computeCmds.h"
 #include "pxr/imaging/hgiMetal/computePipeline.h"
@@ -39,6 +38,7 @@ HgiMetalComputeCmds::HgiMetalComputeCmds(HgiMetal* hgi)
     : HgiComputeCmds()
     , _hgi(hgi)
     , _pipelineState(nullptr)
+    , _commandBuffer(nil)
     , _encoder(nil)
 {
     _CreateEncoder();
@@ -53,13 +53,12 @@ void
 HgiMetalComputeCmds::_CreateEncoder()
 {
     if (!_encoder) {
-        HgiMetalBlitCmds* blitCmds = _hgi->GetActiveBlitEncoder();
-        if (blitCmds) {
-            _hgi->SubmitCmds(blitCmds);
+        id<MTLCommandBuffer> commandBuffer = _hgi->GetPrimaryCommandBuffer();
+        if (commandBuffer == nil) {
+            _commandBuffer = _hgi->GetSecondaryCommandBuffer();
+            commandBuffer = _commandBuffer;
         }
-        _encoder = [_hgi->GetCommandBuffer(true) computeCommandEncoder];
-        _hgi->SetActiveComputeEncoder(this);
-        _ResetSubmitted();
+        _encoder = [commandBuffer computeCommandEncoder];
     }
 }
 
@@ -135,12 +134,36 @@ HgiMetalComputeCmds::PopDebugGroup()
 bool
 HgiMetalComputeCmds::_Submit(Hgi* hgi, HgiSubmitWaitType wait)
 {
+    bool submittedWork = false;
     if (_encoder) {
         [_encoder endEncoding];
         _encoder = nil;
-        return true;
+        submittedWork = true;
+
+        HgiMetal::CommitCommandBufferWaitType waitType;
+        switch(wait) {
+            case HgiSubmitWaitTypeNoWait:
+                waitType = HgiMetal::CommitCommandBuffer_NoWait;
+                break;
+            case HgiSubmitWaitTypeWaitUntilCompleted:
+                waitType = HgiMetal::CommitCommandBuffer_WaitUntilCompleted;
+                break;
+        }
+
+        if (_commandBuffer) {
+            _hgi->CommitSecondaryCommandBuffer(_commandBuffer, waitType);
+        }
+        else {
+            _hgi->CommitPrimaryCommandBuffer(waitType);
+        }
     }
-    return false;
+    
+    if (_commandBuffer) {
+        _hgi->ReleaseSecondaryCommandBuffer(_commandBuffer);
+        _commandBuffer = nil;
+    }
+
+    return submittedWork;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

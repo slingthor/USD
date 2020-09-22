@@ -239,7 +239,7 @@ HdStCommandBuffer::ExecuteDraw(
 
     // Create a new command buffer for each render pass to the current drawable
     if (renderPassDescriptor.colorAttachments[0].loadAction == MTLLoadActionClear) {
-        id <MTLCommandBuffer> commandBuffer = context->GetHgi()->GetCommandBuffer();
+        id <MTLCommandBuffer> commandBuffer = context->GetHgi()->GetPrimaryCommandBuffer();
         int frameNumber = context->GetCurrentFrame();
         [commandBuffer addScheduledHandler:^(id<MTLCommandBuffer> buffer)
          {

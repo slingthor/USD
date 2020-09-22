@@ -66,11 +66,6 @@ protected:
     // Flags the HgiCmds object as 'submitted' to GPU.
     HGI_API
     void _SetSubmitted();
-    
-    // Unflags the HgiCmds object as being 'submitted' to the GPU
-    // Called when a HgiCmds object has been reset
-    HGI_API
-    void _ResetSubmitted();
 
 private:
     HgiCmds & operator=(const HgiCmds&) = delete;

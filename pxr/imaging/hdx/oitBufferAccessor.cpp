@@ -191,7 +191,7 @@ HdxOitBufferAccessor::InitializeOitBuffersIfNecessary()
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
-    id<MTLCommandBuffer> commandBuffer = context->GetHgi()->GetCommandBuffer();
+    id<MTLCommandBuffer> commandBuffer = context->GetHgi()->GetPrimaryCommandBuffer();
     id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
 
     id<MTLBuffer> mtlBuffer = HgiMetalBuffer::MTLBuffer(stCounterResource->GetId());

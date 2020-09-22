@@ -49,10 +49,4 @@ HgiCmds::_SetSubmitted()
     _submitted = true;
 }
 
-void
-HgiCmds::_ResetSubmitted()
-{
-    _submitted = false;
-}
-
 PXR_NAMESPACE_CLOSE_SCOPE

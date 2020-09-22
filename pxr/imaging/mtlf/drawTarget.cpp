@@ -534,9 +534,9 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     // While Mtlf exists, we need to force a flush and generation of a new
     // command buffer, to ensure the blit happens after any work Mtlf has
     // queued
-    hgiMetal->CommitCommandBuffer(HgiMetal::CommitCommandBuffer_NoWait, true);
+    hgiMetal->CommitPrimaryCommandBuffer(HgiMetal::CommitCommandBuffer_NoWait, true);
     
-    id<MTLCommandBuffer> commandBuffer = hgiMetal->GetCommandBuffer();
+    id<MTLCommandBuffer> commandBuffer = hgiMetal->GetPrimaryCommandBuffer();
     id<MTLBlitCommandEncoder> blitEncoder =
         [commandBuffer blitCommandEncoder];
     
@@ -557,7 +557,7 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
 
     [blitEncoder endEncoding];
 
-    hgiMetal->CommitCommandBuffer(
+    hgiMetal->CommitPrimaryCommandBuffer(
         HgiMetal::CommitCommandBuffer_WaitUntilCompleted);
 
     memcpy(buffer, [cpuBuffer contents], bytesPerPixel * width * height);

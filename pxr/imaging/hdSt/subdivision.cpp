@@ -187,7 +187,7 @@ HdSt_OsdRefineComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range,
     HdStResourceRegistry* hdStResourceRegistry =
         static_cast<HdStResourceRegistry*>(resourceRegistry);
     HgiMetal* hgiMetal = static_cast<HgiMetal*>(hdStResourceRegistry->GetHgi());
-    hgiMetal->CommitCommandBuffer(HgiMetal::CommitCommandBuffer_WaitUntilCompleted, true);
+    hgiMetal->CommitPrimaryCommandBuffer(HgiMetal::CommitCommandBuffer_WaitUntilCompleted, true);
     
     subdivision->RefineGPU(range, _name);
 

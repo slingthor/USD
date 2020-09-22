@@ -33,9 +33,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class HgiMetalBlitCmds;
 class HgiMetalCapabilities;
-class HgiMetalComputeCmds;
 
 enum {
     APIVersion_Metal1_0 = 0,
@@ -50,10 +48,14 @@ enum {
 class HgiMetal final : public Hgi
 {
 public:
+    enum CommandBufferFlags {
+        CommandBufferFlagsDefault = 0,
+        CommandBufferFlagsNoFlush
+    };
     enum CommitCommandBufferWaitType {
         CommitCommandBuffer_NoWait = 0,
         CommitCommandBuffer_WaitUntilScheduled,
-        CommitCommandBuffer_WaitUntilCompleted,
+        CommitCommandBuffer_WaitUntilCompleted
     };
     
     HGIMETAL_API
@@ -153,44 +155,33 @@ public:
     id<MTLDevice> GetPrimaryDevice() const;
 
     HGIMETAL_API
-    id<MTLCommandQueue> GetQueue() const {
-        return _commandQueue;
-    }
+    id<MTLCommandQueue> GetQueue() const;
+
+    HGIMETAL_API
+    id<MTLCommandBuffer> GetPrimaryCommandBuffer(
+        CommandBufferFlags flags = CommandBufferFlagsDefault);
+
+    HGIMETAL_API
+    id<MTLCommandBuffer> GetSecondaryCommandBuffer();
+
+    HGIMETAL_API
+    int GetAPIVersion() const;
     
     HGIMETAL_API
-    id<MTLCommandBuffer> GetCommandBuffer(bool flush = true) {
-        if (flush) {
-            _workToFlush = true;
-        }
-        return _commandBuffer;
-    }
+    HgiMetalCapabilities const & GetCapabilities() const;
     
     HGIMETAL_API
-    int GetAPIVersion() const {
-        return _apiVersion;
-    }
-    
-    HGIMETAL_API
-    HgiMetalCapabilities const & GetCapabilities() const {
-        return *_capabilities;
-    }
-    
-    HGIMETAL_API
-    void CommitCommandBuffer(
+    void CommitPrimaryCommandBuffer(
         CommitCommandBufferWaitType waitType = CommitCommandBuffer_NoWait,
         bool forceNewBuffer = false);
 
     HGIMETAL_API
-    void SetActiveComputeEncoder(HgiMetalComputeCmds* encoder);
+    void CommitSecondaryCommandBuffer(
+        id<MTLCommandBuffer> commandBuffer,
+        CommitCommandBufferWaitType waitType);
 
     HGIMETAL_API
-    HgiMetalComputeCmds* GetActiveComputeEncoder();
-
-    HGIMETAL_API
-    void SetActiveBlitEncoder(HgiMetalBlitCmds* encoder);
-
-    HGIMETAL_API
-    HgiMetalBlitCmds* GetActiveBlitEncoder();
+    void ReleaseSecondaryCommandBuffer(id<MTLCommandBuffer> commandBuffer);
 
 protected:
     HGIMETAL_API
@@ -212,9 +203,7 @@ private:
     id<MTLCommandQueue> _commandQueue;
     id<MTLCommandBuffer> _commandBuffer;
     id<MTLCaptureScope> _captureScopeFullFrame;
-    HgiMetalComputeCmds* _currentCmdEncoder;
-    HgiMetalBlitCmds* _currentBlitEncoder;
-
+    HgiCmds* _currentCmds;
 
     std::unique_ptr<HgiMetalCapabilities> _capabilities;
 
@@ -222,7 +211,7 @@ private:
     int _apiVersion;
     bool _useInterop;
     bool _workToFlush;
-    
+
     // APPLE METAL: TEMP for Mtlf handoff
 public:
     

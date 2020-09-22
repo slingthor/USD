@@ -908,7 +908,7 @@ HgiInteropMetal::CompositeToInterop(
         depthTexture = metalDepth->GetTextureId();
     }
 
-    id<MTLCommandBuffer> commandBuffer = _hgiMetal->GetCommandBuffer();
+    id<MTLCommandBuffer> commandBuffer = _hgiMetal->GetPrimaryCommandBuffer();
     
     id<MTLComputeCommandEncoder> computeEncoder;
     
@@ -983,7 +983,7 @@ HgiInteropMetal::CompositeToInterop(
 
     // We wait until the work is scheduled for execution so that future OpenGL
     // calls are guaranteed to happen after the Metal work encoded above
-    _hgiMetal->CommitCommandBuffer(
+    _hgiMetal->CommitPrimaryCommandBuffer(
         HgiMetal::CommitCommandBuffer_WaitUntilScheduled);
 
     if (glShaderIndex != -1) {
