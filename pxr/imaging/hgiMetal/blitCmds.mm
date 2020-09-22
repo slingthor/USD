@@ -42,6 +42,7 @@ HgiMetalBlitCmds::HgiMetalBlitCmds(HgiMetal *hgi)
     , _commandBuffer(nil)
     , _blitEncoder(nil)
     , _label(nil)
+    , _secondaryCommandBuffer(false)
 {
 }
 
@@ -59,12 +60,12 @@ void
 HgiMetalBlitCmds::_CreateEncoder()
 {
     if (!_blitEncoder) {
-        id<MTLCommandBuffer> commandBuffer = _hgi->GetPrimaryCommandBuffer();
-        if (commandBuffer == nil) {
+        _commandBuffer = _hgi->GetPrimaryCommandBuffer();
+        if (_commandBuffer == nil) {
             _commandBuffer = _hgi->GetSecondaryCommandBuffer();
-            commandBuffer = _commandBuffer;
+            _secondaryCommandBuffer = true;
         }
-        _blitEncoder = [commandBuffer blitCommandEncoder];
+        _blitEncoder = [_commandBuffer blitCommandEncoder];
 
         if (_label) {
             if (HgiMetalDebugEnabled()) {
@@ -378,7 +379,7 @@ HgiMetalBlitCmds::_Submit(Hgi* hgi, HgiSubmitWaitType wait)
                 break;
         }
 
-        if (_commandBuffer) {
+        if (_secondaryCommandBuffer) {
             _hgi->CommitSecondaryCommandBuffer(_commandBuffer, waitType);
         }
         else {
@@ -386,10 +387,10 @@ HgiMetalBlitCmds::_Submit(Hgi* hgi, HgiSubmitWaitType wait)
         }
     }
     
-    if (_commandBuffer) {
+    if (_secondaryCommandBuffer) {
         _hgi->ReleaseSecondaryCommandBuffer(_commandBuffer);
-        _commandBuffer = nil;
     }
+    _commandBuffer = nil;
 
     return submittedWork;
 }

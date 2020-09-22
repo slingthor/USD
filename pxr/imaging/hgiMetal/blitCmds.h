@@ -26,7 +26,6 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hgiMetal/api.h"
-#include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgi/blitCmds.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -88,6 +87,7 @@ private:
     id<MTLCommandBuffer> _commandBuffer;
     id<MTLBlitCommandEncoder> _blitEncoder;
     NSString* _label;
+    bool _secondaryCommandBuffer;
 
     // BlitCmds is used only one frame so storing multi-frame state on BlitCmds
     // will not survive.
