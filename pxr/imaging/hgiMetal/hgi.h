@@ -48,10 +48,6 @@ enum {
 class HgiMetal final : public Hgi
 {
 public:
-    enum CommandBufferFlags {
-        CommandBufferFlagsDefault = 0,
-        CommandBufferFlagsNoFlush
-    };
     enum CommitCommandBufferWaitType {
         CommitCommandBuffer_NoWait = 0,
         CommitCommandBuffer_WaitUntilScheduled,
@@ -158,8 +154,7 @@ public:
     id<MTLCommandQueue> GetQueue() const;
 
     HGIMETAL_API
-    id<MTLCommandBuffer> GetPrimaryCommandBuffer(
-        CommandBufferFlags flags = CommandBufferFlagsDefault);
+    id<MTLCommandBuffer> GetPrimaryCommandBuffer(bool flush = true);
 
     HGIMETAL_API
     id<MTLCommandBuffer> GetSecondaryCommandBuffer();

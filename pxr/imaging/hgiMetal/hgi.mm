@@ -360,14 +360,14 @@ HgiMetal::GetQueue() const
 }
 
 id<MTLCommandBuffer>
-HgiMetal::GetPrimaryCommandBuffer(CommandBufferFlags flags)
+HgiMetal::GetPrimaryCommandBuffer(bool flush)
 {
     if (_workToFlush) {
         if (_currentCmds) {
             return nil;
         }
     }
-    if (flags != CommandBufferFlagsNoFlush) {
+    if (flush) {
         _workToFlush = true;
     }
     return _commandBuffer;
