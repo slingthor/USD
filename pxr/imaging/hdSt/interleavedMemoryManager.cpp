@@ -50,6 +50,10 @@
 
 #include <vector>
 
+// APPLE METAL: needed for triple buffering support
+#include "pxr/imaging/hgiMetal/hgi.h"
+#include "pxr/imaging/hgiMetal/capabilities.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 // ---------------------------------------------------------------------------
@@ -442,12 +446,18 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
         curRangeOwner_->GetResources().begin()->second;
 
     Hgi* hgi = _resourceRegistry->GetHgi();
-    
-    HgiBufferHandle newIds[3];
-    HgiBufferHandle oldIds[3];
-    HgiBufferHandle curIds[3];
 
-    for (int32_t i = 0; i < 3; i++) {
+    // APPLE METAL: Multibuffering support
+    bool hasUnifiedMemory =
+        static_cast<HgiMetal*>(hgi)->GetCapabilities().unifiedMemory;
+    const int bufferCount =
+        hasUnifiedMemory ? HdStBufferResource::MULTIBUFFERING:1;
+
+    HgiBufferHandle newIds[HdStBufferResource::MULTIBUFFERING];
+    HgiBufferHandle oldIds[HdStBufferResource::MULTIBUFFERING];
+    HgiBufferHandle curIds[HdStBufferResource::MULTIBUFFERING];
+
+    for (int32_t i = 0; i < bufferCount; i++) {
         oldIds[i] = oldBuffer->GetId(i);
         curIds[i] = currentBuffer->GetId(i);
     }
@@ -458,13 +468,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
         bufDesc.byteSize = totalSize;
         bufDesc.usage = HgiBufferUsageUniform;
 
-#if defined(ARCH_OS_MACOS)
-        {
-            int32_t i = 0;
-#else
-        // Triple buffer everything
-        for (int32_t i = 0; i < 3; i++) {
-#endif
+        for (int32_t i = 0; i < bufferCount; i++) {
             newIds[i] = hgi->CreateBuffer(bufDesc);
         }
     }
@@ -480,7 +484,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
         // pre-pass to combine consecutive buffer range relocation
         std::unique_ptr<HdStBufferRelocator> relocators[3];
         
-        for(int i = 0; i < 3; i++) {
+        for(int i = 0; i < bufferCount; i++) {
             int const curIndex = curIds[i] ? i : 0;
             if (newIds[i]) {
                 relocators[i] = std::make_unique<HdStBufferRelocator>(curIds[curIndex], newIds[i]);
@@ -513,7 +517,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
         }
 
         // buffer copy
-        for(int i = 0; i < 3; i++) {
+        for(int i = 0; i < bufferCount; i++) {
             if (relocators[i]) {
                 relocators[i]->Commit(blitCmds);
             }
@@ -535,7 +539,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
             index += range->GetNumElements();
         }
     }
-    for(int i = 0; i < 3; i++) {
+    for(int i = 0; i < bufferCount; i++) {
         if (oldIds[i]) {
             // delete old buffer
             hgi->DestroyBuffer(&oldIds[i]);

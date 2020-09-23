@@ -94,7 +94,7 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
     [_commandBuffer retain];
 
     _capabilities.reset(
-        new HgiMetalCapabilities(device));
+        new HgiMetalCapabilities(_device));
 
     HgiMetalSetupMetalDebug();
     
