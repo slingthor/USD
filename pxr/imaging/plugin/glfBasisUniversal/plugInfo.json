@@ -1,0 +1,21 @@
+{
+    "Plugins": [
+      {
+        "Info": {
+          "Types": {
+            "Glf_BasisUniversalImage" : {
+                "bases": ["GlfImage"],
+                "imageTypes": ["basis"],
+                "precedence": 0
+            }
+          }
+        },
+        "LibraryPath": "@PLUG_INFO_LIBRARY_PATH@",
+        "Name": "glfBasisUniversal",
+        "ResourcePath": "@PLUG_INFO_RESOURCE_PATH@",
+        "Root": "@PLUG_INFO_ROOT@",
+        "Type": "library"
+      }
+    ]
+  }
+  

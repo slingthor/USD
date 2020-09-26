@@ -185,6 +185,10 @@ if (PXR_BUILD_IMAGING)
         find_package(OpenImageIO REQUIRED)
         add_definitions(-DPXR_OIIO_PLUGIN_ENABLED)
     endif()
+    # --BasisUniversal
+    if (PXR_BUILD_BASISU_PLUGIN)
+        add_definitions(-DPXR_BUILD_BASISU_PLUGIN)
+    endif()
     # --OpenColorIO
     if (PXR_BUILD_OPENCOLORIO_PLUGIN)
         find_package(OpenColorIO REQUIRED)
