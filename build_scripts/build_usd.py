@@ -575,12 +575,13 @@ def DownloadFileWithUrllib(url, outputFilename):
     with open(outputFilename, "wb") as outfile:
         outfile.write(r.read())
 
-def DownloadFromCache(srcDir, url, outputFilename):
-
+def GetDownloadCacheFileName(srcDir, url):
     filename = url.split("/")[-1]
+    return srcDir + '/cache/' + filename
 
-    shutil.copy(os.path.abspath(srcDir +'/cache/'+filename), outputFilename)
-
+def DownloadFromCache(srcDir, url, outputFilename):
+    filepath = GetDownloadCacheFileName(srcDir, url)
+    shutil.copy(os.path.abspath(filepath), outputFilename)
 
 def DownloadURL(url, context, force, dontExtract = None):
     """Download and extract the archive file at given URL to the
@@ -601,8 +602,12 @@ def DownloadURL(url, context, force, dontExtract = None):
             PrintInfo("{0} already exists, skipping download"
                       .format(os.path.abspath(filename)))
         else:
-            PrintInfo("Downloading {0} to {1}"
-                      .format(url, os.path.abspath(filename)))
+            if context.downloader == DownloadFromCache:
+                PrintInfo("Copying {0} to {1}"
+                          .format(GetDownloadCacheFileName(context.usdSrcDir, url), os.path.abspath(filename)))
+            else:
+                PrintInfo("Downloading {0} to {1}"
+                          .format(url, os.path.abspath(filename)))
 
             # To work around occasional hiccups with downloading from websites
             # (SSL validation errors, etc.), retry a few times if we don't
@@ -2665,7 +2670,7 @@ class InstallContext:
         # don't support TLS v1.2, which is required for downloading some
         # dependencies.
         
-        if args.use_download_cache and MacOS():
+        if args.use_download_cache and (MacOS() or iOS()):
             self.downloader = DownloadFromCache
             self.downloaderName = "cache"
         elif find_executable("curl"):
@@ -2678,9 +2683,9 @@ class InstallContext:
             self.downloader = DownloadFileWithUrllib
             self.downloaderName = "built-in"
 
-
-        #MacOS only
         self.use_download_cache = args.use_download_cache
+
+        # MacOS Only
         self.make_relocatable = args.make_relocatable
 
         # CMake generator
@@ -2986,10 +2991,10 @@ Building with settings:
   CMake generator               {cmakeGenerator}
   Downloader                    {downloader}
   
-  MacOS:
+  Apple:
     Build universal binaries    {buildUniversalBinaries}
-    Use download cache          {use_download_cache}
     Make relocatable            {make_relocatable}
+    Use download cache          {use_download_cache}
 
   Building                      {buildType}
     Cross Platform              {targetPlatform}
@@ -3042,7 +3047,7 @@ summaryMsg = summaryMsg.format(
                     else context.cmakeGenerator),
     downloader=(context.downloaderName),
     buildUniversalBinaries=("On" if context.buildUniversal and SupportsMacOSUniversalBinaries() else "Off"),
-    use_download_cache=("On" if context.use_download_cache and MacOS() else "Off"),
+    use_download_cache=("On" if context.use_download_cache else "Off"),
     make_relocatable=("On" if context.make_relocatable and MacOS() else "Off"),
     dependencies=("None" if not dependenciesToBuild else 
                   ", ".join([d.name for d in dependenciesToBuild])),
