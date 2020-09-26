@@ -163,6 +163,7 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     //
     extendedState->SetRenderPassShader(_oitOpaqueRenderPassShader);
     renderPassState->SetEnableDepthMask(true);
+    renderPassState->SetColorMaskUseDefault(false);
     renderPassState->SetColorMask(HdRenderPassState::ColorMaskRGBA);
     HdxRenderTask::Execute(ctx);
 

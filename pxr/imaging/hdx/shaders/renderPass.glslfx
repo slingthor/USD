@@ -79,11 +79,11 @@ void RenderOutputImpl(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
     // first index to start at 0.
     int writeIndex = atomicAdd(hdxOitCounterBuffer[0], 1) + 1;
     
-        if (writeIndex < dataBufferSize) {
+    if (writeIndex < dataBufferSize) {
         int screenIndex =
             int(gl_FragCoord.x) + int(gl_FragCoord.y) * screenWidth;
-        
-            if (screenIndex < counterBufferSize) {
+
+        if (screenIndex < counterBufferSize) {
             int prevIndex =
                 atomicExchange(hdxOitCounterBuffer[screenIndex+1], writeIndex);
             hdxOitDataBuffer[writeIndex] = color;

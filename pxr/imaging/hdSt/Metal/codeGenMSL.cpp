@@ -2244,7 +2244,17 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
             fsInputCode << "    scope." << destPrefix.str() << (accessor.empty() ? name : accessor) << " = " << sourcePrefix.str() << name << ";\n";
         }
     }
-    fsInputCode << "    scope.gl_FragCoord = scope.gl_Position;\n";
+    // How we emulate gl_FragCoord is different based on whether we're
+    // using a pass-through vertex shader due to using compute for GS.
+    // [[position]] is very different, and we we need to standardise it here
+    // by manually doing the division by w to normalise
+    if (_buildTarget != kMSL_BuildTarget_MVA_ComputeGS) {
+        fsInputCode << "    scope.gl_FragCoord = scope.gl_Position;\n";
+    } else {
+        fsInputCode << "    scope.gl_FragCoord.zw = scope.gl_Position.zw;\n";
+        fsInputCode << "    scope.gl_FragCoord.xy = scope.gl_Position.xy / scope.gl_Position.w;\n";
+        fsInputCode << "    scope.gl_FragCoord.xy * vec2(fragExtras->renderTargetWidth, -fragExtras->renderTargetHeight);\n";
+    }
     fsTexturingStruct << "};\n\n";
     fsUniformStruct << "};\n\n";
     fsFuncDef << ")\n{\n";
