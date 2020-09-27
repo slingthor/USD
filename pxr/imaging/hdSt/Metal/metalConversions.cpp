@@ -207,7 +207,7 @@ HdStMetalConversions::GetGlBlendFactor(HdBlendFactor factor)
         MTLBlendFactorDestinationColor,         // HdBlendFactorDstColor,
         MTLBlendFactorOneMinusDestinationColor, // HdBlendFactorOneMinusDstColor,
         MTLBlendFactorSourceAlpha,              // HdBlendFactorSrcAlpha,
-        MTLBlendFactorOneMinusBlendAlpha,       // HdBlendFactorOneMinusSrcAlpha,
+        MTLBlendFactorOneMinusSourceAlpha,      // HdBlendFactorOneMinusSrcAlpha,
         MTLBlendFactorDestinationAlpha,         // HdBlendFactorDstAlpha,
         MTLBlendFactorOneMinusDestinationAlpha, // HdBlendFactorOneMinusDstAlpha,
         MTLBlendFactorBlendColor,               // HdBlendFactorConstantColor,
