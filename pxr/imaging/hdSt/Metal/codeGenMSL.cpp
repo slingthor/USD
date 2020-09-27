@@ -1420,14 +1420,14 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 if(availableInMI_EP) {
                     //The MI entry point needs these too in identical form.
                     vsMI_EP_FuncDefParams << "\n    , "
-                            << (isPtrParam ? (isShaderWritable ? "device " : "device const ") : "")
+                            << (isPtrParam ? "device const " : "")
                             << (inProgramScope ? "ProgramScope_Vert::" : "")
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
                 }
                 
                 //MI wrapper code can't use "attrib" attribute specifier.
-                vsMI_FuncDef << "\n    , " << (isPtrParam ? (isShaderWritable ? "device " : "device const ") : "")
+                vsMI_FuncDef << "\n    , " << (isPtrParam ? "device const " : "")
                              << (inProgramScope ? "ProgramScope_Vert::" : "")
                              << dataType << (isPtrParam ? "* " : " ")
                              << name;
@@ -1704,7 +1704,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 gs_GSInputCode << "        scope." << (accessor.empty() ? name : accessor) << " = ";
                 
                 if(prefixScope && isPtr)
-                    gs_GSInputCode << "(const device ProgramScope_Geometry::" << dataType << "*)" << name << ";\n";
+                    gs_GSInputCode << "(const device ProgramScope_Geometry::" << dataType << "*)";
                 else if (it->usage & HdSt_CodeGenMSL::TParam::Uniform)
                     gs_GSInputCode << "vsUniforms->";
                 gs_GSInputCode << name << ";\n";
@@ -2252,8 +2252,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
         fsInputCode << "    scope.gl_FragCoord = scope.gl_Position;\n";
     } else {
         fsInputCode << "    scope.gl_FragCoord.zw = scope.gl_Position.zw;\n";
-        fsInputCode << "    scope.gl_FragCoord.xy = scope.gl_Position.xy / scope.gl_Position.w;\n";
-        fsInputCode << "    scope.gl_FragCoord.xy * vec2(fragExtras->renderTargetWidth, -fragExtras->renderTargetHeight);\n";
+        fsInputCode << "    vec2 xy = scope.gl_Position.xy / scope.gl_Position.w;\n";
+        fsInputCode << "    xy.y *= -1.0;\n";
+        fsInputCode << "    xy += 1.0;\n";
+        fsInputCode << "    scope.gl_FragCoord.xy = xy * 0.5 * vec2(fragExtras->renderTargetWidth, fragExtras->renderTargetHeight);\n";
     }
     fsTexturingStruct << "};\n\n";
     fsUniformStruct << "};\n\n";
