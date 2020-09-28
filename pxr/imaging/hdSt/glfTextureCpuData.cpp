@@ -60,7 +60,7 @@ _IsValid(GarchBaseTextureDataRefPtr const &textureData)
 
 using _Data = std::unique_ptr<const unsigned char[]>;
 
-template<typename T, T alpha>
+template<typename T, uint32_t alpha>
 _Data
 _ConvertRGBToRGBA(
     const void * const data,
@@ -81,7 +81,7 @@ _ConvertRGBToRGBA(
         typedConvertedData[4 * i + 0] = typedData[3 * i + 0];
         typedConvertedData[4 * i + 1] = typedData[3 * i + 1];
         typedConvertedData[4 * i + 2] = typedData[3 * i + 2];
-        typedConvertedData[4 * i + 3] = alpha;
+        typedConvertedData[4 * i + 3] = T(alpha);
     }
 
     return std::move(result);
@@ -248,9 +248,9 @@ _GetHgiFormatAndConversionFunction(
         }
         break;
     case GL_RGB:
+        // RGB (3 channels) is not supported on MTL, so we need to convert it.
         switch(glType) {
         case GL_UNSIGNED_BYTE:
-            // RGB (24bit) is not supported on MTL, so we need to convert it.
             *conversionFunction = _ConvertRGBToRGBA<unsigned char, 255>;
             if (glInternalFormat == GL_SRGB8) {
                 *hgiFormat = HgiFormatUNorm8Vec4srgb;
@@ -259,10 +259,12 @@ _GetHgiFormatAndConversionFunction(
             }
             break;
         case GL_HALF_FLOAT:
-            *hgiFormat = HgiFormatFloat16Vec3;
+            *conversionFunction = _ConvertRGBToRGBA<GfHalf, 1>;
+            *hgiFormat = HgiFormatFloat16Vec4;
             break;
         case GL_FLOAT:
-            *hgiFormat = HgiFormatFloat32Vec3;
+            *conversionFunction = _ConvertRGBToRGBA<float, 1>;
+            *hgiFormat = HgiFormatFloat32Vec4;
             break;
         default:
             TF_CODING_ERROR("Unsupported texture format GL_RGB 0x%04x",
