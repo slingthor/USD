@@ -29,12 +29,11 @@
 #include "pxr/usd/ar/asset.h"
 #include "pxr/usd/ar/resolver.h"
 
-#include "pxr/base/arch/pragmas.h"
-
 // use gf types to read and write metadata
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/gf/matrix4d.h"
 
+#include "pxr/base/arch/pragmas.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/type.h"
@@ -54,13 +53,13 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 OIIO_NAMESPACE_USING
 
-// _ioProxySupportedExtensions is a list of hardcoded file extensions that
-// support ioProxy. Although OIIO has an api call for checking whether or
-// not a file type supports ioProxy, version 2.0.9 does not include this
+// _ioProxySupportedExtensions is a list of hardcoded file extensions that 
+// support ioProxy. Although OIIO has an api call for checking whether or 
+// not a file type supports ioProxy, version 2.0.9 does not include this 
 // for EXR's, even though EXR's support ioProxy. This issue was fixed in
-// commit 7677d498b599295fa8277d050ef994efbd297b55. Thus, for now we check
-// whether or not a file extension is included in our hardcoded list of
-// extensions we know to support ioProxy.
+// commit 7677d498b599295fa8277d050ef994efbd297b55. Thus, for now we check 
+// whether or not a file extension is included in our hardcoded list of 
+// extensions we know to support ioProxy. 
 TF_MAKE_STATIC_DATA(std::vector<std::string>, _ioProxySupportedExtensions)
 {
     _ioProxySupportedExtensions->push_back("exr");
@@ -107,13 +106,13 @@ protected:
 
 private:
     std::string _GetFilenameExtension() const;
-    #if OIIO_VERSION >= 20003
-        cspan<unsigned char> _GenerateBufferCSpan(
-            const std::shared_ptr<const char>& buffer,
-            int bufferSize) const;
-    #endif
-        bool _CanUseIOProxyForExtension(std::string extension,
-                                        const ImageSpec &config) const;
+#if OIIO_VERSION >= 20003
+    cspan<unsigned char> _GenerateBufferCSpan(
+        const std::shared_ptr<const char>& buffer,
+        int bufferSize) const;
+#endif
+    bool _CanUseIOProxyForExtension(std::string extension, 
+                                    const ImageSpec &config) const;
     std::string _filename;
     int _subimage;
     int _miplevel;
@@ -344,11 +343,7 @@ GarchOIIOImage::GetHeight() const
 GLenum
 GarchOIIOImage::GetFormat() const
 {
-    int nChannels = _imagespec.nchannels;
-    if (nChannels == 3) {
-        nChannels = 4;
-    }
-    return _FormatFromImageData(nChannels);
+    return _FormatFromImageData(_imagespec.nchannels);
 }
 
 /* virtual */
@@ -601,17 +596,10 @@ GarchOIIOImage::ReadCropped(int const cropTop,
         TF_CODING_ERROR("Unable to seek subimage");
         return false;
     }
-
-    int pixelStride;
-    if (imageInput->spec().nchannels == 3) {
-        // Pad out to four channels
-        pixelStride = imageInput->spec().channel_bytes() * 4;
-    }
-    else {
-        pixelStride = imageInput->spec().pixel_bytes();
-    }
-    int strideLength = imageInput->spec().width * pixelStride;
-    int readStride = (storage.flipped)?
+   
+    int strideLength = imageInput->spec().width * 
+                       imageInput->spec().pixel_bytes();
+    int readStride = (storage.flipped)? 
                      (-strideLength) : (strideLength);
     int size = imageInput->spec().height * strideLength;
 
@@ -626,31 +614,21 @@ GarchOIIOImage::ReadCropped(int const cropTop,
     if (imageInput->spec().format == TypeDesc::DOUBLE) {
         imageInput->read_image(TypeDesc::FLOAT,
                                start,
-                               pixelStride,
+                               AutoStride,
                                readStride,
                                AutoStride);
     } else{
         imageInput->read_image(imageInput->spec().format,
                          start,
-                         pixelStride,
+                         AutoStride,
                          readStride,
                          AutoStride);
     }
     
     imageInput->close();
     
-    if (imageInput->spec().nchannels == 3) {
-        // We read it in as 4 channels
-        _imagespec = ImageSpec(
-            imageInput->spec().width, imageInput->spec().height, 4,
-            TypeDesc::BASETYPE(imageInput->spec().format.basetype));
-    }
-    else {
-        _imagespec = imageInput->spec();
-    }
-
     // Construct ImageBuf that wraps around allocated pixels memory
-    ImageBuf imagebuf = ImageBuf(_imagespec, pixels);
+    ImageBuf imagebuf =ImageBuf(imageInput->spec(), pixels);
     ImageBuf *image = &imagebuf;
 
     // Convert color images to linear (unless they are sRGB)
