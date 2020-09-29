@@ -49,7 +49,7 @@ _GetTextureType(const int numDimensions)
 }
 
 bool
-_IsValid(GarchBaseTextureDataRefPtr const &textureData)
+_IsValid(GarchBaseTextureDataConstRefPtr const &textureData)
 {
     return
         textureData->ResizedWidth() > 0 &&
@@ -374,11 +374,10 @@ _GetHgiFormatAndConversionFunction(
 } // anonymous namespace
 
 HdStGlfTextureCpuData::HdStGlfTextureCpuData(
-    GarchBaseTextureDataRefPtr const &textureData,
+    GarchBaseTextureDataConstRefPtr const &textureData,
     const std::string &debugName,
     const bool useOrGenerateMipmaps,
-    const bool premultiplyAlpha,
-    GarchImage::ImageOriginLocation originLoc)
+    const bool premultiplyAlpha)
   : _generateMipmaps(false)
 {
     TRACE_FUNCTION();

@@ -51,11 +51,11 @@ public:
 
     HDST_API
     HdStGlfTextureCpuData(
-        GarchBaseTextureDataRefPtr const &textureData,
+        GarchBaseTextureDataConstRefPtr const &textureData,
         const std::string &debugName,
         bool useOrGenerateMips = false,
-        bool premultiplyAlpha = true,
-        GarchImage::ImageOriginLocation originLoc = GarchImage::OriginUpperLeft);
+        bool premultiplyAlpha = true);
+
     HDST_API
     ~HdStGlfTextureCpuData();
     
@@ -79,7 +79,7 @@ private:
 
     // To avoid a copy, hold on to original data if we
     // can use them.
-    GarchBaseTextureDataRefPtr _textureData;
+    GarchBaseTextureDataConstRefPtr _textureData;
 
     // Buffer if we had to convert the data.
     std::unique_ptr<const unsigned char[]> _convertedData;
