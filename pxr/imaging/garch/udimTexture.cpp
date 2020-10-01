@@ -246,6 +246,25 @@ void _PremultiplyAlphaFloat(
 }
 }
 
+template<typename T, uint32_t alpha>
+void
+_ConvertRGBToRGBA(
+    void * const data,
+    const size_t numPixels)
+{
+    TRACE_FUNCTION();
+
+    T * const typedData = reinterpret_cast<T*>(data);
+
+    size_t i = numPixels;
+    while(i--) {
+        typedData[4 * i + 0] = typedData[3 * i + 0];
+        typedData[4 * i + 1] = typedData[3 * i + 1];
+        typedData[4 * i + 2] = typedData[3 * i + 2];
+        typedData[4 * i + 3] = T(alpha);
+    }
+}
+
 void
 GarchUdimTexture::_ReadImage()
 {
@@ -313,6 +332,11 @@ GarchUdimTexture::_ReadImage()
         sizePerElem = 1;
     }
     
+    const bool convertRGBtoRGBA = numChannels == 3;
+    if (convertRGBtoRGBA) {
+        numChannels = 4;
+    }
+
     const unsigned int maxTileCount =
     std::get<0>(_tiles.back()) + 1;
     _depth = static_cast<int>(_tiles.size());
@@ -457,6 +481,29 @@ GarchUdimTexture::_ReadImage()
                             reinterpret_cast<float *>(spec.data), 
                             GfVec3i(mipSize.width, mipSize.height, 1));
                         break;       
+                    }
+                } else if (convertRGBtoRGBA) {
+                    switch (type) {
+                    case GL_UNSIGNED_BYTE:
+                        _ConvertRGBToRGBA<unsigned char, 255>(
+                            reinterpret_cast<unsigned char *>(spec.data),
+                            mipSize.width * mipSize.height);
+                        break;
+                    case GL_UNSIGNED_SHORT:
+                        _ConvertRGBToRGBA<unsigned short, 65535>(
+                            reinterpret_cast<unsigned short *>(spec.data),
+                            mipSize.width * mipSize.height);
+                        break;
+                    case GL_HALF_FLOAT_ARB:
+                        _ConvertRGBToRGBA<GfHalf, 1>(
+                            reinterpret_cast<GfHalf *>(spec.data),
+                            mipSize.width * mipSize.height);
+                        break;
+                    case GL_FLOAT:
+                        _ConvertRGBToRGBA<float, 1>(
+                            reinterpret_cast<float *>(spec.data),
+                            mipSize.width * mipSize.height);
+                        break;
                     }
                 }
             }
