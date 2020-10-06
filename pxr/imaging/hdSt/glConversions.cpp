@@ -63,6 +63,11 @@ static const _FormatDesc FORMAT_DESC[] =
     {GL_RGB,  GL_FLOAT,         GL_RGB32F},  // HdFormatFloat32Vec3,
     {GL_RGBA, GL_FLOAT,         GL_RGBA32F}, // HdFormatFloat32Vec4,
 
+    {GL_RED,  GL_SHORT,         GL_R16I},    // HdFormatUInt16,
+    {GL_RG,   GL_SHORT,         GL_RG16I},   // HdFormatUInt16Vec2,
+    {GL_RGB,  GL_SHORT,         GL_RGB16I},  // HdFormatUInt16Vec3,
+    {GL_RGBA, GL_SHORT,         GL_RGBA16I}, // HdFormatUInt16Vec4,
+
     {GL_RED,  GL_INT,           GL_R32I},    // HdFormatInt32,
     {GL_RG,   GL_INT,           GL_RG32I},   // HdFormatInt32Vec2,
     {GL_RGB,  GL_INT,           GL_RGB32I},  // HdFormatInt32Vec3,

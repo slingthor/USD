@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
 #include "pxr/imaging/hgiMetal/conversions.h"
 
 #include "pxr/base/arch/defines.h"
@@ -57,6 +56,11 @@ static const MTLPixelFormat _PIXEL_FORMAT_DESC[] =
     MTLPixelFormatInvalid,      // Unsupported by Metal
     MTLPixelFormatRGBA32Float,  // HgiFormatFloat32Vec4,
 
+    MTLPixelFormatR16Uint,      // HgiFormatUInt16,
+    MTLPixelFormatRG16Uint,     // HgiFormatUInt16Vec2,
+    MTLPixelFormatInvalid,      // Unsupported by Metal
+    MTLPixelFormatRGBA16Uint,   // HgiFormatUInt16Vec4,
+
     MTLPixelFormatR32Sint,      // HgiFormatInt32,
     MTLPixelFormatRG32Sint,     // HgiFormatInt32Vec2,
     MTLPixelFormatInvalid,      // Unsupported by Metal
@@ -89,7 +93,8 @@ constexpr bool _CompileTimeValidateHgiFormatTable() {
             HgiFormatUNorm8 == 0 &&
             HgiFormatFloat16Vec4 == 9 &&
             HgiFormatFloat32Vec4 == 13 &&
-            HgiFormatUNorm8Vec4srgb == 18) ? true : false;
+            HgiFormatUInt16Vec4 == 17 &&
+            HgiFormatUNorm8Vec4srgb == 22) ? true : false;
 }
 
 static_assert(_CompileTimeValidateHgiFormatTable(),
@@ -121,6 +126,11 @@ static const MTLVertexFormat _VERTEX_FORMAT_DESC[] =
     MTLVertexFormatFloat3,              // HgiFormatFloat32Vec3,
     MTLVertexFormatFloat4,              // HgiFormatFloat32Vec4,
 
+    MTLVertexFormatShort,               // HgiFormatShort32,
+    MTLVertexFormatShort2,              // HgiFormatShort32Vec2,
+    MTLVertexFormatShort3,              // HgiFormatShort32Vec3,
+    MTLVertexFormatShort4,              // HgiFormatShort32Vec4,
+
     MTLVertexFormatInt,                 // HgiFormatInt32,
     MTLVertexFormatInt2,                // HgiFormatInt32Vec2,
     MTLVertexFormatInt3,                // HgiFormatInt32Vec3,
@@ -143,7 +153,8 @@ constexpr bool _CompileTimeValidateHgiVertexFormatTable() {
             HgiFormatUNorm8 == 0 &&
             HgiFormatFloat16Vec4 == 9 &&
             HgiFormatFloat32Vec4 == 13 &&
-            HgiFormatUNorm8Vec4srgb == 18) ? true : false;
+            HgiFormatUInt16Vec4 == 17 &&
+            HgiFormatUNorm8Vec4srgb == 22) ? true : false;
 }
 
 static_assert(_CompileTimeValidateHgiVertexFormatTable(),
@@ -306,7 +317,8 @@ struct {
 {
     {HgiTextureType1D,           MTLTextureType1D},
     {HgiTextureType2D,           MTLTextureType2D},
-    {HgiTextureType3D,           MTLTextureType3D}
+    {HgiTextureType3D,           MTLTextureType3D},
+    {HgiTextureType2DArray,      MTLTextureType2DArray},
 };
 
 static_assert(TfArraySize(_compareFnTable) == HgiCompareFunctionCount,

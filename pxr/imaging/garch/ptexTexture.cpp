@@ -21,7 +21,7 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-/// \file mtlf/ptexTexture.cpp
+/// \file garch/ptexTexture.cpp
 
 // 
 
@@ -64,20 +64,6 @@ PXR_NAMESPACE_CLOSE_SCOPE
 using std::string;
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-TF_REGISTRY_FUNCTION(TfType)
-{
-    typedef GarchPtexTexture Type;
-    TfType t = TfType::Define<Type, TfType::Bases<GarchTexture> >();
-    t.SetFactory< GarchTextureFactory<Type> >();
-}
-
-//------------------------------------------------------------------------------
-GarchPtexTextureRefPtr
-GarchPtexTexture::New(const TfToken &imageFilePath, const bool premultiplyAlpha)
-{
-    return GarchResourceFactory::GetInstance()->NewPtexTexture(imageFilePath, premultiplyAlpha);
-}
 
 //------------------------------------------------------------------------------
 GarchPtexTexture::GarchPtexTexture(const TfToken &imageFilePath,

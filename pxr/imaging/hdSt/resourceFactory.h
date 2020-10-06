@@ -126,9 +126,6 @@ public:
     HDST_API
     virtual char const *const GetComputeShaderFilename() const = 0;
     
-    HDST_API
-    virtual char const *const GetPtexTextureShaderFilename() const = 0;
-
     /// Creates a graphics API specific program
     HDST_API
     virtual HdStGLSLProgram *NewProgram(

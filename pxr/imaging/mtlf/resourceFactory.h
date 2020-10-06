@@ -86,21 +86,6 @@ public:
     MTLF_API
     virtual GarchBaseTexture *NewBaseTexture() const override;
 
-#ifdef PXR_PTEX_SUPPORT_ENABLED
-    // Ptex Texture
-    MTLF_API
-    virtual GarchPtexTextureRefPtr NewPtexTexture(const TfToken &imageFilePath,
-                                                  const bool premultiplyAlpha) const override;
-#endif
-    
-    // UDIM Texture
-    MTLF_API
-    virtual GarchUdimTextureRefPtr NewUdimTexture(TfToken const& imageFilePath,
-                                                  GarchImage::ImageOriginLocation originLocation,
-                                                  std::vector<std::tuple<int, TfToken>>&& tiles,
-                                                  const bool premultiplyAlpha,
-                                                  GarchImage::SourceColorSpace sourceColorSpace) const override;
-
 private:
     MtlfContextCaps contextCaps;
 };

@@ -191,6 +191,23 @@ public:
     HGI_API
     virtual void DestroyTextureView(HgiTextureViewHandle* viewHandle) = 0;
 
+    /// Create a texture buffer in rendering backend.
+    /// A texture buffer aliases another buffer's data.
+    /// It is the responsibility of the client to ensure that the sourceBuffer
+    /// is not destroyed while the texture buffer is in use.
+    /// Thread safety: Creation must happen on main thread. See notes above.
+    HGI_API
+    virtual HgiTextureBufferHandle CreateTextureBuffer(
+        HgiTextureBufferDesc const & desc) = 0;
+
+    /// Destroy a texture buffer in rendering backend.
+    /// This will destroy the texture buffer's texture, but not the sourceBuffer that
+    /// was aliased by the texture buffer. The sourceBuffer data remains unchanged.
+    /// Thread safety: Destruction must happen on main thread. See notes above.
+    HGI_API
+    virtual void DestroyTextureBuffer(
+        HgiTextureBufferHandle* textureBufferHandle) = 0;
+
     /// Create a sampler in rendering backend.
     /// Thread safety: Creation must happen on main thread. See notes above.
     HGI_API

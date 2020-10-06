@@ -89,19 +89,6 @@ GarchUdimTexture::~GarchUdimTexture()
 {
 }
 
-GarchUdimTextureRefPtr
-GarchUdimTexture::New(
-    TfToken const& imageFilePath,
-    GarchImage::ImageOriginLocation originLocation,
-    std::vector<std::tuple<int, TfToken>>&& tiles,
-    bool const premultiplyAlpha,
-    GarchImage::SourceColorSpace sourceColorSpace) // APPLE METAL: GarchImage
-{
-    return GarchResourceFactory::GetInstance()->NewUdimTexture(
-        imageFilePath, originLocation, std::move(tiles), premultiplyAlpha,
-	    sourceColorSpace);
-}
-
 GarchTexture::BindingVector
 GarchUdimTexture::GetBindings(
     TfToken const& identifier,

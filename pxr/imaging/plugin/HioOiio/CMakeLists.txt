@@ -1,5 +1,5 @@
 set(PXR_PREFIX pxr/imaging)
-set(PXR_PACKAGE glfOiio)
+set(PXR_PACKAGE HioOiio)
 
 if (NOT ${PXR_BUILD_GPU_SUPPORT})
     message(STATUS
@@ -7,12 +7,12 @@ if (NOT ${PXR_BUILD_GPU_SUPPORT})
     return()
 endif()
 
-pxr_plugin(glfOiio
+pxr_plugin(HioOiio
     LIBRARIES
         ar
         arch
         gf
-        glf
+        hio
         tf
         ${OIIO_LIBRARIES}
         ${OPENEXR_LIBRARY}

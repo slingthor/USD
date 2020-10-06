@@ -21,10 +21,7 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/garch/gl.h"
-
-#include "pxr/imaging/garch/image.h"
-#include "pxr/imaging/garch/utils.h"
+#include "pxr/imaging/hio/image.h"
 
 #include "pxr/usd/ar/asset.h"
 #include "pxr/usd/ar/resolver.h"
@@ -35,9 +32,10 @@
 
 #include "pxr/base/arch/pragmas.h"
 #include "pxr/base/tf/diagnostic.h"
+#include "pxr/base/tf/iterator.h"
+#include "pxr/base/tf/staticData.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/type.h"
-#include "pxr/base/tf/staticData.h"
 
 ARCH_PRAGMA_PUSH
 ARCH_PRAGMA_MACRO_REDEFINITION // due to Python copysign
@@ -49,7 +47,6 @@ ARCH_PRAGMA_MACRO_REDEFINITION // due to Python copysign
 ARCH_PRAGMA_POP
 
 PXR_NAMESPACE_OPEN_SCOPE
-
 
 OIIO_NAMESPACE_USING
 
@@ -65,42 +62,45 @@ TF_MAKE_STATIC_DATA(std::vector<std::string>, _ioProxySupportedExtensions)
     _ioProxySupportedExtensions->push_back("exr");
 }
 
-class GarchOIIOImage : public GarchImage {
+class HioOIIO_Image : public HioImage
+{
 public:
-    typedef GarchImage Base;
+    using Base = HioImage;
 
-    GarchOIIOImage();
+    HioOIIO_Image();
 
-    virtual ~GarchOIIOImage();
+    ~HioOIIO_Image() override;
 
-    // GarchImage overrides
-    virtual std::string const & GetFilename() const;
-    virtual int GetWidth() const;
-    virtual int GetHeight() const;
-    virtual GLenum GetFormat() const;
-    virtual GLenum GetType() const;
-    virtual int GetBytesPerPixel() const;
-    virtual int GetNumMipLevels() const;
+    // HioImage overrides
+    std::string const & GetFilename() const override;
+    int GetWidth() const override;
+    int GetHeight() const override;
+    HioColorChannelType GetFormat() const override;
+    int GetNumChannels() const override;
+    int GetBytesPerPixel() const override;
+    int GetNumMipLevels() const override;
 
-    virtual bool IsColorSpaceSRGB() const;
+    bool IsColorSpaceSRGB() const override;
 
-    virtual bool GetMetadata(TfToken const & key, VtValue * value) const;
-    virtual bool GetSamplerMetadata(GLenum pname, VtValue * param) const;
+    bool GetMetadata(TfToken const & key, 
+                             VtValue * value) const override;
+    bool GetSamplerMetadata(HioAddressDimension pname,
+                                    VtValue * param) const override;
 
-    virtual bool Read(StorageSpec const & storage);
-    virtual bool ReadCropped(int const cropTop,
-	                     int const cropBottom,
-	                     int const cropLeft,
-	                     int const cropRight,
-                             StorageSpec const & storage);
+    bool Read(StorageSpec const & storage) override;
+    bool ReadCropped(int const cropTop,
+                     int const cropBottom,
+                     int const cropLeft,
+                     int const cropRight,
+                     StorageSpec const & storage) override;
 
-    virtual bool Write(StorageSpec const & storage,
-                       VtDictionary const & metadata);
+    bool Write(StorageSpec const & storage,
+               VtDictionary const & metadata) override;
 
 protected:
     bool _OpenForReading(std::string const & filename, int subimage,
                                  int mip, 
-                                 GarchImage::SourceColorSpace sourceColorSpace,  // APPLE METAL: GarchImage
+                                 HioImage::SourceColorSpace sourceColorSpace,
                                  bool suppressErrors) override;
     bool _OpenForWriting(std::string const & filename) override;
 
@@ -117,63 +117,31 @@ private:
     int _subimage;
     int _miplevel;
     ImageSpec _imagespec;
-    GarchImage::SourceColorSpace _sourceColorSpace; // APPLE METAL: GarchImage
+    HioImage::SourceColorSpace _sourceColorSpace;
 };
 
 TF_REGISTRY_FUNCTION(TfType)
 {
-    using Image = GarchOIIOImage;
+    using Image = HioOIIO_Image;
     TfType t = TfType::Define<Image, TfType::Bases<Image::Base> >();
-    t.SetFactory< GarchImageFactory<Image> >();
-}
-
-static GLenum
-_FormatFromImageData(unsigned int nchannels)
-{
-    return GarchGetBaseFormat(nchannels);
-}
-
-/// Converts an OpenImageIO component type to its GL equivalent.
-static GLenum
-_TypeFromImageData(TypeDesc typedesc)
-{
-    switch (typedesc.basetype) {
-    case TypeDesc::UINT32:
-        return GL_UNSIGNED_INT;
-    case TypeDesc::UINT16:
-        return GL_UNSIGNED_SHORT;
-    case TypeDesc::HALF:
-        return GL_HALF_FLOAT;
-    case TypeDesc::FLOAT:
-    case TypeDesc::DOUBLE:
-        return GL_FLOAT;
-    case TypeDesc::UINT8:
-    default:
-        return GL_UNSIGNED_BYTE;
-    }    
+    t.SetFactory< HioImageFactory<Image> >();
 }
 
 /// Converts a GL type into its OpenImageIO component type equivalent.
 static TypeDesc
-_GetOIIOBaseType(GLenum type)
+_GetOIIOBaseType(HioColorChannelType format)
 {
-    switch (type) {
-    case GL_UNSIGNED_BYTE:
+    switch (format) {
+    case HioColorChannelTypeUNorm8:
         return TypeDesc::UINT8;
-    case GL_BYTE:
-        return TypeDesc::INT8;
-    case GL_UNSIGNED_SHORT:
-        return TypeDesc::UINT16;
-    case GL_SHORT:
-        return TypeDesc::INT16;
-    case GL_UNSIGNED_INT:
-        return TypeDesc::UINT32;
-    case GL_INT:
-        return TypeDesc::INT32;
-    case GL_HALF_FLOAT:
+    case HioColorChannelTypeFloat16:
         return TypeDesc::HALF;
-    case GL_FLOAT:
+    case HioColorChannelTypeFloat32:
         return TypeDesc::FLOAT;
+    case HioColorChannelTypeUInt16:
+        return TypeDesc::UINT16;
+    case HioColorChannelTypeInt32:
+        return TypeDesc::INT32;
     default:
         TF_CODING_ERROR("Unsupported type");
         return TypeDesc::FLOAT;
@@ -308,66 +276,80 @@ _SetAttribute(ImageSpec * spec,
     }
 }
 
-GarchOIIOImage::GarchOIIOImage()
+HioOIIO_Image::HioOIIO_Image()
     : _subimage(0), _miplevel(0)
 {
 }
 
 /* virtual */
-GarchOIIOImage::~GarchOIIOImage()
+HioOIIO_Image::~HioOIIO_Image()
 {
 }
 
 /* virtual */
 std::string const &
-GarchOIIOImage::GetFilename() const
+HioOIIO_Image::GetFilename() const
 {
     return _filename;
 }
 
 /* virtual */
 int
-GarchOIIOImage::GetWidth() const
+HioOIIO_Image::GetWidth() const
 {
     return _imagespec.width;
 }
 
 /* virtual */
 int
-GarchOIIOImage::GetHeight() const
+HioOIIO_Image::GetHeight() const
 {
     return _imagespec.height;
 }
 
 /* virtual */
-GLenum
-GarchOIIOImage::GetFormat() const
+HioColorChannelType
+HioOIIO_Image::GetFormat() const
 {
-    return _FormatFromImageData(_imagespec.nchannels);
-}
-
-/* virtual */
-GLenum
-GarchOIIOImage::GetType() const
-{
-    return _TypeFromImageData(_imagespec.format);
+    TypeDesc const& type = _imagespec.format;
+    if (type == TypeDesc::FLOAT) {
+        return HioColorChannelTypeFloat32;
+    } else if (type == TypeDesc::HALF) {
+        return HioColorChannelTypeFloat16;
+    } else if (type == TypeDesc::UINT16) {
+        return HioColorChannelTypeUInt16;
+    } else if (type == TypeDesc::INT32) {
+        return HioColorChannelTypeInt32;
+    } else if (type == TypeDesc::UINT8) {
+        return HioColorChannelTypeUNorm8;
+    }
+    
+    TF_CODING_ERROR("Unsupported type");
+    return HioColorChannelTypeFloat32;
 }
 
 /* virtual */
 int
-GarchOIIOImage::GetBytesPerPixel() const
+HioOIIO_Image::GetNumChannels() const
+{
+    return _imagespec.nchannels;
+}
+
+/* virtual */
+int
+HioOIIO_Image::GetBytesPerPixel() const
 {
     return _imagespec.pixel_bytes();
 }
 
 /* virtual */
 bool
-GarchOIIOImage::IsColorSpaceSRGB() const
+HioOIIO_Image::IsColorSpaceSRGB() const
 {
-    if (_sourceColorSpace == GarchImage::SRGB) {
+    if (_sourceColorSpace == HioImage::SRGB) {
         return true;
     } 
-    if (_sourceColorSpace == GarchImage::Raw) {
+    if (_sourceColorSpace == HioImage::Raw) {
         return false;
     }
 
@@ -378,7 +360,7 @@ GarchOIIOImage::IsColorSpaceSRGB() const
 
 /* virtual */
 bool
-GarchOIIOImage::GetMetadata(TfToken const & key, VtValue * value) const
+HioOIIO_Image::GetMetadata(TfToken const & key, VtValue * value) const
 {
     VtValue result = _FindAttribute(_imagespec, key.GetString());
     if (!result.IsEmpty()) {
@@ -388,34 +370,34 @@ GarchOIIOImage::GetMetadata(TfToken const & key, VtValue * value) const
     return false;
 }
 
-static GLenum
+static HioAddressMode
 _TranslateWrap(std::string const & wrapMode)
 {
     if (wrapMode == "black")
-        return GL_CLAMP_TO_BORDER;
+        return HioAddressModeClampToBorderColor;
     if (wrapMode == "clamp")
-        return GL_CLAMP_TO_EDGE;
+        return HioAddressModeClampToEdge;
     if (wrapMode == "periodic")
-        return GL_REPEAT;
+        return HioAddressModeRepeat;
     if (wrapMode == "mirror")
-        return GL_MIRRORED_REPEAT;
+        return HioAddressModeMirrorRepeat;
 
-    return GL_CLAMP_TO_EDGE;
+    return HioAddressModeClampToEdge;
 }
 
 /* virtual */
 bool
-GarchOIIOImage::GetSamplerMetadata(GLenum pname, VtValue * param) const
+HioOIIO_Image::GetSamplerMetadata(HioAddressDimension pname, VtValue * param) const
 {
     switch (pname) {
-        case GL_TEXTURE_WRAP_S: {
+        case HioAddressDimensionU: {
                 VtValue smode = _FindAttribute(_imagespec, "s mode");
                 if (!smode.IsEmpty() && smode.IsHolding<std::string>()) {
                     *param = VtValue(_TranslateWrap(smode.Get<std::string>()));
                     return true;
                 }
             } return false;
-        case GL_TEXTURE_WRAP_T: {
+        case HioAddressDimensionV: {
                 VtValue tmode = _FindAttribute(_imagespec, "t mode");
                 if (!tmode.IsEmpty() && tmode.IsHolding<std::string>()) {
                     *param = VtValue(_TranslateWrap(tmode.Get<std::string>()));
@@ -429,14 +411,14 @@ GarchOIIOImage::GetSamplerMetadata(GLenum pname, VtValue * param) const
 
 /* virtual */
 int
-GarchOIIOImage::GetNumMipLevels() const
+HioOIIO_Image::GetNumMipLevels() const
 {
     // XXX Add support for mip counting
     return 1;
 }
 
-std::string
-GarchOIIOImage::_GetFilenameExtension() const
+std::string 
+HioOIIO_Image::_GetFilenameExtension() const
 {
     std::string fileExtension = ArGetResolver().GetExtension(_filename);
     return TfStringToLower(fileExtension);
@@ -444,10 +426,10 @@ GarchOIIOImage::_GetFilenameExtension() const
 
 #if OIIO_VERSION >= 20003
 cspan<unsigned char>
-GarchOIIOImage::_GenerateBufferCSpan(const std::shared_ptr<const char>& buffer,
-                                      int bufferSize) const
+HioOIIO_Image::_GenerateBufferCSpan(const std::shared_ptr<const char>& buffer,
+                                    int bufferSize) const
 {
-    const char* bufferPtr = buffer.get();
+    const char* bufferPtr = buffer.get(); 
     const unsigned char* bufferPtrUnsigned = (const unsigned char *) bufferPtr;
     cspan<unsigned char> bufferCSpan(bufferPtrUnsigned, bufferSize);
     return bufferCSpan;
@@ -455,11 +437,11 @@ GarchOIIOImage::_GenerateBufferCSpan(const std::shared_ptr<const char>& buffer,
 #endif
 
 bool
-GarchOIIOImage::_CanUseIOProxyForExtension(std::string extension,
-                                            const ImageSpec & config) const
+HioOIIO_Image::_CanUseIOProxyForExtension(std::string extension,
+                                          const ImageSpec & config) const
 {
-    if (std::find(_ioProxySupportedExtensions->begin(),
-                  _ioProxySupportedExtensions->end(),
+    if (std::find(_ioProxySupportedExtensions->begin(), 
+                  _ioProxySupportedExtensions->end(), 
                   extension)
             != _ioProxySupportedExtensions->end()) {
         return true;
@@ -480,20 +462,20 @@ GarchOIIOImage::_CanUseIOProxyForExtension(std::string extension,
 
 /* virtual */
 bool
-GarchOIIOImage::_OpenForReading(std::string const & filename, int subimage,
+HioOIIO_Image::_OpenForReading(std::string const & filename, int subimage,
                                int mip, 
-                               GarchImage::SourceColorSpace sourceColorSpace,  // APPLE METAL: GarchImage
+                               HioImage::SourceColorSpace sourceColorSpace,
                                bool suppressErrors)
 {
     _filename = filename;
     _subimage = subimage;
-    _miplevel = mip;
+    _miplevel = mip;    
     _sourceColorSpace = sourceColorSpace;
     _imagespec = ImageSpec();
 
 #if OIIO_VERSION >= 20003
     std::shared_ptr<ArAsset> asset = ArGetResolver().OpenAsset(_filename);
-    if (!asset) {
+    if (!asset) { 
         return false;
     }
 
@@ -538,22 +520,23 @@ GarchOIIOImage::_OpenForReading(std::string const & filename, int subimage,
 
 /* virtual */
 bool
-GarchOIIOImage::Read(StorageSpec const & storage)
+HioOIIO_Image::Read(StorageSpec const & storage)
 {
     return ReadCropped(0, 0, 0, 0, storage);
 }
 
 /* virtual */
 bool
-GarchOIIOImage::ReadCropped(int const cropTop,
-                            int const cropBottom,
-                            int const cropLeft,
-                            int const cropRight,
-                            StorageSpec const & storage)
+HioOIIO_Image::ReadCropped(int const cropTop,
+                           int const cropBottom,
+                           int const cropLeft,
+                           int const cropRight,
+                           StorageSpec const & storage)
 {
+
 #if OIIO_VERSION >= 20003
     std::shared_ptr<ArAsset> asset = ArGetResolver().OpenAsset(_filename);
-    if (!asset) {
+    if (!asset) { 
         return false;
     }
 
@@ -605,7 +588,7 @@ GarchOIIOImage::ReadCropped(int const cropTop,
 
     std::unique_ptr<uint8_t[]>pixelData(new uint8_t[size]);
     unsigned char *pixels = pixelData.get();
-    void *start = (storage.flipped)?
+    void *start = (storage.flipped)? 
                   (pixels + size - strideLength) : (pixels);
 
     // Read Image into pixels, flipping upon load so that
@@ -634,7 +617,7 @@ GarchOIIOImage::ReadCropped(int const cropTop,
     // Convert color images to linear (unless they are sRGB)
     // (Currently unimplemented, requires OpenColorIO support from OpenImageIO)
 
-    // Crop
+    // Crop 
     ImageBuf cropped;
     if (cropTop || cropBottom || cropLeft || cropRight) {
         ImageBufAlgo::cut(cropped, *image,
@@ -645,7 +628,7 @@ GarchOIIOImage::ReadCropped(int const cropTop,
 
     // Reformat
     ImageBuf scaled;
-    if (image->spec().width != storage.width ||
+    if (image->spec().width != storage.width || 
         image->spec().height != storage.height) {
         ImageBufAlgo::resample(scaled, *image, /*interpolate=*/false,
                 ROI(0, storage.width, 0, storage.height));
@@ -653,7 +636,7 @@ GarchOIIOImage::ReadCropped(int const cropTop,
     }
 
     // Read pixel data
-    TypeDesc type = _GetOIIOBaseType(storage.type);
+    TypeDesc type = _GetOIIOBaseType(storage.format);
 
 #if OIIO_VERSION > 10603
     if (!image->get_pixels(ROI(0, storage.width, 0, storage.height, 0, 1),
@@ -673,7 +656,7 @@ GarchOIIOImage::ReadCropped(int const cropTop,
 
 /* virtual */
 bool
-GarchOIIOImage::_OpenForWriting(std::string const & filename)
+HioOIIO_Image::_OpenForWriting(std::string const & filename)
 {
     _filename = filename;
     _imagespec = ImageSpec();
@@ -681,11 +664,11 @@ GarchOIIOImage::_OpenForWriting(std::string const & filename)
 }
 
 bool
-GarchOIIOImage::Write(StorageSpec const & storage,
-                       VtDictionary const & metadata)
+HioOIIO_Image::Write(StorageSpec const & storage,
+                     VtDictionary const & metadata)
 {
-    int nchannels = GarchGetNumElements(storage.format);
-    TypeDesc format = _GetOIIOBaseType(storage.type);
+    int nchannels = storage.numChannels;
+    TypeDesc format = _GetOIIOBaseType(storage.format);
     ImageSpec spec(storage.width, storage.height, nchannels, format);
 
     for (const std::pair<std::string, VtValue>& m : metadata) {

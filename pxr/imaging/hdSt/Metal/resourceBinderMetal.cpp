@@ -26,8 +26,10 @@
 #include "pxr/imaging/hdSt/Metal/resourceBinderMetal.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/drawItem.h"
+#include "pxr/imaging/hdSt/ptexTextureObject.h"
 #include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/textureObject.h"
+#include "pxr/imaging/hdSt/udimTextureObject.h"
 #include "pxr/imaging/hdSt/samplerObject.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 
@@ -338,13 +340,26 @@ public:
         const bool bind)
     {
         // Bind the texels
-        GarchTextureGPUHandle texelHandle = texture.GetTexelGLTextureName();
-        mslProgram.BindTexture(name, texelHandle);
+        {
+            auto metalTexture = dynamic_cast<HgiMetalTexture const*>(
+                texture.GetTexelTexture().Get());
+            auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
+                sampler.GetTexelsSampler().Get());
+
+            mslProgram.BindTexture(name, metalTexture?metalTexture->GetTextureId():nil);
+            mslProgram.BindSampler(name, metalSampler?metalSampler->GetSamplerId():nil);
+        }
         
         // Bind the layout
-        TfToken layoutName = HdSt_ResourceBinder::_Concat(name, HdSt_ResourceBindingSuffixTokens->layout);
-        GarchTextureGPUHandle layoutHandle = texture.GetLayoutGLTextureName();
-        mslProgram.BindTexture(layoutName, layoutHandle);
+        {
+            auto metalTexture = dynamic_cast<HgiMetalTexture const*>(
+                texture.GetLayoutTexture().Get());
+
+            mslProgram.BindTexture(
+                HdSt_ResourceBinder::_Concat(
+                    name, HdSt_ResourceBindingSuffixTokens->layout),
+                metalTexture?metalTexture->GetTextureId():nil);
+        }
     }
 
     static void Compute(
@@ -355,21 +370,26 @@ public:
         const bool bind)
     {
         // Bind the texels
-        GarchTextureGPUHandle texelHandle = texture.GetTexelGLTextureName();
-        mslProgram.BindTexture(name, texelHandle);
+        {
+            auto metalTexture = dynamic_cast<HgiMetalTexture const*>(
+                texture.GetTexelTexture().Get());
+            auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
+                sampler.GetTexelsSampler().Get());
+
+            mslProgram.BindTexture(name, metalTexture?metalTexture->GetTextureId():nil);
+            mslProgram.BindSampler(name, metalSampler?metalSampler->GetSamplerId():nil);
+        }
         
         // Bind the layout
-        GarchTextureGPUHandle layoutHandle = texture.GetLayoutGLTextureName();
-        mslProgram.BindTexture(
-            HdSt_ResourceBinder::_Concat(
-                name, HdSt_ResourceBindingSuffixTokens->layout),
-            layoutHandle);
+        {
+            auto metalTexture = dynamic_cast<HgiMetalTexture const*>(
+                texture.GetLayoutTexture().Get());
 
-        // Bind the sampler
-        auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
-            sampler.GetTexelsSampler().Get());
-        id<MTLSamplerState> samplerID = metalSampler?metalSampler->GetSamplerId():nil;
-        mslProgram.BindSampler(name, samplerID);
+            mslProgram.BindTexture(
+                HdSt_ResourceBinder::_Concat(
+                    name, HdSt_ResourceBindingSuffixTokens->layout),
+                metalTexture?metalTexture->GetTextureId():nil);
+        }
     }
 };
 

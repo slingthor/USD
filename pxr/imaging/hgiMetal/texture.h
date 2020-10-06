@@ -67,6 +67,10 @@ protected:
     HgiMetalTexture(HgiMetal *hgi,
                     HgiTextureViewDesc const & desc);
     
+    HGIMETAL_API
+    HgiMetalTexture(HgiMetal *hgi,
+                    HgiTextureBufferDesc const & desc);
+    
 private:
     HgiMetalTexture() = delete;
     HgiMetalTexture & operator=(const HgiMetalTexture&) = delete;

@@ -188,7 +188,7 @@ std::string
 _GetPtexTextureShaderSource()
 {
     static std::string source =
-        HioGlslfx(HdStPackagePtexTextureShader()).GetSource(
+        HioGlslfx(HdStPackagePtexTextureShader(), TfToken("Metal")).GetSource(
             _tokens->ptexTextureSampler);
     return source;
 }
@@ -5370,21 +5370,26 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
         } else if (bindingType == HdBinding::TEXTURE_PTEX_TEXEL) {
             // appending '_layout' for layout is by convention.
             std::string texelBindName("textureBind_" + it->second.name.GetString());
+            std::string samplerBindName("samplerBind_" + it->second.name.GetString());
             std::string layoutBindName("textureBind_" + it->second.name.GetString() + "_layout");
             
             declarations
                 << "texture2d_array<float> " << texelBindName << ";\n"
-                << "texture1d<int> " << layoutBindName << ";\n";
+                << "texture_buffer<ushort> " << layoutBindName << ";\n"
+                << "sampler " << samplerBindName << ";\n";
             
+            _AddInputParam(_mslPSInputParams, TfToken(samplerBindName),
+                           TfToken("sampler"), TfToken(), it->first).usage
+                |= HdSt_CodeGenMSL::TParam::Sampler;
             _AddInputParam(_mslPSInputParams, TfToken(texelBindName),
                            TfToken("texture2d_array<float>"), TfToken(), it->first).usage
                 |= HdSt_CodeGenMSL::TParam::Texture;
-            
+
             HdBinding layoutBinding(HdBinding::TEXTURE_PTEX_LAYOUT,
                 it->first.GetLocation(),
                 it->first.GetTextureUnit());
             _AddInputParam(_mslPSInputParams, TfToken(layoutBindName),
-                           TfToken("texture1d<int>"), TfToken(), layoutBinding).usage
+                           TfToken("texture_buffer<ushort>"), TfToken(), layoutBinding).usage
                 |= HdSt_CodeGenMSL::TParam::Texture;
 
             accessors
@@ -5394,6 +5399,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << "(GlopPtexTextureLookup("
                 << texelBindName << ","
                 << layoutBindName << ","
+                << samplerBindName << ","
                 << "GetPatchCoord(localIndex))" << swizzle << ");\n"
                 << "}\n"
                 << _GetUnpackedType(it->second.dataType, false)
@@ -5405,6 +5411,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << "(GlopPtexTextureLookup("
                 << texelBindName<< ","
                 << layoutBindName << ","
+                << samplerBindName << ","
                 << "patchCoord)" << swizzle << ");\n"
                 << "}\n";
             addScalarAccessor = false;

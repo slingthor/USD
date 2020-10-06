@@ -112,4 +112,39 @@ HgiTextureView::GetViewTexture() const
     return _viewTexture;
 }
 
+bool operator==(const HgiTextureBufferDesc& lhs,
+    const HgiTextureBufferDesc& rhs)
+{
+    return  lhs.debugName == rhs.debugName &&
+            lhs.usage == rhs.usage &&
+            lhs.format == rhs.format &&
+            lhs.width == rhs.width &&
+            lhs.sourceBuffer == rhs.sourceBuffer
+    ;
+}
+
+bool operator!=(const HgiTextureBufferDesc& lhs,
+    const HgiTextureBufferDesc& rhs)
+{
+    return !(lhs == rhs);
+}
+
+HgiTextureBuffer::HgiTextureBuffer(HgiTextureBufferDesc const& desc)
+{
+}
+
+HgiTextureBuffer::~HgiTextureBuffer() = default;
+
+void
+HgiTextureBuffer::SetTextureBuffer(HgiTextureHandle const& handle)
+{
+    _textureBuffer = handle;
+}
+
+HgiTextureHandle const&
+HgiTextureBuffer::GetTextureBuffer() const
+{
+    return _textureBuffer;
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE

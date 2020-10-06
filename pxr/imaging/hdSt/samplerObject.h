@@ -162,6 +162,12 @@ public:
 
     ~HdStPtexSamplerObject() override;
 
+    /// The GPU sampler object for the texels texture.
+    ///
+    const HgiSamplerHandle &GetTexelsSampler() const {
+        return _texelsSampler;
+    }
+
     /// The GL texture handle for bindless textures (as returned by
     /// glGetTextureHandleARB). This is for texels.
     ///
@@ -177,6 +183,8 @@ public:
     }
 
 private:
+    HgiSamplerHandle _texelsSampler;
+
     const uint64_t _texelsGLTextureHandle;
     const uint64_t _layoutGLTextureHandle;
 };
@@ -197,8 +205,7 @@ public:
 
     ~HdStUdimSamplerObject() override;
 
-    /// The GL sampler (as understood by glBindSampler) for the
-    /// texels texture.
+    /// The GPU sampler object for the texels texture.
     ///
     const HgiSamplerHandle &GetTexelsSampler() const {
         return _texelsSampler;
