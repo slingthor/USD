@@ -430,6 +430,8 @@ enum HdFormat
     // Depth-stencil format
     HdFormatFloat32UInt8,
 
+    HdFormatBC7UNorm8Vec4srgb,
+
     HdFormatCount
 };
 

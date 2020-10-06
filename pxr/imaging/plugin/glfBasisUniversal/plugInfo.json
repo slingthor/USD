@@ -3,8 +3,8 @@
       {
         "Info": {
           "Types": {
-            "Glf_BasisUniversalImage" : {
-                "bases": ["GlfImage"],
+            "Garch_BasisUniversalImage" : {
+                "bases": ["GarchImage"],
                 "imageTypes": ["basis"],
                 "precedence": 0
             }

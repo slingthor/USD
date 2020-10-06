@@ -90,8 +90,9 @@ GlfCheckGLFrameBufferStatus(GLuint target, std::string * reason)
 
 bool GlfIsCompressedFormat(GLenum format)
 {
-    if (format == GL_COMPRESSED_RGBA_BPTC_UNORM || 
-        format == GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT) {
+    if (format == GL_COMPRESSED_RGBA_BPTC_UNORM ||
+        format == GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT ||
+        format == GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM) {
         return true;
     }
     return false;
@@ -104,8 +105,9 @@ size_t GlfGetCompressedTextureSize(int width, int height, GLenum format, GLenum 
     int alignSize = 0;
     
     // XXX Only BPTC is supported right now
-    if (format == GL_COMPRESSED_RGBA_BPTC_UNORM || 
-        format == GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT) {
+    if (format == GL_COMPRESSED_RGBA_BPTC_UNORM ||
+        format == GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT ||
+        format == GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM) {
         blockSize = 16;
         tileSize = 4;
         alignSize = 3;

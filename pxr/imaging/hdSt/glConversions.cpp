@@ -69,6 +69,8 @@ static const _FormatDesc FORMAT_DESC[] =
     {GL_RGBA, GL_INT,           GL_RGBA32I}, // HdFormatInt32Vec4,
 
     {GL_DEPTH_STENCIL, GL_FLOAT, GL_DEPTH32F_STENCIL8}, // HdFormatFloat32UInt8
+    
+    {GL_RGBA, GL_UNSIGNED_BYTE, GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM},
 };
 static_assert(TfArraySize(FORMAT_DESC) ==
         HdFormatCount, "FORMAT_DESC to HdFormat enum mismatch");
