@@ -434,7 +434,11 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
 
     if IsVisualStudio2019OrGreater():
         generator = generator + " -A x64"
-                
+
+    toolset = context.cmakeToolset
+    if toolset is not None:
+        toolset = '-T "{toolset}"'.format(toolset=toolset)
+
     # On MacOS, enable the use of @rpath for relocatable builds.
     osx_rpath = None
     if targetMacOS or targetIOS:
@@ -497,6 +501,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
             '-DCMAKE_BUILD_TYPE={config} '
             '{osx_rpath} '
             '{generator} '
+            '{toolset} '
             '{extraArgs} '
             '"{srcDir}"'
             .format(instDir=instDir,
@@ -505,6 +510,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
                     srcDir=srcDir,
                     osx_rpath=(osx_rpath or ""),
                     generator=(generator or ""),
+                    toolset=(toolset or ""),
                     extraArgs=(" ".join(extraArgs) if extraArgs else "")))
 
         Run("cmake --build . --config {config} --target install -- {multiproc}"
@@ -919,7 +925,13 @@ def InstallBoost_Helper(context, force, buildArgs):
         if Windows():
             # toolset parameter for Visual Studio documented here:
             # https://github.com/boostorg/build/blob/develop/src/tools/msvc.jam
-            if IsVisualStudio2019OrGreater():
+            if context.cmakeToolset == "v142":
+                b2_toolset.append("toolset=msvc-14.2")
+            elif context.cmakeToolset == "v141":
+                b2_toolset.append("toolset=msvc-14.1")
+            elif context.cmakeToolset == "v140":
+                b2_toolset.append("toolset=msvc-14.0")
+            elif IsVisualStudio2019OrGreater():
                 b2_toolset = "toolset=msvc-14.2"
             elif IsVisualStudio2017OrGreater():
                 b2_toolset = "toolset=msvc-14.1"
@@ -1355,17 +1367,22 @@ def InstallTIFF(context, force, buildArgs):
             subprocess.call(['git', 'apply', '--reject', '--whitespace=fix', 
                 patchPath + '/0001-tif_fax3-more-buffer-overflow-checks-in-Fax3Decode2D.patch'],
                 stdout=devout, stderr=devout)
-
-            PatchFile("CMakeLists.txt",
-                   [("option(ld-version-script \"Enable linker version script\" ON)",
-                     "option(ld-version-script \"Enable linker version script\" OFF)")])
-
+        
         if iOS():
             # Skip contrib to avoid issues with code signing.
             PatchFile("CMakeLists.txt",
                     [("add_subdirectory(contrib)", "# add_subdirectory(contrib)")])
-
-        RunCMake(context, force, buildArgs)
+			
+        # The libTIFF CMakeScript says the ld-version-script 
+        # functionality is only for compilers using GNU ld on 
+        # ELF systems or systems which provide an emulation; therefore
+        # skipping it completely on mac and windows.
+        if MacOS() or iOS() or Windows():
+            extraArgs = ["-Dld-version-script=OFF"]
+        else:
+            extraArgs = []
+        extraArgs += buildArgs
+        RunCMake(context, force, extraArgs)
         return os.getcwd()
 
 TIFF = Dependency("TIFF", InstallTIFF, "include/tiff.h")
@@ -2181,6 +2198,9 @@ def InstallUSD(context, force, buildArgs):
     with CurrentWorkingDirectory(context.usdSrcDir):
         extraArgs = []
 
+        extraArgs.append('-DPXR_PREFER_SAFETY_OVER_SPEED=' + 
+                         'ON' if context.safetyFirst else 'OFF')
+
         if context.buildPython:
             extraArgs.append('-DPXR_ENABLE_PYTHON_SUPPORT=ON')
             if Python3():
@@ -2471,6 +2491,9 @@ group.add_argument("--force-all", action="store_true",
 group.add_argument("--generator", type=str,
                    help=("CMake generator to use when building libraries with "
                          "cmake"))
+group.add_argument("--toolset", type=str,
+                   help=("CMake toolset to use when building libraries with "
+                         "cmake"))
 
 group = parser.add_argument_group(title="3rd Party Dependency Build Options")
 group.add_argument("--src", type=str,
@@ -2531,6 +2554,15 @@ subgroup.add_argument("--universal", dest="universal", action="store_true",
                       default=False, help="Build universal binaries on MacOS ")
 subgroup.add_argument("--no-universal", dest="universal", action="store_false",
                       help="Do not build universal binaries on MacOS (default)")
+subgroup.add_argument("--prefer-safety-over-speed", dest="safety_first",
+                      action="store_true", default=True, help=
+                      "Enable extra safety checks (which may negatively "
+                      "impact performance) against malformed input files "
+                      "(default)")
+subgroup.add_argument("--prefer-speed-over-safety", dest="safety_first",
+                      action="store_false", help=
+                      "Disable performance-impacting safety checks against "
+                      "malformed input files")
 
 (NO_IMAGING, IMAGING, USD_IMAGING) = (0, 1, 2)
 
@@ -2688,8 +2720,9 @@ class InstallContext:
         # MacOS Only
         self.make_relocatable = args.make_relocatable
 
-        # CMake generator
+        # CMake generator and toolset
         self.cmakeGenerator = args.generator
+        self.cmakeToolset = args.toolset
 
         # Number of jobs
         self.numJobs = args.jobs
@@ -2713,7 +2746,10 @@ class InstallContext:
         self.buildDebug = args.build_debug;
         self.buildShared = (args.build_type == SHARED_LIBS)
         self.buildMonolithic = (args.build_type == MONOLITHIC_LIB)
+
+        # Build options
         self.buildUniversal = args.universal
+        self.safetyFirst = args.safety_first
 
         # Dependencies that are forced to be built
         self.forceBuildAll = args.force_all
@@ -2989,6 +3025,7 @@ Building with settings:
   3rd-party install directory   {instDir}
   Build directory               {buildDir}
   CMake generator               {cmakeGenerator}
+  CMake toolset                 {cmakeToolset}
   Downloader                    {downloader}
   
   Apple:
@@ -3045,6 +3082,8 @@ summaryMsg = summaryMsg.format(
     instDir=context.instDir,
     cmakeGenerator=("Default" if not context.cmakeGenerator
                     else context.cmakeGenerator),
+    cmakeToolset=("Default" if not context.cmakeToolset
+                  else context.cmakeToolset),
     downloader=(context.downloaderName),
     buildUniversalBinaries=("On" if context.buildUniversal and SupportsMacOSUniversalBinaries() else "Off"),
     use_download_cache=("On" if context.use_download_cache else "Off"),

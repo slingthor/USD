@@ -84,7 +84,7 @@ GarchArrayTextureRefPtr MtlfResourceFactory::NewArrayTexture(TfTokenVector const
                                                              unsigned int cropBottom,
                                                              unsigned int cropLeft,
                                                              unsigned int cropRight,
-                                                             GarchImage::ImageOriginLocation originLocation) const
+                                                             HioImage::ImageOriginLocation originLocation) const
 {
     return TfCreateRefPtr(new MtlfArrayTexture(imageFilePaths, arraySize,
                                                cropTop, cropBottom,

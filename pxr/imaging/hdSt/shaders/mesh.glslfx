@@ -362,7 +362,7 @@ void emit(int index, vec4 Peye, vec3 Neye,
 }
 
 #if !defined(ARCH_GFX_METAL)
-vec4 ComputeSelectionOffset();
+vec4 ComputeSelectionOffset(); // selection.glslfx
 #endif
 
 void main(void)

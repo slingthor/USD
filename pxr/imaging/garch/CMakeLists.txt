@@ -59,6 +59,7 @@ endif()
 pxr_library(garch
     LIBRARIES
         arch
+        hio
         js
         plug
         sdf

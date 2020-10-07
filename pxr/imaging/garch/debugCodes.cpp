@@ -35,7 +35,8 @@ TF_REGISTRY_FUNCTION(TfDebug)
 {
     TF_DEBUG_ENVIRONMENT_SYMBOL(GARCH_DEBUG_VDB_TEXTURE,
         "Garch Vdb texture loading");
-
+    TF_DEBUG_ENVIRONMENT_SYMBOL(GARCH_DEBUG_POST_SURFACE_LIGHTING,
+        "Garch post surface lighting setup");
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

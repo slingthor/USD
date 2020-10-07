@@ -199,9 +199,9 @@ void HdStRenderDelegateMetal::PrepareRender(
     }
     
     if (params.enableIdRender) {
-        context->SetAlphaCoverageEnable(false);
+        context->SetAlphaCoverageEnable(false, false);
     } else if (params.enableSampleAlphaToCoverage) {
-        context->SetAlphaCoverageEnable(true);
+        context->SetAlphaCoverageEnable(true, false);
     }
 }
 

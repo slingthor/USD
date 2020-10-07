@@ -260,8 +260,8 @@ _ComputeHeader(id<MTLDevice> device)
             << "        float x, xx, xxx, xxxx, y, z, w;\n"
             << "        float r, rr, rrr, rrrr, g, b, a;\n"
             << "    };\n"
-            << "    wrapped_float(float _x) { x = _x;}\n"
-            << "    operator float () {\n"
+            << "    wrapped_float(float const _x) { x = _x;}\n"
+            << "    operator float () const {\n"
             << "        return x;\n"
             << "    }\n"
             << "};\n";
@@ -271,8 +271,8 @@ _ComputeHeader(id<MTLDevice> device)
             << "        int x, xx, xxx, xxxx, y, z, w;\n"
             << "        int r, rr, rrr, rrrr, g, b, a;\n"
             << "    };\n"
-            << "    wrapped_int(int _x) { x = _x;}\n"
-            << "    operator int () {\n"
+            << "    wrapped_int(int const _x) { x = _x;}\n"
+            << "    operator int () const {\n"
             << "        return x;\n"
             << "    }\n"
             << "};\n";

@@ -284,7 +284,7 @@ public:
     void SetDepthComparisonFunction(MTLCompareFunction comparisonFn);
     
     MTLF_API
-    void SetAlphaCoverageEnable(bool alphaCoverageEnable);
+    void SetAlphaCoverageEnable(bool alphaCoverageEnable, bool alphaToOneEnable);
 
     MTLF_API
     void SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor);
@@ -560,6 +560,7 @@ protected:
     struct BlendState {
         bool blendEnable;
         bool alphaCoverageEnable;
+        bool alphaToOneEnable;
         MTLBlendOperation rgbBlendOp;
         MTLBlendOperation alphaBlendOp;
         MTLBlendFactor sourceColorFactor;

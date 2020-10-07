@@ -112,9 +112,6 @@ HgiGLOps::CopyTextureGpuToCpu(HgiTextureGpuToCpuOp const& copyOp)
                 "Copying from compressed GPU texture not supported.");
             return;
         }
-        
-        // Make sure writes are finished before we read from the texture
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
         glGetTextureSubImage(
             srcTexture->GetTextureId(),
@@ -202,9 +199,6 @@ HgiGLOps::CopyTextureCpuToGpu(HgiTextureCpuToGpuOp const& copyOp)
             break;
         }
 
-        // Make sure the copy is finished before reads from texture.
-        glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT);
-
         HGIGL_POST_PENDING_GL_ERRORS();
     };
 }
@@ -268,13 +262,6 @@ HgiGLOps::CopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp)
             dstOffset,
             copyOp.byteSize,
             src);
-
-        // We do not need this barrier because (currently) no shaders write
-        // to these buffers from Storm. Meaning: we can rely on OpenGL's
-        // implicit synch. Adding this barrier would cause some performance
-        // regressions. If we do need this barrier in the future, we need to
-        // find a Hgi way of expressing when the barrier should be inserted.
-        // glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
 
         HGIGL_POST_PENDING_GL_ERRORS();
     };
@@ -436,6 +423,52 @@ HgiGLOps::BindVertexBuffers(
 }
 
 HgiGLOpsFn
+HgiGLOps::Draw(
+    HgiPrimitiveType primitiveType,
+    uint32_t vertexCount,
+    uint32_t firstVertex,
+    uint32_t instanceCount)
+{
+    return [primitiveType, vertexCount, firstVertex, instanceCount] {
+        TF_VERIFY(instanceCount>0);
+
+        glDrawArraysInstanced(
+            HgiGLConversions::GetPrimitiveType(primitiveType),
+            firstVertex,
+            vertexCount,
+            instanceCount);
+
+        HGIGL_POST_PENDING_GL_ERRORS();
+    };
+}
+
+HgiGLOpsFn
+HgiGLOps::DrawIndirect(
+    HgiPrimitiveType primitiveType,
+    HgiBufferHandle const& drawParameterBuffer,
+    uint32_t drawBufferOffset,
+    uint32_t drawCount,
+    uint32_t stride)
+{
+    return [primitiveType, drawParameterBuffer, drawBufferOffset, drawCount, 
+            stride] {
+
+        HgiGLBuffer* drawBuf =
+            static_cast<HgiGLBuffer*>(drawParameterBuffer.Get());
+
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawBuf->GetBufferId());
+
+        glMultiDrawArraysIndirect(
+            HgiGLConversions::GetPrimitiveType(primitiveType),
+            reinterpret_cast<const void*>(drawBufferOffset),
+            drawCount,
+            stride);
+
+        HGIGL_POST_PENDING_GL_ERRORS();
+    };
+}
+
+HgiGLOpsFn
 HgiGLOps::DrawIndexed(
     HgiPrimitiveType primitiveType,
     HgiBufferHandle const& indexBuffer,
@@ -469,6 +502,42 @@ HgiGLOps::DrawIndexed(
 }
 
 HgiGLOpsFn
+HgiGLOps::DrawIndexedIndirect(
+    HgiPrimitiveType primitiveType,
+    HgiBufferHandle const& indexBuffer,
+    HgiBufferHandle const& drawParameterBuffer,
+    uint32_t drawBufferOffset,
+    uint32_t drawCount,
+    uint32_t stride)
+{
+    return [primitiveType, indexBuffer, drawParameterBuffer, drawBufferOffset,
+            drawCount, stride] {
+
+        HgiGLBuffer* indexBuf = static_cast<HgiGLBuffer*>(indexBuffer.Get());
+        HgiBufferDesc const& indexDesc = indexBuf->GetDescriptor();
+
+        // We assume 32bit indices: GL_UNSIGNED_INT
+        TF_VERIFY(indexDesc.usage & HgiBufferUsageIndex32);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuf->GetBufferId());
+
+        HgiGLBuffer* drawBuf =
+            static_cast<HgiGLBuffer*>(drawParameterBuffer.Get());
+
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawBuf->GetBufferId());
+
+        glMultiDrawElementsIndirect(
+            HgiGLConversions::GetPrimitiveType(primitiveType),
+            GL_UNSIGNED_INT,
+            reinterpret_cast<const void*>(drawBufferOffset),
+            drawCount,
+            stride);
+
+        HGIGL_POST_PENDING_GL_ERRORS();
+    };
+}
+
+HgiGLOpsFn
 HgiGLOps::Dispatch(int dimX, int dimY)
 {
     return [dimX, dimY] {
@@ -489,6 +558,7 @@ HgiGLOps::BindFramebufferOp(
         uint32_t framebuffer = device->AcquireFramebuffer(desc);
 
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        glEnable(GL_FRAMEBUFFER_SRGB);
 
         bool blendEnabled = false;
 
@@ -496,6 +566,12 @@ HgiGLOps::BindFramebufferOp(
         for (size_t i=0; i<desc.colorAttachmentDescs.size(); i++) {
             HgiAttachmentDesc const& colorAttachment =
                 desc.colorAttachmentDescs[i];
+
+            if (colorAttachment.format == HgiFormatInvalid) {
+                TF_CODING_ERROR(
+                    "Binding framebuffer with invalid format "
+                    "for color attachment %zu.", i);
+            }
 
             if (colorAttachment.loadOp == HgiAttachmentLoadOpClear) {
                 glClearBufferfv(GL_COLOR, i, colorAttachment.clearValue.data());
@@ -524,6 +600,15 @@ HgiGLOps::BindFramebufferOp(
 
         HgiAttachmentDesc const& depthAttachment =
             desc.depthAttachmentDesc;
+
+        if (desc.depthTexture) {
+            if (depthAttachment.format == HgiFormatInvalid) {
+                TF_CODING_ERROR(
+                    "Binding framebuffer with invalid format "
+                    "for depth attachment.");
+            }
+        }
+
         if (desc.depthTexture &&
             depthAttachment.loadOp == HgiAttachmentLoadOpClear) {
             glClearBufferfv(GL_DEPTH, 0, depthAttachment.clearValue.data());
@@ -577,6 +662,7 @@ HgiGLOps::ResolveFramebuffer(
 
         glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolvedFramebuffer);
+        glEnable(GL_FRAMEBUFFER_SRGB);
         glBlitFramebuffer(0, 0, graphicsCmds.width, graphicsCmds.height,
                           0, 0, graphicsCmds.width, graphicsCmds.height,
                           mask,

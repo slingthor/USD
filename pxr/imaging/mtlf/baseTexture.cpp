@@ -42,89 +42,35 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 static bool useAsncTextureUploads = false;
 
-static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, size_t *outPixelByteSize, int *numChannels)
+static MTLPixelFormat GetMetalFormat(HioFormat hioFormat, size_t *outPixelByteSize, int *numChannels)
 {
-    MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
+    HioColorChannelType type = HioGetChannelTypeFromFormat(hioFormat);
+    *numChannels = HioGetNumChannels(hioFormat);
+    *outPixelByteSize = *numChannels * HioGetChannelSize(type);
     
-    *outPixelByteSize = 0;
-    *numChannels = 4;
+    static MTLPixelFormat mtlFormats[][4] = {
+        { MTLPixelFormatR8Unorm, MTLPixelFormatRG8Unorm,
+          MTLPixelFormatRGBA8Unorm, MTLPixelFormatRGBA8Unorm },
+        { MTLPixelFormatR16Float, MTLPixelFormatRG16Float,
+          MTLPixelFormatRGBA16Float, MTLPixelFormatRGBA16Float },
+        { MTLPixelFormatR32Float, MTLPixelFormatRG32Float,
+          MTLPixelFormatRGBA32Float, MTLPixelFormatRGBA32Float },
+        { MTLPixelFormatR16Uint, MTLPixelFormatRG16Uint,
+          MTLPixelFormatRGBA16Uint, MTLPixelFormatRGBA16Uint },
+        { MTLPixelFormatR32Sint, MTLPixelFormatRG32Sint,
+          MTLPixelFormatRGBA32Sint, MTLPixelFormatRGBA32Sint },
+    };
     
-    switch (inInternalFormat)
-    {
-        case GL_RGB:
-            *numChannels = 3;
-            // Drop through
-        case GL_RGBA:
-            mtlFormat = MTLPixelFormatRGBA8Unorm;
-            *outPixelByteSize = sizeof(char) * 4;
-            break;
-
-        case GL_SRGB:
-            *numChannels = 3;
-            // Drop through
-        case GL_SRGB_ALPHA:
-            mtlFormat = MTLPixelFormatRGBA8Unorm_sRGB;
-            *outPixelByteSize = sizeof(char) * 4;
-            break;
-            
-        case GL_RED:
-            mtlFormat = MTLPixelFormatR8Unorm;
-            *outPixelByteSize = sizeof(char);
-            *numChannels = 1;
-            break;
-        
-        case GL_RGB16:
-            *numChannels = 3;
-            // Drop through
-        case GL_RGBA16:
-            mtlFormat = MTLPixelFormatRGBA16Unorm;
-            *outPixelByteSize = sizeof(short) * 4;
-            break;
-            
-        case GL_R16:
-            mtlFormat = MTLPixelFormatRGBA16Unorm;
-            *outPixelByteSize = sizeof(short);
-            *numChannels = 1;
-            break;
-            
-        case GL_RGB16F:
-            *numChannels = 3;
-            // Drop through
-        case GL_RGBA16F:
-            mtlFormat = MTLPixelFormatRGBA16Float;
-            *outPixelByteSize = sizeof(short) * 4;
-            break;
-            
-        case GL_R16F:
-            mtlFormat = MTLPixelFormatR16Float;
-            *outPixelByteSize = sizeof(short);
-            *numChannels = 1;
-            break;
-            
-        case GL_RGB32F:
-            *numChannels = 3;
-            // Drop through
-        case GL_RGBA32F:
-            mtlFormat = MTLPixelFormatRGBA32Float;
-            *outPixelByteSize = sizeof(float) * 4;
-            break;
-            
-        case GL_R32F:
-            mtlFormat = MTLPixelFormatRGBA32Float;
-            *outPixelByteSize = sizeof(float);
-            *numChannels = 1;
-            break;
-    }
-    
-    return mtlFormat;
+    return mtlFormats[type][*numChannels];
 }
 
-void *MtlfBaseTexture::PadImage(uint32_t glFormat, void const* rawData, size_t pixelByteSize, int numPixels)
+void *MtlfBaseTexture::PadImage(HioFormat hioFormat, void const* rawData, size_t pixelByteSize, int numPixels)
 {
+    HioColorChannelType type = HioGetChannelTypeFromFormat(hioFormat);
     void* texBuffer;
-    switch (glFormat)
+    switch (type)
     {
-        case GL_RGB32F:
+        case HioColorChannelTypeFloat32:
         {
             texBuffer = new float[pixelByteSize * numPixels];
             
@@ -139,7 +85,7 @@ void *MtlfBaseTexture::PadImage(uint32_t glFormat, void const* rawData, size_t p
         }
         break;
             
-        case GL_RGB16F:
+        case HioColorChannelTypeFloat16:
         {
             texBuffer = new uint16_t[pixelByteSize * numPixels];
             
@@ -154,7 +100,7 @@ void *MtlfBaseTexture::PadImage(uint32_t glFormat, void const* rawData, size_t p
         }
         break;
             
-        case GL_RGB16:
+        case HioColorChannelTypeUInt16:
         {
             texBuffer = new uint16_t[pixelByteSize * numPixels];
             
@@ -169,8 +115,8 @@ void *MtlfBaseTexture::PadImage(uint32_t glFormat, void const* rawData, size_t p
         }
         break;
             
-        case GL_SRGB:
-        case GL_RGB:
+        case HioColorChannelTypeUNorm8:
+        case HioColorChannelTypeUNorm8srgb:
         {
             texBuffer = new uint8_t[pixelByteSize * numPixels];
             
@@ -253,7 +199,7 @@ MtlfBaseTexture::_UpdateTexture(GarchBaseTextureDataConstPtr texData)
         _currentWidth  = texData->ResizedWidth();
         _currentHeight = texData->ResizedHeight();
         _currentDepth  = texData->ResizedDepth();
-        _format        = texData->GLFormat();
+        _format        = texData->GetHioFormat();
         _hasWrapModeS  = texData->GetWrapInfo().hasWrapModeS;
         _hasWrapModeT  = texData->GetWrapInfo().hasWrapModeT;
         _hasWrapModeR  = texData->GetWrapInfo().hasWrapModeR;
@@ -338,13 +284,13 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             size_t pixelByteSize;
             int numPixels = texDataWidth * texDataHeight;
             int numChannels;
-            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GLInternalFormat(), texData->GLType(), &pixelByteSize, &numChannels);
+            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GetHioFormat(), &pixelByteSize, &numChannels);
             int isThreeChannelTexture = numChannels == 3;
             
             void *texBuffer = texData->GetRawBuffer(0);
             if (isThreeChannelTexture) {
                 // Pad out 24bit formats to 32bit
-                texBuffer = PadImage(texData->GLInternalFormat(), texData->GetRawBuffer(0), pixelByteSize, numPixels);
+                texBuffer = PadImage(texData->GetHioFormat(), texData->GetRawBuffer(0), pixelByteSize, numPixels);
             }
             
             if (!texData->IsCompressed()) {
@@ -477,7 +423,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
         } else {
             size_t pixelByteSize;
             int numChannels;
-            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GLInternalFormat(), texData->GLType(), &pixelByteSize, &numChannels);
+            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GetHioFormat(), &pixelByteSize, &numChannels);
             bool isThreeChannelTexture = numChannels == 3;
 
             if (mtlFormat == MTLPixelFormatInvalid) {
@@ -517,7 +463,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                            
                             if (isThreeChannelTexture) {
                                 // Pad out 24bit formats to 32bit
-                                texBuffer = PadImage((*asyncOwnedTexData)->GLInternalFormat(), (*asyncOwnedTexData)->GetRawBuffer(1), pixelByteSize, numPixels);
+                                texBuffer = PadImage((*asyncOwnedTexData)->GetHioFormat(), (*asyncOwnedTexData)->GetRawBuffer(1), pixelByteSize, numPixels);
                             }
 
                             [_textureName replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))
@@ -541,7 +487,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                     
                     if (isThreeChannelTexture) {
                         // Pad out 24bit formats to 32bit
-                        texBuffer = PadImage(texData->GLInternalFormat(), texData->GetRawBuffer(1), pixelByteSize, numPixels);
+                        texBuffer = PadImage(texData->GetHioFormat(), texData->GetRawBuffer(1), pixelByteSize, numPixels);
                     }
                     
                     [_textureName replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))

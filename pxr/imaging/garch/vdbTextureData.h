@@ -71,29 +71,37 @@ public:
     GARCH_API
     int ResizedDepth(int mipLevel = 0) const override;
 
-    GLenum GLInternalFormat() const override;
+    GARCH_API
+    HioFormat GetHioFormat() const override;
+    
+    GARCH_API
+    int GetNumChannels() const override;
 
-    GLenum GLFormat() const override;
-
-    GLenum GLType() const override;
-
+    GARCH_API
     size_t TargetMemory() const override;
 
+    GARCH_API
     WrapInfo GetWrapInfo() const override;
 
+    GARCH_API
     size_t ComputeBytesUsed() const override;
 
+    GARCH_API
     size_t ComputeBytesUsedByMip(int mipLevel = 0) const override;
 
+    GARCH_API
     bool Read(int degradeLevel, 
               bool generateMipmap,
-              GarchImage::ImageOriginLocation
-                  originLocation = GarchImage::OriginUpperLeft) override;
+              HioImage::ImageOriginLocation
+                  originLocation = HioImage::OriginUpperLeft) override;
     
+    GARCH_API
     bool HasRawBuffer(int mipLevel = 0) const override;
 
+    GARCH_API
     unsigned char * GetRawBuffer(int mipLevel = 0) const override;
 
+    GARCH_API
     int GetNumMipLevels() const override;
 
 private:
@@ -110,8 +118,9 @@ private:
     int _nativeWidth, _nativeHeight, _nativeDepth;
     int _resizedWidth, _resizedHeight, _resizedDepth;
     int _bytesPerPixel;
+    int _numChannels;
 
-    GLenum  _glInternalFormat, _glFormat, _glType;
+    HioFormat _hioFormat;
 
     WrapInfo _wrapInfo;
 

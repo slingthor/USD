@@ -62,8 +62,8 @@ public:
     virtual std::string const & GetFilename() const;
     virtual int GetWidth() const;
     virtual int GetHeight() const;
-    virtual GLenum GetFormat() const;
-    virtual GLenum GetType() const;
+    virtual HioFormat GetHioFormat() const;
+    virtual int GetNumChannels() const;
     virtual int GetBytesPerPixel() const;
     virtual int GetNumMipLevels() const;
 
@@ -74,9 +74,9 @@ public:
 
     virtual bool Read(StorageSpec const & storage);
     virtual bool ReadCropped(int const cropTop,
-	                     int const cropBottom,
-	                     int const cropLeft,
-	                     int const cropRight,
+                             int const cropBottom,
+                             int const cropLeft,
+                             int const cropRight,
                              StorageSpec const & storage);
 
     virtual bool Write(StorageSpec const & storage,
@@ -104,10 +104,10 @@ private:
     int _height;
     float _gamma;
     
-    //GL_UNSIGNED_BYTE, GL_FLOAT
-    GLenum _outputType; 
-    
+    HioColorChannelType _outputType;
     int _nchannels;
+    
+    HioFormat _hioFormat;
 
     SourceColorSpace _sourceColorSpace;
 };
@@ -117,33 +117,6 @@ TF_REGISTRY_FUNCTION(TfType)
     typedef Garch_StbImage Image;
     TfType t = TfType::Define<Image, TfType::Bases<Image::Base> >();
     t.SetFactory< GarchImageFactory<Image> >();
-}
-
-static GLenum
-_FormatFromImageData(unsigned int nchannels)
-{
-    return GarchGetBaseFormat(nchannels);
-}
-
-/// Returns the bpc (bits per channel) based on the GLType stored in storage
-static int
-_GetBytesPerChannelFromType(GLenum const & type)
-{
-    switch(type) {
-    case GL_UNSIGNED_BYTE:
-        return 1;
-    case GL_FLOAT:
-        return 4;
-    default:
-        TF_CODING_ERROR("Unsupported type");
-        return 4;
-    }
-}
-
-static int 
-_GetNumChannelsFromGLFormat(GLenum const & format)
-{
-    return GarchGetNumElements(format);
 }
 
 bool 
@@ -175,8 +148,9 @@ Garch_StbImage::_GetInfoFromStorageSpec(GarchImage::StorageSpec const & storage)
 {
     _width = storage.width;
     _height = storage.height;
-    _outputType = storage.type;
-    _nchannels = _GetNumChannelsFromGLFormat(storage.format);
+    _hioFormat = storage.hioFormat;
+    _nchannels = storage.numChannels;
+    _outputType = HioGetChannelTypeFromFormat(storage.hioFormat);
 }
 
 Garch_StbImage::Garch_StbImage()
@@ -253,7 +227,7 @@ Garch_StbImage::_CropAndResize(void const *sourceData, int const cropTop,
                                     storage.width * bpp,
                                     _nchannels, alphaIndex, 0);
         } else {
-            if (_outputType == GL_FLOAT) {
+            if (_outputType == HioColorChannelTypeFloat32) {
                     stbir_resize_float((float *) croppedData, 
                                        cropWidth, cropHeight, 
                                        croppedStrideLength,
@@ -307,24 +281,24 @@ Garch_StbImage::GetHeight() const
 }
 
 /* virtual */
-GLenum
-Garch_StbImage::GetFormat() const
+HioFormat
+Garch_StbImage::GetHioFormat() const
 {
-    return _FormatFromImageData(_nchannels);
+    return _hioFormat;
 }
 
 /* virtual */
-GLenum
-Garch_StbImage::GetType() const
+int
+Garch_StbImage::GetNumChannels() const
 {
-    return _outputType;
+    return _nchannels;
 }
 
 /* virtual */
 int
 Garch_StbImage::GetBytesPerPixel() const
 {
-    return _GetBytesPerChannelFromType(_outputType) * _nchannels;
+    return HioGetChannelSize(_outputType) * _nchannels;
 }
 
 /* virtual */
@@ -357,7 +331,7 @@ Garch_StbImage::IsColorSpaceSRGB() const
 
     // Texture had no (recognized) gamma hint, make a reasonable guess
     return ((_nchannels == 3 || _nchannels == 4) && 
-            GetType() == GL_UNSIGNED_BYTE);
+            _outputType == HioColorChannelTypeUNorm8);
 }
 
 //XXX Still need to investigate Metadata handling
@@ -393,9 +367,9 @@ Garch_StbImage::_OpenForReading(std::string const & filename, int subimage,
 
     std::string fileExtension = _GetFilenameExtension();
     if (fileExtension == "hdr") {
-        _outputType = GL_FLOAT;
+        _outputType = HioColorChannelTypeFloat32;
     } else {
-        _outputType = GL_UNSIGNED_BYTE;
+        _outputType = HioColorChannelTypeUNorm8;
     }
 
     std::shared_ptr<ArAsset> asset = ArGetResolver().OpenAsset(_filename);
@@ -408,10 +382,13 @@ Garch_StbImage::_OpenForReading(std::string const & filename, int subimage,
         return false;
     }
 
-    return stbi_info_from_memory(
+    const bool open =  stbi_info_from_memory(
         reinterpret_cast<stbi_uc const*>(buffer.get()), asset->GetSize(), 
         &_width, &_height, &_nchannels, &_gamma) &&
             subimage == 0 && mip == 0;
+    
+    _hioFormat = HioGetFormat(_nchannels, _outputType, IsColorSpaceSRGB());
+    return open;
 }
 
 /* virtual */
@@ -458,7 +435,7 @@ Garch_StbImage::ReadCropped(int const cropTop,
     std::shared_ptr<const char> buffer = asset->GetBuffer();
     if (buffer) {
         size_t bufferSize = asset->GetSize();
-        if (_outputType == GL_FLOAT) {
+        if (_outputType == HioColorChannelTypeFloat32) {
             imageData = stbi_loadf_from_memory(
                 reinterpret_cast<stbi_uc const *>(buffer.get()), bufferSize,
                 &_width, &_height, &_nchannels, 0);
@@ -512,7 +489,7 @@ Garch_StbImage::ReadCropped(int const cropTop,
 
         if (resizeNeeded) {
             // XXX STB only has a sRGB resize for 8bit
-            if (IsColorSpaceSRGB() && _outputType == GL_UNSIGNED_BYTE) {
+            if (IsColorSpaceSRGB() && _outputType == HioColorChannelTypeUNorm8){
                 int alphaIndex = (_nchannels != 4)?
                                  STBIR_ALPHA_CHANNEL_NONE : 3;
                 stbir_resize_uint8_srgb((unsigned char*)imageData, 
@@ -525,7 +502,7 @@ Garch_StbImage::ReadCropped(int const cropTop,
                                         storage.width * bpp,
                                         _nchannels, alphaIndex, 0);
             } else {
-                if (_outputType == GL_FLOAT) {
+                if (_outputType == HioColorChannelTypeFloat32) {
                     stbir_resize_float((float *)imageData, 
                                        _width, 
                                        _height,
@@ -593,16 +570,15 @@ _Quantize(float value)
 
 template<typename T>
 Garch_StbImage::StorageSpec
-_Quantize(
-    Garch_StbImage::StorageSpec const & storageIn,
-    std::unique_ptr<uint8_t[]> & quantizedData)
+_Quantize(Garch_StbImage::StorageSpec const & storageIn,
+          std::unique_ptr<uint8_t[]> & quantizedData, 
+          bool isSRGB)
 {
     // stb requires unsigned byte data to write non .hdr file formats.
     // We'll quantize the data ourselves here.
-    size_t numElements =
-        storageIn.width * storageIn.height *
-        _GetNumChannelsFromGLFormat(storageIn.format);
-
+    int numChannels = storageIn.numChannels;
+    
+    size_t numElements = storageIn.width * storageIn.height * numChannels;
     quantizedData.reset(new uint8_t[numElements]);
 
     const T* inData = static_cast<T*>(storageIn.data);
@@ -613,8 +589,10 @@ _Quantize(
     Garch_StbImage::StorageSpec quantizedSpec;
     quantizedSpec = storageIn; // shallow copy
     quantizedSpec.data = quantizedData.get();
-    quantizedSpec.type = GL_UNSIGNED_BYTE;
-    
+    quantizedSpec.numChannels = numChannels;
+    quantizedSpec.hioFormat = HioGetFormat(numChannels,
+                                           HioColorChannelTypeUNorm8,
+                                           isSRGB);
     return quantizedSpec;
 }
 
@@ -635,19 +613,21 @@ Garch_StbImage::Write(StorageSpec const & storageIn,
 
     StorageSpec quantizedSpec;
     std::unique_ptr<uint8_t[]> quantizedData;
+    HioColorChannelType type = HioGetChannelTypeFromFormat(storageIn.hioFormat);
+    bool isSRGB = IsColorSpaceSRGB();
 
-    if (storageIn.type == GL_FLOAT && fileExtension != "hdr") {
-        quantizedSpec = _Quantize<float>(storageIn, quantizedData);
+    if (type == HioColorChannelTypeFloat32 && fileExtension != "hdr") {
+        quantizedSpec = _Quantize<float>(storageIn, quantizedData, isSRGB);
     }
-    else if (storageIn.type == GL_HALF_FLOAT && fileExtension != "hdr") {
-        quantizedSpec = _Quantize<GfHalf>(storageIn, quantizedData);
+    else if (type == HioColorChannelTypeFloat16 && fileExtension != "hdr") {
+        quantizedSpec = _Quantize<GfHalf>(storageIn, quantizedData, isSRGB);
     }
-    else if (storageIn.type != GL_UNSIGNED_BYTE && fileExtension != "hdr") {
+    else if (type != HioColorChannelTypeUNorm8 && fileExtension != "hdr") {
         TF_CODING_ERROR("stb expects unsigned byte data to write filetype %s",
                         fileExtension.c_str());
         return false;
     }
-    else if (storageIn.type != GL_FLOAT && fileExtension == "hdr") 
+    else if (type != HioColorChannelTypeFloat32 && fileExtension == "hdr")
     {
         TF_CODING_ERROR("stb expects linear float data to write filetype hdr");
         return false;

@@ -4,7 +4,6 @@ set(PXR_PACKAGE hio)
 pxr_library(hio
     LIBRARIES
         arch
-        garch
         js
         plug
         tf
@@ -21,6 +20,7 @@ pxr_library(hio
         glslfxConfig
         image
         imageRegistry
+        types
 
     PRIVATE_CLASSES
         debugCodes

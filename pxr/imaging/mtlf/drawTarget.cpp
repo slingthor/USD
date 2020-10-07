@@ -636,11 +636,15 @@ MtlfDrawTarget::WriteToFile(std::string const & name,
 
     HgiMetal* hgiMetal = MtlfMetalContext::GetMetalContext()->GetHgi();
 
+    MTLPixelFormat internalFormat = a->GetInternalFormat();
+    bool isSRGB = internalFormat == MTLPixelFormatRGBA8Unorm_sRGB;
+
     GarchImage::StorageSpec storage;
     storage.width = _size[0];
     storage.height = _size[1];
-    storage.format = a->GetFormat();
-    storage.type = a->GetType();
+    storage.hioFormat = GarchGetHioFormat(a->GetFormat(),
+                                        a->GetType(),
+                                        /* isSRGB */ isSRGB);
     storage.flipped = hgiMetal->_needsFlip;
     storage.data = buf;
 

@@ -131,19 +131,28 @@ _GetMipLevels(const TfToken& filePath,
 
 static
 HgiFormat
-_GetPixelFormatForImage(HioImageSharedPtr image)
+_GetPixelFormatForImage(HioFormat hioFormat)
 {
     constexpr HgiFormat hgiFormats[][4] = {
         { HgiFormatUNorm8, HgiFormatUNorm8Vec2,
           HgiFormatUNorm8Vec4, HgiFormatUNorm8Vec4 },
+        { HgiFormatUNorm8, HgiFormatUNorm8Vec4srgb,
+          HgiFormatUNorm8Vec4srgb, HgiFormatUNorm8Vec4srgb },
         { HgiFormatFloat16, HgiFormatFloat16Vec2,
           HgiFormatFloat16Vec4, HgiFormatFloat16Vec4 },
         { HgiFormatFloat32, HgiFormatFloat32Vec2,
           HgiFormatFloat32Vec4, HgiFormatFloat32Vec4 },
+        { HgiFormatUInt16, HgiFormatUInt16Vec2,
+          HgiFormatUInt16Vec4, HgiFormatUInt16Vec4 },
         { HgiFormatInt32, HgiFormatInt32Vec2,
           HgiFormatInt32Vec4, HgiFormatInt32Vec4 }
     };
-    return hgiFormats[image->GetFormat()][image->GetNumChannels() - 1];
+    
+    static_assert(TfArraySize(hgiFormats) == HioColorChannelTypeCount,
+                  "hgiFormats to HioColorChannelType enum mismatch");
+
+    uint32_t nChannels = HioGetNumChannels(hioFormat);
+    return hgiFormats[HioGetChannelTypeFromFormat(hioFormat)][nChannels - 1];
 }
 
 static
@@ -152,6 +161,7 @@ _GetPerElementSize(HioColorChannelType format)
 {
     switch(format) {
     case HioColorChannelTypeUNorm8:
+    case HioColorChannelTypeUNorm8srgb:
         return 1;
     case HioColorChannelTypeFloat16:
         return 2;
@@ -397,11 +407,11 @@ HdStUdimTextureObject::_Load()
         return;
     }
     
-    HioColorChannelType hioFormat = firstImageMips[0].image->GetFormat();
-    _hgiFormat = _GetPixelFormatForImage(firstImageMips[0].image);
-    uint32_t numChannels = firstImageMips[0].image->GetNumChannels();
-    uint32_t sizePerElem = _GetPerElementSize(hioFormat);
+    const HioFormat hioFormat = firstImageMips[0].image->GetHioFormat();
+    int numChannels = firstImageMips[0].image->GetNumChannels();
+    const size_t sizePerElem = HioGetChannelSize(hioFormat);
     
+    _hgiFormat = _GetPixelFormatForImage(hioFormat);
     if (firstImageMips[0].image->IsColorSpaceSRGB()) {
         _hgiFormat = HgiFormatUNorm8Vec4srgb;
     }
@@ -507,7 +517,7 @@ HdStUdimTextureObject::_Load()
                 spec.width = mipSize.width;
                 spec.height = mipSize.height;
                 spec.numChannels = numChannels;
-                spec.format = hioFormat;
+                spec.hioFormat = hioFormat;
                 spec.flipped = true;
                 spec.data = mipData[mip].data() + (tileId * numBytesPerLayer);
                 const auto it = std::find_if(images.rbegin(), images.rend(),

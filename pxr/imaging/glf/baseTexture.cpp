@@ -27,6 +27,7 @@
 #include "pxr/imaging/glf/baseTexture.h"
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/glf/glContext.h"
+#include "pxr/imaging/glf/utils.h"
 
 #include "pxr/imaging/garch/baseTextureData.h"
 #include "pxr/imaging/garch/utils.h"
@@ -60,7 +61,7 @@ GlfBaseTexture::GlfBaseTexture()
     _textureName = _GenName();
 }
 
-GlfBaseTexture::GlfBaseTexture(GarchImage::ImageOriginLocation originLocation)
+GlfBaseTexture::GlfBaseTexture(HioImage::ImageOriginLocation originLocation)
   : GarchBaseTexture(originLocation)
 {
     _textureName = _GenName();
@@ -156,7 +157,7 @@ GlfBaseTexture::_UpdateTexture(GarchBaseTextureDataConstPtr texData)
         _currentWidth  = texData->ResizedWidth();
         _currentHeight = texData->ResizedHeight();
         _currentDepth  = texData->ResizedDepth();
-        _format        = texData->GLFormat();
+        _format        = GlfGetGLFormat(texData->GetHioFormat());
         _hasWrapModeS  = texData->GetWrapInfo().hasWrapModeS;
         _hasWrapModeT  = texData->GetWrapInfo().hasWrapModeT;
         _hasWrapModeR  = texData->GetWrapInfo().hasWrapModeR;
@@ -304,7 +305,7 @@ GlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 _GlCompressedTexImageND(
                     numDimensions,
                     textureTarget, i,
-                    texData->GLInternalFormat(),
+                    GlfGetGLInternalFormat(texData->GetHioFormat()),
                     texData->ResizedWidth(i),
                     texData->ResizedHeight(i),
                     texData->ResizedDepth(i),
@@ -315,7 +316,7 @@ GlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
         } else {
             // Uncompressed textures can have cropping and other special 
             // behaviours.
-            if (GarchGetNumElements(texData->GLFormat()) == 1) {
+            if (HioGetNumChannels(texData->GetHioFormat()) == 1) {
                 GLint swizzleMask[] = {GL_RED, GL_RED, GL_RED, GL_ONE};
                 glTexParameteriv(
                     textureTarget,
@@ -390,13 +391,13 @@ GlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 // Send the mip to the driver now
                 _GlTexImageND(numDimensions,
                               textureTarget, 0,
-                              texData->GLInternalFormat(),
+                              GlfGetGLInternalFormat(texData->GetHioFormat()),
                               croppedWidth,
                               croppedHeight,
                               croppedDepth,
                               0,
-                              texData->GLFormat(),
-                              texData->GLType(),
+                              GlfGetGLFormat(texData->GetHioFormat()),
+                              GlfGetGLType(texData->GetHioFormat()),
                               texData->GetRawBuffer(0));
                 
                 // Reset the OpenGL state if we have modify it previously
@@ -406,13 +407,13 @@ GlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 for (int i = 0 ; i < numMipLevels; i++) {
                     _GlTexImageND(numDimensions,
                                   textureTarget, i,
-                                  texData->GLInternalFormat(),
+                                  GlfGetGLInternalFormat(texData->GetHioFormat()),
                                   texData->ResizedWidth(i),
                                   texData->ResizedHeight(i),
                                   texData->ResizedDepth(i),
                                   0,
-                                  texData->GLFormat(),
-                                  texData->GLType(),
+                                  GlfGetGLFormat(texData->GetHioFormat()),
+                                  GlfGetGLType(texData->GetHioFormat()),
                                   texData->GetRawBuffer(i));
                 }
             }

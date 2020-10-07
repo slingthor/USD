@@ -29,8 +29,176 @@
 #include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/base/tf/stringUtils.h"
+#include "pxr/base/tf/iterator.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+struct _FormatDesc {
+    GLenum format;
+    GLenum type;
+    GLenum internalFormat;
+};
+
+static const _FormatDesc FORMAT_DESC[] =
+{
+    // glFormat, glType,        glInternatFormat  // HioFormat
+    {GL_RED,  GL_UNSIGNED_BYTE, GL_R8          }, // UNorm8
+    {GL_RG,   GL_UNSIGNED_BYTE, GL_RG8         }, // UNorm8Vec2
+    {GL_RGB,  GL_UNSIGNED_BYTE, GL_RGB8        }, // UNorm8Vec3
+    {GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8       }, // UNorm8Vec4
+
+    {GL_RED,  GL_BYTE,          GL_R8_SNORM    }, // SNorm8
+    {GL_RG,   GL_BYTE,          GL_RG8_SNORM   }, // SNorm8Vec2
+    {GL_RGB,  GL_BYTE,          GL_RGB8_SNORM  }, // SNorm8Vec3
+    {GL_RGBA, GL_BYTE,          GL_RGBA8_SNORM }, // SNorm8Vec4
+
+    {GL_RED,  GL_HALF_FLOAT,    GL_R16F        }, // Float16
+    {GL_RG,   GL_HALF_FLOAT,    GL_RG16F       }, // Float16Vec2
+    {GL_RGB,  GL_HALF_FLOAT,    GL_RGB16F      }, // Float16Vec3
+    {GL_RGBA, GL_HALF_FLOAT,    GL_RGBA16F     }, // Float16Vec4
+
+    {GL_RED,  GL_FLOAT,         GL_R32F        }, // Float32
+    {GL_RG,   GL_FLOAT,         GL_RG32F       }, // Float32Vec2
+    {GL_RGB,  GL_FLOAT,         GL_RGB32F      }, // Float32Vec3
+    {GL_RGBA, GL_FLOAT,         GL_RGBA32F     }, // Float32Vec4
+
+    {GL_RED,  GL_DOUBLE,        GL_RED         }, // Double64
+    {GL_RG,   GL_DOUBLE,        GL_RG          }, // Double64Vec2
+    {GL_RGB,  GL_DOUBLE,        GL_RGB         }, // Double64Vec3
+    {GL_RGBA, GL_DOUBLE,        GL_RGBA        }, // Double64Vec4
+
+    {GL_RED,  GL_UNSIGNED_SHORT,GL_R16UI       }, // UInt16
+    {GL_RG,   GL_UNSIGNED_SHORT,GL_RG16UI      }, // UInt16Vec2
+    {GL_RGB,  GL_UNSIGNED_SHORT,GL_RGB16UI     }, // UInt16Vec3
+    {GL_RGBA, GL_UNSIGNED_SHORT,GL_RGBA16UI    }, // UInt16Vec4
+
+    {GL_RED,  GL_SHORT,         GL_R16I        }, // Int16
+    {GL_RG,   GL_SHORT,         GL_RG16I       }, // Int16Vec2
+    {GL_RGB,  GL_SHORT,         GL_RGB16I      }, // Int16Vec3
+    {GL_RGBA, GL_SHORT,         GL_RGBA16I     }, // Int16Vec4
+
+    {GL_RED,  GL_UNSIGNED_INT,  GL_R32UI       }, // UInt32
+    {GL_RG,   GL_UNSIGNED_INT,  GL_RG32UI      }, // UInt32Vec2
+    {GL_RGB,  GL_UNSIGNED_INT,  GL_RGB32UI     }, // UInt32Vec3
+    {GL_RGBA, GL_UNSIGNED_INT,  GL_RGBA32UI    }, // UInt32Vec4
+
+    {GL_RED,  GL_INT,           GL_R32I        }, // Int32
+    {GL_RG,   GL_INT,           GL_RG32I       }, // Int32Vec2
+    {GL_RGB,  GL_INT,           GL_RGB32I      }, // Int32Vec3
+    {GL_RGBA, GL_INT,           GL_RGBA32I     }, // Int32Vec4
+
+    {GL_NONE, GL_NONE, GL_NONE }, // UNorm8srgb - not supported by OpenGL
+    {GL_NONE, GL_NONE, GL_NONE }, // UNorm8Vec2srgb - not supported by OpenGL
+    {GL_RGB,  GL_UNSIGNED_BYTE, GL_SRGB8,       },  // UNorm8Vec3srgb
+    {GL_RGBA, GL_UNSIGNED_BYTE, GL_SRGB8_ALPHA8 }, // UNorm8Vec4sRGB
+
+    {GL_RGB,  GL_FLOAT,
+              GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT   }, // BC6FloatVec3
+    {GL_RGB,  GL_FLOAT,
+              GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT }, // BC6UFloatVec3
+    {GL_RGBA, GL_UNSIGNED_BYTE,
+              GL_COMPRESSED_RGBA_BPTC_UNORM         }, // BC7UNorm8Vec4
+    {GL_RGBA, GL_UNSIGNED_BYTE,
+              GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM   }, // BC7UNorm8Vec4srgb
+
+};
+
+// A few random format validations to make sure the GL table stays
+// aligned with the HioFormat table.
+constexpr bool _CompileTimeValidateHioFormatTable() {
+    return (TfArraySize(FORMAT_DESC) == HioFormatCount &&
+            HioFormatUNorm8 == 0 &&
+            HioFormatFloat32 == 12 &&
+            HioFormatUInt32 == 28 &&
+            HioFormatBC6FloatVec3 == 40) ? true : false;
+}
+
+static_assert(_CompileTimeValidateHioFormatTable(),
+              "_FormatDesc array in glfUtils out of sync with HioFormat enum");
+
+GLenum
+GlfGetBaseFormat(int numComponents)
+{
+    switch (numComponents) {
+        case 1:
+            return GL_RED;
+        case 2:
+            return GL_RG;
+        case 3:
+            return GL_RGB;
+        case 4:
+            return GL_RGBA;
+        default:
+            TF_CODING_ERROR("Unsupported numComponents");
+            return 1;
+    }
+}
+
+int
+GlfGetNumElements(GLenum format)
+{
+    switch (format) {
+        case GL_DEPTH_COMPONENT:
+        case GL_COLOR_INDEX:
+        case GL_ALPHA:
+        case GL_LUMINANCE:
+        case GL_RED:
+            return 1;
+        case GL_LUMINANCE_ALPHA :
+        case GL_RG:
+            return 2;
+        case GL_RGB:
+            return 3;
+        case GL_RGBA:
+            return 4;
+        default:
+            TF_CODING_ERROR("Unsupported format");
+            return 1;
+    }
+}
+
+int
+GlfGetElementSize(GLenum type)
+{
+    switch (type) {
+        case GL_UNSIGNED_BYTE:
+        case GL_BYTE:
+            return sizeof(GLubyte);
+        case GL_UNSIGNED_SHORT:
+        case GL_SHORT:
+            return sizeof(GLshort);
+        case GL_FLOAT:
+            return sizeof(GLfloat);
+        case GL_DOUBLE:
+            return sizeof(GLdouble);
+        case GL_HALF_FLOAT:
+            return sizeof(GLhalf);
+        default:
+            TF_CODING_ERROR("Unsupported type");
+            return sizeof(GLfloat);
+    }
+}
+
+GLenum
+GlfGetGLType(HioFormat hioFormat)
+{
+    const _FormatDesc &desc = FORMAT_DESC[hioFormat];
+    return desc.type;
+}
+
+GLenum
+GlfGetGLFormat(HioFormat hioFormat)
+{
+    const _FormatDesc &desc = FORMAT_DESC[hioFormat];
+    return desc.format;
+}
+
+GLenum
+GlfGetGLInternalFormat(HioFormat hioFormat)
+{
+    const _FormatDesc &desc = FORMAT_DESC[hioFormat];
+    return desc.internalFormat;
+}
 
 bool
 GlfCheckGLFrameBufferStatus(GLuint target, std::string * reason)
@@ -86,34 +254,6 @@ GlfCheckGLFrameBufferStatus(GLuint target, std::string * reason)
         }
         return false;
     }
-}
-
-bool GlfIsCompressedFormat(GLenum format)
-{
-    if (format == GL_COMPRESSED_RGBA_BPTC_UNORM || 
-        format == GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT) {
-        return true;
-    }
-    return false;
-}
-
-size_t GlfGetCompressedTextureSize(int width, int height, GLenum format, GLenum type)
-{
-    int blockSize = 0;
-    int tileSize = 0;
-    int alignSize = 0;
-    
-    // XXX Only BPTC is supported right now
-    if (format == GL_COMPRESSED_RGBA_BPTC_UNORM || 
-        format == GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT) {
-        blockSize = 16;
-        tileSize = 4;
-        alignSize = 3;
-    }
-
-    size_t numPixels = ((width + alignSize)/tileSize) * 
-                       ((height + alignSize)/tileSize);
-    return numPixels * blockSize;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

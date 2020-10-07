@@ -25,6 +25,8 @@
 #define PXR_IMAGING_HIO_TYPES_H
 
 #include "pxr/pxr.h"
+#include "pxr/imaging/hio/api.h"
+#include <stdlib.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -65,23 +67,29 @@ enum HioFormat
     HioFormatFloat32Vec3,
     HioFormatFloat32Vec4,
 
+    // Double64 - a 8-byte IEEE double.
+    HioFormatDouble64,
+    HioFormatDouble64Vec2,
+    HioFormatDouble64Vec3,
+    HioFormatDouble64Vec4,
+
     // UInt16 - a 2-byte unsigned short integer. 
     HioFormatUInt16,
-    HioFormatUInt16vec2,
-    HioFormatUInt16vec3,
-    HioFormatUInt16vec4,
+    HioFormatUInt16Vec2,
+    HioFormatUInt16Vec3,
+    HioFormatUInt16Vec4,
 
     // Int16 - a 2-byte signed short integer. 
     HioFormatInt16,
-    HioFormatInt16vec2,
-    HioFormatInt16vec3,
-    HioFormatInt16vec4,
+    HioFormatInt16Vec2,
+    HioFormatInt16Vec3,
+    HioFormatInt16Vec4,
 
     // UInt32 - a 4-byte unsigned integer. 
     HioFormatUInt32,
-    HioFormatUInt32vec2,
-    HioFormatUInt32vec3,
-    HioFormatUInt32vec4,
+    HioFormatUInt32Vec2,
+    HioFormatUInt32Vec3,
+    HioFormatUInt32Vec4,
 
     // Int32 - a 4-byte signed integer.
     HioFormatInt32,
@@ -112,6 +120,83 @@ enum HioFormat
     HioFormatCount
 };
 
+/// \enum HioAddressDimension
+///
+/// Available texture sampling dimensions.
+///
+enum HioAddressDimension
+{
+    HioAddressDimensionU,
+    HioAddressDimensionV,
+    HioAddressDimensionW
+};
+
+/// \enum HioAddressMode
+///
+/// Various modes used during sampling of a texture.
+///
+enum HioAddressMode
+{
+    HioAddressModeClampToEdge = 0,
+    HioAddressModeMirrorClampToEdge,
+    HioAddressModeRepeat,
+    HioAddressModeMirrorRepeat,
+    HioAddressModeClampToBorderColor
+};
+
+/// \enum HioColorChannelType
+///
+/// Various color channel representation formats.
+///
+enum HioColorChannelType
+{
+    // UNorm8 - a 1-byte value representing a float between 0 and 1.
+    // float value = (unorm / 255.0f);
+    HioColorChannelTypeUNorm8,
+    // float value = (unorm / 255.0f) in srgb;
+    HioColorChannelTypeUNorm8srgb,
+    // Float16 - a 2-byte IEEE half-precision float.
+    HioColorChannelTypeFloat16,
+    // Float32 - a 4-byte IEEE float.
+    HioColorChannelTypeFloat32,
+    // UInt16 - a 2-byte unsigned integer
+    HioColorChannelTypeUInt16,
+    // Int32 - a 4-byte signed integer
+    HioColorChannelTypeInt32,
+    
+    HioColorChannelTypeCount
+};
+
+/// Returns the HioFormat of containing nChannels of HioColorChannelType type.
+HIO_API
+HioFormat HioGetFormat(uint32_t nchannels,
+                       HioColorChannelType type,
+                       bool isSRGB);
+
+/// Returns the color channel type that format is based on.
+HIO_API
+HioColorChannelType HioGetChannelTypeFromFormat(HioFormat format);
+
+/// Returns the bpc (bits per channel) based on the HioColorChannelType stored in storage.
+HIO_API
+uint32_t HioGetChannelSize(HioColorChannelType type);
+
+/// Same as HioGetChannelSize, returning bpc (bits per channel), but accepts an HioFormat
+/// to infer the channel type from.
+HIO_API
+uint32_t HioGetChannelSize(HioFormat format);
+
+/// Returns the number of channels in a colour format.
+HIO_API
+uint32_t HioGetNumChannels(HioFormat const & hioFormat);
+
+/// Return if the given format is compressed.
+HIO_API
+bool HioIsCompressed(HioFormat format);
+
+/// Calculate the byte size of compressed textures.
+HIO_API
+size_t HioGetCompressedTextureSize(int width, int height, HioFormat hioFormat);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

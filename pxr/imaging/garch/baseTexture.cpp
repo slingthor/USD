@@ -55,7 +55,7 @@ GarchBaseTexture::GarchBaseTexture()
     /* nothing */
 }
 
-GarchBaseTexture::GarchBaseTexture(GarchImage::ImageOriginLocation originLocation)
+GarchBaseTexture::GarchBaseTexture(HioImage::ImageOriginLocation originLocation)
   : GarchTexture(originLocation),
     _loaded(false),
     _currentWidth(0),

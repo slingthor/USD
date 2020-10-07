@@ -23,8 +23,7 @@
 //
 
 #include "pxr/imaging/hio/image.h"
-
-#include "pxr/imaging/hgi/types.h"
+#include "pxr/imaging/hio/types.h"
 
 #include "pxr/usd/ar/asset.h"
 #include "pxr/usd/ar/resolver.h"
@@ -59,34 +58,34 @@ public:
     virtual ~Hio_StbImage();
 
     // GarchImage overrides
-    virtual std::string const & GetFilename() const;
-    virtual int GetWidth() const;
-    virtual int GetHeight() const;
-    virtual HioColorChannelType GetFormat() const;
-    virtual int GetNumChannels() const;
-    virtual int GetBytesPerPixel() const;
-    virtual int GetNumMipLevels() const;
+    std::string const & GetFilename() const override;
+    virtual int GetWidth() const override;
+    virtual int GetHeight() const override;
+    virtual HioFormat GetHioFormat() const override;
+    virtual int GetNumChannels() const override;
+    virtual int GetBytesPerPixel() const override;
+    virtual int GetNumMipLevels() const override;
 
-    virtual bool IsColorSpaceSRGB() const;
+    virtual bool IsColorSpaceSRGB() const override;
 
-    virtual bool GetMetadata(TfToken const & key, VtValue * value) const;
-    virtual bool GetSamplerMetadata(HioAddressDimension dim, VtValue * param) const;
+    virtual bool GetMetadata(TfToken const & key, VtValue * value) const override;
+    virtual bool GetSamplerMetadata(HioAddressDimension dim, VtValue * param) const override;
 
-    virtual bool Read(StorageSpec const & storage);
+    virtual bool Read(StorageSpec const & storage) override;
     virtual bool ReadCropped(int const cropTop,
-	                     int const cropBottom,
-	                     int const cropLeft,
-	                     int const cropRight,
-                             StorageSpec const & storage);
+                             int const cropBottom,
+                             int const cropLeft,
+                             int const cropRight,
+                             StorageSpec const & storage) override;
 
     virtual bool Write(StorageSpec const & storage,
-                       VtDictionary const & metadata);
+                       VtDictionary const & metadata) override;
 
 protected:
     virtual bool _OpenForReading(std::string const & filename, int subimage,
                                  int mip, SourceColorSpace sourceColorSpace, 
-                                 bool suppressErrors);
-    virtual bool _OpenForWriting(std::string const & filename);
+                                 bool suppressErrors) override;
+    virtual bool _OpenForWriting(std::string const & filename) override;
 
 private:
     std::string _GetFilenameExtension();
@@ -105,8 +104,9 @@ private:
     float _gamma;
     
     HioColorChannelType _outputType;
-    
     int _nchannels;
+
+    HioFormat _hioFormat;
 
     SourceColorSpace _sourceColorSpace;
 };
@@ -116,28 +116,6 @@ TF_REGISTRY_FUNCTION(TfType)
     typedef Hio_StbImage Image;
     TfType t = TfType::Define<Image, TfType::Bases<Image::Base> >();
     t.SetFactory< HioImageFactory<Image> >();
-}
-
-namespace {
-
-/// Returns the bpc (bits per channel) based on the GLType stored in storage
-static int
-_GetBytesPerChannelFromFormat(HioColorChannelType format)
-{
-    switch(format) {
-    case HioColorChannelTypeUNorm8:
-        return 1;
-    case HioColorChannelTypeFloat16:
-        return 2;
-    case HioColorChannelTypeFloat32:
-    case HioColorChannelTypeInt32:
-        return 4;
-    default:
-        TF_CODING_ERROR("Unsupported format");
-        return 4;
-    }
-}
-// annonymous namespace
 }
 
 bool
@@ -169,7 +147,8 @@ Hio_StbImage::_GetInfoFromStorageSpec(HioImage::StorageSpec const & storage)
 {
     _width = storage.width;
     _height = storage.height;
-    _outputType = storage.format;
+    _hioFormat = storage.hioFormat;
+    _outputType = HioGetChannelTypeFromFormat(storage.hioFormat);
     _nchannels = storage.numChannels;
 }
 
@@ -300,10 +279,10 @@ Hio_StbImage::GetHeight() const
 }
 
 /* virtual */
-HioColorChannelType
-Hio_StbImage::GetFormat() const
+HioFormat
+Hio_StbImage::GetHioFormat() const
 {
-    return _outputType;
+    return _hioFormat;
 }
 
 /* virtual */
@@ -317,7 +296,7 @@ Hio_StbImage::GetNumChannels() const
 int
 Hio_StbImage::GetBytesPerPixel() const
 {
-    return _GetBytesPerChannelFromFormat(_outputType) * _nchannels;
+    return HioGetChannelSize(_outputType) * _nchannels;
 }
 
 /* virtual */
@@ -350,7 +329,7 @@ Hio_StbImage::IsColorSpaceSRGB() const
 
     // Texture had no (recognized) gamma hint, make a reasonable guess
     return ((_nchannels == 3 || _nchannels == 4) && 
-            GetFormat() == HioColorChannelTypeUNorm8);
+            _outputType == HioColorChannelTypeUNorm8);
 }
 
 //XXX Still need to investigate Metadata handling
@@ -401,10 +380,13 @@ Hio_StbImage::_OpenForReading(std::string const & filename, int subimage,
         return false;
     }
 
-    return stbi_info_from_memory(
-        reinterpret_cast<stbi_uc const*>(buffer.get()), asset->GetSize(), 
+    const bool open =  stbi_info_from_memory(
+        reinterpret_cast<stbi_uc const*>(buffer.get()), asset->GetSize(),
         &_width, &_height, &_nchannels, &_gamma) &&
             subimage == 0 && mip == 0;
+    
+    _hioFormat = HioGetFormat(_nchannels, _outputType, IsColorSpaceSRGB());
+    return open;
 }
 
 /* virtual */
@@ -586,14 +568,14 @@ _Quantize(float value)
 
 template<typename T>
 Hio_StbImage::StorageSpec
-_Quantize(
-          Hio_StbImage::StorageSpec const & storageIn,
-    std::unique_ptr<uint8_t[]> & quantizedData)
+_Quantize(Hio_StbImage::StorageSpec const & storageIn,
+          std::unique_ptr<uint8_t[]> & quantizedData,
+          bool isSRGB)
 {
     // stb requires unsigned byte data to write non .hdr file formats.
     // We'll quantize the data ourselves here.
-    size_t numElements =
-        storageIn.width * storageIn.height * storageIn.numChannels;
+    int numChannels = storageIn.numChannels;
+    size_t numElements = storageIn.width * storageIn.height * numChannels;
 
     quantizedData.reset(new uint8_t[numElements]);
 
@@ -605,7 +587,10 @@ _Quantize(
     Hio_StbImage::StorageSpec quantizedSpec;
     quantizedSpec = storageIn; // shallow copy
     quantizedSpec.data = quantizedData.get();
-    quantizedSpec.format = HioColorChannelTypeUNorm8;
+    quantizedSpec.numChannels = numChannels;
+    quantizedSpec.hioFormat = HioGetFormat(numChannels,
+                                           HioColorChannelTypeUNorm8,
+                                           isSRGB);
     
     return quantizedSpec;
 }
@@ -627,23 +612,21 @@ Hio_StbImage::Write(StorageSpec const & storageIn,
 
     StorageSpec quantizedSpec;
     std::unique_ptr<uint8_t[]> quantizedData;
+    HioColorChannelType type = HioGetChannelTypeFromFormat(storageIn.hioFormat);
+    bool isSRGB = IsColorSpaceSRGB();
 
-    if (storageIn.format == HioColorChannelTypeFloat32 &&
-        fileExtension != "hdr") {
-        quantizedSpec = _Quantize<float>(storageIn, quantizedData);
+    if (type == HioColorChannelTypeFloat32 && fileExtension != "hdr") {
+        quantizedSpec = _Quantize<float>(storageIn, quantizedData, isSRGB);
     }
-    else if (storageIn.format == HioColorChannelTypeFloat16 &&
-        fileExtension != "hdr") {
-        quantizedSpec = _Quantize<GfHalf>(storageIn, quantizedData);
+    else if (type == HioColorChannelTypeFloat16 && fileExtension != "hdr") {
+        quantizedSpec = _Quantize<GfHalf>(storageIn, quantizedData, isSRGB);
     }
-    else if (storageIn.format != HioColorChannelTypeUNorm8 &&
-        fileExtension != "hdr") {
+    else if (type != HioColorChannelTypeUNorm8 && fileExtension != "hdr") {
         TF_CODING_ERROR("stb expects unsigned byte data to write filetype %s",
                         fileExtension.c_str());
         return false;
     }
-    else if (storageIn.format != HioColorChannelTypeFloat32 &&
-        fileExtension == "hdr")
+    else if (type != HioColorChannelTypeFloat32 && fileExtension == "hdr")
     {
         TF_CODING_ERROR("stb expects linear float data to write filetype hdr");
         return false;

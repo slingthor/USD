@@ -88,6 +88,7 @@ private:
     HgiMetalComputePipeline* _pipelineState;
     id<MTLCommandBuffer> _commandBuffer;
     id<MTLComputeCommandEncoder> _encoder;
+    bool _secondaryCommandBuffer;
     bool _hasWork;
 };
 

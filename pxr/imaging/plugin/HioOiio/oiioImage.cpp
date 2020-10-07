@@ -22,6 +22,7 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/hio/image.h"
+#include "pxr/imaging/hio/types.h"
 
 #include "pxr/usd/ar/asset.h"
 #include "pxr/usd/ar/resolver.h"
@@ -75,7 +76,7 @@ public:
     std::string const & GetFilename() const override;
     int GetWidth() const override;
     int GetHeight() const override;
-    HioColorChannelType GetFormat() const override;
+    HioFormat GetHioFormat() const override;
     int GetNumChannels() const override;
     int GetBytesPerPixel() const override;
     int GetNumMipLevels() const override;
@@ -127,24 +128,159 @@ TF_REGISTRY_FUNCTION(TfType)
     t.SetFactory< HioImageFactory<Image> >();
 }
 
-/// Converts a GL type into its OpenImageIO component type equivalent.
-static TypeDesc
-_GetOIIOBaseType(HioColorChannelType format)
+/// Converts an OpenImageIO component type to its HioFormat equivalent.
+static HioFormat
+_GetHioFormatFromImageData(unsigned int nchannels, TypeDesc typedesc,
+                           bool isSRGB)
 {
-    switch (format) {
-    case HioColorChannelTypeUNorm8:
-        return TypeDesc::UINT8;
-    case HioColorChannelTypeFloat16:
-        return TypeDesc::HALF;
-    case HioColorChannelTypeFloat32:
-        return TypeDesc::FLOAT;
-    case HioColorChannelTypeUInt16:
-        return TypeDesc::UINT16;
-    case HioColorChannelTypeInt32:
-        return TypeDesc::INT32;
-    default:
-        TF_CODING_ERROR("Unsupported type");
-        return TypeDesc::FLOAT;
+    switch (nchannels) {
+        case 1:
+            switch (typedesc.basetype) {
+                case TypeDesc::UINT8:
+                    if (isSRGB) {
+                        return HioFormatUNorm8srgb;
+                    }
+                    return HioFormatUNorm8;
+                case TypeDesc::INT8:
+                    return HioFormatSNorm8;
+                case TypeDesc::UINT16:
+                    return HioFormatUInt16;
+                case TypeDesc::INT16:
+                    return HioFormatInt16;
+                case TypeDesc::UINT32:
+                    return HioFormatUInt32;
+                case TypeDesc::INT32:
+                    return HioFormatInt32;
+                case TypeDesc::HALF:
+                    return HioFormatFloat16;
+                case TypeDesc::FLOAT:
+                    return HioFormatFloat32;                
+            }
+        case 2:
+            switch (typedesc.basetype) {
+                case TypeDesc::UINT8:
+                    if (isSRGB) {
+                        return HioFormatUNorm8Vec2srgb;
+                    }
+                    return HioFormatUNorm8Vec2;
+                case TypeDesc::INT8:
+                    return HioFormatSNorm8Vec2;
+                case TypeDesc::UINT16:
+                    return HioFormatUInt16Vec2;
+                case TypeDesc::INT16:
+                    return HioFormatInt16Vec2;
+                case TypeDesc::UINT32:
+                    return HioFormatUInt32Vec2;
+                case TypeDesc::INT32:
+                    return HioFormatInt32Vec2;
+                case TypeDesc::HALF:
+                    return HioFormatFloat16Vec2;
+                case TypeDesc::FLOAT:
+                    return HioFormatFloat32Vec2;             
+            }
+        case 3:
+            switch (typedesc.basetype) {
+                case TypeDesc::UINT8:
+                    if (isSRGB) {
+                        return HioFormatUNorm8Vec3srgb;
+                    }
+                    return HioFormatUNorm8Vec3;
+                case TypeDesc::INT8:
+                    return HioFormatSNorm8Vec3;
+                case TypeDesc::UINT16:
+                    return HioFormatUInt16Vec3;
+                case TypeDesc::INT16:
+                    return HioFormatInt16Vec3;
+                case TypeDesc::UINT32:
+                    return HioFormatUInt32Vec3;
+                case TypeDesc::INT32:
+                    return HioFormatInt32Vec3;
+                case TypeDesc::HALF:
+                    return HioFormatFloat16Vec3;
+                case TypeDesc::FLOAT:
+                    return HioFormatFloat32Vec3;             
+            }
+        case 4:
+            switch (typedesc.basetype) {
+                case TypeDesc::UINT8:
+                    if (isSRGB) {
+                        return HioFormatUNorm8Vec4srgb;
+                    }
+                    return HioFormatUNorm8Vec4;
+                case TypeDesc::INT8:
+                    return HioFormatSNorm8Vec4;
+                case TypeDesc::UINT16:
+                    return HioFormatUInt16Vec4;
+                case TypeDesc::INT16:
+                    return HioFormatInt16Vec4;
+                case TypeDesc::UINT32:
+                    return HioFormatUInt32Vec4;
+                case TypeDesc::INT32:
+                    return HioFormatInt32Vec4;
+                case TypeDesc::HALF:
+                    return HioFormatFloat16Vec4;
+                case TypeDesc::FLOAT:
+                    return HioFormatFloat32Vec4;             
+            }
+        default:
+            TF_CODING_ERROR("Unsupported type");
+            return HioFormatUNorm8Vec3;
+    }
+}
+/// Converts an HioFormat into its OpenImageIO component type equivalent.
+// XXX does not support conversions for:HioFormatBC6FloatVec3, 
+// HioFormatBC6UFloatVec3, HioFormatBC7UNorm8Vec4, or HioFormatBC7UNorm8Vec4srgb
+static TypeDesc
+_GetOIIOBaseType(HioFormat hioFormat)
+{
+    switch (hioFormat) {
+        case HioFormatUNorm8:
+        case HioFormatUNorm8Vec2:
+        case HioFormatUNorm8Vec3:
+        case HioFormatUNorm8Vec4:
+        case HioFormatUNorm8srgb:
+        case HioFormatUNorm8Vec2srgb:
+        case HioFormatUNorm8Vec3srgb:
+        case HioFormatUNorm8Vec4srgb:
+            return TypeDesc::UINT8;
+        case HioFormatSNorm8:
+        case HioFormatSNorm8Vec2:
+        case HioFormatSNorm8Vec3:
+        case HioFormatSNorm8Vec4:
+            return TypeDesc::INT8;
+        case HioFormatUInt16:
+        case HioFormatUInt16Vec2:
+        case HioFormatUInt16Vec3:
+        case HioFormatUInt16Vec4:
+            return TypeDesc::UINT16;
+        case HioFormatInt16:
+        case HioFormatInt16Vec2:
+        case HioFormatInt16Vec3:
+        case HioFormatInt16Vec4:
+            return TypeDesc::INT16;
+        case HioFormatUInt32:
+        case HioFormatUInt32Vec2:
+        case HioFormatUInt32Vec3:
+        case HioFormatUInt32Vec4:
+            return TypeDesc::UINT32;
+        case HioFormatInt32:
+        case HioFormatInt32Vec2:
+        case HioFormatInt32Vec3:
+        case HioFormatInt32Vec4:
+            return TypeDesc::INT32;
+        case HioFormatFloat16:
+        case HioFormatFloat16Vec2:
+        case HioFormatFloat16Vec3:
+        case HioFormatFloat16Vec4:
+            return TypeDesc::HALF;
+        case HioFormatFloat32:
+        case HioFormatFloat32Vec2:
+        case HioFormatFloat32Vec3:
+        case HioFormatFloat32Vec4:
+            return TypeDesc::FLOAT;
+        default:
+            TF_CODING_ERROR("Unsupported type");
+            return TypeDesc::FLOAT;
     }
 }
 
@@ -308,24 +444,11 @@ HioOIIO_Image::GetHeight() const
 }
 
 /* virtual */
-HioColorChannelType
-HioOIIO_Image::GetFormat() const
+HioFormat
+HioOIIO_Image::GetHioFormat() const
 {
-    TypeDesc const& type = _imagespec.format;
-    if (type == TypeDesc::FLOAT) {
-        return HioColorChannelTypeFloat32;
-    } else if (type == TypeDesc::HALF) {
-        return HioColorChannelTypeFloat16;
-    } else if (type == TypeDesc::UINT16) {
-        return HioColorChannelTypeUInt16;
-    } else if (type == TypeDesc::INT32) {
-        return HioColorChannelTypeInt32;
-    } else if (type == TypeDesc::UINT8) {
-        return HioColorChannelTypeUNorm8;
-    }
-    
-    TF_CODING_ERROR("Unsupported type");
-    return HioColorChannelTypeFloat32;
+    return _GetHioFormatFromImageData(_imagespec.nchannels, _imagespec.format,
+                                      IsColorSpaceSRGB());
 }
 
 /* virtual */
@@ -636,7 +759,7 @@ HioOIIO_Image::ReadCropped(int const cropTop,
     }
 
     // Read pixel data
-    TypeDesc type = _GetOIIOBaseType(storage.format);
+    TypeDesc type = _GetOIIOBaseType(storage.hioFormat);
 
 #if OIIO_VERSION > 10603
     if (!image->get_pixels(ROI(0, storage.width, 0, storage.height, 0, 1),
@@ -668,7 +791,7 @@ HioOIIO_Image::Write(StorageSpec const & storage,
                      VtDictionary const & metadata)
 {
     int nchannels = storage.numChannels;
-    TypeDesc format = _GetOIIOBaseType(storage.format);
+    TypeDesc format = _GetOIIOBaseType(storage.hioFormat);
     ImageSpec spec(storage.width, storage.height, nchannels, format);
 
     for (const std::pair<std::string, VtValue>& m : metadata) {

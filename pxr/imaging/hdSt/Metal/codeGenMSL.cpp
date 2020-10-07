@@ -2787,7 +2787,9 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "        float r, rr, rrr, rrrr, g, b, a;\n"
             << "    };\n"
             << "    wrapped_float(float _x) { x = _x;}\n"
-            << "    operator float () {\n"
+            << "    wrapped_float(const thread wrapped_float &_x) { x = _x.x;}\n"
+            << "    wrapped_float(const device wrapped_float &_x) { x = _x.x;}\n"
+            << "    operator float () const {\n"
             << "        return x;\n"
             << "    }\n"
             << "};\n";
@@ -2798,7 +2800,9 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "        int r, rr, rrr, rrrr, g, b, a;\n"
             << "    };\n"
             << "    wrapped_int(int _x) { x = _x;}\n"
-            << "    operator int () {\n"
+            << "    wrapped_int(const thread wrapped_int &_x) { x = _x.x;}\n"
+            << "    wrapped_int(const device wrapped_int &_x) { x = _x.x;}\n"
+            << "    operator int () const {\n"
             << "        return x;\n"
             << "    }\n"
             << "};\n";
@@ -2984,25 +2988,25 @@ static void _EmitStructAccessor(std::stringstream &str,
             str << _GetUnpackedType(type, false) << " HdGet_" << name
                 << "(int arrayIndex, int localIndex) {\n"
                 << "  return "
-                << _GetPackedTypeAccessor(type, false) << "("
+                << _GetUnpackedType(_GetPackedTypeAccessor(type, false), false) << "("
                 << structMemberName << "[" << index << "]." << name << "[arrayIndex]);\n}\n";
         } else {
             str << _GetUnpackedType(type, false) << " HdGet_" << name
                 << "(int localIndex) {\n"
                 << "  return "
-                << _GetPackedTypeAccessor(type, false) << "("
+                << _GetUnpackedType(_GetPackedTypeAccessor(type, false), false) << "("
                 << structMemberName << "[" << index << "]." << name << ");\n}\n";
         }
     } else {
         if (arraySize > 1) {
             str << _GetUnpackedType(type, false) << " HdGet_" << name
                 << "(int arrayIndex, int localIndex) { return "
-                << _GetPackedTypeAccessor(type, false) << "("
+                << _GetUnpackedType(_GetPackedTypeAccessor(type, false), false) << "("
                 << structMemberName << ptrAccessor << name << "[arrayIndex]);}\n";
         } else {
             str << _GetUnpackedType(type, false) << " HdGet_" << name
                 << "(int localIndex) { return "
-                << _GetPackedTypeAccessor(type, false) << "("
+                << _GetUnpackedType(_GetPackedTypeAccessor(type, false), false) << "("
                 << structMemberName << ptrAccessor << name << ");}\n";
         }
     }
@@ -3137,7 +3141,7 @@ static void _EmitAccessor(std::stringstream &str,
         str << _GetUnpackedType(type, false)
             << " HdGet_" << name << "(int localIndex) {\n"
             << "  int index = " << index << ";\n";
-        str << "  return " << _GetPackedTypeAccessor(type, true) << "("
+        str << "  return " << _GetUnpackedType(_GetPackedTypeAccessor(type, true), false) << "("
             << name << "[index]);\n}\n";
     } else {
         // non-indexed, only makes sense for uniform or vertex.
@@ -3147,7 +3151,7 @@ static void _EmitAccessor(std::stringstream &str,
             emitIndexlessVariant = true;
             str << _GetUnpackedType(type, false)
                 << " HdGet_" << name << "(int localIndex) { return ";
-            str << _GetPackedTypeAccessor(type, true) << "(" << name << ");}\n";
+            str << _GetUnpackedType(_GetPackedTypeAccessor(type, true), false) << "(" << name << ");}\n";
         }
     }
     
@@ -3225,8 +3229,8 @@ static void _EmitTextureAccessors(
         accessors
             << "  " << textureStr << dim << "d<float> tex = HdGetSampler_" << name << "();\n"
             << "  " << _GetUnpackedType(dataType, false)
-            << "  result = is_null_texture(tex) ? 0.0f:"
-            << _GetPackedTypeAccessor(dataType, false)
+            << " result = is_null_texture(tex) ? wrapped_float(0.0f):"
+            << _GetUnpackedType(_GetPackedTypeAccessor(dataType, false), false)
             << "((tex.sample(samplerBind_" << name << ", sampleCoord)\n"
             << "#ifdef HD_HAS_" << name << "_" << HdStTokens->scale << "\n"
             << "    * HdGet_" << name << "_" << HdStTokens->scale << "()\n"
@@ -3239,8 +3243,8 @@ static void _EmitTextureAccessors(
         accessors
             << "  " << textureStr << dim << "d<float> tex = HdGetSampler_" << name << "();\n"
             << "  " << _GetUnpackedType(dataType, false)
-            << "  result = is_null_texture(tex) ? 0.0f :"
-            << _GetPackedTypeAccessor(dataType, false)
+            << "  result = is_null_texture(tex) ? wrapped_float(0.0f):"
+            << _GetUnpackedType(_GetPackedTypeAccessor(dataType, false), false)
             << "(tex.sample(samplerBind_" << name << ", sampleCoord)"
             << swizzle << ");\n";
     }
@@ -3263,7 +3267,7 @@ static void _EmitTextureAccessors(
                 << "    return result;\n"
                 << "  } else {\n"
                 << "    return ("
-                << _GetPackedTypeAccessor(dataType, false)
+                << _GetUnpackedType(_GetPackedTypeAccessor(dataType, false), false)
                 << "(materialParams[shaderCoord]."
                 << name
                 << HdSt_ResourceBindingSuffixTokens->fallback << swizzle << ")\n"
@@ -3282,7 +3286,7 @@ static void _EmitTextureAccessors(
                 << "    return result;\n"
                 << "  } else {\n"
                 << "    return "
-                << _GetPackedTypeAccessor(dataType, false)
+                << _GetUnpackedType(_GetPackedTypeAccessor(dataType, false), false)
                 << "(materialParams[shaderCoord]."
                 << name
                 << HdSt_ResourceBindingSuffixTokens->fallback << ");\n"
@@ -5159,7 +5163,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << " HdGet_" << it->second.name << "(int localIndex) {\n"
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return "
-                << _GetPackedTypeAccessor(it->second.dataType, false)
+                << _GetUnpackedType(_GetPackedTypeAccessor(it->second.dataType, false), false)
                 << "(materialParams[shaderCoord]."
                 << it->second.name << HdSt_ResourceBindingSuffixTokens->fallback
                 << swizzle
@@ -5454,7 +5458,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                     // Otherwise use default value.
                     << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
                     << "  return "
-                    << _GetPackedTypeAccessor(it->second.dataType, false)
+                    << _GetUnpackedType(_GetPackedTypeAccessor(it->second.dataType, false), false)
                     << "(materialParams[shaderCoord]."
                     << it->second.name << HdSt_ResourceBindingSuffixTokens->fallback
                     << swizzle << ";\n"
@@ -5472,7 +5476,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                     // Otherwise use default value.
                     << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
                     << "  return "
-                    << _GetPackedTypeAccessor(it->second.dataType, false)
+                    << _GetUnpackedType(_GetPackedTypeAccessor(it->second.dataType, false), false)
                     << "(materialParams[shaderCoord]."
                     << it->second.name << HdSt_ResourceBindingSuffixTokens->fallback
                     << swizzle <<  ");\n"
@@ -5602,7 +5606,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 // Otherwise use default value.
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
                 << "  return "
-                << _GetPackedTypeAccessor(it->second.dataType, false)
+                << _GetUnpackedType(_GetPackedTypeAccessor(it->second.dataType, false), false)
                 << "(materialParams[shaderCoord]."
                 << it->second.name << HdSt_ResourceBindingSuffixTokens->fallback
                 <<  ");\n"

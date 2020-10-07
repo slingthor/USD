@@ -78,8 +78,6 @@ HdStSimpleLightingShader::HdStSimpleLightingShader()
     , _useLighting(true)
     , _glslfx(std::make_unique<HioGlslfx>(HdStPackageSimpleLightingShader()))
 {
-    _lightingContext->InitUniformBlockBindings(_bindingMap);
-    _lightingContext->InitSamplerUnitBindings(_bindingMap);
 }
 
 HdStSimpleLightingShader::~HdStSimpleLightingShader() = default;
@@ -102,6 +100,7 @@ HdStSimpleLightingShader::ComputeHash() const
     boost::hash_combine(hash, numLights);
     boost::hash_combine(hash, useShadows);
     boost::hash_combine(hash, numShadows);
+    boost::hash_combine(hash, _lightingContext->ComputeShaderSourceHash());
 
     return (ID)hash;
 }
@@ -134,7 +133,14 @@ HdStSimpleLightingShader::GetSource(TfToken const &shaderStageKey) const
                      << int(useBindlessShadowMaps) << "\n";
     }
 
-    return defineStream.str() + source;
+    const std::string postSurfaceShader =
+        _lightingContext->ComputeShaderSource(shaderStageKey);
+
+    if (!postSurfaceShader.empty()) {
+        defineStream << "#define HD_HAS_postSurfaceShader\n";
+    }
+
+    return defineStream.str() + postSurfaceShader + source;
 }
 
 /* virtual */
@@ -167,10 +173,15 @@ HdStSimpleLightingShader::BindResources(HdStGLSLProgram const &program,
     std::lock_guard<std::mutex> lock(_mutex);
 
     // XXX: we'd like to use HdSt_ResourceBinder instead of GlfBindingMap.
-    //
+    _bindingMap->ResetUniformBindings(
+                     binder.GetNumReservedUniformBlockLocations());
+    _lightingContext->InitUniformBlockBindings(_bindingMap);
     program.AssignUniformBindings(_bindingMap);
     _lightingContext->BindUniformBlocks(_bindingMap);
 
+    _bindingMap->ResetSamplerBindings(
+                     binder.GetNumReservedTextureUnits());
+    _lightingContext->InitSamplerUnitBindings(_bindingMap);
     program.AssignSamplerUnits(_bindingMap);
     _lightingContext->BindSamplers(_bindingMap);
 

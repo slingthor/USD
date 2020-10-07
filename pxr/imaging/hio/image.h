@@ -28,6 +28,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hio/api.h"
+#include "pxr/imaging/hio/types.h"
 
 #include "pxr/base/tf/token.h"
 #include "pxr/base/tf/type.h"
@@ -40,50 +41,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef std::shared_ptr<class HioImage> HioImageSharedPtr;
-
-/// \enum HioAddressDimension
-///
-/// Available texture sampling dimensions.
-///
-enum HioAddressDimension
-{
-    HioAddressDimensionU,
-    HioAddressDimensionV,
-    HioAddressDimensionW
-};
-
-/// \enum HioAddressMode
-///
-/// Various modes used during sampling of a texture.
-///
-enum HioAddressMode
-{
-    HioAddressModeClampToEdge = 0,
-    HioAddressModeMirrorClampToEdge,
-    HioAddressModeRepeat,
-    HioAddressModeMirrorRepeat,
-    HioAddressModeClampToBorderColor
-};
-
-/// \enum HioColorChannelType
-///
-/// Various color channel representation formats.
-///
-enum HioColorChannelType
-{
-    // UNorm8 - a 1-byte value representing a float between 0 and 1.
-    // float value = (unorm / 255.0f);
-    HioColorChannelTypeUNorm8,
-    // Float16 - a 2-byte IEEE half-precision float.
-    HioColorChannelTypeFloat16,
-    // Float32 - a 4-byte IEEE float.
-    HioColorChannelTypeFloat32,
-    // UInt16 - a 2-byte unsigned integer
-    HioColorChannelTypeUInt16,
-    // Int32 - a 4-byte signed integer
-    HioColorChannelTypeInt32
-};
+using HioImageSharedPtr = std::shared_ptr<class HioImage>;
 
 /// \class HioImage
 ///
@@ -123,13 +81,13 @@ public:
         StorageSpec()
             : width(0), height(0), depth(0)
             , numChannels(0)
-            , format(HioColorChannelTypeUNorm8)
+            , hioFormat(HioFormatInvalid)
             , flipped(false)
             , data(0) { }
 
         int width, height, depth;
         int numChannels;
-        HioColorChannelType format;
+        HioFormat hioFormat;
         bool flipped;
         void * data;
     };
@@ -196,10 +154,10 @@ public:
     /// Returns the image height.
     virtual int GetHeight() const = 0;
 
-    /// Returns the image format.
-    virtual HioColorChannelType GetFormat() const = 0;
+    /// Returns the destination HioFormat.
+    virtual HioFormat GetHioFormat() const = 0;
 
-    /// Returns the number of color channels per pixel.
+    /// Returns the number of channels.
     virtual int GetNumChannels() const = 0;
 
     /// Returns the number of bytes per pixel.

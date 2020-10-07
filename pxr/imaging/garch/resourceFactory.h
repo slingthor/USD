@@ -27,12 +27,13 @@
 /// \file garch/resourceFactory.h
 
 #include "pxr/pxr.h"
+#include "pxr/imaging/garch/api.h"
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/singleton.h"
 #include "pxr/base/tf/token.h"
 #include "pxr/base/gf/vec2i.h"
 
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 
 #include <boost/noncopyable.hpp>
 
@@ -98,7 +99,7 @@ public:
                                                     unsigned int cropBottom,
                                                     unsigned int cropLeft,
                                                     unsigned int cropRight,
-                                                    GarchImage::ImageOriginLocation originLocation) const = 0;
+                                                    HioImage::ImageOriginLocation originLocation) const = 0;
 
     // BaseTexture
 	GARCH_API

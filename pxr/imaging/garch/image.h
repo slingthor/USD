@@ -30,6 +30,8 @@
 #include "pxr/imaging/garch/api.h"
 #include "pxr/imaging/garch/gl.h"
 
+#include "pxr/imaging/hio/types.h"
+
 #include "pxr/base/tf/token.h"
 #include "pxr/base/tf/type.h"
 #include "pxr/base/vt/dictionary.h"
@@ -43,7 +45,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef std::shared_ptr<class GarchImage> GarchImageSharedPtr;
+using GarchImageSharedPtr = std::shared_ptr<class GarchImage>;
 
 /// \class GarchImage
 ///
@@ -82,14 +84,15 @@ public:
     class StorageSpec {
     public:
         StorageSpec()
-            : width(0), height(0)
-            , format(GL_NONE)
-            , type(GL_NONE)
+            : width(0), height(0), depth(0)
+            , numChannels(0)
+            , hioFormat(HioFormatInvalid)
             , flipped(false)
             , data(0) { }
 
         int width, height, depth;
-        uint32_t format, type;
+        int numChannels;
+        HioFormat hioFormat;
         bool flipped;
         void * data;
     };
@@ -148,11 +151,11 @@ public:
     /// Returns the image height.
     virtual int GetHeight() const = 0;
 
-    /// Returns the image format.
-    virtual GLenum GetFormat() const = 0;
+    /// Returns the target HioFormat.
+    virtual HioFormat GetHioFormat() const = 0;
 
-    /// Returns the image type.
-    virtual GLenum GetType() const = 0;
+    /// Returns the number of channels.
+    virtual int GetNumChannels() const = 0;
 
     /// Returns the number of bytes per pixel.
     virtual int GetBytesPerPixel() const = 0;

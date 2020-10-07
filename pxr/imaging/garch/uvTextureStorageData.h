@@ -26,7 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/api.h"
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/baseTextureData.h"
 
 #include "pxr/base/vt/value.h"
@@ -62,16 +62,12 @@ public:
         return 1;
     };
 
-    GLenum GLInternalFormat() const override {
-        return _glInternalFormat;
+    HioFormat GetHioFormat() const override {
+        return _hioFormat;
     };
 
-    GLenum GLFormat() const override {
-        return _glFormat;
-    };
-
-    GLenum GLType() const override {
-        return _glType;
+    int GetNumChannels() const override {
+        return _numChannels;
     };
 
     size_t TargetMemory() const override {
@@ -99,8 +95,8 @@ public:
     bool Read(
         int degradeLevel,
         bool generateMipmap,
-        GarchImage::ImageOriginLocation originLocation =
-              GarchImage::OriginUpperLeft) override;
+        HioImage::ImageOriginLocation originLocation =
+              HioImage::OriginUpperLeft) override;
 
     GARCH_API
     bool IsCompressed() const override;
@@ -124,7 +120,8 @@ private:
     // if _storageData is used for larger images
     VtValue _storageData; 
 
-    GLenum  _glInternalFormat, _glFormat, _glType;
+    HioFormat _hioFormat;
+    int _numChannels;
 
     WrapInfo _wrapInfo;
 

@@ -162,8 +162,8 @@ thsat by using a seperate define to define the array size.
 // ---------------------------------------------------------------------------
 
 layout(std140) uniform Lighting {
-    bool useLighting;
-    bool useColorMaterialDiffuse;
+    uint32_t useLighting;
+    uint32_t useColorMaterialDiffuse;
     LightSource lightSource[NUM_LIGHTS_ARRAY_SIZE];
 };
 

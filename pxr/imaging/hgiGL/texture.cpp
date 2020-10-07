@@ -224,7 +224,7 @@ HgiGLTexture::HgiGLTexture(HgiTextureDesc const & desc)
     }
 
     if (!_descriptor.debugName.empty()) {
-        glObjectLabel(GL_TEXTURE, _textureId,-1, _descriptor.debugName.c_str());
+        HgiGLObjectLabel(GL_TEXTURE, _textureId, _descriptor.debugName);
     }
 
     if (desc.sampleCount == HgiSampleCount1) {
@@ -366,7 +366,7 @@ HgiGLTexture::HgiGLTexture(HgiTextureViewDesc const & desc)
         desc.layerCount);
 
     if (!desc.debugName.empty()) {
-        glObjectLabel(GL_TEXTURE, _textureId,-1, desc.debugName.c_str());
+        HgiGLObjectLabel(GL_TEXTURE, _textureId, desc.debugName);
     }
 
     glTextureParameteri(_textureId, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

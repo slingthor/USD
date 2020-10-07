@@ -245,7 +245,7 @@ UsdImagingPrimAdapter::MarkWindowPolicyDirty(UsdPrim const& prim,
 
 /*virtual*/
 void
-UsdImagingPrimAdapter::InvokeComputation(SdfPath const& computationPath,
+UsdImagingPrimAdapter::InvokeComputation(SdfPath const& cachePath,
                                          HdExtComputationContext* context)
 {
 }
@@ -277,6 +277,16 @@ UsdImagingPrimAdapter::SampleInstancerTransform(
     GfMatrix4d *sampleValues)
 {
     return 0;
+}
+
+/*virtual*/
+GfMatrix4d
+UsdImagingPrimAdapter::GetInstancerTransform(
+    UsdPrim const& instancerPrim,
+    SdfPath const& instancerPath,
+    UsdTimeCode time) const
+{
+    return GfMatrix4d(1.0); 
 }
 
 /*virtual*/
@@ -379,9 +389,8 @@ UsdImagingPrimAdapter::SamplePrimvar(
     // instead synthesize them -- ex: Cube, Cylinder, Capsule.
     if (maxNumSamples > 0) {
         sampleTimes[0] = 0;
-        if (_GetValueCache()->ExtractPrimvar(cachePath, key, &sampleValues[0])){
-            return sampleValues[0].IsEmpty() ? 0 : 1;
-        }
+        sampleValues[0] = Get(usdPrim, cachePath, key, time);
+        return sampleValues[0].IsEmpty() ? 0 : 1;
     }
 
     return 0;
@@ -515,8 +524,8 @@ UsdImagingPrimAdapter::_GetPrimPathFromInstancerChain(
     //   +-- ProtoA ----------+
     //
     // paths = 
-    //    /__Master__1/cube
-    //    /__Master__2/ProtoCube
+    //    /__Prototype_1/cube
+    //    /__Prototype_2/ProtoCube
     //    /PointInstancer/ProtoA
     //
     // This function uses the path chain to recreate the instance path:
@@ -672,32 +681,31 @@ UsdImagingPrimAdapter::_UsdToHdRole(TfToken const& usdRole)
 void 
 UsdImagingPrimAdapter::_ComputeAndMergePrimvar(
     UsdPrim const& gprim,
-    SdfPath const& cachePath,
     UsdGeomPrimvar const& primvar,
     UsdTimeCode time,
-    UsdImagingValueCache* valueCache,
+    HdPrimvarDescriptorVector* primvarDescs,
     HdInterpolation *interpOverride) const
 {
+    TRACE_FUNCTION();
+
     VtValue v;
     TfToken primvarName = primvar.GetPrimvarName();
     if (primvar.ComputeFlattened(&v, time)) {
-        valueCache->GetPrimvar(cachePath, primvarName) = v;
         HdInterpolation interp = interpOverride ? *interpOverride
             : _UsdToHdInterpolation(primvar.GetInterpolation());
         TfToken role = _UsdToHdRole(primvar.GetAttr().GetRoleName());
         TF_DEBUG(USDIMAGING_SHADERS)
-            .Msg("UsdImaging: found primvar (%s %s) %s, interp %s\n",
+            .Msg("UsdImaging: found primvar (%s) %s, interp %s\n",
                  gprim.GetPath().GetText(),
-                 cachePath.GetText(),
                  primvarName.GetText(),
                  TfEnum::GetName(interp).c_str());
-        _MergePrimvar(&valueCache->GetPrimvars(cachePath),
-                      primvarName, interp, role);
+        _MergePrimvar(primvarDescs, primvarName, interp, role);
+
     } else {
         TF_DEBUG(USDIMAGING_SHADERS)
             .Msg( "\t\t No primvar on <%s> named %s\n",
                   gprim.GetPath().GetText(), primvarName.GetText());
-        _RemovePrimvar(&valueCache->GetPrimvars(cachePath), primvarName);
+        _RemovePrimvar(primvarDescs, primvarName);
     }
 }
 
@@ -960,10 +968,12 @@ UsdImagingPrimAdapter::_IsTransformVarying(UsdPrim prim,
 }
 
 GfMatrix4d 
-UsdImagingPrimAdapter::GetTransform(UsdPrim const& prim, UsdTimeCode time,
+UsdImagingPrimAdapter::GetTransform(UsdPrim const& prim, 
+                                    SdfPath const& cachePath,
+                                    UsdTimeCode time,
                                     bool ignoreRootTransform) const
 {
-    HD_TRACE_FUNCTION();
+    TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
     
     UsdImaging_XformCache &xfCache = _delegate->_xformCache;
@@ -1046,7 +1056,7 @@ UsdImagingPrimAdapter::SampleTransform(
         // other object synthesized by UsdImaging.  Just return
         // the single transform sample from the ValueCache.
         sampleTimes[0] = 0.0;
-        sampleValues[0] = GetTransform(prim, 0.0);
+        sampleValues[0] = GetTransform(prim, prim.GetPath(), 0.0);
         return 1;
     }
 
@@ -1104,21 +1114,11 @@ UsdImagingPrimAdapter::Get(
     TfToken const &key,
     UsdTimeCode time) const
 {
-    // XXX: This does not work for point instancer child
-    // prims; while we do not hit this code path given the
-    // current state of the universe, we need to rethink
-    // UsdImagingDelegate::Get().
-    //
-    // XXX(UsdImaging): We use cachePath directly as
-    // usdPath here, but should do the proper
-    // transformation.  Maybe we can use the
-    // primInfo.usdPrim?
-
     UsdAttribute const &attr = prim.GetAttribute(key);
     VtValue value;
-    TF_VERIFY(attr && attr.Get(&value, time),
-              "%s, %s\n", cachePath.GetText(), key.GetText());
-
+    if (attr) {
+        attr.Get(&value, time);
+    }
     return value;
 }
 
@@ -1237,13 +1237,83 @@ UsdImagingPrimAdapter::GetDoubleSided(UsdPrim const& prim,
 }
 
 /*virtual*/
+SdfPath 
+UsdImagingPrimAdapter::GetMaterialId(UsdPrim const& prim, 
+                                     SdfPath const& cachePath, 
+                                     UsdTimeCode time) const
+{
+    return SdfPath();
+}
+
+/*virtual*/
+VtValue
+UsdImagingPrimAdapter::GetMaterialResource(UsdPrim const& prim, 
+                              SdfPath const& cachePath, 
+                              UsdTimeCode time) const
+{
+    return VtValue();
+}
+
+/*virtual*/
 const TfTokenVector &
 UsdImagingPrimAdapter::GetExtComputationSceneInputNames(
-    SdfPath const& computationPath,
     SdfPath const& cachePath) const
 {
     static TfTokenVector emptyTokenVector;
     return emptyTokenVector;
+}
+
+/*virtual*/
+HdExtComputationInputDescriptorVector
+UsdImagingPrimAdapter::GetExtComputationInputs(
+    UsdPrim const& prim,
+    SdfPath const& cachePath,
+    const UsdImagingInstancerContext* instancerContext) const
+{
+    return HdExtComputationInputDescriptorVector();
+}
+
+/*virtual*/
+HdExtComputationOutputDescriptorVector
+UsdImagingPrimAdapter::GetExtComputationOutputs(
+    UsdPrim const& prim,
+    SdfPath const& cachePath,
+    const UsdImagingInstancerContext* instancerContext) const
+{
+    return HdExtComputationOutputDescriptorVector();
+}
+
+/*virtual*/
+HdExtComputationPrimvarDescriptorVector
+UsdImagingPrimAdapter::GetExtComputationPrimvars(
+    UsdPrim const& prim,
+    SdfPath const& cachePath,
+    HdInterpolation interpolation,
+    const UsdImagingInstancerContext* instancerContext) const
+{
+    return HdExtComputationPrimvarDescriptorVector();
+}
+
+/*virtual*/
+VtValue 
+UsdImagingPrimAdapter::GetExtComputationInput(
+    UsdPrim const& prim,
+    SdfPath const& cachePath,
+    TfToken const& name,
+    UsdTimeCode time,
+    const UsdImagingInstancerContext* instancerContext) const
+{
+    return VtValue();
+}
+
+/*virtual*/ 
+std::string 
+UsdImagingPrimAdapter::GetExtComputationKernel(
+    UsdPrim const& prim,
+    SdfPath const& cachePath,
+    const UsdImagingInstancerContext* instancerContext) const
+{
+    return std::string();
 }
 
 VtArray<VtIntArray>

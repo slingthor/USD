@@ -295,6 +295,7 @@ void MtlfMetalContext::Init()
     
     blendState.blendEnable = false;
     blendState.alphaCoverageEnable = false;
+    blendState.alphaToOneEnable = false;
     blendState.rgbBlendOp = MTLBlendOperationAdd;
     blendState.alphaBlendOp = MTLBlendOperationAdd;
     blendState.sourceColorFactor = MTLBlendFactorSourceAlpha;
@@ -726,9 +727,10 @@ void MtlfMetalContext::SetDepthComparisonFunction(MTLCompareFunction comparisonF
     depthState.depthCompareFunction = comparisonFn;
 }
 
-void MtlfMetalContext::SetAlphaCoverageEnable(bool _alphaCoverageEnable)
+void MtlfMetalContext::SetAlphaCoverageEnable(bool alphaCoverageEnable, bool alphaToOneEnable)
 {
-    blendState.alphaCoverageEnable = _alphaCoverageEnable;
+    blendState.alphaCoverageEnable = alphaCoverageEnable;
+    blendState.alphaToOneEnable = alphaToOneEnable;
 }
 
 void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, bool _enableMVA)
@@ -979,6 +981,7 @@ void MtlfMetalContext::SetRenderPipelineState()
     boost::hash_combine(hashVal, wq->currentColourAttachmentsHash);
     boost::hash_combine(hashVal, blendState.blendEnable);
     boost::hash_combine(hashVal, blendState.alphaCoverageEnable);
+    boost::hash_combine(hashVal, blendState.alphaToOneEnable);
     boost::hash_combine(hashVal, blendState.rgbBlendOp);
     boost::hash_combine(hashVal, blendState.alphaBlendOp);
     boost::hash_combine(hashVal, blendState.sourceColorFactor);
@@ -1054,7 +1057,13 @@ void MtlfMetalContext::SetRenderPipelineState()
             else {
                 renderPipelineStateDescriptor.alphaToCoverageEnabled = NO;
             }
-            
+
+            if (blendState.alphaToOneEnable) {
+                renderPipelineStateDescriptor.alphaToOneEnabled = YES;
+            } else {
+                renderPipelineStateDescriptor.alphaToOneEnabled = NO;
+            }
+
             for (int i = 0; i < METAL_MAX_COLOR_ATTACHMENTS; i++) {
                 if (!wq->currentRenderPassDescriptor.colorAttachments[i].texture) {
                     break;

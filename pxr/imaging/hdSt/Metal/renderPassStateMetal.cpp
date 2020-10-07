@@ -101,9 +101,9 @@ HdStRenderPassStateMetal::Bind()
     
     if (!_alphaToCoverageUseDefault) {
         if (_alphaToCoverageEnabled) {
-            context->SetAlphaCoverageEnable(true);
+            context->SetAlphaCoverageEnable(true, true);
         } else {
-            context->SetAlphaCoverageEnable(false);
+            context->SetAlphaCoverageEnable(false, false);
         }
     }
     
@@ -203,7 +203,7 @@ HdStRenderPassStateMetal::Unbind()
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
-    context->SetAlphaCoverageEnable(false);
+    context->SetAlphaCoverageEnable(false, false);
 
     context->SetAlphaBlendingEnable(false);
     context->SetBlendOps(MTLBlendOperationAdd, MTLBlendOperationAdd);

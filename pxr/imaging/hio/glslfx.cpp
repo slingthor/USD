@@ -25,7 +25,6 @@
 #include "pxr/imaging/hio/glslfxConfig.h"
 #include "pxr/imaging/hio/debugCodes.h"
 
-#include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/usd/ar/resolver.h"
 
 #include "pxr/base/arch/systemInfo.h"
@@ -149,7 +148,8 @@ _ResolveResourcePath(const string& importFile, string *errorStr)
     
     // Look for the $BASE_GFX tag and replace with the appropriate lower level API path
     if (packageName == "$BASE_GFX") {
-        packageName = GarchResourceFactory::GetInstance()->GetPackageName();
+        // APPLE METAL: Force use of mtlf for packages
+        packageName = "mtlf";
     }
 
     const string assetPath = TfStringJoin(

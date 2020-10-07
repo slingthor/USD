@@ -83,7 +83,7 @@ public:
                                                     unsigned int cropBottom,
                                                     unsigned int cropLeft,
                                                     unsigned int cropRight,
-                                                    GarchImage::ImageOriginLocation originLocation) const override;
+                                                    HioImage::ImageOriginLocation originLocation) const override;
     
     // BaseTexture
     GLF_API

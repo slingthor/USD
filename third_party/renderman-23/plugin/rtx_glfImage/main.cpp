@@ -24,9 +24,8 @@
 
 #include "RtxPlugin.h"
 #include "RixInterfaces.h"
-#include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/garch/image.h"
-#include "pxr/imaging/garch/utils.h"
+#include "pxr/imaging/hio/image.h"
+#include "pxr/imaging/hio/types.h"
 #include "pxr/base/gf/gamma.h"
 #include <mutex>
 
@@ -40,10 +39,10 @@ namespace {
 
 // Per TextureCtx user data.
 struct RtxGlfImagePluginUserData {
-    GarchImageSharedPtr image;
+    HioImageSharedPtr image;
 
     std::mutex mipLevelsMutex;
-    std::vector<GarchImage::StorageSpec> mipLevels;
+    std::vector<HioImage::StorageSpec> mipLevels;
 };
 
 /// A Renderman Rtx texture plugin that uses GlfImage to read files,
@@ -78,29 +77,29 @@ RtxGlfImagePlugin::~RtxGlfImagePlugin()
 }
 
 static bool
-_ConvertWrapMode(GLenum glWrapMode, RixMessages *msgs,
+_ConvertWrapMode(HioAddressMode hioWrapMode, RixMessages *msgs,
                  const std::string &filename,
                  RtxPlugin::TextureCtx::WrapMode *rmanWrapMode)
 {
-    switch(glWrapMode) {
-    case GL_REPEAT:
+    switch(hioWrapMode) {
+    case HioAddressModeRepeat:
         *rmanWrapMode = RtxPlugin::TextureCtx::k_Periodic;
         return true;
-    case GL_MIRRORED_REPEAT:
+    case HioAddressModeMirrorRepeat:
         msgs->ErrorAlways(
             "RtxGlfImagePlugin: "
-            "Texture %s has unsupported GL_MIRROR_REPEAT; using "
+            "Texture %s has unsupported HioAddressModeMirrorRepeat; using "
             "k_Periodic instead.",
             filename.c_str());
         *rmanWrapMode = RtxPlugin::TextureCtx::k_Periodic;
         return true;
-    case GL_CLAMP_TO_EDGE:
+    case HioAddressModeClampToEdge:
         *rmanWrapMode = RtxPlugin::TextureCtx::k_Clamp;
         return true;
-    case GL_CLAMP_TO_BORDER:
+    case HioAddressModeClampToBorderColor:
         msgs->ErrorAlways(
             "RtxGlfImagePlugin: "
-            "Texture %s has unsupported GL_CLAMP_TO_BORDER; using "
+            "Texture %s has unsupported HioAddressModeClampToBorderColor; using "
             "k_Black instead.",
             filename.c_str());
         *rmanWrapMode = RtxPlugin::TextureCtx::k_Black;
@@ -150,7 +149,7 @@ RtxGlfImagePlugin::Open(TextureCtx& tCtx)
     }
 
     // Open GlfImage.
-    GarchImageSharedPtr image = GarchImage::OpenForReading(filename);
+    HioImageSharedPtr image = HioImage::OpenForReading(filename);
     if (!image) {
         m_msgHandler->ErrorAlways(
             "RtxGlfImagePlugin %p: "
@@ -167,15 +166,16 @@ RtxGlfImagePlugin::Open(TextureCtx& tCtx)
     tCtx.minRes.Y = 1;
     tCtx.maxRes.X = image->GetWidth();
     tCtx.maxRes.Y = image->GetHeight();
+    tCtx.numChannels = image->GetNumChannels();
     // Component data type.
-    switch (image->GetType()) {
-    case GL_FLOAT:
+    HioColorChannelType channelType =
+        HioGetChannelTypeFromFormat(image->GetHioFormat());
+    switch (channelType) {
+    case HioColorChannelTypeFloat32:
         tCtx.dataType = TextureCtx::k_Float;
-        tCtx.numChannels = image->GetBytesPerPixel() / sizeof(float);
         break;
-    case GL_UNSIGNED_BYTE:
+    case HioColorChannelTypeUNorm8:
         tCtx.dataType = TextureCtx::k_Byte;
-        tCtx.numChannels = image->GetBytesPerPixel();
         break;
     default:
         m_msgHandler->ErrorAlways(
@@ -189,9 +189,9 @@ RtxGlfImagePlugin::Open(TextureCtx& tCtx)
     // fall back to check metadata in the texture asset.
     tCtx.sWrap = TextureCtx::k_Black;
     tCtx.tWrap = TextureCtx::k_Black;
-    GLenum wrapModeS, wrapModeT;
+    HioAddressMode wrapModeS, wrapModeT;
     if (wrapS.empty() || wrapS == "useMetadata") {
-        if (image->GetSamplerMetadata(GL_TEXTURE_WRAP_S, &wrapModeS)) {
+        if (image->GetSamplerMetadata(HioAddressDimensionU, &wrapModeS)) {
             _ConvertWrapMode(wrapModeS, m_msgHandler, filename, &tCtx.sWrap);
         }
     } else if (wrapS == "black") {
@@ -202,7 +202,7 @@ RtxGlfImagePlugin::Open(TextureCtx& tCtx)
         tCtx.sWrap = RtxPlugin::TextureCtx::k_Periodic;
     }
     if (wrapT.empty() || wrapT == "useMetadata") {
-        if (image->GetSamplerMetadata(GL_TEXTURE_WRAP_T, &wrapModeT)) {
+        if (image->GetSamplerMetadata(HioAddressDimensionV, &wrapModeT)) {
             _ConvertWrapMode(wrapModeT, m_msgHandler, filename, &tCtx.tWrap);
         }
     } else if (wrapT == "black") {
@@ -229,12 +229,12 @@ RtxGlfImagePlugin::Fill(TextureCtx& tCtx, FillRequest& fillReq)
     assert(nullptr != data);
 
     // Find (or create) appropriate MIP level.
-    GarchImage::StorageSpec level;
+    HioImage::StorageSpec level;
     level.flipped = true;
     {
         // Lock mutex while scanning or modifying mipLevels.
         std::lock_guard<std::mutex> lock(data->mipLevelsMutex);
-        for (GarchImage::StorageSpec &cachedLevel: data->mipLevels) {
+        for (HioImage::StorageSpec &cachedLevel: data->mipLevels) {
             if (cachedLevel.width == fillReq.imgRes.X &&
                 cachedLevel.height == fillReq.imgRes.Y) {
                 level = cachedLevel;
@@ -246,13 +246,11 @@ RtxGlfImagePlugin::Fill(TextureCtx& tCtx, FillRequest& fillReq)
             level.width = fillReq.imgRes.X;
             level.height = fillReq.imgRes.Y;
             level.depth = data->image->GetBytesPerPixel();
-            level.format = data->image->GetFormat();
+            level.hioFormat = data->image->GetHioFormat();
+            level.numChannels = data->image->GetNumChannels();
 
-            if (tCtx.dataType == TextureCtx::k_Byte) {
-                level.type = GL_UNSIGNED_BYTE;
-            } else if (tCtx.dataType == TextureCtx::k_Float) {
-                level.type = GL_FLOAT;
-            } else {
+            if (tCtx.dataType != TextureCtx::k_Byte &&
+                tCtx.dataType != TextureCtx::k_Float) {
                 m_msgHandler->ErrorAlways(
                     "RtxGlfImagePlugin %p: unsupported data type\n", this);
                 return 1;
@@ -266,10 +264,11 @@ RtxGlfImagePlugin::Fill(TextureCtx& tCtx, FillRequest& fillReq)
     }
 
     const bool isSRGB = data->image->IsColorSpaceSRGB();
-    const GLenum type = data->image->GetType();
+    const HioColorChannelType channelType =
+        HioGetChannelTypeFromFormat(data->image->GetHioFormat());
 
-    const int numImageChannels = GarchGetNumElements(level.format);
-    const int bytesPerChannel = GarchGetElementSize(type);
+    const int numImageChannels = level.numChannels;
+    const int bytesPerChannel = HioGetChannelSize(level.hioFormat);
 
     // Copy out tile data, one row at a time.
     const int bytesPerImagePixel = level.depth;
@@ -309,12 +308,12 @@ RtxGlfImagePlugin::Fill(TextureCtx& tCtx, FillRequest& fillReq)
 
     // Make sure texture data is linear
     if (isSRGB) {
-        if (type == GL_FLOAT) {
+        if (channelType == HioColorChannelTypeFloat32) {
             _ConvertSRGBtoLinear(
                 (float*)fillReq.tileData, 
                 fillReq.tile.size.X * fillReq.tile.size.Y,
                 fillReq.numChannels, fillReq.channelOffset);
-        } else if (type == GL_UNSIGNED_BYTE) {
+        } else if (channelType == HioColorChannelTypeUNorm8) {
             _ConvertSRGBtoLinear(
                 (unsigned char*)fillReq.tileData, 
                 fillReq.tile.size.X * fillReq.tile.size.Y,
@@ -330,7 +329,7 @@ RtxGlfImagePlugin::Close(TextureCtx& tCtx)
 {
     RtxGlfImagePluginUserData* data = this->data(tCtx);
     if (nullptr != data) {
-        for (GarchImage::StorageSpec &cachedLevel: data->mipLevels) {
+        for (HioImage::StorageSpec &cachedLevel: data->mipLevels) {
             delete [] (char*) cachedLevel.data;
         }
         delete data;

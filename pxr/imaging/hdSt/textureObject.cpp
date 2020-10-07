@@ -190,7 +190,7 @@ _GetPremultiplyAlpha(const HdStSubtextureIdentifier * const subId,
 // Read from the HdStSubtextureIdentifier its source color space
 //
 static
-GarchImage::SourceColorSpace
+HioImage::SourceColorSpace
 _GetSourceColorSpace(const HdStSubtextureIdentifier * const subId,
                    const HdTextureType textureType)
 {
@@ -201,12 +201,12 @@ _GetSourceColorSpace(const HdStSubtextureIdentifier * const subId,
     }
 
     if (sourceColorSpace == HdStTokens->sRGB) {
-        return GarchImage::SRGB;
+        return HioImage::SRGB;
     }
     if (sourceColorSpace == HdStTokens->raw) {
-        return GarchImage::Raw;
+        return HioImage::Raw;
     }
-    return GarchImage::Auto;
+    return HioImage::Auto;
 }
 
 } // anonymous namespace
@@ -343,17 +343,17 @@ _GetWrapParameters(GarchUVTextureDataRefPtr const &uvTexture)
 // vertical orientation opposite to UsdUvTexture.
 //
 static
-GarchImage::ImageOriginLocation
+HioImage::ImageOriginLocation
 _GetImageOriginLocation(const HdStSubtextureIdentifier * const subId)
 {
     using SubId = const HdStAssetUvSubtextureIdentifier;
     
     if (SubId* const uvSubId = dynamic_cast<SubId*>(subId)) {
         if (uvSubId->GetFlipVertically()) {
-            return GarchImage::OriginUpperLeft;
+            return HioImage::OriginUpperLeft;
         }
     }
-    return GarchImage::OriginLowerLeft;
+    return HioImage::OriginLowerLeft;
 }
 
 HdStAssetUvTextureObject::HdStAssetUvTextureObject(

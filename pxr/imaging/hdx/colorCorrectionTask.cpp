@@ -374,8 +374,8 @@ HdxColorCorrectionTask::_CreateShaderResources()
     // Setup the shader program
     HgiShaderProgramDesc programDesc;
     programDesc.debugName =_tokens->colorCorrectionShader.GetString();
-    programDesc.shaderFunctions.emplace_back(std::move(vertFn));
-    programDesc.shaderFunctions.emplace_back(std::move(fragFn));
+    programDesc.shaderFunctions.push_back(std::move(vertFn));
+    programDesc.shaderFunctions.push_back(std::move(fragFn));
     _shaderProgram = _GetHgi()->CreateShaderProgram(programDesc);
 
     if (!_shaderProgram->IsValid() || !vertFn->IsValid() || !fragFn->IsValid()){
@@ -438,7 +438,7 @@ HdxColorCorrectionTask::_CreateResourceBindings(
     texBind0.stageUsage = HgiShaderStageFragment;
     texBind0.textures.push_back(aovTexture);
     texBind0.samplers.push_back(_sampler);
-    resourceDesc.textures.emplace_back(std::move(texBind0));
+    resourceDesc.textures.push_back(std::move(texBind0));
 
     if (useOCIO && _texture3dLUT) {
         HgiTextureBindDesc texBind1;
@@ -446,7 +446,7 @@ HdxColorCorrectionTask::_CreateResourceBindings(
         texBind1.stageUsage = HgiShaderStageFragment;
         texBind1.textures.push_back(_texture3dLUT);
         texBind1.samplers.push_back(_sampler);
-        resourceDesc.textures.emplace_back(std::move(texBind1));
+        resourceDesc.textures.push_back(std::move(texBind1));
     }
 
     // If nothing has changed in the descriptor we avoid re-creating the
@@ -491,7 +491,7 @@ HdxColorCorrectionTask::_CreatePipeline(HgiTextureHandle const& aovTexture)
     vboDesc.vertexStride = sizeof(float) * 4;
     vboDesc.vertexAttributes.push_back(posAttr);
 
-    desc.vertexBuffers.emplace_back(std::move(vboDesc));
+    desc.vertexBuffers.push_back(std::move(vboDesc));
 
     // Depth test and write can be off since we only colorcorrect the color aov.
     desc.depthState.depthTestEnabled = false;
@@ -515,7 +515,7 @@ HdxColorCorrectionTask::_CreatePipeline(HgiTextureHandle const& aovTexture)
     _attachment0.loadOp = HgiAttachmentLoadOpDontCare;
     _attachment0.storeOp = HgiAttachmentStoreOpStore;
     _attachment0.format = aovTexture->GetDescriptor().format;
-    desc.colorAttachmentDescs.emplace_back(_attachment0);
+    desc.colorAttachmentDescs.push_back(_attachment0);
 
     _pipeline = _GetHgi()->CreateGraphicsPipeline(desc);
 
@@ -552,8 +552,8 @@ HdxColorCorrectionTask::_ApplyColorCorrection(
     HgiGraphicsCmdsDesc gfxDesc;
     gfxDesc.width = dimensions[0];
     gfxDesc.height = dimensions[1];
-    gfxDesc.colorAttachmentDescs.emplace_back(_attachment0);
-    gfxDesc.colorTextures.emplace_back(aovTexture);
+    gfxDesc.colorAttachmentDescs.push_back(_attachment0);
+    gfxDesc.colorTextures.push_back(aovTexture);
 
     // Begin rendering
     HgiGraphicsCmdsUniquePtr gfxCmds = _GetHgi()->CreateGraphicsCmds(gfxDesc);
