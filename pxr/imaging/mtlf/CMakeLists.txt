@@ -19,7 +19,6 @@ pxr_library(mtlf
         gf
         glf
         hgiMetal
-        hio
         js
         plug
         tf

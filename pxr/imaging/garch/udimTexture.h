@@ -80,7 +80,7 @@ public:
         HioImage::ImageOriginLocation originLocation,
         std::vector<std::tuple<int, TfToken>>&& tiles,
         bool const premultiplyAlpha = false,
-        HioImage::SourceColorSpace sourceColorSpace = HioImage::Raw); // APPLE METAL: GarchImage
+        HioImage::SourceColorSpace sourceColorSpace = HioImage::Raw); // APPLE METAL: HioImage
 
     GARCH_API
     GarchTexture::BindingVector GetBindings(
@@ -109,7 +109,7 @@ protected:
         HioImage::ImageOriginLocation originLocation,
         std::vector<std::tuple<int, TfToken>>&& tiles,
         bool const premultiplyAlpha,
-        HioImage::SourceColorSpace sourceColorSpace); // APPLE METAL: GarchImage
+        HioImage::SourceColorSpace sourceColorSpace); // APPLE METAL: HioImage
 
     GARCH_API
     virtual void _ReadTexture() override;
@@ -139,7 +139,7 @@ protected:
     GarchTextureGPUHandle _layout;
     bool _loaded = false;
     bool _premultiplyAlpha = false;
-    HioImage::SourceColorSpace _sourceColorSpace = HioImage::Auto; // APPLE METAL: GarchImage
+    HioImage::SourceColorSpace _sourceColorSpace = HioImage::Auto; // APPLE METAL: HioImage
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

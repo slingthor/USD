@@ -28,6 +28,7 @@
 #include "pxr/imaging/garch/utils.h"
 #include "pxr/imaging/garch/uvTextureData.h"
 
+#include "pxr/base/gf/vec3i.h"
 #include "pxr/base/tf/fileUtils.h"
 #include "pxr/base/trace/trace.h"
 #include "pxr/base/work/loops.h"
@@ -43,7 +44,7 @@ GarchUVTextureData::New(
     unsigned int cropBottom,
     unsigned int cropLeft,
     unsigned int cropRight,
-    HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: GarchImage
+    HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: HioImage
 {
     GarchUVTextureData::Params params;
     params.targetMemory = targetMemory;
@@ -56,7 +57,7 @@ GarchUVTextureData::New(
 
 GarchUVTextureDataRefPtr
 GarchUVTextureData::New(std::string const &filePath, Params const &params,
-                        HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: GarchImage
+                        HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: HioImage
 {
     return TfCreateRefPtr(new GarchUVTextureData(filePath, params,
 												 sourceColorSpace));
@@ -68,7 +69,7 @@ GarchUVTextureData::~GarchUVTextureData()
 
 GarchUVTextureData::GarchUVTextureData(std::string const &filePath,
                                    Params const &params, 
-                                   HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: GarchImage
+                                   HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: HioImage
   : _filePath(filePath),
     _params(params),
     _targetMemory(0),
@@ -99,8 +100,8 @@ GarchUVTextureData_ComputeMemory(HioImageSharedPtr const &img,
     const double scale = generateMipmap ? 4.0 / 3 : 1.0;
 
     if (HioIsCompressed(img->GetHioFormat())) {
-         return scale * HioGetCompressedTextureSize(img->GetWidth(), 
-                            img->GetHeight(), img->GetHioFormat());
+         return scale * HioGetDataSize(img->GetHioFormat(),
+                            GfVec3i(img->GetWidth(), img->GetHeight(), 1));
     }
 
     const size_t numPixels = img->GetWidth() * img->GetHeight();
@@ -331,7 +332,7 @@ GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
         // textureData is updated to include hioFormat 
         _bytesPerPixel = image->GetBytesPerPixel();
     } else {
-        _bytesPerPixel = HioGetChannelSize(_hioFormat) * _numChannels;
+        _bytesPerPixel = HioGetDataSizeOfType(_hioFormat) * _numChannels;
 
         if (needsCropping) {
             TRACE_FUNCTION_SCOPE("cropping");
@@ -405,9 +406,9 @@ GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
         mip.height = needsResizeOnLoad ? _resizedHeight : image->GetHeight();
         
         const size_t numPixels = mip.width * mip.height;
-        mip.size   = isCompressed ? HioGetCompressedTextureSize( 
-                                    mip.width, mip.height, _hioFormat):
-                                    numPixels * _bytesPerPixel;
+        mip.size   = isCompressed ? HioGetDataSize(_hioFormat,
+                                        GfVec3i(mip.width, mip.height,1))
+                                    : numPixels * _bytesPerPixel;
         mip.offset = _size;
         _size += mip.size;
     }

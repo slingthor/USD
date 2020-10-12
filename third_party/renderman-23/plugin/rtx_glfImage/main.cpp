@@ -168,13 +168,12 @@ RtxGlfImagePlugin::Open(TextureCtx& tCtx)
     tCtx.maxRes.Y = image->GetHeight();
     tCtx.numChannels = image->GetNumChannels();
     // Component data type.
-    HioColorChannelType channelType =
-        HioGetChannelTypeFromFormat(image->GetHioFormat());
+    HioType channelType = HioGetHioType(image->GetHioFormat());
     switch (channelType) {
-    case HioColorChannelTypeFloat32:
+    case HioTypeFloat:
         tCtx.dataType = TextureCtx::k_Float;
         break;
-    case HioColorChannelTypeUNorm8:
+    case HioTypeUnsignedByte:
         tCtx.dataType = TextureCtx::k_Byte;
         break;
     default:
@@ -264,11 +263,11 @@ RtxGlfImagePlugin::Fill(TextureCtx& tCtx, FillRequest& fillReq)
     }
 
     const bool isSRGB = data->image->IsColorSpaceSRGB();
-    const HioColorChannelType channelType =
-        HioGetChannelTypeFromFormat(data->image->GetHioFormat());
+    const HioType channelType =
+        HioGetHioType(data->image->GetHioFormat());
 
     const int numImageChannels = level.numChannels;
-    const int bytesPerChannel = HioGetChannelSize(level.hioFormat);
+    const int bytesPerChannel = HioGetDataSizeOfFormat(level.hioFormat);
 
     // Copy out tile data, one row at a time.
     const int bytesPerImagePixel = level.depth;
@@ -308,12 +307,12 @@ RtxGlfImagePlugin::Fill(TextureCtx& tCtx, FillRequest& fillReq)
 
     // Make sure texture data is linear
     if (isSRGB) {
-        if (channelType == HioColorChannelTypeFloat32) {
+        if (channelType == HioTypeFloat) {
             _ConvertSRGBtoLinear(
                 (float*)fillReq.tileData, 
                 fillReq.tile.size.X * fillReq.tile.size.Y,
                 fillReq.numChannels, fillReq.channelOffset);
-        } else if (channelType == HioColorChannelTypeUNorm8) {
+        } else if (channelType == HioTypeUnsignedByte) {
             _ConvertSRGBtoLinear(
                 (unsigned char*)fillReq.tileData, 
                 fillReq.tile.size.X * fillReq.tile.size.Y,

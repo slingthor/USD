@@ -23,7 +23,7 @@
 //
 
 #include "pxr/imaging/garch/debugCodes.h"
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/utils.h"
 #include "pxr/imaging/garch/vdbTextureData.h"
 #include "pxr/imaging/hf/perfLog.h"
@@ -549,7 +549,7 @@ GarchVdbTextureData::Read(int degradeLevel, bool generateMipmap,
     // Get _bytesPerPixel & _hioFormat
     gridHolder->GetMetadata(&_bytesPerPixel,
                             &_hioFormat);
-    _numChannels = HioGetNumChannels(_hioFormat);
+    _numChannels = HioGetComponentCount(_hioFormat);
 
     // Get tree bounding box to compute native dimensions and size
     const openvdb::CoordBBox &nativeTreeBoundingBox =

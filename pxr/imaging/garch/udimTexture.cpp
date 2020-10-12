@@ -27,7 +27,7 @@
 #include "pxr/base/gf/math.h"
 #include "pxr/base/gf/vec3i.h"
 
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/base/tf/stringUtils.h"
@@ -79,7 +79,7 @@ GarchUdimTexture::GarchUdimTexture(
     HioImage::ImageOriginLocation originLocation,
     std::vector<std::tuple<int, TfToken>>&& tiles,
     bool const premultiplyAlpha,
-    HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: GarchImage
+    HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: HioImage
     : GarchTexture(originLocation), _tiles(std::move(tiles)), 
       _premultiplyAlpha(premultiplyAlpha), _sourceColorSpace(sourceColorSpace)
 {

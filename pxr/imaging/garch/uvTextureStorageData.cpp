@@ -128,8 +128,7 @@ bool GarchUVTextureStorageData::Read(int degradeLevel,
         return false; 
     }
     _numChannels = storageArray.size();
-    _bytesPerPixel = HioGetChannelSize(_hioFormat) *
-                         HioGetChannelSize(_hioFormat);
+    _bytesPerPixel = HioGetDataSizeOfFormat(_hioFormat);
 
     _size = _resizedWidth * _resizedHeight * _bytesPerPixel;
 

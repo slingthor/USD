@@ -30,6 +30,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class GfVec3i;
 
 /// \enum HioFormat
 ///
@@ -148,47 +149,49 @@ enum HioAddressMode
 ///
 /// Various color channel representation formats.
 ///
-enum HioColorChannelType
+enum HioType
 {
-    // UNorm8 - a 1-byte value representing a float between 0 and 1.
-    // float value = (unorm / 255.0f);
-    HioColorChannelTypeUNorm8,
-    // float value = (unorm / 255.0f) in srgb;
-    HioColorChannelTypeUNorm8srgb,
-    // Float16 - a 2-byte IEEE half-precision float.
-    HioColorChannelTypeFloat16,
-    // Float32 - a 4-byte IEEE float.
-    HioColorChannelTypeFloat32,
-    // UInt16 - a 2-byte unsigned integer
-    HioColorChannelTypeUInt16,
-    // Int32 - a 4-byte signed integer
-    HioColorChannelTypeInt32,
+    HioTypeUnsignedByte,
+    HioTypeUnsignedByteSRGB,
+    HioTypeSignedByte,
+    HioTypeUnsignedShort,
+    HioTypeSignedShort,
+    HioTypeUnsignedInt,
+    HioTypeInt,
+    HioTypeHalfFloat,
+    HioTypeFloat,
+    HioTypeDouble,
     
-    HioColorChannelTypeCount
+    HioTypeCount
 };
 
-/// Returns the HioFormat of containing nChannels of HioColorChannelType type.
+/// Returns the HioFormat of containing nChannels of HioType type.
 HIO_API
 HioFormat HioGetFormat(uint32_t nchannels,
-                       HioColorChannelType type,
+                       HioType type,
                        bool isSRGB);
 
-/// Returns the color channel type that format is based on.
+/// Return the HioType corresponding to the given HioFormat
 HIO_API
-HioColorChannelType HioGetChannelTypeFromFormat(HioFormat format);
+HioType HioGetHioType(HioFormat);
 
-/// Returns the bpc (bits per channel) based on the HioColorChannelType stored in storage.
-HIO_API
-uint32_t HioGetChannelSize(HioColorChannelType type);
+/// Return the count of components (channels) in the given HioFormat.
+HIO_API 
+int HioGetComponentCount(HioFormat format);
 
-/// Same as HioGetChannelSize, returning bpc (bits per channel), but accepts an HioFormat
-/// to infer the channel type from.
+/// Return the size in bytes for a component (channel) in the given HioFormat. 
 HIO_API
-uint32_t HioGetChannelSize(HioFormat format);
+size_t HioGetDataSizeOfType(HioFormat hioFormat);
 
-/// Returns the number of channels in a colour format.
+/// Return the size in bytes for a component (channel) in the given HioType.
 HIO_API
-uint32_t HioGetNumChannels(HioFormat const & hioFormat);
+size_t HioGetDataSizeOfType(HioType type);
+
+/// Returns the size of bytes per pixel for the given HioFormat
+HIO_API
+size_t HioGetDataSizeOfFormat(HioFormat format,
+                             size_t *blockWidth = nullptr,
+                             size_t *blockHeight = nullptr);
 
 /// Return if the given format is compressed.
 HIO_API
@@ -196,7 +199,7 @@ bool HioIsCompressed(HioFormat format);
 
 /// Calculate the byte size of compressed textures.
 HIO_API
-size_t HioGetCompressedTextureSize(int width, int height, HioFormat hioFormat);
+size_t HioGetDataSize(const HioFormat hioFormat, const GfVec3i &dimensions);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

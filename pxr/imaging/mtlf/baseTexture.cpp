@@ -44,9 +44,9 @@ static bool useAsncTextureUploads = false;
 
 static MTLPixelFormat GetMetalFormat(HioFormat hioFormat, size_t *outPixelByteSize, int *numChannels)
 {
-    HioColorChannelType type = HioGetChannelTypeFromFormat(hioFormat);
-    *numChannels = HioGetNumChannels(hioFormat);
-    *outPixelByteSize = *numChannels * HioGetChannelSize(type);
+    HioType type = HioGetHioType(hioFormat);
+    *numChannels = HioGetComponentCount(hioFormat);
+    *outPixelByteSize = *numChannels * HioGetDataSizeOfType(type);
     
     static MTLPixelFormat mtlFormats[][4] = {
         { MTLPixelFormatR8Unorm, MTLPixelFormatRG8Unorm,
@@ -66,11 +66,11 @@ static MTLPixelFormat GetMetalFormat(HioFormat hioFormat, size_t *outPixelByteSi
 
 void *MtlfBaseTexture::PadImage(HioFormat hioFormat, void const* rawData, size_t pixelByteSize, int numPixels)
 {
-    HioColorChannelType type = HioGetChannelTypeFromFormat(hioFormat);
+    HioType type = HioGetHioType(hioFormat);
     void* texBuffer;
     switch (type)
     {
-        case HioColorChannelTypeFloat32:
+        case HioTypeFloat:
         {
             texBuffer = new float[pixelByteSize * numPixels];
             
@@ -85,7 +85,7 @@ void *MtlfBaseTexture::PadImage(HioFormat hioFormat, void const* rawData, size_t
         }
         break;
             
-        case HioColorChannelTypeFloat16:
+        case HioTypeHalfFloat:
         {
             texBuffer = new uint16_t[pixelByteSize * numPixels];
             
@@ -100,7 +100,7 @@ void *MtlfBaseTexture::PadImage(HioFormat hioFormat, void const* rawData, size_t
         }
         break;
             
-        case HioColorChannelTypeUInt16:
+        case HioTypeUnsignedShort:
         {
             texBuffer = new uint16_t[pixelByteSize * numPixels];
             
@@ -115,8 +115,8 @@ void *MtlfBaseTexture::PadImage(HioFormat hioFormat, void const* rawData, size_t
         }
         break;
             
-        case HioColorChannelTypeUNorm8:
-        case HioColorChannelTypeUNorm8srgb:
+        case HioTypeUnsignedByte:
+        case HioTypeUnsignedByteSRGB:
         {
             texBuffer = new uint8_t[pixelByteSize * numPixels];
             

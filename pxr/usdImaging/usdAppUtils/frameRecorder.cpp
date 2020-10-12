@@ -184,7 +184,7 @@ _WriteTextureToFile(HgiTextureDesc const& textureDesc,
     storage.width = width;
     storage.height = height;
     storage.hioFormat = GetHioFormat(textureDesc.format);
-    storage.numChannels = HioGetNumChannels(storage.hioFormat);
+    storage.numChannels = HioGetComponentCount(storage.hioFormat);
     storage.flipped = flipped;
     storage.data = (void*)buffer.data();
 
@@ -284,22 +284,16 @@ UsdAppUtilsFrameRecorder::Record(
     renderParams.showRender = _HasPurpose(_purposes, UsdGeomTokens->render);
     renderParams.showGuides = _HasPurpose(_purposes, UsdGeomTokens->guide);
 
-#if defined(ARCH_GFX_OPENGL)
-    glEnable(GL_DEPTH_TEST);
-    glViewport(0, 0, _imageWidth, imageHeight);
+//    glEnable(GL_DEPTH_TEST);
+//    glViewport(0, 0, _imageWidth, imageHeight);
 
     const GLfloat CLEAR_DEPTH[1] = { 1.0f };
-    glClearBufferfv(GL_COLOR, 0, CLEAR_COLOR.data());
-    glClearBufferfv(GL_DEPTH, 0, CLEAR_DEPTH);
-#endif
 
     const UsdPrim& pseudoRoot = stage->GetPseudoRoot();
 
     do {
-#if defined(ARCH_GFX_OPENGL)
-        glClearBufferfv(GL_COLOR, 0, CLEAR_COLOR.data());
-        glClearBufferfv(GL_DEPTH, 0, CLEAR_DEPTH);
-#endif
+//        glClearBufferfv(GL_COLOR, 0, CLEAR_COLOR.data());
+//        glClearBufferfv(GL_DEPTH, 0, CLEAR_DEPTH);
         _imagingEngine->Render(pseudoRoot, renderParams);
     } while (!_imagingEngine->IsConverged());
 

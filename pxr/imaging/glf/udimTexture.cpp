@@ -52,7 +52,7 @@ GlfUdimTexture::GlfUdimTexture(
     HioImage::ImageOriginLocation originLocation,
     std::vector<std::tuple<int, TfToken>>&& tiles,
     bool const premultiplyAlpha,
-    HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: GarchImage
+    HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: HioImage
     : GarchUdimTexture(imageFilePath, originLocation, std::move(tiles), 
       premultiplyAlpha, sourceColorSpace)
 {

@@ -81,8 +81,6 @@ pxr_library(garch
         contextCaps
         drawTarget
         field3DTextureDataBase
-        image
-        imageRegistry
         glDebugWindow
         glPlatformDebugContext
         ptexTexture
@@ -114,11 +112,7 @@ pxr_library(garch
         ${GARCH_GLPLATFORMCONTEXT}.h
 
     PRIVATE_HEADERS
-        rankedTypeMap.h
         ${GARCH_GLPLATFORMDEBUGWINDOW}.h
-        stb/stb_image.h
-        stb/stb_image_resize.h
-        stb/stb_image_write.h
 
     PYTHON_CPPFILES
         moduleDeps.cpp
@@ -127,7 +121,6 @@ pxr_library(garch
         ${GARCH_GLPLATFORMCONTEXT}.${GARCH_SOURCE_EXTENSION}
         ${GARCH_GLPLATFORMDEBUGWINDOW}.${GARCH_SOURCE_EXTENSION}
         ${optionalCppFiles}
-        stbImage.cpp
 
     PYMODULE_CPPFILES
         module.cpp

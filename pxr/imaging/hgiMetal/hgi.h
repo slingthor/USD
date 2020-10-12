@@ -169,7 +169,8 @@ public:
     // For example, the client code may record in a HgiBlitCmds and a
     // HgiComputeCmds at the same time.
     HGIMETAL_API
-    id<MTLCommandBuffer> GetPrimaryCommandBuffer(bool flush = true);
+    id<MTLCommandBuffer> GetPrimaryCommandBuffer(HgiCmds *requester = nullptr,
+                                                 bool flush = true);
 
     HGIMETAL_API
     id<MTLCommandBuffer> GetSecondaryCommandBuffer();

@@ -134,44 +134,43 @@ HgiFormat
 _GetPixelFormatForImage(HioFormat hioFormat)
 {
     constexpr HgiFormat hgiFormats[][4] = {
+        // HioTypeUnsignedByte
         { HgiFormatUNorm8, HgiFormatUNorm8Vec2,
           HgiFormatUNorm8Vec4, HgiFormatUNorm8Vec4 },
-        { HgiFormatUNorm8, HgiFormatUNorm8Vec4srgb,
+        // HioTypeUnsignedByteSRGB
+        { HgiFormatInvalid, HgiFormatInvalid,
           HgiFormatUNorm8Vec4srgb, HgiFormatUNorm8Vec4srgb },
-        { HgiFormatFloat16, HgiFormatFloat16Vec2,
-          HgiFormatFloat16Vec4, HgiFormatFloat16Vec4 },
-        { HgiFormatFloat32, HgiFormatFloat32Vec2,
-          HgiFormatFloat32Vec4, HgiFormatFloat32Vec4 },
+        // HioTypeSignedByte
+        { HgiFormatSNorm8, HgiFormatSNorm8Vec2,
+          HgiFormatSNorm8Vec4, HgiFormatSNorm8Vec4 },
+        // HioTypeUnsignedShort
         { HgiFormatUInt16, HgiFormatUInt16Vec2,
           HgiFormatUInt16Vec4, HgiFormatUInt16Vec4 },
+        // HioTypeSignedShort
+        { HgiFormatInvalid, HgiFormatInvalid,
+          HgiFormatInvalid, HgiFormatInvalid },
+        // HioTypeUnsignedInt
+        { HgiFormatInvalid, HgiFormatInvalid,
+          HgiFormatInvalid, HgiFormatInvalid },
+        // HioTypeInt
         { HgiFormatInt32, HgiFormatInt32Vec2,
-          HgiFormatInt32Vec4, HgiFormatInt32Vec4 }
+          HgiFormatInt32Vec4, HgiFormatInt32Vec4 },
+        // HioTypeHalfFloat
+        { HgiFormatFloat16, HgiFormatFloat16Vec2,
+          HgiFormatFloat16Vec4, HgiFormatFloat16Vec4 },
+        // HioTypeFloat
+        { HgiFormatFloat32, HgiFormatFloat32Vec2,
+          HgiFormatFloat32Vec4, HgiFormatFloat32Vec4 },
+        // HioTypeDouble
+        { HgiFormatInvalid, HgiFormatInvalid,
+          HgiFormatInvalid, HgiFormatInvalid },
     };
     
-    static_assert(TfArraySize(hgiFormats) == HioColorChannelTypeCount,
-                  "hgiFormats to HioColorChannelType enum mismatch");
+    static_assert(TfArraySize(hgiFormats) == HioTypeCount,
+                  "hgiFormats to HioType enum mismatch");
 
-    uint32_t nChannels = HioGetNumChannels(hioFormat);
-    return hgiFormats[HioGetChannelTypeFromFormat(hioFormat)][nChannels - 1];
-}
-
-static
-int
-_GetPerElementSize(HioColorChannelType format)
-{
-    switch(format) {
-    case HioColorChannelTypeUNorm8:
-    case HioColorChannelTypeUNorm8srgb:
-        return 1;
-    case HioColorChannelTypeFloat16:
-        return 2;
-    case HioColorChannelTypeFloat32:
-    case HioColorChannelTypeInt32:
-        return 4;
-    default:
-        TF_CODING_ERROR("Unsupported format");
-        return 1;
-    }
+    uint32_t nChannels = HioGetComponentCount(hioFormat);
+    return hgiFormats[HioGetHioType(hioFormat)][nChannels - 1];
 }
 
 enum _ColorSpaceTransform
@@ -409,7 +408,7 @@ HdStUdimTextureObject::_Load()
     
     const HioFormat hioFormat = firstImageMips[0].image->GetHioFormat();
     int numChannels = firstImageMips[0].image->GetNumChannels();
-    const size_t sizePerElem = HioGetChannelSize(hioFormat);
+    const size_t sizePerElem = HioGetDataSizeOfType(hioFormat);
     
     _hgiFormat = _GetPixelFormatForImage(hioFormat);
     if (firstImageMips[0].image->IsColorSpaceSRGB()) {

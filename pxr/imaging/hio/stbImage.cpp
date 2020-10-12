@@ -57,7 +57,7 @@ public:
 
     virtual ~Hio_StbImage();
 
-    // GarchImage overrides
+    // HioImage overrides
     std::string const & GetFilename() const override;
     virtual int GetWidth() const override;
     virtual int GetHeight() const override;
@@ -103,7 +103,7 @@ private:
     int _height;
     float _gamma;
     
-    HioColorChannelType _outputType;
+    HioType _outputType;
     int _nchannels;
 
     HioFormat _hioFormat;
@@ -148,7 +148,7 @@ Hio_StbImage::_GetInfoFromStorageSpec(HioImage::StorageSpec const & storage)
     _width = storage.width;
     _height = storage.height;
     _hioFormat = storage.hioFormat;
-    _outputType = HioGetChannelTypeFromFormat(storage.hioFormat);
+    _outputType = HioGetHioType(storage.hioFormat);
     _nchannels = storage.numChannels;
 }
 
@@ -225,7 +225,7 @@ Hio_StbImage::_CropAndResize(void const *sourceData, int const cropTop,
                                     storage.width * bpp,
                                     _nchannels, alphaIndex, 0);
         } else {
-            if (_outputType == HioColorChannelTypeFloat32) {
+            if (_outputType == HioTypeFloat) {
                     stbir_resize_float((float *) croppedData, 
                                        cropWidth, cropHeight, 
                                        croppedStrideLength,
@@ -296,7 +296,7 @@ Hio_StbImage::GetNumChannels() const
 int
 Hio_StbImage::GetBytesPerPixel() const
 {
-    return HioGetChannelSize(_outputType) * _nchannels;
+    return HioGetDataSizeOfType(_outputType) * _nchannels;
 }
 
 /* virtual */
@@ -329,7 +329,7 @@ Hio_StbImage::IsColorSpaceSRGB() const
 
     // Texture had no (recognized) gamma hint, make a reasonable guess
     return ((_nchannels == 3 || _nchannels == 4) && 
-            _outputType == HioColorChannelTypeUNorm8);
+            _outputType == HioTypeUnsignedByte);
 }
 
 //XXX Still need to investigate Metadata handling
@@ -365,9 +365,9 @@ Hio_StbImage::_OpenForReading(std::string const & filename, int subimage,
 
     std::string fileExtension = _GetFilenameExtension();
     if (fileExtension == "hdr") {
-        _outputType = HioColorChannelTypeFloat32;
+        _outputType = HioTypeFloat;
     } else {
-        _outputType = HioColorChannelTypeUNorm8;
+        _outputType = HioTypeUnsignedByte;
     }
 
     std::shared_ptr<ArAsset> asset = ArGetResolver().OpenAsset(_filename);
@@ -433,7 +433,7 @@ Hio_StbImage::ReadCropped(int const cropTop,
     std::shared_ptr<const char> buffer = asset->GetBuffer();
     if (buffer) {
         size_t bufferSize = asset->GetSize();
-        if (_outputType == HioColorChannelTypeFloat32) {
+        if (_outputType == HioTypeFloat) {
             imageData = stbi_loadf_from_memory(
                 reinterpret_cast<stbi_uc const *>(buffer.get()), bufferSize,
                 &_width, &_height, &_nchannels, 0);
@@ -487,7 +487,7 @@ Hio_StbImage::ReadCropped(int const cropTop,
 
         if (resizeNeeded) {
             // XXX STB only has a sRGB resize for 8bit
-            if (IsColorSpaceSRGB() && _outputType == HioColorChannelTypeUNorm8){
+            if (IsColorSpaceSRGB() && _outputType == HioTypeUnsignedByte) {
                 int alphaIndex = (_nchannels != 4)?
                                  STBIR_ALPHA_CHANNEL_NONE : 3;
                 stbir_resize_uint8_srgb((unsigned char*)imageData, 
@@ -500,7 +500,7 @@ Hio_StbImage::ReadCropped(int const cropTop,
                                         storage.width * bpp,
                                         _nchannels, alphaIndex, 0);
             } else {
-                if (_outputType == HioColorChannelTypeFloat32) {
+                if (_outputType == HioTypeFloat) {
                     stbir_resize_float((float *)imageData, 
                                        _width, 
                                        _height,
@@ -589,7 +589,7 @@ _Quantize(Hio_StbImage::StorageSpec const & storageIn,
     quantizedSpec.data = quantizedData.get();
     quantizedSpec.numChannels = numChannels;
     quantizedSpec.hioFormat = HioGetFormat(numChannels,
-                                           HioColorChannelTypeUNorm8,
+                                           HioTypeUnsignedByte,
                                            isSRGB);
     
     return quantizedSpec;
@@ -612,21 +612,21 @@ Hio_StbImage::Write(StorageSpec const & storageIn,
 
     StorageSpec quantizedSpec;
     std::unique_ptr<uint8_t[]> quantizedData;
-    HioColorChannelType type = HioGetChannelTypeFromFormat(storageIn.hioFormat);
+    HioType type = HioGetHioType(storageIn.hioFormat);
     bool isSRGB = IsColorSpaceSRGB();
 
-    if (type == HioColorChannelTypeFloat32 && fileExtension != "hdr") {
+    if (type == HioTypeFloat && fileExtension != "hdr") {
         quantizedSpec = _Quantize<float>(storageIn, quantizedData, isSRGB);
     }
-    else if (type == HioColorChannelTypeFloat16 && fileExtension != "hdr") {
+    else if (type == HioTypeHalfFloat && fileExtension != "hdr") {
         quantizedSpec = _Quantize<GfHalf>(storageIn, quantizedData, isSRGB);
     }
-    else if (type != HioColorChannelTypeUNorm8 && fileExtension != "hdr") {
+    else if (type != HioTypeUnsignedByte && fileExtension != "hdr") {
         TF_CODING_ERROR("stb expects unsigned byte data to write filetype %s",
                         fileExtension.c_str());
         return false;
     }
-    else if (type != HioColorChannelTypeFloat32 && fileExtension == "hdr")
+    else if (type != HioTypeFloat && fileExtension == "hdr")
     {
         TF_CODING_ERROR("stb expects linear float data to write filetype hdr");
         return false;

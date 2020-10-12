@@ -25,7 +25,7 @@
 // 
 
 #include "pxr/imaging/garch/arrayTexture.h"
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/uvTexture.h"
 #include "pxr/imaging/garch/uvTextureData.h"

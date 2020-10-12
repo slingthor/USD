@@ -31,7 +31,7 @@
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/glf/utils.h"
 
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/utils.h"
 
 #include "pxr/imaging/hf/perfLog.h"
@@ -622,7 +622,7 @@ GlfDrawTarget::WriteToFile(std::string const & name,
     GLenum glInternalFormat = a->GetInternalFormat();
     bool isSRGB = (glInternalFormat == GL_SRGB8 ||
                    glInternalFormat == GL_SRGB8_ALPHA8);
-    GarchImage::StorageSpec storage;
+    HioImage::StorageSpec storage;
     storage.width = _size[0];
     storage.height = _size[1];
     storage.hioFormat = GarchGetHioFormat(a->GetFormat(),
@@ -634,7 +634,7 @@ GlfDrawTarget::WriteToFile(std::string const & name,
     {
         TRACE_FUNCTION_SCOPE("writing image");
 
-        GarchImageSharedPtr const image = GarchImage::OpenForWriting(filename);
+        HioImageSharedPtr const image = HioImage::OpenForWriting(filename);
         const bool writeSuccess = image && image->Write(storage, metadata);
         
         if (!writeSuccess) {

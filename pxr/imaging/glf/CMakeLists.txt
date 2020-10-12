@@ -35,7 +35,6 @@ endif()
             garch
             gf
             hf
-            hio
             js
             plug
             tf
@@ -78,7 +77,6 @@ else()
             garch
             gf
             hf
-            hio
             js
             plug
             tf

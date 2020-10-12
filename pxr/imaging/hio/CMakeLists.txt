@@ -40,4 +40,5 @@ pxr_library(hio
 
     RESOURCE_FILES
         plugInfo.json
+    
 )

@@ -316,7 +316,7 @@ GlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
         } else {
             // Uncompressed textures can have cropping and other special 
             // behaviours.
-            if (HioGetNumChannels(texData->GetHioFormat()) == 1) {
+            if (HioGetComponentCount(texData->GetHioFormat()) == 1) {
                 GLint swizzleMask[] = {GL_RED, GL_RED, GL_RED, GL_ONE};
                 glTexParameteriv(
                     textureTarget,

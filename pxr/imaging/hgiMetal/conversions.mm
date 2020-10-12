@@ -126,10 +126,10 @@ static const MTLVertexFormat _VERTEX_FORMAT_DESC[] =
     MTLVertexFormatFloat3,              // HgiFormatFloat32Vec3,
     MTLVertexFormatFloat4,              // HgiFormatFloat32Vec4,
 
-    MTLVertexFormatShort,               // HgiFormatShort32,
-    MTLVertexFormatShort2,              // HgiFormatShort32Vec2,
-    MTLVertexFormatShort3,              // HgiFormatShort32Vec3,
-    MTLVertexFormatShort4,              // HgiFormatShort32Vec4,
+    MTLVertexFormatUShort,              // HgiFormatUInt16,
+    MTLVertexFormatUShort2,             // HgiFormatUInt16Vec2,
+    MTLVertexFormatUShort3,             // HgiFormatUInt16Vec3,
+    MTLVertexFormatUShort4,             // HgiFormatUInt16Vec4,
 
     MTLVertexFormatInt,                 // HgiFormatInt32,
     MTLVertexFormatInt2,                // HgiFormatInt32Vec2,

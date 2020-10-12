@@ -30,7 +30,7 @@
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/vec3i.h"
 #include "pxr/imaging/garch/api.h"
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/fieldTextureData.h"
 
 #include "pxr/base/gf/bbox3d.h"

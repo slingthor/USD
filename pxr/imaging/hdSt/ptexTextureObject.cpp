@@ -164,7 +164,7 @@ HdStPtexTextureObject::_Load()
     const bool premultiplyAlpha =
         _GetPremultiplyAlpha(GetTextureIdentifier().GetSubtextureIdentifier());
 
-    HioColorChannelType hioFormat = HioColorChannelTypeUNorm8;
+    HioType hioFormat = HioTypeUnsignedByte;
 
     const unsigned char *loaderLayoutBuffer = nullptr;
     const unsigned char *loaderTexelBuffer = nullptr;
@@ -207,13 +207,13 @@ HdStPtexTextureObject::_Load()
     
     Ptex::DataType type = reader->dataType();
     if (type == Ptex::dt_float) {
-        hioFormat = HioColorChannelTypeFloat32;
+        hioFormat = HioTypeFloat;
     } else if (type == Ptex::dt_half) {
-        hioFormat = HioColorChannelTypeFloat16;
+        hioFormat = HioTypeHalfFloat;
     } else if (type == Ptex::dt_uint16) {
-        hioFormat = HioColorChannelTypeUInt16;
+        hioFormat = HioTypeUnsignedShort;
     } else if (type == Ptex::dt_uint8) {
-        hioFormat = HioColorChannelTypeUNorm8;
+        hioFormat = HioTypeUnsignedByte;
     }
 
     loaderLayoutBuffer = loader->GetLayoutBuffer();
@@ -240,7 +240,7 @@ HdStPtexTextureObject::_Load()
     _numBytesPerPixel = 0;
     _ConversionFunction conversionFunction = nullptr;
 
-    if (hioFormat == HioColorChannelTypeFloat16) {
+    if (hioFormat == HioTypeHalfFloat) {
         static HgiFormat floatFormats[] =
             { HgiFormatFloat32, HgiFormatFloat32Vec2,
               HgiFormatFloat32Vec4, HgiFormatFloat32Vec4 };
@@ -251,7 +251,7 @@ HdStPtexTextureObject::_Load()
         if (convertRGBtoRGBA) {
             conversionFunction = _ConvertRGBToRGBA<float, 1>;
         }
-    } else if (hioFormat == HioColorChannelTypeUInt16) {
+    } else if (hioFormat == HioTypeUnsignedShort) {
         static HgiFormat uint16Formats[] =
             { HgiFormatInt32, HgiFormatInt32Vec2,
               HgiFormatInt32Vec4, HgiFormatInt32Vec4 };
@@ -262,7 +262,7 @@ HdStPtexTextureObject::_Load()
         if (convertRGBtoRGBA) {
             conversionFunction = _ConvertRGBToRGBA<uint16_t, 65535>;
         }
-    } else if (hioFormat == HioColorChannelTypeFloat16) {
+    } else if (hioFormat == HioTypeHalfFloat) {
         static HgiFormat halfFormats[] =
             { HgiFormatFloat16, HgiFormatFloat16Vec2,
               HgiFormatFloat16Vec4, HgiFormatFloat16Vec4 };
@@ -273,7 +273,7 @@ HdStPtexTextureObject::_Load()
         if (convertRGBtoRGBA) {
             conversionFunction = _ConvertRGBToRGBA<GfHalf, 1>;
         }
-    } else if (hioFormat == HioColorChannelTypeUNorm8) {
+    } else if (hioFormat == HioTypeUnsignedByte) {
         static HgiFormat uint8Formats[] =
             { HgiFormatUNorm8, HgiFormatUNorm8Vec2,
               HgiFormatUNorm8Vec4, HgiFormatUNorm8Vec4 };
