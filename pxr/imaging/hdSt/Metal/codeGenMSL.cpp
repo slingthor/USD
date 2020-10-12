@@ -136,6 +136,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (dvec2)
     (dvec3)
     (dvec4)
+    (mat2)
     (mat3)
     (mat4)
     (dmat3)
@@ -2723,6 +2724,7 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "#define vec2 float2\n"
             << "#define vec3 float3\n"
             << "#define vec4 float4\n"
+            << "#define mat2 float2x2\n"
             << "#define mat3 float3x3\n"
             << "#define mat4 float4x4\n"
             << "#define ivec2 int2\n"
@@ -2734,6 +2736,7 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "#define dvec2 float2\n"
             << "#define dvec3 float3\n"
             << "#define dvec4 float4\n"
+            << "#define dmat2 float2x2\n"
             << "#define dmat3 float3x3\n"
             << "#define dmat4 float4x4\n";
     
