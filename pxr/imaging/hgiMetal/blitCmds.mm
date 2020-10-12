@@ -60,7 +60,7 @@ void
 HgiMetalBlitCmds::_CreateEncoder()
 {
     if (!_blitEncoder) {
-        _commandBuffer = _hgi->GetPrimaryCommandBuffer();
+        _commandBuffer = _hgi->GetPrimaryCommandBuffer(this);
         if (_commandBuffer == nil) {
             _commandBuffer = _hgi->GetSecondaryCommandBuffer();
             _secondaryCommandBuffer = true;
@@ -82,7 +82,7 @@ HgiMetalBlitCmds::PushDebugGroup(const char* label)
         HGIMETAL_DEBUG_LABEL(_blitEncoder, label)
     }
     else if (HgiMetalDebugEnabled()) {
-        _label = @(label);
+        _label = [@(label) copy];
     }
 }
 

@@ -153,8 +153,16 @@ public:
     HGIMETAL_API
     id<MTLCommandQueue> GetQueue() const;
 
+    // Metal Command buffers are heavy weight, while encoders are lightweight.
+    // But we cannot have more than one active encoder at a time per cmd buf.
+    // (Ideally we would have created on encoder for each HgiCmds)
+    // So for the sake of efficiency, we try to create only one cmd buf and
+    // only use the secondary command buffer when the client code requires it.
+    // For example, the client code may record in a HgiBlitCmds and a
+    // HgiComputeCmds at the same time.
     HGIMETAL_API
-    id<MTLCommandBuffer> GetPrimaryCommandBuffer(bool flush = true);
+    id<MTLCommandBuffer> GetPrimaryCommandBuffer(HgiCmds *requester = nullptr,
+                                                 bool flush = true);
 
     HGIMETAL_API
     id<MTLCommandBuffer> GetSecondaryCommandBuffer();

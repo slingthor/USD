@@ -188,7 +188,7 @@ HgiMetalGraphicsCmds::_CreateEncoder()
 {
     if (!_encoder) {
         _encoder = [
-            _hgi->GetPrimaryCommandBuffer(false)
+            _hgi->GetPrimaryCommandBuffer(this, false)
             renderCommandEncoderWithDescriptor:_renderPassDescriptor];
         
         if (_debugLabel) {
