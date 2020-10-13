@@ -22,9 +22,6 @@
 // language governing permissions and limitations under the Apache License.
 //
 
-// Must be included before GL headers.
-#include "pxr/imaging/glf/glew.h"
-
 #include "pxr/pxr.h"
 #include "pxr/usdImaging/usdAppUtils/frameRecorder.h"
 
@@ -59,7 +56,8 @@ UsdAppUtilsFrameRecorder::UsdAppUtilsFrameRecorder() :
 
     _imagingEngine.reset(new UsdImagingGLEngine(_driver));
     
-    GlfGlewInit();
+	// Apple Metal: Don't initialise GL
+//  GlfGlewInit();
 }
 
 UsdAppUtilsFrameRecorder::~UsdAppUtilsFrameRecorder()
@@ -332,22 +330,16 @@ UsdAppUtilsFrameRecorder::Record(
     renderParams.showRender = _HasPurpose(_purposes, UsdGeomTokens->render);
     renderParams.showGuides = _HasPurpose(_purposes, UsdGeomTokens->guide);
 
-#if defined(ARCH_GFX_OPENGL)
-    glEnable(GL_DEPTH_TEST);
-    glViewport(0, 0, _imageWidth, imageHeight);
-
-    const GLfloat CLEAR_DEPTH[1] = { 1.0f };
-    glClearBufferfv(GL_COLOR, 0, CLEAR_COLOR.data());
-    glClearBufferfv(GL_DEPTH, 0, CLEAR_DEPTH);
-#endif
+    // Apple Metal: Don't call OpenGL calls for clear
+//  glEnable(GL_DEPTH_TEST);
+//  glViewport(0, 0, _imageWidth, imageHeight);
 
     const UsdPrim& pseudoRoot = stage->GetPseudoRoot();
 
     do {
-#if defined(ARCH_GFX_OPENGL)
-        glClearBufferfv(GL_COLOR, 0, CLEAR_COLOR.data());
-        glClearBufferfv(GL_DEPTH, 0, CLEAR_DEPTH);
-#endif
+        // Apple Metal: Don't call OpenGL calls for clear
+//      glClearBufferfv(GL_COLOR, 0, CLEAR_COLOR.data());
+//      glClearBufferfv(GL_DEPTH, 0, CLEAR_DEPTH);
         _imagingEngine->Render(pseudoRoot, renderParams);
     } while (!_imagingEngine->IsConverged());
 

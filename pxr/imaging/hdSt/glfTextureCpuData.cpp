@@ -356,6 +356,7 @@ _GetHgiFormatAndConversionFunction(
         switch(glType) {
         case GL_UNSIGNED_BYTE:
             *hgiFormat = HgiFormatBC7UNorm8Vec4srgb;
+            break;
         default:
             TF_CODING_ERROR(
                 "Unsupported texture format "

@@ -77,7 +77,6 @@ MtlfUniformBlock::Update(const void *data, int size)
     }
     if (size > 0 && !didCreate) {
         if([_buffer storageMode] == MTLStorageModeManaged) {
-            auto ptr = _buffer.contents;
             memcpy(_buffer.contents, data, size);
             [_buffer didModifyRange:(NSRange){0, static_cast<NSUInteger>(size)}];
         }
