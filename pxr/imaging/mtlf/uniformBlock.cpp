@@ -65,7 +65,7 @@ MtlfUniformBlock::Update(const void *data, int size)
     // Only recreate buffer if one doesn't already exist or the size has changed
     if (!_buffer || _buffer.length != size) {
         _buffer = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(size, MTLResourceStorageModeDefault, data);
-    } else if (_size > 0 && [_buffer respondsToSelector:@selector(didModifyRange:)]) {
+    } else if (size > 0 && [_buffer respondsToSelector:@selector(didModifyRange:)]) {
         if([_buffer storageMode] == MTLStorageModeManaged) {
             NSRange range = NSMakeRange(0, size);
             memcpy(_buffer.contents, data, size);
