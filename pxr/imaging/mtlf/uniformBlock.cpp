@@ -63,8 +63,10 @@ void
 MtlfUniformBlock::Update(const void *data, int size)
 {
     // Only recreate buffer if one doesn't already exist or the size has changed
+    bool didCreate = false;
     if (!_buffer || _buffer.length != size) {
         _buffer = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(size, MTLResourceStorageModeDefault, data);
+        didCreate = true;
     }
     
     //METAL TODO
@@ -73,8 +75,15 @@ MtlfUniformBlock::Update(const void *data, int size)
 //        glBufferData(GL_UNIFORM_BUFFER, size, NULL, GL_STATIC_DRAW);
         _size = size;
     }
-    if (size > 0) {
-//        glBufferSubData(GL_UNIFORM_BUFFER, 0, size, data);
+    if (size > 0 && !didCreate) {
+        if([_buffer storageMode] == MTLStorageModeManaged) {
+            auto ptr = _buffer.contents;
+            memcpy(_buffer.contents, data, size);
+            [_buffer didModifyRange:(NSRange){0, static_cast<NSUInteger>(size)}];
+        }
+        else {
+            TF_WARN("Unable to update Metal uniform block as it's storage mode is not managed");
+        }
     }
 }
 
