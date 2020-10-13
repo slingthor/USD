@@ -63,26 +63,28 @@ void
 MtlfUniformBlock::Update(const void *data, int size)
 {
     // Only recreate buffer if one doesn't already exist or the size has changed
-    bool didCreate = false;
     if (!_buffer || _buffer.length != size) {
         _buffer = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(size, MTLResourceStorageModeDefault, data);
-        didCreate = true;
-    }
-    
-    //METAL TODO
-//    glBindBuffer(GL_UNIFORM_BUFFER, _buffer);
-    if (_size != size) {
-//        glBufferData(GL_UNIFORM_BUFFER, size, NULL, GL_STATIC_DRAW);
-        _size = size;
-    }
-    if (size > 0 && !didCreate) {
+    } else if (_size > 0 && [_buffer respondsToSelector:@selector(didModifyRange:)]) {
         if([_buffer storageMode] == MTLStorageModeManaged) {
+            NSRange range = NSMakeRange(0, size);
             memcpy(_buffer.contents, data, size);
-            [_buffer didModifyRange:(NSRange){0, static_cast<NSUInteger>(size)}];
+            id<MTLResource> resource = _buffer;
+            ARCH_PRAGMA_PUSH
+            ARCH_PRAGMA_INSTANCE_METHOD_NOT_FOUND
+            [resource didModifyRange:range];
+            ARCH_PRAGMA_POP
         }
         else {
             TF_WARN("Unable to update Metal uniform block as it's storage mode is not managed");
         }
+    } else {
+        TF_WARN("Unable to update Metal uniform block as architecture does not support didModifyRange");
+    }
+    
+    if (_size != size) {
+//        glBufferData(GL_UNIFORM_BUFFER, size, NULL, GL_STATIC_DRAW);
+        _size = size;
     }
 }
 
