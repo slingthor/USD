@@ -78,10 +78,8 @@ MtlfUniformBlock::Update(const void *data, int size)
             ARCH_PRAGMA_POP
         }
     }
-    
-    if (_size != size) {
-        _size = size;
-    }
+
+    _size = size;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
