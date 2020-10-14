@@ -56,6 +56,9 @@ UsdAppUtilsFrameRecorder::UsdAppUtilsFrameRecorder() :
     _driver.driver = VtValue(_hgi.get());
 
     _imagingEngine.reset(new UsdImagingGLEngine(_driver));
+    
+	// Apple Metal: Don't initialise GL
+//  GlfGlewInit();
 }
 
 UsdAppUtilsFrameRecorder::~UsdAppUtilsFrameRecorder()
