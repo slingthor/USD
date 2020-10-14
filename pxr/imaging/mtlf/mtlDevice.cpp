@@ -898,9 +898,21 @@ void MtlfMetalContext::SetUniformBuffer(
     threadState.boundBuffers.push_back(bufferInfo);
 }
 
-void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name)
+void MtlfMetalContext::SetVertexBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name)
 {
     BufferBinding *bufferInfo = new BufferBinding{index, buffer, name, kMSL_ProgramStage_Vertex, 0, true};
+    threadState.boundBuffers.push_back(bufferInfo);
+
+    if (name == points) {
+        threadState.vertexPositionBuffer = buffer;
+    }
+    
+    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
+}
+
+void MtlfMetalContext::SetFragmentBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name)
+{
+    BufferBinding *bufferInfo = new BufferBinding{index, buffer, name, kMSL_ProgramStage_Fragment, 0, true};
     threadState.boundBuffers.push_back(bufferInfo);
 
     if (name == points) {

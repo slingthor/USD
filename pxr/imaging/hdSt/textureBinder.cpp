@@ -159,13 +159,6 @@ public:
             std::make_shared<HdSt_BindlessSamplerBufferSource>(
                 name,
                 sampler.GetTexelsGLTextureHandle()));
-
-        sources->push_back(
-            std::make_shared<HdSt_BindlessSamplerBufferSource>(
-                _Concat(
-                    name,
-                    HdSt_ResourceBindingSuffixTokens->layout),
-                sampler.GetLayoutGLTextureHandle()));
     }
 
     static void Compute(

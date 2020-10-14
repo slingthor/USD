@@ -22,7 +22,6 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include <GL/glew.h>
-#include "pxr/imaging/hgiGL/buffer.h"
 #include "pxr/imaging/hgiGL/diagnostic.h"
 #include "pxr/imaging/hgiGL/conversions.h"
 #include "pxr/imaging/hgiGL/texture.h"
@@ -383,47 +382,6 @@ HgiGLTexture::HgiGLTexture(HgiTextureViewDesc const & desc)
     glTextureParameterf(_textureId, GL_TEXTURE_MAX_ANISOTROPY_EXT,aniso);
     glTextureParameteri(_textureId, GL_TEXTURE_BASE_LEVEL, /*low-mip*/0);
     glTextureParameteri(_textureId, GL_TEXTURE_MAX_LEVEL, /*hi-mip*/mips-1);
-
-    HGIGL_POST_PENDING_GL_ERRORS();
-}
-
-HgiGLTexture::HgiGLTexture(HgiTextureBufferDesc const & desc)
-    : HgiTexture(HgiTextureDesc())
-    , _textureId(0)
-{
-    // Update the texture descriptor to reflect the view desc
-    _descriptor.debugName = desc.debugName;
-    _descriptor.usage = desc.usage;
-    _descriptor.dimensions = GfVec3i(desc.width, 1, 1);
-    _descriptor.format = desc.format;
-
-    HgiGLBuffer* srcBuffer =
-        static_cast<HgiGLBuffer*>(desc.sourceBuffer.Get());
-    GLenum glInternalFormat = 0;
-    GLenum glFormat = 0;
-    GLenum glPixelType = 0;
-    HgiGLConversions::GetFormat(
-        desc.format,
-        &glFormat,
-        &glPixelType,
-        &glInternalFormat);
-
-    // Note we must use glGenTextures, not glCreateTextures.
-    // glTextureView requires the textureId to be unbound and not given a type.
-    glGenTextures(1, &_textureId);
-
-    glTextureBuffer(_textureId, glInternalFormat, srcBuffer->GetBufferId());
-
-    if (!desc.debugName.empty()) {
-        glObjectLabel(GL_TEXTURE, _textureId, -1, desc.debugName.c_str());
-    }
-
-    glTextureParameteri(_textureId, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTextureParameteri(_textureId, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTextureParameteri(_textureId, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-    glTextureParameteri(_textureId, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTextureParameteri(_textureId, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     HGIGL_POST_PENDING_GL_ERRORS();
 }

@@ -591,11 +591,10 @@ public:
 
         const HdBinding layoutBinding = binder.GetBinding(
             HdSt_ResourceBinder::_Concat(name, HdSt_ResourceBindingSuffixTokens->layout));
-        const int layoutSamplerUnit = layoutBinding.GetTextureUnit();
-
-        glActiveTexture(GL_TEXTURE0 + layoutSamplerUnit);
-        glBindTexture(GL_TEXTURE_BUFFER,
-                      bind ? texture.GetLayoutTexture()->GetRawResource() : 0);
+        const int layoutBufferLocation = layoutBinding.GetLocation();
+        
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, layoutBufferLocation,
+            bind ? texture.GetLayoutBuffer()->GetRawResource() : 0);
     }
 
     static void Compute(

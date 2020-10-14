@@ -136,6 +136,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (dvec2)
     (dvec3)
     (dvec4)
+    (mat2)
     (mat3)
     (mat4)
     (dmat3)
@@ -2723,6 +2724,7 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "#define vec2 float2\n"
             << "#define vec3 float3\n"
             << "#define vec4 float4\n"
+            << "#define mat2 float2x2\n"
             << "#define mat3 float3x3\n"
             << "#define mat4 float4x4\n"
             << "#define ivec2 int2\n"
@@ -2734,6 +2736,7 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "#define dvec2 float2\n"
             << "#define dvec3 float3\n"
             << "#define dvec4 float4\n"
+            << "#define dmat2 float2x2\n"
             << "#define dmat3 float3x3\n"
             << "#define dmat4 float4x4\n";
     
@@ -5375,11 +5378,11 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             // appending '_layout' for layout is by convention.
             std::string texelBindName("textureBind_" + it->second.name.GetString());
             std::string samplerBindName("samplerBind_" + it->second.name.GetString());
-            std::string layoutBindName("textureBind_" + it->second.name.GetString() + "_layout");
+            std::string layoutBindName("bufferBind_" + it->second.name.GetString() + "_layout");
             
             declarations
                 << "texture2d_array<float> " << texelBindName << ";\n"
-                << "texture_buffer<ushort> " << layoutBindName << ";\n"
+                << "const device ushort * " << layoutBindName << ";\n"
                 << "sampler " << samplerBindName << ";\n";
             
             _AddInputParam(_mslPSInputParams, TfToken(samplerBindName),
@@ -5392,9 +5395,8 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             HdBinding layoutBinding(HdBinding::TEXTURE_PTEX_LAYOUT,
                 it->first.GetLocation(),
                 it->first.GetTextureUnit());
-            _AddInputParam(_mslPSInputParams, TfToken(layoutBindName),
-                           TfToken("texture_buffer<ushort>"), TfToken(), layoutBinding).usage
-                |= HdSt_CodeGenMSL::TParam::Texture;
+            _AddInputPtrParam(_mslPSInputParams, TfToken(layoutBindName),
+                TfToken("ushort"), TfToken(), HdBinding(HdBinding::UNIFORM, 0));
 
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
@@ -5491,13 +5493,13 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             }
         } else if (bindingType == HdBinding::TRANSFORM_2D) {
             // Forward declare rotation, scale, and translation
-            accessors
-                << "float HdGet_" << it->second.name << "_"
-                << HdStTokens->rotation  << "();\n"
-                << "vec2 HdGet_" << it->second.name << "_"
-                << HdStTokens->scale  << "();\n"
-                << "vec2 HdGet_" << it->second.name << "_"
-                << HdStTokens->translation  << "();\n";
+//            accessors
+//                << "float HdGet_" << it->second.name << "_"
+//                << HdStTokens->rotation  << "();\n"
+//                << "vec2 HdGet_" << it->second.name << "_"
+//                << HdStTokens->scale  << "();\n"
+//                << "vec2 HdGet_" << it->second.name << "_"
+//                << HdStTokens->translation  << "();\n";
 
             // vec2 HdGet_name(int localIndex)
             accessors

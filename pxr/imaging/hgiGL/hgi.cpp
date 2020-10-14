@@ -147,31 +147,6 @@ HgiGL::DestroyTextureView(HgiTextureViewHandle* viewHandle)
     *viewHandle = HgiTextureViewHandle();
 }
 
-HgiTextureBufferHandle
-HgiGL::CreateTextureBuffer(HgiTextureBufferDesc const & desc)
-{
-    if (!desc.sourceBuffer) {
-        TF_CODING_ERROR("Source buffer is null");
-    }
-
-    HgiTextureHandle src =
-        HgiTextureHandle(new HgiGLTexture(desc), GetUniqueId());
-    HgiTextureBuffer* textureBuffer = new HgiTextureBuffer(desc);
-    textureBuffer->SetTextureBuffer(src);
-    return HgiTextureBufferHandle(textureBuffer, GetUniqueId());
-}
-
-void
-HgiGL::DestroyTextureBuffer(HgiTextureBufferHandle* textureBufferHandle)
-{
-    // Trash the texture inside the view and invalidate the view handle.
-    HgiTextureHandle texHandle = (*textureBufferHandle)->GetTextureBuffer();
-    _TrashObject(&texHandle, _garbageCollector.GetTextureList());
-    (*textureBufferHandle)->SetTextureBuffer(HgiTextureHandle());
-    delete textureBufferHandle->Get();
-    *textureBufferHandle = HgiTextureBufferHandle();
-}
-
 HgiSamplerHandle
 HgiGL::CreateSampler(HgiSamplerDesc const & desc)
 {

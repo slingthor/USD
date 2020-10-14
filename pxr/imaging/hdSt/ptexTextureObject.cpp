@@ -134,17 +134,10 @@ HdStPtexTextureObject::_DestroyTextures()
         if (_texelTexture) {
             hgi->DestroyTexture(&_texelTexture);
         }
-        if (_layoutTexture) {
-            hgi->DestroyTextureBuffer(&_layoutTexture);
-        }
         if (_layoutBuffer) {
             hgi->DestroyBuffer(&_layoutBuffer);
         }
     }
-}
-
-HgiTextureHandle HdStPtexTextureObject::GetLayoutTexture() const {
-    return _layoutTexture->GetTextureBuffer();
 }
 
 void
@@ -353,15 +346,6 @@ HdStPtexTextureObject::_Commit()
         bufDesc.byteSize = _numFaces * 6 * sizeof(uint16_t);
         bufDesc.initialData = _layoutData.get();
         _layoutBuffer = hgi->CreateBuffer(bufDesc);
-    
-        // Create a texture buffer view for the layer buffer
-        HgiTextureBufferDesc texBufDesc;
-        texBufDesc.usage = HgiTextureUsageBitsShaderRead;
-        texBufDesc.format = HgiFormatUInt16;
-        texBufDesc.width = _numFaces * 6;
-        texBufDesc.sourceBuffer = _layoutBuffer;
-
-        _layoutTexture = hgi->CreateTextureBuffer(texBufDesc);
     }
     
     // Free CPU data

@@ -23,7 +23,6 @@
 //
 #include <Metal/Metal.h>
 
-#include "pxr/imaging/hgiMetal/buffer.h"
 #include "pxr/imaging/hgiMetal/capabilities.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
@@ -219,47 +218,6 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureViewDesc const & desc)
     _descriptor.format = desc.format;
     _descriptor.layerCount = desc.layerCount;
     _descriptor.mipLevels = desc.mipLevels;
-}
-
-HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi,
-                                 HgiTextureBufferDesc const & desc)
-    : HgiTexture(HgiTextureDesc())
-    , _textureId(nil)
-{
-    HgiMetalBuffer* srcBuffer =
-        static_cast<HgiMetalBuffer*>(desc.sourceBuffer.Get());
-    MTLPixelFormat mtlFormat =
-        HgiMetalConversions::GetPixelFormat(desc.format);
-    MTLResourceOptions resourceOptions =
-        srcBuffer->GetBufferId().resourceOptions;
-    MTLTextureUsage usage = MTLTextureUsageUnknown;
-    
-    if (desc.usage & HgiTextureUsageBitsShaderRead) {
-        usage |= MTLTextureUsageShaderRead;
-    }
-    if (desc.usage & HgiTextureUsageBitsShaderWrite) {
-        usage |= MTLTextureUsageShaderWrite;
-    }
-
-    MTLTextureDescriptor* texDesc;
-
-    texDesc =
-        [MTLTextureDescriptor
-         textureBufferDescriptorWithPixelFormat:mtlFormat
-                                          width:desc.width
-                                resourceOptions:resourceOptions
-                                          usage:usage];
-    
-    _textureId = [srcBuffer->GetBufferId()
-                  newTextureWithDescriptor:texDesc
-                                    offset:0
-                               bytesPerRow:srcBuffer->GetDescriptor().byteSize];
-    
-    // Update the texture descriptor to reflect the above
-    _descriptor.debugName = desc.debugName;
-    _descriptor.usage = desc.usage;
-    _descriptor.format = desc.format;
-    _descriptor.dimensions = GfVec3i(desc.width, 1, 1);
 }
 
 HgiMetalTexture::~HgiMetalTexture()

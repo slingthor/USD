@@ -36,8 +36,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-using HgiBufferHandle = HgiHandle<class HgiBuffer>;
-
 /// \struct HgiComponentMapping
 ///
 /// Describes color component mapping.
@@ -314,91 +312,6 @@ private:
 template class HgiHandle<class HgiTextureView>;
 using HgiTextureViewHandle = HgiHandle<class HgiTextureView>;
 using HgiTextureViewHandleVector = std::vector<HgiTextureViewHandle>;
-
-/// \struct HgiTextureBufferDesc
-///
-/// Describes the properties needed to create a GPU texture buffer from an
-/// existing GPU buffer object.
-///
-/// <ul>
-/// <li>debugName:
-///   This label can be applied as debug label for GPU debugging.</li>
-/// <li>usage:
-///   Describes how the texture is intended to be used.</li>
-/// <li>format:
-///   The format of the texture buffer.</li>
-/// <li>width:
-///   The width of the texture.</li>
-/// <li>sourceBuffer:
-///   Handle to the HgiBuffer to be used as the source data backing.</li>
-/// </ul>
-///
-struct HgiTextureBufferDesc
-{
-    HgiTextureBufferDesc()
-    : usage(0)
-    , format(HgiFormatInvalid)
-    , width(0)
-    , sourceBuffer()
-    {}
-
-    std::string debugName;
-    HgiTextureUsage usage;
-    HgiFormat format;
-    int32_t width;
-    HgiBufferHandle sourceBuffer;
-};
-
-HGI_API
-bool operator==(
-    const HgiTextureBufferDesc& lhs,
-    const HgiTextureBufferDesc& rhs);
-
-HGI_API
-bool operator!=(
-    const HgiTextureBufferDesc& lhs,
-    const HgiTextureBufferDesc& rhs);
-///
-/// \class HgiTextureBuffer
-///
-/// Represents a graphics platform independent GPU texture buffer resource.
-/// Texture Buffers should be created via Hgi::CreateTextureBuffer.
-///
-/// A TextureBuffer aliases the data of another buffer and is a thin wrapper
-/// around a HgiBufferHandle. The embeded texture handle is used to add
-/// the buffer to texture resource bindings for use in shaders.
-///
-class HgiTextureBuffer
-{
-public:
-    HGI_API
-    HgiTextureBuffer(HgiTextureBufferDesc const& desc);
-
-    HGI_API
-    virtual ~HgiTextureBuffer();
-
-    /// Set the handle to the buffer that aliases another texture.
-    HGI_API
-    void SetTextureBuffer(HgiTextureHandle const& handle);
-
-    /// Returns the handle to the buffer that aliases another texture.
-    HGI_API
-    HgiTextureHandle const& GetTextureBuffer() const;
-
-protected:
-    HgiTextureHandle _textureBuffer;
-
-private:
-    HgiTextureBuffer() = delete;
-    HgiTextureBuffer & operator=(const HgiTextureBuffer&) = delete;
-    HgiTextureBuffer(const HgiTextureBuffer&) = delete;
-};
-
-
-/// Explicitly instantiate and define texture view handle
-template class HgiHandle<class HgiTextureBuffer>;
-using HgiTextureBufferHandle = HgiHandle<class HgiTextureBuffer>;
-using HgiTextureBufferHandleVector = std::vector<HgiTextureBufferHandle>;
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

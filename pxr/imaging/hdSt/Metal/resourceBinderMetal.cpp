@@ -168,7 +168,7 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
                 buffer->GetStride(),
                 offset,
                 name);
-            MtlfMetalContext::GetMetalContext()->SetBuffer(shaderBinding->_index, metalBuffer, name);
+            MtlfMetalContext::GetMetalContext()->SetVertexBuffer(shaderBinding->_index, metalBuffer, name);
             break;
         case kMSL_BindingType_UniformBuffer:
             context->SetUniformBuffer(shaderBinding->_index, metalBuffer, name, shaderBinding->_stage, offset);
@@ -352,13 +352,14 @@ public:
         
         // Bind the layout
         {
-            auto metalTexture = dynamic_cast<HgiMetalTexture const*>(
-                texture.GetLayoutTexture().Get());
+            auto metalBuffer = dynamic_cast<HgiMetalBuffer const*>(
+                texture.GetLayoutBuffer().Get());
 
-            mslProgram.BindTexture(
+            mslProgram.BindBuffer(
                 HdSt_ResourceBinder::_Concat(
                     name, HdSt_ResourceBindingSuffixTokens->layout),
-                metalTexture?metalTexture->GetTextureId():nil);
+                metalBuffer?metalBuffer->GetBufferId():nil,
+                true);
         }
     }
 

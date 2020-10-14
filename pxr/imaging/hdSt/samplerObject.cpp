@@ -364,10 +364,7 @@ HdStPtexSamplerObject::HdStPtexSamplerObject(
       _GenGlTextureHandle(
           ptexTexture.GetTexelTexture(),
           createBindlessHandle && ptexTexture.IsValid()))
-  , _layoutGLTextureHandle(
-      _GenGlTextureHandle(
-          ptexTexture.GetLayoutTexture(),
-          createBindlessHandle && ptexTexture.IsValid()))
+  , _layoutBuffer(ptexTexture.GetLayoutBuffer())
 {
 }
 

@@ -81,7 +81,7 @@ public:
     /// Only valid after commit phase.
     ///
     HDST_API
-    HgiTextureHandle GetLayoutTexture() const;
+    HgiBufferHandle GetLayoutBuffer() const { return _layoutBuffer; }
 
     HDST_API
     bool IsValid() const override;
@@ -109,7 +109,6 @@ private:
 
     HgiTextureHandle _texelTexture;
     HgiBufferHandle _layoutBuffer;
-    HgiTextureBufferHandle _layoutTexture;
 
     void _DestroyTextures();
 };

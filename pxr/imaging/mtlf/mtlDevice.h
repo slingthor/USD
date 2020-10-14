@@ -241,8 +241,11 @@ public:
              int oldStyleUniformSize);
 
     MTLF_API
-    void SetBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name);	//Implementation binds this as a vertex buffer!
-    
+    void SetVertexBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name);	//Implementation binds this as a vertex buffer!
+
+    MTLF_API
+    void SetFragmentBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name);    //Implementation binds this as a vertex buffer!
+
     MTLF_API
     void SetIndexBuffer(id<MTLBuffer> const buffer);
 

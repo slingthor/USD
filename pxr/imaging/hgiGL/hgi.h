@@ -83,14 +83,6 @@ public:
     void DestroyTextureView(HgiTextureViewHandle* viewHandle) override;
 
     HGIGL_API
-    HgiTextureBufferHandle CreateTextureBuffer(
-        HgiTextureBufferDesc const& desc) override;
-
-    HGIGL_API
-    void DestroyTextureBuffer(
-        HgiTextureBufferHandle* textureBufferHandle) override;
-
-    HGIGL_API
     HgiSamplerHandle CreateSampler(HgiSamplerDesc const & desc) override;
 
     HGIGL_API
