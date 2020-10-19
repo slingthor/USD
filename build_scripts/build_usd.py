@@ -440,7 +440,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
     if targetMacOS or targetIOS:
         osx_rpath = "-DCMAKE_MACOSX_RPATH=ON"
 
-    extraArgs = buildArgs
+    extraArgs = copy.deepcopy(buildArgs)
 
     # TEMPORARY WORKAROUND
     if targetMacOS or targetIOS:
