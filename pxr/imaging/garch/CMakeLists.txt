@@ -112,6 +112,7 @@ pxr_library(garch
         ${GARCH_GLPLATFORMCONTEXT}.h
 
     PRIVATE_HEADERS
+        rankedTypeMap.h
         ${GARCH_GLPLATFORMDEBUGWINDOW}.h
 
     PYTHON_CPPFILES
