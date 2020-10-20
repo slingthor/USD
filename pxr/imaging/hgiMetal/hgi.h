@@ -225,7 +225,6 @@ public:
     MTLRenderPassDescriptor *renderPassDescriptor;
     
     int _sampleCount;
-    bool _needsFlip;
     
     HGIMETAL_API
     void StartFrame(bool capture);

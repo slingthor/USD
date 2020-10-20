@@ -645,7 +645,7 @@ MtlfDrawTarget::WriteToFile(std::string const & name,
     storage.hioFormat = GarchGetHioFormat(a->GetFormat(),
                                         a->GetType(),
                                         /* isSRGB */ isSRGB);
-    storage.flipped = hgiMetal->_needsFlip;
+    storage.flipped = false;
     storage.data = buf;
 
     HioImageSharedPtr image = HioImage::OpenForWriting(filename);

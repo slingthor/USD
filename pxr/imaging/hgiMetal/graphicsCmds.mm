@@ -203,16 +203,29 @@ HgiMetalGraphicsCmds::_CreateEncoder()
 void
 HgiMetalGraphicsCmds::SetViewport(GfVec4i const& vp)
 {
-    double x = vp[0];
-    double y = vp[1];
-    double w = vp[2];
-    double h = vp[3];
+    double offsetX = vp[0];
+    double offsetY = vp[1];
+    double width = vp[2];
+    double height = vp[3];
+#if 1
     if (_encoder) {
-        [_encoder setViewport:(MTLViewport){x, y, w, h, 0.0, 1.0}];
+        [_encoder setViewport:(MTLViewport){
+            offsetX, offsetY, width, height, 0.0, 1.0}];
     }
     else {
-        _viewport = (MTLViewport){x, y, w, h, 0.0, 1.0};
+        _viewport = (MTLViewport){
+            offsetX, offsetY, width, height, 0.0, 1.0};
     }
+#else
+    if (_encoder) {
+        [_encoder setViewport:(MTLViewport){
+            offsetX, height - offsetY, width, -height, 0.0, 1.0}];
+    }
+    else {
+        _viewport = (MTLViewport){
+            offsetX, height - offsetY, width, -height, 0.0, 1.0};
+    }
+#endif
     _viewportSet = true;
 }
 

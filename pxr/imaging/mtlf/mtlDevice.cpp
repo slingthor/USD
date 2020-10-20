@@ -1793,7 +1793,16 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
                 TF_FATAL_CODING_ERROR("Can ony pass null renderPassDescriptor if the render encoder is currently active");
             }
             wq->currentRenderEncoder = [wq->commandBuffer renderCommandEncoderWithDescriptor: wq->currentRenderPassDescriptor];
-            //_PatchRenderPassDescriptor();
+            double w = 0.0;
+            double h = 0.0;
+            if (wq->currentRenderPassDescriptor.colorAttachments[0].texture) {
+                w = wq->currentRenderPassDescriptor.colorAttachments[0].texture.width;
+                h = wq->currentRenderPassDescriptor.colorAttachments[0].texture.height;
+            } else if (wq->currentRenderPassDescriptor.depthAttachment) {
+                w = wq->currentRenderPassDescriptor.depthAttachment.texture.width;
+                h = wq->currentRenderPassDescriptor.depthAttachment.texture.height;
+            }
+            [wq->currentRenderEncoder setViewport:(MTLViewport){0, h, w, -h, 0.0, 1.0}];
 
             // Since the encoder is new we'll need to emit all the state again
             threadState.dirtyRenderState = 0xffffffff;

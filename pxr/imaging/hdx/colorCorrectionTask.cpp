@@ -406,7 +406,7 @@ HdxColorCorrectionTask::_CreateBufferResources()
     vboDesc.debugName = "HdxColorCorrectionTask VertexBuffer";
     vboDesc.usage = HgiBufferUsageVertex;
     vboDesc.initialData = vertices;
-    vboDesc.byteSize = sizeof(vertices) * sizeof(vertices[0]);
+    vboDesc.byteSize = sizeof(vertices);
     vboDesc.vertexStride = elementsPerVertex * sizeof(vertices[0]);
     _vertexBuffer = _GetHgi()->CreateBuffer(vboDesc);
 

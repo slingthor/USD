@@ -2254,7 +2254,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     } else {
         fsInputCode << "    scope.gl_FragCoord.zw = scope.gl_Position.zw;\n";
         fsInputCode << "    vec2 xy = scope.gl_Position.xy / scope.gl_Position.w;\n";
-        fsInputCode << "    xy.y *= -1.0;\n";
+        //fsInputCode << "    xy.y *= -1.0;\n";
         fsInputCode << "    xy += 1.0;\n";
         fsInputCode << "    scope.gl_FragCoord.xy = xy * 0.5 * vec2(fragExtras->renderTargetWidth, fragExtras->renderTargetHeight);\n";
     }

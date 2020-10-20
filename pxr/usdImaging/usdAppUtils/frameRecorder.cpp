@@ -314,7 +314,7 @@ UsdAppUtilsFrameRecorder::Record(
     return _WriteTextureToFile(handle.Get()->GetDescriptor(),
                                buffer,
                                outputImagePath,
-                               false);
+                               true);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
