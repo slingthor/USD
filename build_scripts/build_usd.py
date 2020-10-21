@@ -101,15 +101,53 @@ def Python3():
 def GetLocale():
     return sys.stdout.encoding or locale.getdefaultlocale()[1] or "UTF-8"
 
-def GetCommandOutput(command):
-    """Executes the specified command and returns output or None."""
+def GetCommandOutput(command, captureStdErr=True):
+    """Executes the specified command and returns output or None.
+    If command contains pipes (i.e '|'s), creates a subprocess for
+    each pipe in command, returning the output from the last subcommand
+    or None if any of the subcommands result in a CalledProcessError"""
+
+    result = None
+
+    args = shlex.split(command)
+    commands = []
+    cmd_args = []
+    while args:
+        arg = args.pop(0)
+        if arg == '|':
+            commands.append((cmd_args))
+            cmd_args = []
+        else:
+            cmd_args.append(arg)
+    commands.append((cmd_args))
+
+    pipes = []
+    while len(commands) > 1:
+        # We have some pipes
+        command = commands.pop(0)
+        stdin = pipes[-1].stdout if pipes else None
+        try:
+            pipe = subprocess.Popen(command, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE if captureStdErr else None)
+            pipes.append(pipe)
+        except subprocess.CalledProcessError:
+            return None
+
+    # The last command actually returns a result
+    command = commands[0]
     try:
-        return subprocess.check_output(
-            shlex.split(command), 
-            stderr=subprocess.STDOUT).decode(GetLocale(), 'replace').strip()
+        stdin = pipes[-1].stdout if pipes else None
+        result = subprocess.check_output(
+            command,
+            stdin = stdin,
+            stderr=subprocess.STDOUT if captureStdErr else None).decode('utf-8').strip()
     except subprocess.CalledProcessError:
         pass
-    return None
+
+    # clean-up
+    for pipe in pipes:
+        pipe.wait()
+    
+    return result
 
 def GetMacArch():
     macArch = GetCommandOutput('arch').strip()
@@ -473,6 +511,12 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
 
         CODE_SIGN_ID = CheckCodeSignID()
 
+        DEVELOPMENT_TEAM = os.environ.get('XCODE_ATTRIBUTE_DEVELOPMENT_TEAM')
+        if DEVELOPMENT_TEAM is None and not CODE_SIGN_ID == "-":
+            x509subject = GetCommandOutput('security find-certificate -c "{}" -p | openssl x509 -subject | head -1'.format(CODE_SIGN_ID)).strip()
+            # Extract the Organizational Unit (OU field) from the cert
+            DEVELOPMENT_TEAM = [elm for elm in x509subject.split('/') if elm.startswith('OU')][0].split('=')[1]
+
         # Edge case for iOS
         if CODE_SIGN_ID == "-":
             CODE_SIGN_ID = ""
@@ -488,7 +532,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
                 '-DPYTHON_LIBRARY=/System/Library/Frameworks/Python.framework/Versions/2.7/lib '
                 '-DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python '.format(
                     codesignid=CODE_SIGN_ID,
-                    developmentTeam=os.environ.get('XCODE_ATTRIBUTE_DEVELOPMENT_TEAM')))
+                    developmentTeam=DEVELOPMENT_TEAM))
 
     # We use -DCMAKE_BUILD_TYPE for single-configuration generators 
     # (Ninja, make), and --config for multi-configuration generators 
@@ -3115,9 +3159,6 @@ for dir in [context.usdInstDir, context.instDir, context.srcDir,
                    .format(dir=dir))
         sys.exit(1)
 
-if args.make_relocatable:
-    CheckCodeSignID()
-
 # Output dependency order
 with open(context.usdInstDir + '/dependencies.txt', 'wt') as file:
     def GetName(dep):
@@ -3159,6 +3200,7 @@ if Windows():
     ])
 
 if args.make_relocatable:
+    CheckCodeSignID()
     from make_relocatable import make_relocatable
     make_relocatable(context.usdInstDir, context.buildPython, iOS(), verbosity > 1)
 
