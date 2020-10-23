@@ -19,6 +19,16 @@ if (OPENSUBDIV_HAS_METAL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
 endif()
 
+set(optionalPublicClasses "")
+set(optionalLibs "")
+set(optionalIncludeDirs "")
+if (PXR_ENABLE_PTEX_SUPPORT)
+    list(APPEND optionalPublicClasses ptexMipmapTextureLoader)
+    list(APPEND optionalLibs ${PTEX_LIBRARY})
+    list(APPEND optionalIncludeDirs ${PTEX_INCLUDE_DIR})
+endif()
+
+
 set(GFX "")
 set(GFXADDITIONAL "")
 set(GFXADDITIONALPUBLIC "")
@@ -69,10 +79,12 @@ pxr_library(hdSt
         ${GFX}
         ${GLEW_LIBRARY}
         ${OPENSUBDIV_LIBRARIES}
+        ${optionalLibs}
 
     INCLUDE_DIRS
         ${GLEW_INCLUDE_DIR}
         ${OPENSUBDIV_INCLUDE_DIR}
+        ${optionalIncludeDirs}
 
     PUBLIC_CLASSES
         basisCurves
@@ -115,6 +127,7 @@ pxr_library(hdSt
         mixinShader
         package
         points
+        ptexTextureObject
         renderBuffer
         renderDelegate
         renderPass
@@ -132,6 +145,7 @@ pxr_library(hdSt
         surfaceShader
         texture
         textureBinder
+        textureCpuData
         textureHandle
         textureHandleRegistry
         textureIdentifier
@@ -140,15 +154,16 @@ pxr_library(hdSt
         textureResource
         textureResourceHandle
         tokens
+        udimTextureObject
         vboMemoryManager
         vboSimpleMemoryManager
         volume
+        ${optionalPublicClasses}
         ${GFXADDITIONALPUBLIC}
 
     PUBLIC_HEADERS
         api.h
         dynamicUvTextureImplementation.h
-        textureCpuData.h
 
     PRIVATE_CLASSES
         basisCurvesComputations
@@ -201,8 +216,7 @@ pxr_library(hdSt
         shaders/meshWire.glslfx
         shaders/points.glslfx
         shaders/pointId.glslfx
-        shaders/ptexTextureGL.glslfx
-        shaders/ptexTextureMetal.glslfx
+        shaders/ptexTexture.glslfx
         shaders/renderPass.glslfx
         shaders/renderPassShader.glslfx
         shaders/simpleLightingShader.glslfx

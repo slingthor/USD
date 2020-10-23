@@ -26,18 +26,26 @@
 #include "pxr/imaging/garch/simpleLightingContext.h"
 #include "pxr/imaging/garch/bindingMap.h"
 #include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/debugCodes.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/garch/simpleMaterial.h"
 #include "pxr/imaging/garch/uniformBlock.h"
+#include "pxr/imaging/hio/glslfx.h"
 
+#include "pxr/base/arch/hash.h"
 #include "pxr/base/arch/pragmas.h"
+#include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/staticData.h"
 #include "pxr/base/tf/staticTokens.h"
 
+#include "pxr/base/trace/trace.h"
+
 #include <algorithm>
 #include <iostream>
+#include <set>
+#include <sstream>
 #include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -49,6 +57,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((shadowUB, "Shadow"))
     ((bindlessShadowUB, "BindlessShadowSamplers"))
     ((materialUB, "Material"))
+    ((postSurfaceShaderUB, "PostSurfaceShaderParams"))
     ((shadowSampler, "shadowTexture"))
     ((shadowCompareSampler, "shadowCompareTexture"))
 );
@@ -79,7 +88,8 @@ GarchSimpleLightingContext::GarchSimpleLightingContext() :
     _useColorMaterialDiffuse(false),
     _lightingUniformBlockValid(false),
     _shadowUniformBlockValid(false),
-    _materialUniformBlockValid(false)
+    _materialUniformBlockValid(false),
+    _postSurfaceShaderStateValid(false)
 {
 }
 
@@ -93,6 +103,7 @@ GarchSimpleLightingContext::SetLights(GarchSimpleLightVector const & lights)
     _lights = lights;
     _lightingUniformBlockValid = false;
     _shadowUniformBlockValid = false;
+    _postSurfaceShaderStateValid = false;
 
     int numLights = GetNumLightsUsed();
 
@@ -228,6 +239,7 @@ GarchSimpleLightingContext::InitUniformBlockBindings(
     bindingMap->GetUniformBinding(_tokens->lightingUB);
     bindingMap->GetUniformBinding(_tokens->shadowUB);
     bindingMap->GetUniformBinding(_tokens->materialUB);
+    bindingMap->GetUniformBinding(_tokens->postSurfaceShaderUB);
     
     if (GarchSimpleShadowArray::GetBindlessShadowMapsEnabled()) {
         bindingMap->GetUniformBinding(_tokens->bindlessShadowUB);
@@ -502,7 +514,224 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
     }
 
     _materialUniformBlock->Bind(bindingMap, _tokens->materialUB);
+    
+    _BindPostSurfaceShaderParams(bindingMap);
 }
 
+class GarchSimpleLightingContext::_PostSurfaceShaderState {
+public:
+    _PostSurfaceShaderState(size_t hash, GarchSimpleLightVector const & lights)
+        : _hash(hash)
+    {
+        _Init(lights);
+    }
+
+    std::string const & GetShaderSource() const {
+        return _shaderSource;
+    }
+
+    GarchUniformBlockRefPtr const & GetUniformBlock() const {
+        return _uniformBlock;
+    }
+
+    size_t GetHash() const {
+        return _hash;
+    }
+
+private:
+    void _Init(GarchSimpleLightVector const & lights);
+
+    std::string _shaderSource;;
+    GarchUniformBlockRefPtr _uniformBlock;
+    size_t _hash;
+};
+
+void
+GarchSimpleLightingContext::_PostSurfaceShaderState::_Init(
+        GarchSimpleLightVector const & lights)
+{
+    TRACE_FUNCTION();
+
+    // Generate shader code and aggregate uniform block data
+
+    //
+    // layout(std140) uniform PostSurfaceShaderParams {
+    //     MurkPostParams light1;
+    //     CausticsParams light2;
+    //     ...
+    // } postSurface;
+    //
+    // MAT4 GetWorldToViewInverseMatrix();
+    // vec4 postSurfaceShader(vec4 Peye, vec3 Neye, vec4 color)
+    // {
+    //   vec4 Pworld = vec4(GetWorldToViewInverseMatrix() * Peye);
+    //   color = ApplyMurkPostWorldSpace(postSurface.light1,color,Pworld.xyz);
+    //   color = ApplyCausticsWorldSpace(postSurface.light2,color,Pworld.xyz);
+    //   ...
+    //   return color
+    // }
+    //
+    std::stringstream lightsSourceStr;
+    std::stringstream paramsSourceStr;
+    std::stringstream applySourceStr;
+
+    std::vector<uint8_t> uniformData;
+
+    std::set<TfToken> activeShaderIdentifiers;
+    size_t activeShaders = 0;
+    for (GarchSimpleLight const & light: lights) {
+
+        TfToken const & shaderIdentifier = light.GetPostSurfaceIdentifier();
+        std::string const & shaderSource = light.GetPostSurfaceShaderSource();
+        VtUCharArray const & shaderParams = light.GetPostSurfaceShaderParams();
+
+        if (shaderIdentifier.IsEmpty() ||
+            shaderSource.empty() ||
+            shaderParams.empty()) {
+            continue;
+        }
+
+        // omit lights with misaligned parameter data
+        // GLSL std140 packing has a base alignment of "vec4"
+        size_t const std140Alignment = 4*sizeof(float);
+        if ((shaderParams.size() % std140Alignment) != 0) {
+            TF_CODING_ERROR("Invalid shader params size (%zd bytes) "
+                            "for %s (must be a multiple of %zd)\n",
+                            shaderParams.size(),
+                            light.GetID().GetText(),
+                            std140Alignment);
+            continue;
+        }
+
+        TF_DEBUG(GARCH_DEBUG_POST_SURFACE_LIGHTING).Msg(
+                "PostSurfaceLight: %s: %s\n",
+                shaderIdentifier.GetText(),
+                light.GetID().GetText());
+
+        ++activeShaders;
+
+        // emit per-light type shader source only one time
+        if (!activeShaderIdentifiers.count(shaderIdentifier)) {
+            activeShaderIdentifiers.insert(shaderIdentifier);
+            lightsSourceStr << shaderSource;
+        }
+
+        // add a per-light parameter declaration to the uniform block
+        paramsSourceStr << "    "
+                  << shaderIdentifier << "Params "
+                  << "light"<<activeShaders << ";\n";
+
+        // append a call to apply the shader with per-light parameters
+        applySourceStr << "    "
+                << "color = Apply"<<shaderIdentifier<<"WorldSpace("
+                << "postSurface.light"<<activeShaders << ", color, Pworld.xyz"
+                << ");\n";
+
+        uniformData.insert(uniformData.end(),
+                           shaderParams.begin(), shaderParams.end());
+    }
+
+    if (activeShaders < 1) {
+        return;
+    }
+
+    _shaderSource = lightsSourceStr.str();
+
+    _shaderSource +=
+        "layout(std140) uniform PostSurfaceShaderParams {\n";
+    _shaderSource += paramsSourceStr.str();
+    _shaderSource +=
+        "} postSurface;\n\n";
+
+    _shaderSource +=
+        "MAT4 GetWorldToViewInverseMatrix();\n"
+        "vec4 postSurfaceShader(vec4 Peye, vec3 Neye, vec4 color)\n"
+        "{\n"
+        "    vec4 Pworld = vec4(GetWorldToViewInverseMatrix() * Peye);\n"
+        "    color.rgb /= color.a;\n";
+    _shaderSource += applySourceStr.str();
+    _shaderSource +=
+        "    color.rgb *= color.a;\n"
+        "    return color;\n"
+        "}\n\n";
+
+    _uniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock(
+                        "_postSurfaceShaderUniformBlock");
+    _uniformBlock->Update(uniformData.data(), uniformData.size());
+}
+
+static size_t
+_ComputeHash(GarchSimpleLightVector const & lights)
+{
+    TRACE_FUNCTION();
+
+    // hash includes light type and shader source but not parameter values
+    size_t hash = 0;
+    for (GarchSimpleLight const & light: lights) {
+        TfToken const & identifier = light.GetPostSurfaceIdentifier();
+        std::string const & shaderSource = light.GetPostSurfaceShaderSource();
+
+        hash = ArchHash64(identifier.GetText(), identifier.size(), hash);
+        hash = ArchHash64(shaderSource.c_str(), shaderSource.size(), hash);
+    }
+
+    return hash;
+}
+
+void
+GarchSimpleLightingContext::_ComputePostSurfaceShaderState()
+{
+    size_t hash = _ComputeHash(GetLights());
+    if (!_postSurfaceShaderState ||
+                (_postSurfaceShaderState->GetHash() != hash)) {
+        _postSurfaceShaderState.reset(
+                new _PostSurfaceShaderState(hash, GetLights()));
+    }
+    _postSurfaceShaderStateValid = true;
+}
+
+size_t
+GarchSimpleLightingContext::ComputeShaderSourceHash()
+{
+    if (!_postSurfaceShaderStateValid) {
+        _ComputePostSurfaceShaderState();
+    }
+
+    if (_postSurfaceShaderState) {
+        return _postSurfaceShaderState->GetHash();
+    }
+
+    return 0;
+}
+
+std::string const &
+GarchSimpleLightingContext::ComputeShaderSource(TfToken const &shaderStageKey)
+{
+    if (!_postSurfaceShaderStateValid) {
+        _ComputePostSurfaceShaderState();
+    }
+
+    if (_postSurfaceShaderState &&
+                shaderStageKey==HioGlslfxTokens->fragmentShader) {
+        return _postSurfaceShaderState->GetShaderSource();
+    }
+
+    static const std::string empty;
+    return empty;
+}
+
+void
+GarchSimpleLightingContext::_BindPostSurfaceShaderParams(
+        GarchBindingMapPtr const &bindingMap)
+{
+    if (!_postSurfaceShaderStateValid) {
+        _ComputePostSurfaceShaderState();
+    }
+
+    if (_postSurfaceShaderState && _postSurfaceShaderState->GetUniformBlock()) {
+        _postSurfaceShaderState->GetUniformBlock()->
+                Bind(bindingMap, _tokens->postSurfaceShaderUB);
+    }
+}
 PXR_NAMESPACE_CLOSE_SCOPE
 

@@ -203,16 +203,29 @@ HgiMetalGraphicsCmds::_CreateEncoder()
 void
 HgiMetalGraphicsCmds::SetViewport(GfVec4i const& vp)
 {
-    double x = vp[0];
-    double y = vp[1];
-    double w = vp[2];
-    double h = vp[3];
+    double offsetX = vp[0];
+    double offsetY = vp[1];
+    double width = vp[2];
+    double height = vp[3];
+#if 1
     if (_encoder) {
-        [_encoder setViewport:(MTLViewport){x, y, w, h, 0.0, 1.0}];
+        [_encoder setViewport:(MTLViewport){
+            offsetX, offsetY, width, height, 0.0, 1.0}];
     }
     else {
-        _viewport = (MTLViewport){x, y, w, h, 0.0, 1.0};
+        _viewport = (MTLViewport){
+            offsetX, offsetY, width, height, 0.0, 1.0};
     }
+#else
+    if (_encoder) {
+        [_encoder setViewport:(MTLViewport){
+            offsetX, height - offsetY, width, -height, 0.0, 1.0}];
+    }
+    else {
+        _viewport = (MTLViewport){
+            offsetX, height - offsetY, width, -height, 0.0, 1.0};
+    }
+#endif
     _viewportSet = true;
 }
 
@@ -300,6 +313,53 @@ HgiMetalGraphicsCmds::BindVertexBuffers(
 }
 
 void
+HgiMetalGraphicsCmds::Draw(
+    uint32_t vertexCount,
+    uint32_t firstVertex,
+    uint32_t instanceCount)
+{
+    TF_VERIFY(instanceCount>0);
+
+    _CreateEncoder();
+    
+    MTLPrimitiveType type=HgiMetalConversions::GetPrimitiveType(_primitiveType);
+
+    if (instanceCount == 1) {
+        [_encoder drawPrimitives:type
+                     vertexStart:firstVertex
+                     vertexCount:vertexCount];
+    } else {
+        [_encoder drawPrimitives:type
+                     vertexStart:firstVertex
+                     vertexCount:vertexCount
+                   instanceCount:instanceCount];
+    }
+
+    _hasWork = true;
+}
+
+void
+HgiMetalGraphicsCmds::DrawIndirect(
+    HgiBufferHandle const& drawParameterBuffer,
+    uint32_t bufferOffset,
+    uint32_t drawCount,
+    uint32_t stride)
+{
+    _CreateEncoder();
+    
+    HgiMetalBuffer* drawBuf =
+        static_cast<HgiMetalBuffer*>(drawParameterBuffer.Get());
+
+    MTLPrimitiveType type=HgiMetalConversions::GetPrimitiveType(_primitiveType);
+
+    for (uint32_t i = 0; i < drawCount; i++) {
+        [_encoder drawPrimitives:type
+                  indirectBuffer:drawBuf->GetBufferId()
+            indirectBufferOffset:bufferOffset + (i * stride)];
+    }
+}
+
+void
 HgiMetalGraphicsCmds::DrawIndexed(
     HgiBufferHandle const& indexBuffer,
     uint32_t indexCount,
@@ -329,6 +389,37 @@ HgiMetalGraphicsCmds::DrawIndexed(
                        baseInstance:0];
 
     _hasWork = true;
+}
+
+void
+HgiMetalGraphicsCmds::DrawIndexedIndirect(
+    HgiBufferHandle const& indexBuffer,
+    HgiBufferHandle const& drawParameterBuffer,
+    uint32_t drawBufferOffset,
+    uint32_t drawCount,
+    uint32_t stride)
+{
+    _CreateEncoder();
+    
+    HgiMetalBuffer* indexBuf = static_cast<HgiMetalBuffer*>(indexBuffer.Get());
+    HgiBufferDesc const& indexDesc = indexBuf->GetDescriptor();
+
+    // We assume 32bit indices: GL_UNSIGNED_INT
+    TF_VERIFY(indexDesc.usage & HgiBufferUsageIndex32);
+
+    HgiMetalBuffer* drawBuf =
+        static_cast<HgiMetalBuffer*>(drawParameterBuffer.Get());
+
+    MTLPrimitiveType type=HgiMetalConversions::GetPrimitiveType(_primitiveType);
+
+    for (uint32_t i = 0; i < drawCount; i++) {
+        [_encoder drawIndexedPrimitives:type
+                              indexType:MTLIndexTypeUInt32
+                            indexBuffer:indexBuf->GetBufferId()
+                      indexBufferOffset:0
+                         indirectBuffer:drawBuf->GetBufferId()
+                   indirectBufferOffset:drawBufferOffset + (i * stride)];
+    }
 }
 
 void

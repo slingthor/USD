@@ -161,6 +161,9 @@ HgiInteropOpenGL::CompositeToInterop(
     }
 #endif
 
+    GLint restoreActiveTexture = 0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &restoreActiveTexture);
+
     // Setup shader program
     uint32_t prg = color && depth ? _prgDepth : _prgNoDepth;
     glUseProgram(prg);
@@ -271,9 +274,9 @@ HgiInteropOpenGL::CompositeToInterop(
 
     glUseProgram(0);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, 0);
     glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, 0);
 
 #if defined(GL_KHR_debug)
@@ -281,6 +284,8 @@ HgiInteropOpenGL::CompositeToInterop(
         glPopDebugGroup();
     }
 #endif
+
+    glActiveTexture(restoreActiveTexture);
 
     TF_VERIFY(glGetError() == GL_NO_ERROR);
 }

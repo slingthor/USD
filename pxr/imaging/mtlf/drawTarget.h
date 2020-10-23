@@ -126,6 +126,8 @@ public:
         /// Returns the GL type of the texture (GL_BYTE, GL_INT, GL_FLOAT...)
         GLenum GetType() const { return _type; }
 
+        MTLPixelFormat GetInternalFormat() const { return _internalFormat; }
+        
         /// Returns the attachment point index in the framebuffer.
         int GetAttach() const { return _attachmentIndex; }
         

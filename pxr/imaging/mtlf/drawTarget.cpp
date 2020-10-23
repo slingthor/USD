@@ -32,7 +32,7 @@
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/texture.h"
 
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/utils.h"
 
 #include "pxr/base/tf/stringUtils.h"
@@ -636,15 +636,19 @@ MtlfDrawTarget::WriteToFile(std::string const & name,
 
     HgiMetal* hgiMetal = MtlfMetalContext::GetMetalContext()->GetHgi();
 
-    GarchImage::StorageSpec storage;
+    MTLPixelFormat internalFormat = a->GetInternalFormat();
+    bool isSRGB = internalFormat == MTLPixelFormatRGBA8Unorm_sRGB;
+
+    HioImage::StorageSpec storage;
     storage.width = _size[0];
     storage.height = _size[1];
-    storage.format = a->GetFormat();
-    storage.type = a->GetType();
-    storage.flipped = hgiMetal->_needsFlip;
+    storage.format = GarchGetHioFormat(a->GetFormat(),
+                                        a->GetType(),
+                                        /* isSRGB */ isSRGB);
+    storage.flipped = false;
     storage.data = buf;
 
-    GarchImageSharedPtr image = GarchImage::OpenForWriting(filename);
+    HioImageSharedPtr image = HioImage::OpenForWriting(filename);
     bool writeSuccess = image && image->Write(storage, metadata);
 
     free(buf);

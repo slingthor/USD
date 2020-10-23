@@ -28,7 +28,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/api.h"
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/uvTexture.h"
 
 #include "pxr/base/tf/declarePtrs.h"
@@ -67,8 +67,8 @@ public:
         unsigned int cropBottom = 0,
         unsigned int cropLeft   = 0,
         unsigned int cropRight  = 0,
-        GarchImage::ImageOriginLocation originLocation =
-                            GarchImage::OriginUpperLeft);
+        HioImage::ImageOriginLocation originLocation =
+                            HioImage::OriginUpperLeft);
 
     GARCH_API
     static GarchArrayTextureRefPtr New(
@@ -78,8 +78,8 @@ public:
         unsigned int cropBottom = 0,
         unsigned int cropLeft   = 0,
         unsigned int cropRight  = 0,
-        GarchImage::ImageOriginLocation originLocation =
-                            GarchImage::OriginUpperLeft);
+        HioImage::ImageOriginLocation originLocation =
+                            HioImage::OriginUpperLeft);
 
     GARCH_API
     static bool IsSupportedImageFile(TfToken const &imageFilePath);
@@ -105,8 +105,8 @@ protected:
         unsigned int cropBottom,
         unsigned int cropLeft,
         unsigned int cropRight,
-        GarchImage::ImageOriginLocation originLocation =
-                        GarchImage::OriginUpperLeft);
+        HioImage::ImageOriginLocation originLocation =
+                        HioImage::OriginUpperLeft);
 
     GARCH_API
     virtual void _OnSetMemoryRequested(size_t targetMemory);

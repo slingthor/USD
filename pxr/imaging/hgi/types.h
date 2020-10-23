@@ -42,7 +42,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///
 /// For reference, see:
 ///   https://www.khronos.org/registry/vulkan/specs/1.1/html/vkspec.html#VkFormat
-enum HgiFormat
+enum HgiFormat : int
 {
     HgiFormatInvalid = -1,
 
@@ -71,6 +71,12 @@ enum HgiFormat
     HgiFormatFloat32Vec2,
     HgiFormatFloat32Vec3,
     HgiFormatFloat32Vec4,
+
+    // UInt16 - a 2-byte unsigned integer
+    HgiFormatUInt16,
+    HgiFormatUInt16Vec2,
+    HgiFormatUInt16Vec3,
+    HgiFormatUInt16Vec4,
 
     // Int32 - a 4-byte signed integer
     HgiFormatInt32,
@@ -159,6 +165,7 @@ std::vector<HgiMipInfo>
 HgiGetMipInfos(
     HgiFormat format,
     const GfVec3i& dimensions,
+    size_t layerCount,
     size_t dataByteSize = std::numeric_limits<size_t>::max());
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -21,21 +21,19 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef GARCH_IMAGE_H
-#define GARCH_IMAGE_H
+#ifndef PXR_IMAGING_HIO_IMAGE_H
+#define PXR_IMAGING_HIO_IMAGE_H
 
-/// \file garch/image.h
+/// \file hio/image.h
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/garch/api.h"
-#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/hio/api.h"
+#include "pxr/imaging/hio/types.h"
 
 #include "pxr/base/tf/token.h"
 #include "pxr/base/tf/type.h"
 #include "pxr/base/vt/dictionary.h"
 #include "pxr/base/vt/value.h"
-
-#include <boost/noncopyable.hpp>
 
 #include <memory>
 #include <string>
@@ -43,16 +41,16 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef std::shared_ptr<class GarchImage> GarchImageSharedPtr;
+using HioImageSharedPtr = std::shared_ptr<class HioImage>;
 
-/// \class GarchImage
+/// \class HioImage
 ///
 /// A base class for reading and writing texture image data.
 ///
 /// The class allows basic access to texture image file data.
 ///
-class GarchImage : public boost::noncopyable {
-    
+class HioImage
+{
 public:
 
     /// Specifies whether to treat the image origin as the upper-left corner
@@ -63,18 +61,17 @@ public:
         OriginLowerLeft
     }; 
 
-    // APPLE METAL: From glfImage
-    /// Specifies the source color space in which the texture is encoded, with
-    /// "Auto" indicating the texture reader should determine color space based
-    /// on hints from the image (e.g. file type, number of channels, image
+    /// Specifies the source color space in which the texture is encoded, with 
+    /// "Auto" indicating the texture reader should determine color space based 
+    /// on hints from the image (e.g. file type, number of channels, image 
     /// metadata)
     enum SourceColorSpace
     {
-       Raw,
-       SRGB,
-       Auto
-    };
-
+        Raw, 
+        SRGB,
+        Auto
+    }; 
+   
     /// \class StorageSpec
     ///
     /// Describes the memory layout and storage of a texture image
@@ -82,37 +79,44 @@ public:
     class StorageSpec {
     public:
         StorageSpec()
-            : width(0), height(0)
-            , format(GL_NONE)
-            , type(GL_NONE)
+            : width(0), height(0), depth(0)
+            , format(HioFormatInvalid)
             , flipped(false)
             , data(0) { }
 
         int width, height, depth;
-        uint32_t format, type;
+        HioFormat format;
         bool flipped;
         void * data;
     };
 
 public:
-    GARCH_API
-    virtual ~GarchImage();
+    HioImage() = default;
+
+    HIO_API
+    virtual ~HioImage();
+
+    // Disallow copies
+    HioImage(const HioImage&) = delete;
+    HioImage& operator=(const HioImage&) = delete;
 
     /// Returns whether \a filename opened as a texture image.
-    GARCH_API
+    HIO_API
     static bool IsSupportedImageFile(std::string const & filename);
 
     /// \name Reading
     /// {@
 
-    /// Opens \a filename for reading from the given \a subimage.
-    GARCH_API
-    static GarchImageSharedPtr OpenForReading(std::string const & filename,
-                                              int subimage = 0,
-                                              int mip = 0,
-                                              SourceColorSpace sourceColorSpace =
-                                                  SourceColorSpace::Auto,
-                                              bool suppressErrors = false);
+    /// Opens \a filename for reading from the given \a subimage at mip level
+    /// \a mip, using \a sourceColorSpace to help determine the color space
+    /// with which to interpret the texture
+    HIO_API
+    static HioImageSharedPtr OpenForReading(std::string const & filename,
+                                            int subimage = 0,
+                                            int mip = 0,
+                                            SourceColorSpace sourceColorSpace = 
+                                                SourceColorSpace::Auto,
+                                            bool suppressErrors = false);
 
     /// Reads the image file into \a storage.
     virtual bool Read(StorageSpec const & storage) = 0;
@@ -130,8 +134,8 @@ public:
     /// {@
 
     /// Opens \a filename for writing from the given \a storage.
-    GARCH_API
-    static GarchImageSharedPtr OpenForWriting(std::string const & filename);
+    HIO_API
+    static HioImageSharedPtr OpenForWriting(std::string const & filename);
 
     /// Writes the image with \a metadata.
     virtual bool Write(StorageSpec const & storage,
@@ -148,11 +152,8 @@ public:
     /// Returns the image height.
     virtual int GetHeight() const = 0;
 
-    /// Returns the image format.
-    virtual GLenum GetFormat() const = 0;
-
-    /// Returns the image type.
-    virtual GLenum GetType() const = 0;
+    /// Returns the destination HioFormat.
+    virtual HioFormat GetFormat() const = 0;
 
     /// Returns the number of bytes per pixel.
     virtual int GetBytesPerPixel() const = 0;
@@ -160,7 +161,7 @@ public:
     /// Returns the number of mips available.
     virtual int GetNumMipLevels() const = 0;
 
-    /// Returns whether the iamge is in the sRGB color space.
+    /// Returns whether the image is in the sRGB color space.
     virtual bool IsColorSpaceSRGB() const = 0;
 
     /// \name Metadata
@@ -171,9 +172,10 @@ public:
     virtual bool GetMetadata(TfToken const & key, VtValue * value) const = 0;
 
     template <typename T>
-    bool GetSamplerMetadata(GLenum pname, T * param) const;
+    bool GetSamplerMetadata(HioAddressDimension dim, T * param) const;
 
-    virtual bool GetSamplerMetadata(GLenum pname, VtValue * param) const = 0;
+    virtual bool GetSamplerMetadata(HioAddressDimension dim,
+                                    VtValue * param) const = 0;
 
     /// }@
 
@@ -189,7 +191,7 @@ protected:
 
 template <typename T>
 bool
-GarchImage::GetMetadata(TfToken const & key, T * value) const
+HioImage::GetMetadata(TfToken const & key, T * value) const
 {
     VtValue any;
     if (!GetMetadata(key, &any) || !any.IsHolding<T>()) {
@@ -201,31 +203,31 @@ GarchImage::GetMetadata(TfToken const & key, T * value) const
 
 template <typename T>
 bool
-GarchImage::GetSamplerMetadata(GLenum pname, T * param) const
+HioImage::GetSamplerMetadata(HioAddressDimension dim, T * param) const
 {
     VtValue any;
-    if (!GetSamplerMetadata(pname, &any) || !any.IsHolding<T>()) {
+    if (!GetSamplerMetadata(dim, &any) || !any.IsHolding<T>()) {
         return false;
     }
     *param = any.UncheckedGet<T>();
     return true;
 }
 
-class GarchImageFactoryBase : public TfType::FactoryBase {
+class HioImageFactoryBase : public TfType::FactoryBase {
 public:
-    virtual GarchImageSharedPtr New() const = 0;
+    virtual HioImageSharedPtr New() const = 0;
 };
 
 template <class T>
-class GarchImageFactory : public GarchImageFactoryBase {
+class HioImageFactory : public HioImageFactoryBase {
 public:
-    virtual GarchImageSharedPtr New() const
+    virtual HioImageSharedPtr New() const
     {
-        return GarchImageSharedPtr(new T);
+        return HioImageSharedPtr(new T);
     }
 };
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif  // GARCH_IMAGE_H
+#endif  // PXR_IMAGING_HIO_IMAGE_H

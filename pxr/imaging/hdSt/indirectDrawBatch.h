@@ -45,7 +45,7 @@ using HdBindingRequestVector = std::vector<HdBindingRequest>;
     (instanceCountInput)                    \
     (ulocDrawCommandNumUints)               \
     (ulocResetPass)                         \
-    (ulocCullMatrix)                        \
+    (ulocCullParams)                        \
     (ulocDrawRangeNDC)
 
 TF_DECLARE_PUBLIC_TOKENS(HdStIndirectDrawTokens, HDST_API,
@@ -176,10 +176,11 @@ protected:
     HdStDispatchBufferSharedPtr _dispatchBuffer;
     HdStDispatchBufferSharedPtr _dispatchBufferCullInput;
 
-    std::vector<GLuint> _drawCommandBuffer;
+    std::vector<uint32_t> _drawCommandBuffer;
     bool _drawCommandBufferDirty;
     size_t _bufferArraysHash;
 
+    HdStBufferResourceSharedPtr _resultBuffer;
     size_t _numVisibleItems;
     size_t _numTotalVertices;
     size_t _numTotalElements;

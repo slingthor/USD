@@ -34,6 +34,7 @@
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/glf/glContext.h"
 
+#include "pxr/imaging/glf/utils.h"
 #include "pxr/base/tf/stringUtils.h"
 
 #include "pxr/base/trace/trace.h"
@@ -48,10 +49,10 @@ TF_REGISTRY_FUNCTION(TfType)
 
 GlfUdimTexture::GlfUdimTexture(
     TfToken const& imageFilePath,
-    GarchImage::ImageOriginLocation originLocation,
+    HioImage::ImageOriginLocation originLocation,
     std::vector<std::tuple<int, TfToken>>&& tiles,
     bool const premultiplyAlpha,
-    GarchImage::SourceColorSpace sourceColorSpace) // APPLE METAL: GarchImage
+    HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: HioImage
     : GarchUdimTexture(imageFilePath, originLocation, std::move(tiles), 
       premultiplyAlpha, sourceColorSpace)
 {
@@ -152,10 +153,11 @@ GlfUdimTexture::_CreateGPUResources(unsigned int numChannels,
         totalTextureMemory += currentMipMemory;
     }
 
+    GLenum format = GlfGetGLFormat(_format);
     for (unsigned int mip = 0; mip < mipCount; ++mip) {
         _TextureSize const& mipSize = mips[mip];
         glTexSubImage3D(GL_TEXTURE_2D_ARRAY, mip, 0, 0, 0,
-                        mipSize.width, mipSize.height, _depth, _format, type,
+                        mipSize.width, mipSize.height, _depth, format, type,
                         mipData[mip].data());
     }
 

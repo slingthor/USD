@@ -313,8 +313,6 @@ template class HgiHandle<class HgiTextureView>;
 using HgiTextureViewHandle = HgiHandle<class HgiTextureView>;
 using HgiTextureViewHandleVector = std::vector<HgiTextureViewHandle>;
 
-
-
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif

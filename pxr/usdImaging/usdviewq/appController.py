@@ -1001,8 +1001,8 @@ class AppController(QtCore.QObject):
             self._ui.actionShow_Inactive_Prims.triggered.connect(
                 self._toggleShowInactivePrims)
 
-            self._ui.actionShow_All_Master_Prims.triggered.connect(
-                self._toggleShowMasterPrims)
+            self._ui.actionShow_All_Prototype_Prims.triggered.connect(
+                self._toggleShowPrototypePrims)
 
             self._ui.actionShow_Undefined_Prims.triggered.connect(
                 self._toggleShowUndefinedPrims)
@@ -2098,10 +2098,10 @@ class AppController(QtCore.QObject):
                                              self._displayPredicate)
                    if isMatch(prim.GetName())]
 
-        if self._dataModel.viewSettings.showAllMasterPrims:
-            for master in self._dataModel.stage.GetMasters():
+        if self._dataModel.viewSettings.showAllPrototypePrims:
+            for prototype in self._dataModel.stage.GetPrototypes():
                 matches += [prim.GetPath() for prim
-                            in Usd.PrimRange(master, self._displayPredicate)
+                            in Usd.PrimRange(prototype, self._displayPredicate)
                             if isMatch(prim.GetName())]
 
         return matches
@@ -3077,7 +3077,7 @@ class AppController(QtCore.QObject):
     def _toggleShowInactivePrims(self):
         self._dataModel.viewSettings.showInactivePrims = (
             self._ui.actionShow_Inactive_Prims.isChecked())
-        # Note: _toggleShowInactivePrims, _toggleShowMasterPrims,
+        # Note: _toggleShowInactivePrims, _toggleShowPrototypePrims,
         #       _toggleShowUndefinedPrims, and _toggleShowAbstractPrims all call
         #       _resetPrimView after being toggled, but only from menu items.
         #       In the future, we should do this when a signal from
@@ -3086,10 +3086,10 @@ class AppController(QtCore.QObject):
         self._dataModel.selection.removeInactivePrims()
         self._resetPrimView()
 
-    def _toggleShowMasterPrims(self):
-        self._dataModel.viewSettings.showAllMasterPrims = (
-            self._ui.actionShow_All_Master_Prims.isChecked())
-        self._dataModel.selection.removeMasterPrims()
+    def _toggleShowPrototypePrims(self):
+        self._dataModel.viewSettings.showAllPrototypePrims = (
+            self._ui.actionShow_All_Prototype_Prims.isChecked())
+        self._dataModel.selection.removePrototypePrims()
         self._resetPrimView()
 
     def _toggleShowUndefinedPrims(self):
@@ -3169,9 +3169,9 @@ class AppController(QtCore.QObject):
         rootItem = self._populateItem(rootPrim)
         self._populateChildren(rootItem)
 
-        if self._dataModel.viewSettings.showAllMasterPrims:
+        if self._dataModel.viewSettings.showAllPrototypePrims:
             self._populateChildren(rootItem,
-                childrenToAdd=self._dataModel.stage.GetMasters())
+                childrenToAdd=self._dataModel.stage.GetPrototypes())
 
         # Add all descendents all at once.
         invisibleRootItem.addChild(rootItem)
@@ -4593,14 +4593,15 @@ class AppController(QtCore.QObject):
 
         with BusyContext():
 
-            # We can only activate/deactivate prims which are not in a master.
+            # We can only activate/deactivate prims which are not in a
+            # prototype.
             paths = []
             for item in self.getSelectedItems():
                 if item.prim.IsPseudoRoot():
                     print("WARNING: Cannot change activation of pseudoroot.")
-                elif item.isInMaster:
+                elif item.isInPrototype:
                     print("WARNING: The prim <" + str(item.prim.GetPrimPath()) +
-                        "> is in a master. Cannot change activation.")
+                        "> is in a prototype. Cannot change activation.")
                 else:
                     paths.append(item.prim.GetPrimPath())
 
@@ -4910,13 +4911,13 @@ class AppController(QtCore.QObject):
             if not gotValidMaterial:
                 materialStr += "<small><em>No assigned Material!</em></small>"
 
-            # Instance / master info, if this prim is a native instance, else
+            # Instance / prototype info, if this prim is a native instance, else
             # instance index/id if it's from a PointInstancer
             instanceStr = ""
             if prim.IsInstance():
                 instanceStr = "<hr><b>Instancing:</b><br>"
-                instanceStr += "<nobr><small><em>Instance of master:</em></small> %s</nobr>" % \
-                    str(prim.GetMaster().GetPath())
+                instanceStr += "<nobr><small><em>Instance of prototype:</em></small> %s</nobr>" % \
+                    str(prim.GetPrototype().GetPath())
             elif topLevelInstanceIndex != -1:
                 instanceStr = "<hr><b>Instance Id:</b> %d" % topLevelInstanceIndex
 
@@ -5078,8 +5079,8 @@ class AppController(QtCore.QObject):
     def _refreshShowPrimMenu(self):
         self._ui.actionShow_Inactive_Prims.setChecked(
             self._dataModel.viewSettings.showInactivePrims)
-        self._ui.actionShow_All_Master_Prims.setChecked(
-            self._dataModel.viewSettings.showAllMasterPrims)
+        self._ui.actionShow_All_Prototype_Prims.setChecked(
+            self._dataModel.viewSettings.showAllPrototypePrims)
         self._ui.actionShow_Undefined_Prims.setChecked(
             self._dataModel.viewSettings.showUndefinedPrims)
         self._ui.actionShow_Abstract_Prims.setChecked(

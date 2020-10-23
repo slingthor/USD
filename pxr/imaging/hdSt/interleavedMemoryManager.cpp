@@ -414,7 +414,8 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    // XXX: make sure glcontext
+    HgiBlitCmds* blitCmds = _resourceRegistry->GetGlobalBlitCmds();
+    blitCmds->PushDebugGroup(__ARCH_PRETTY_FUNCTION__);
 
     HD_PERF_COUNTER_INCR(HdPerfTokens->vboRelocated);
 
@@ -479,8 +480,6 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
 
         size_t rangeCount = GetRangeCount();
 
-        HgiBlitCmds* blitCmds = _resourceRegistry->GetGlobalBlitCmds();
-        
         // pre-pass to combine consecutive buffer range relocation
         std::unique_ptr<HdStBufferRelocator> relocators[3];
         
@@ -550,6 +549,8 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
     TF_FOR_ALL(it, GetResources()) {
         it->second->SetAllocations(newIds[0], newIds[1], newIds[2], totalSize);
     }
+
+    blitCmds->PopDebugGroup();
 
     _needsReallocation = false;
     _needsCompaction = false;

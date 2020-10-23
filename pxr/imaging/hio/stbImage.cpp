@@ -22,8 +22,8 @@
 // language governing permissions and limitations under the Apache License.
 //
 
-#include "pxr/imaging/garch/image.h"
-#include "pxr/imaging/garch/utils.h"
+#include "pxr/imaging/hio/image.h"
+#include "pxr/imaging/hio/types.h"
 
 #include "pxr/usd/ar/asset.h"
 #include "pxr/usd/ar/resolver.h"
@@ -39,59 +39,57 @@
 #include "pxr/base/tf/type.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "pxr/imaging/garch/stb/stb_image.h"
+#include "pxr/imaging/hio/stb/stb_image.h"
 
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
-#include "pxr/imaging/garch/stb/stb_image_resize.h"
+#include "pxr/imaging/hio/stb/stb_image_resize.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "pxr/imaging/garch/stb/stb_image_write.h"
+#include "pxr/imaging/hio/stb/stb_image_write.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-class Garch_StbImage : public GarchImage {
+class Hio_StbImage : public HioImage {
 public:
-    typedef GarchImage Base;
+    typedef HioImage Base;
 
-    Garch_StbImage();
+    Hio_StbImage();
 
-    virtual ~Garch_StbImage();
+    virtual ~Hio_StbImage();
 
-    // GarchImage overrides
-    virtual std::string const & GetFilename() const;
-    virtual int GetWidth() const;
-    virtual int GetHeight() const;
-    virtual GLenum GetFormat() const;
-    virtual GLenum GetType() const;
-    virtual int GetBytesPerPixel() const;
-    virtual int GetNumMipLevels() const;
+    // HioImage overrides
+    std::string const & GetFilename() const override;
+    virtual int GetWidth() const override;
+    virtual int GetHeight() const override;
+    virtual HioFormat GetFormat() const override;
+    virtual int GetBytesPerPixel() const override;
+    virtual int GetNumMipLevels() const override;
 
-    virtual bool IsColorSpaceSRGB() const;
+    virtual bool IsColorSpaceSRGB() const override;
 
-    virtual bool GetMetadata(TfToken const & key, VtValue * value) const;
-    virtual bool GetSamplerMetadata(GLenum pname, VtValue * param) const;
+    virtual bool GetMetadata(TfToken const & key, VtValue * value) const override;
+    virtual bool GetSamplerMetadata(HioAddressDimension dim, VtValue * param) const override;
 
-    virtual bool Read(StorageSpec const & storage);
+    virtual bool Read(StorageSpec const & storage) override;
     virtual bool ReadCropped(int const cropTop,
-	                     int const cropBottom,
-	                     int const cropLeft,
-	                     int const cropRight,
-                             StorageSpec const & storage);
+                             int const cropBottom,
+                             int const cropLeft,
+                             int const cropRight,
+                             StorageSpec const & storage) override;
 
     virtual bool Write(StorageSpec const & storage,
-                       VtDictionary const & metadata);
+                       VtDictionary const & metadata) override;
 
 protected:
     virtual bool _OpenForReading(std::string const & filename, int subimage,
                                  int mip, SourceColorSpace sourceColorSpace, 
-                                 bool suppressErrors);
-    virtual bool _OpenForWriting(std::string const & filename);
+                                 bool suppressErrors) override;
+    virtual bool _OpenForWriting(std::string const & filename) override;
 
 private:
     std::string _GetFilenameExtension();
     bool _IsValidCrop(int cropTop, int cropBottom, int cropLeft, int cropRight);
-    void _GetInfoFromStorageSpec(GarchImage::StorageSpec const & storage);
+    void _GetInfoFromStorageSpec(HioImage::StorageSpec const & storage);
     bool _CropAndResize(void const *sourceData, int const cropTop,
                    int const cropBottom,
                    int const cropLeft,
@@ -104,50 +102,23 @@ private:
     int _height;
     float _gamma;
     
-    //GL_UNSIGNED_BYTE, GL_FLOAT
-    GLenum _outputType; 
-    
+    HioType _outputType;
     int _nchannels;
+
+    HioFormat _format;
 
     SourceColorSpace _sourceColorSpace;
 };
 
 TF_REGISTRY_FUNCTION(TfType)
 {
-    typedef Garch_StbImage Image;
+    typedef Hio_StbImage Image;
     TfType t = TfType::Define<Image, TfType::Bases<Image::Base> >();
-    t.SetFactory< GarchImageFactory<Image> >();
+    t.SetFactory< HioImageFactory<Image> >();
 }
 
-static GLenum
-_FormatFromImageData(unsigned int nchannels)
-{
-    return GarchGetBaseFormat(nchannels);
-}
-
-/// Returns the bpc (bits per channel) based on the GLType stored in storage
-static int
-_GetBytesPerChannelFromType(GLenum const & type)
-{
-    switch(type) {
-    case GL_UNSIGNED_BYTE:
-        return 1;
-    case GL_FLOAT:
-        return 4;
-    default:
-        TF_CODING_ERROR("Unsupported type");
-        return 4;
-    }
-}
-
-static int 
-_GetNumChannelsFromGLFormat(GLenum const & format)
-{
-    return GarchGetNumElements(format);
-}
-
-bool 
-Garch_StbImage::_IsValidCrop(int cropTop, int cropBottom, int cropLeft, int cropRight)
+bool
+Hio_StbImage::_IsValidCrop(int cropTop, int cropBottom, int cropLeft, int cropRight)
 {
     int cropImageWidth = _width - (cropLeft + cropRight);
     int cropImageHeight = _height - (cropTop + cropBottom);
@@ -160,7 +131,7 @@ Garch_StbImage::_IsValidCrop(int cropTop, int cropBottom, int cropLeft, int crop
 }
 
 std::string 
-Garch_StbImage::_GetFilenameExtension()
+Hio_StbImage::_GetFilenameExtension()
 {
     std::string fileExtension = ArGetResolver().GetExtension(_filename);
     //convert to lowercase
@@ -171,20 +142,19 @@ Garch_StbImage::_GetFilenameExtension()
 }
 
 void
-Garch_StbImage::_GetInfoFromStorageSpec(GarchImage::StorageSpec const & storage)
+Hio_StbImage::_GetInfoFromStorageSpec(HioImage::StorageSpec const & storage)
 {
     _width = storage.width;
     _height = storage.height;
-    _outputType = storage.type;
-    _nchannels = _GetNumChannelsFromGLFormat(storage.format);
+    _format = storage.format;
+    _outputType = HioGetHioType(storage.format);
 }
 
-Garch_StbImage::Garch_StbImage()
+Hio_StbImage::Hio_StbImage()
     : _width(0)
     , _height(0)
     , _gamma(0.0f)
     , _nchannels(0)
-
 {
 }
 
@@ -193,7 +163,7 @@ Garch_StbImage::Garch_StbImage()
 /// the incoming data to fit the dimensions defined in storage.  _width
 /// and _height are updated to match those in storage
 bool 
-Garch_StbImage::_CropAndResize(void const *sourceData, int const cropTop,
+Hio_StbImage::_CropAndResize(void const *sourceData, int const cropTop,
         int const cropBottom,
         int const cropLeft,
         int const cropRight,
@@ -253,7 +223,7 @@ Garch_StbImage::_CropAndResize(void const *sourceData, int const cropTop,
                                     storage.width * bpp,
                                     _nchannels, alphaIndex, 0);
         } else {
-            if (_outputType == GL_FLOAT) {
+            if (_outputType == HioTypeFloat) {
                     stbir_resize_float((float *) croppedData, 
                                        cropWidth, cropHeight, 
                                        croppedStrideLength,
@@ -280,13 +250,13 @@ Garch_StbImage::_CropAndResize(void const *sourceData, int const cropTop,
 }
 
 /* virtual */
-Garch_StbImage::~Garch_StbImage()
+Hio_StbImage::~Hio_StbImage()
 {
 }
 
 /* virtual */
 std::string const &
-Garch_StbImage::GetFilename() const
+Hio_StbImage::GetFilename() const
 {
     return _filename;
 }
@@ -294,47 +264,40 @@ Garch_StbImage::GetFilename() const
 
 /* virtual */
 int
-Garch_StbImage::GetWidth() const
+Hio_StbImage::GetWidth() const
 {
     return _width;
 }
 
 /* virtual */
 int
-Garch_StbImage::GetHeight() const
+Hio_StbImage::GetHeight() const
 {
     return _height;
 }
 
 /* virtual */
-GLenum
-Garch_StbImage::GetFormat() const
+HioFormat
+Hio_StbImage::GetFormat() const
 {
-    return _FormatFromImageData(_nchannels);
-}
-
-/* virtual */
-GLenum
-Garch_StbImage::GetType() const
-{
-    return _outputType;
+    return _format;
 }
 
 /* virtual */
 int
-Garch_StbImage::GetBytesPerPixel() const
+Hio_StbImage::GetBytesPerPixel() const
 {
-    return _GetBytesPerChannelFromType(_outputType) * _nchannels;
+    return HioGetDataSizeOfType(_outputType) * _nchannels;
 }
 
 /* virtual */
 bool
-Garch_StbImage::IsColorSpaceSRGB() const
+Hio_StbImage::IsColorSpaceSRGB() const
 {
-    if (_sourceColorSpace == GarchImage::SRGB) {
+    if (_sourceColorSpace == HioImage::SRGB) {
         return true;
     }
-    if (_sourceColorSpace == GarchImage::Raw) {
+    if (_sourceColorSpace == HioImage::Raw) {
         return false;
     }
 
@@ -357,34 +320,34 @@ Garch_StbImage::IsColorSpaceSRGB() const
 
     // Texture had no (recognized) gamma hint, make a reasonable guess
     return ((_nchannels == 3 || _nchannels == 4) && 
-            GetType() == GL_UNSIGNED_BYTE);
+            _outputType == HioTypeUnsignedByte);
 }
 
 //XXX Still need to investigate Metadata handling
 /* virtual */
 bool
-Garch_StbImage::GetMetadata(TfToken const & key, VtValue * value) const
+Hio_StbImage::GetMetadata(TfToken const & key, VtValue * value) const
 {
     return false;
 }
 
 /* virtual */
 bool
-Garch_StbImage::GetSamplerMetadata(GLenum pname, VtValue * param) const
+Hio_StbImage::GetSamplerMetadata(HioAddressDimension dim, VtValue * param) const
 {
     return false;
 }
 
 /* virtual */
 int
-Garch_StbImage::GetNumMipLevels() const
+Hio_StbImage::GetNumMipLevels() const
 {
     return 1;
 }
 
 /* virtual */
 bool
-Garch_StbImage::_OpenForReading(std::string const & filename, int subimage,
+Hio_StbImage::_OpenForReading(std::string const & filename, int subimage,
                               int mip, SourceColorSpace sourceColorSpace, 
                               bool suppressErrors)
 {
@@ -393,9 +356,9 @@ Garch_StbImage::_OpenForReading(std::string const & filename, int subimage,
 
     std::string fileExtension = _GetFilenameExtension();
     if (fileExtension == "hdr") {
-        _outputType = GL_FLOAT;
+        _outputType = HioTypeFloat;
     } else {
-        _outputType = GL_UNSIGNED_BYTE;
+        _outputType = HioTypeUnsignedByte;
     }
 
     std::shared_ptr<ArAsset> asset = ArGetResolver().OpenAsset(_filename);
@@ -408,15 +371,18 @@ Garch_StbImage::_OpenForReading(std::string const & filename, int subimage,
         return false;
     }
 
-    return stbi_info_from_memory(
-        reinterpret_cast<stbi_uc const*>(buffer.get()), asset->GetSize(), 
+    const bool open =  stbi_info_from_memory(
+        reinterpret_cast<stbi_uc const*>(buffer.get()), asset->GetSize(),
         &_width, &_height, &_nchannels, &_gamma) &&
             subimage == 0 && mip == 0;
+    
+    _format = HioGetFormat(_nchannels, _outputType, IsColorSpaceSRGB());
+    return open;
 }
 
 /* virtual */
 bool
-Garch_StbImage::Read(StorageSpec const & storage)
+Hio_StbImage::Read(StorageSpec const & storage)
 {
     return ReadCropped(0, 0, 0, 0, storage);
 }
@@ -426,11 +392,11 @@ Garch_StbImage::Read(StorageSpec const & storage)
 /// cropped and/or resized.  The _width and _height are updated to match 
 /// storage.width and storage.height
 bool
-Garch_StbImage::ReadCropped(int const cropTop,
-                            int const cropBottom,
-                            int const cropLeft,
-                            int const cropRight,
-                            StorageSpec const & storage)
+Hio_StbImage::ReadCropped(int const cropTop,
+                          int const cropBottom,
+                          int const cropLeft,
+                          int const cropRight,
+                          StorageSpec const & storage)
 {
     // read from file
     // NOTE: stbi_load will always return image data as a contiguous block 
@@ -458,7 +424,7 @@ Garch_StbImage::ReadCropped(int const cropTop,
     std::shared_ptr<const char> buffer = asset->GetBuffer();
     if (buffer) {
         size_t bufferSize = asset->GetSize();
-        if (_outputType == GL_FLOAT) {
+        if (_outputType == HioTypeFloat) {
             imageData = stbi_loadf_from_memory(
                 reinterpret_cast<stbi_uc const *>(buffer.get()), bufferSize,
                 &_width, &_height, &_nchannels, 0);
@@ -508,11 +474,11 @@ Garch_StbImage::ReadCropped(int const cropTop,
     {
         int bpp = GetBytesPerPixel();
         int inputStrideInBytes = _width * bpp; 
-        bool resizeNeeded = _width != storage.width || _height != storage.height;
+        bool resizeNeeded = _width!=storage.width || _height!=storage.height;
 
         if (resizeNeeded) {
             // XXX STB only has a sRGB resize for 8bit
-            if (IsColorSpaceSRGB() && _outputType == GL_UNSIGNED_BYTE) {
+            if (IsColorSpaceSRGB() && _outputType == HioTypeUnsignedByte) {
                 int alphaIndex = (_nchannels != 4)?
                                  STBIR_ALPHA_CHANNEL_NONE : 3;
                 stbir_resize_uint8_srgb((unsigned char*)imageData, 
@@ -525,7 +491,7 @@ Garch_StbImage::ReadCropped(int const cropTop,
                                         storage.width * bpp,
                                         _nchannels, alphaIndex, 0);
             } else {
-                if (_outputType == GL_FLOAT) {
+                if (_outputType == HioTypeFloat) {
                     stbir_resize_float((float *)imageData, 
                                        _width, 
                                        _height,
@@ -570,7 +536,7 @@ Garch_StbImage::ReadCropped(int const cropTop,
 
 /* virtual */
 bool
-Garch_StbImage::_OpenForWriting(std::string const & filename)
+Hio_StbImage::_OpenForWriting(std::string const & filename)
 {
     _filename = filename;
     // think about whether or not we need to clear the data ptr
@@ -592,16 +558,15 @@ _Quantize(float value)
 }
 
 template<typename T>
-Garch_StbImage::StorageSpec
-_Quantize(
-    Garch_StbImage::StorageSpec const & storageIn,
-    std::unique_ptr<uint8_t[]> & quantizedData)
+Hio_StbImage::StorageSpec
+_Quantize(Hio_StbImage::StorageSpec const & storageIn,
+          std::unique_ptr<uint8_t[]> & quantizedData,
+          bool isSRGB)
 {
     // stb requires unsigned byte data to write non .hdr file formats.
     // We'll quantize the data ourselves here.
-    size_t numElements =
-        storageIn.width * storageIn.height *
-        _GetNumChannelsFromGLFormat(storageIn.format);
+    int numChannels = HioGetComponentCount(storageIn.format);
+    size_t numElements = storageIn.width * storageIn.height * numChannels;
 
     quantizedData.reset(new uint8_t[numElements]);
 
@@ -610,10 +575,12 @@ _Quantize(
         quantizedData[i] = _Quantize(inData[i]);
     }
 
-    Garch_StbImage::StorageSpec quantizedSpec;
+    Hio_StbImage::StorageSpec quantizedSpec;
     quantizedSpec = storageIn; // shallow copy
     quantizedSpec.data = quantizedData.get();
-    quantizedSpec.type = GL_UNSIGNED_BYTE;
+    quantizedSpec.format = HioGetFormat(numChannels,
+                                           HioTypeUnsignedByte,
+                                           isSRGB);
     
     return quantizedSpec;
 }
@@ -628,26 +595,28 @@ _Quantize(
 /// file type.
 /* virtual */
 bool
-Garch_StbImage::Write(StorageSpec const & storageIn,
+Hio_StbImage::Write(StorageSpec const & storageIn,
                       VtDictionary const & metadata)
 {
     const std::string fileExtension = _GetFilenameExtension();
 
     StorageSpec quantizedSpec;
     std::unique_ptr<uint8_t[]> quantizedData;
+    HioType type = HioGetHioType(storageIn.format);
+    bool isSRGB = IsColorSpaceSRGB();
 
-    if (storageIn.type == GL_FLOAT && fileExtension != "hdr") {
-        quantizedSpec = _Quantize<float>(storageIn, quantizedData);
+    if (type == HioTypeFloat && fileExtension != "hdr") {
+        quantizedSpec = _Quantize<float>(storageIn, quantizedData, isSRGB);
     }
-    else if (storageIn.type == GL_HALF_FLOAT && fileExtension != "hdr") {
-        quantizedSpec = _Quantize<GfHalf>(storageIn, quantizedData);
+    else if (type == HioTypeHalfFloat && fileExtension != "hdr") {
+        quantizedSpec = _Quantize<GfHalf>(storageIn, quantizedData, isSRGB);
     }
-    else if (storageIn.type != GL_UNSIGNED_BYTE && fileExtension != "hdr") {
+    else if (type != HioTypeUnsignedByte && fileExtension != "hdr") {
         TF_CODING_ERROR("stb expects unsigned byte data to write filetype %s",
                         fileExtension.c_str());
         return false;
     }
-    else if (storageIn.type != GL_FLOAT && fileExtension == "hdr") 
+    else if (type != HioTypeFloat && fileExtension == "hdr")
     {
         TF_CODING_ERROR("stb expects linear float data to write filetype hdr");
         return false;

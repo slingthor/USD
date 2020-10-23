@@ -21,57 +21,56 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/garch/image.h"
-#include "pxr/imaging/garch/imageRegistry.h"
+#include "pxr/imaging/hio/image.h"
+#include "pxr/imaging/hio/imageRegistry.h"
 
 #include "pxr/base/tf/type.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
 TF_REGISTRY_FUNCTION(TfType)
 {
-    TfType::Define<GarchImage>();
+    TfType::Define<HioImage>();
 }
 
-GarchImage::~GarchImage()
+HioImage::~HioImage()
 {
 }
 
 /* static */
 bool
-GarchImage::IsSupportedImageFile(std::string const & filename)
+HioImage::IsSupportedImageFile(std::string const & filename)
 {
-    GarchImageRegistry & registry = GarchImageRegistry::GetInstance();
+    HioImageRegistry & registry = HioImageRegistry::GetInstance();
     return registry.IsSupportedImageFile(filename);
 }
 
 /* static */
-GarchImageSharedPtr
-GarchImage::OpenForReading(std::string const & filename, int subimage,
-                         int mip, SourceColorSpace sourceColorSpace,
+HioImageSharedPtr
+HioImage::OpenForReading(std::string const & filename, int subimage,
+                         int mip, SourceColorSpace sourceColorSpace, 
                          bool suppressErrors)
 {
-    GarchImageRegistry & registry = GarchImageRegistry::GetInstance();
+    HioImageRegistry & registry = HioImageRegistry::GetInstance();
 
-    GarchImageSharedPtr image = registry._ConstructImage(filename);
+    HioImageSharedPtr image = registry._ConstructImage(filename);
     if (!image || !image->_OpenForReading(filename, subimage, mip, 
                                           sourceColorSpace, suppressErrors)) {
-        return GarchImageSharedPtr();
+        return HioImageSharedPtr();
     }
 
     return image;
 }
 
 /* static */
-GarchImageSharedPtr
-GarchImage::OpenForWriting(std::string const & filename)
+HioImageSharedPtr
+HioImage::OpenForWriting(std::string const & filename)
 {
-    GarchImageRegistry & registry = GarchImageRegistry::GetInstance();
+    HioImageRegistry & registry = HioImageRegistry::GetInstance();
 
-    GarchImageSharedPtr image = registry._ConstructImage(filename);
+    HioImageSharedPtr image = registry._ConstructImage(filename);
     if (!image || !image->_OpenForWriting(filename)) {
-        return GarchImageSharedPtr();
+        return HioImageSharedPtr();
     }
 
     return image;

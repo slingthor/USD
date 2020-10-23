@@ -27,12 +27,13 @@
 /// \file garch/resourceFactory.h
 
 #include "pxr/pxr.h"
+#include "pxr/imaging/garch/api.h"
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/singleton.h"
 #include "pxr/base/tf/token.h"
 #include "pxr/base/gf/vec2i.h"
 
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 
 #include <boost/noncopyable.hpp>
 
@@ -42,17 +43,14 @@ class GarchBaseTexture;
 class GarchBindingMap;
 class GarchContextCaps;
 class GarchDrawTarget;
-class GarchPtexTexture;
 class GarchSimpleLightingContext;
 class GarchSimpleShadowArray;
-class GarchUdimTexture;
 class GarchUniformBlock;
 class GarchVdbTexture;
 class GarchVdbTextureContainer;
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchArrayTexture);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchDrawTarget);
-TF_DECLARE_WEAK_AND_REF_PTRS(GarchPtexTexture);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchUniformBlock);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchUdimTexture);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchVdbTexture);
@@ -101,26 +99,11 @@ public:
                                                     unsigned int cropBottom,
                                                     unsigned int cropLeft,
                                                     unsigned int cropRight,
-                                                    GarchImage::ImageOriginLocation originLocation) const = 0;
+                                                    HioImage::ImageOriginLocation originLocation) const = 0;
 
     // BaseTexture
 	GARCH_API
     virtual GarchBaseTexture *NewBaseTexture() const = 0;
-
-#ifdef PXR_PTEX_SUPPORT_ENABLED
-    // Ptex Texture
-    GARCH_API
-    virtual GarchPtexTextureRefPtr NewPtexTexture(const TfToken &imageFilePath,
-                                                  const bool premultiplyAlpha) const = 0;
-#endif
-    
-    // UDIM Texture
-    GARCH_API
-    virtual GarchUdimTextureRefPtr NewUdimTexture(TfToken const& imageFilePath,
-                                                  GarchImage::ImageOriginLocation originLocation,
-                                                  std::vector<std::tuple<int, TfToken>>&& tiles,
-                                                  const bool premultiplyAlpha,
-                                                  GarchImage::SourceColorSpace sourceColorSpace) const = 0;
 
 protected:
 	GARCH_API

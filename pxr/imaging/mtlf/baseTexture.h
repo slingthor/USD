@@ -79,7 +79,7 @@ public:
                                       GarchSamplerGPUHandle const& samplerName) override;
     
     MTLF_API
-    static void *PadImage(uint32_t glFormat, void const* rawData, size_t pixelByteSize, int numPixels);
+    static void *PadImage(HioFormat hioFormat, void const* rawData, size_t pixelByteSize, int numPixels);
 
 protected:
     
@@ -87,7 +87,7 @@ protected:
     MtlfBaseTexture();
     
     MTLF_API
-    MtlfBaseTexture(GarchImage::ImageOriginLocation originLocation);
+    MtlfBaseTexture(HioImage::ImageOriginLocation originLocation);
     
     friend class MtlfResourceFactory;
     

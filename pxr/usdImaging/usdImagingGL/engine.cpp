@@ -362,7 +362,8 @@ UsdImagingGLEngine::Render(
     TF_VERIFY(_taskController);
 
 #if defined(PXR_METAL_SUPPORT_ENABLED)
-@autoreleasepool{
+@autoreleasepool
+    {
 #endif
 
     PrepareBatch(root, params);
@@ -1206,10 +1207,10 @@ UsdImagingGLEngine::SetColorCorrectionSettings(
     _taskController->SetColorCorrectionParams(hdParams);
 }
 
-bool 
+bool
 UsdImagingGLEngine::IsColorCorrectionCapable()
 {
-    return _floatingPointBuffersEnabled && IsHydraEnabled();
+    return true;
 }
 
 

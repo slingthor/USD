@@ -29,7 +29,7 @@
 #include "pxr/imaging/garch/texture.h"
 #include "pxr/imaging/garch/textureHandle.h"
 #include "pxr/imaging/garch/textureRegistry.h"
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 
 #include "pxr/usd/ar/resolver.h"
 
@@ -64,14 +64,14 @@ GarchTextureRegistry::GarchTextureRegistry() :
 
 GarchTextureHandleRefPtr
 GarchTextureRegistry::GetTextureHandle(const TfToken &texture,
-                                       GarchImage::ImageOriginLocation originLocation)
+                                       HioImage::ImageOriginLocation originLocation)
 {
     GarchTextureHandleRefPtr textureHandle;
 
     _TextureMetadata md(texture);
 
     // look into exisiting textures
-    std::map<std::pair<TfToken, GarchImage::ImageOriginLocation>,
+    std::map<std::pair<TfToken, HioImage::ImageOriginLocation>,
              _TextureMetadata>::iterator it =
         _textureRegistry.find(std::make_pair(texture, originLocation));
 
@@ -91,7 +91,7 @@ GarchTextureRegistry::GetTextureHandle(const TfToken &texture,
 
 GarchTextureHandleRefPtr
 GarchTextureRegistry::GetTextureHandle(const TfTokenVector &textures,
-                                       GarchImage::ImageOriginLocation originLocation)
+                                       HioImage::ImageOriginLocation originLocation)
 {
     if (textures.empty()) {
         TF_WARN("Attempting to register arrayTexture with empty token vector.");
@@ -107,7 +107,7 @@ GarchTextureRegistry::GetTextureHandle(const TfTokenVector &textures,
     _TextureMetadata md(textures);
 
     // look into exisiting textures
-    std::map<std::pair<TfToken, GarchImage::ImageOriginLocation>,
+    std::map<std::pair<TfToken, HioImage::ImageOriginLocation>,
              _TextureMetadata>::iterator it =
         _textureRegistry.find(std::make_pair(texture, originLocation));
     
@@ -155,7 +155,7 @@ GarchTextureRegistry::GetTextureHandle(GarchTextureRefPtr texture)
 GarchTextureHandleRefPtr
 GarchTextureRegistry::GetTextureHandle(
     const TfToken& texture,
-    GarchImage::ImageOriginLocation originLocation,
+    HioImage::ImageOriginLocation originLocation,
     const GarchTextureFactoryBase* textureFactory)
 {
     if (!TF_VERIFY(textureFactory != nullptr)) {
@@ -164,7 +164,7 @@ GarchTextureRegistry::GetTextureHandle(
 
     _TextureMetadata md(texture);
 
-    std::map<std::pair<TfToken, GarchImage::ImageOriginLocation>,
+    std::map<std::pair<TfToken, HioImage::ImageOriginLocation>,
         _TextureMetadata>::iterator it =
         _textureRegistry.find(std::make_pair(texture, originLocation));
 
@@ -185,10 +185,10 @@ GarchTextureRegistry::GetTextureHandle(
 
 bool
 GarchTextureRegistry::HasTexture(const TfToken &texture,
-                                 GarchImage::ImageOriginLocation originLocation) const
+                                 HioImage::ImageOriginLocation originLocation) const
 {
     // look into exisiting textures
-    std::map<std::pair<TfToken, GarchImage::ImageOriginLocation>,
+    std::map<std::pair<TfToken, HioImage::ImageOriginLocation>,
              _TextureMetadata>::const_iterator it =
         _textureRegistry.find(std::make_pair(texture, originLocation));
     
@@ -197,7 +197,7 @@ GarchTextureRegistry::HasTexture(const TfToken &texture,
 
 GarchTextureHandleRefPtr
 GarchTextureRegistry::_CreateTexture(const TfToken &texture,
-                                     GarchImage::ImageOriginLocation originLocation)
+                                     HioImage::ImageOriginLocation originLocation)
 {
     GarchTextureRefPtr result;
     if (GarchTextureFactoryBase* factory = _GetTextureFactory(texture)) {
@@ -214,7 +214,7 @@ GarchTextureRegistry::_CreateTexture(const TfToken &texture,
 GarchTextureHandleRefPtr
 GarchTextureRegistry::_CreateTexture(const TfTokenVector &textures,
                                      const size_t numTextures,
-                                     GarchImage::ImageOriginLocation originLocation)
+                                     HioImage::ImageOriginLocation originLocation)
 {
     GarchTextureRefPtr result;
     TfToken filename = textures.empty() ? TfToken() : textures.front();
@@ -231,7 +231,7 @@ GarchTextureRegistry::_CreateTexture(const TfTokenVector &textures,
 
 GarchTextureHandleRefPtr
 GarchTextureRegistry::_CreateTexture(const TfToken &texture,
-                                     GarchImage::ImageOriginLocation originLocation,
+                                     HioImage::ImageOriginLocation originLocation,
                                      const GarchTextureFactoryBase *textureFactory)
 {
     GarchTextureRefPtr result;
@@ -314,7 +314,7 @@ GarchTextureRegistry::GarbageCollectIfNeeded()
     // least-recently-used queue or something?
     TRACE_FUNCTION();
 
-    std::map<std::pair<TfToken, GarchImage::ImageOriginLocation>,
+    std::map<std::pair<TfToken, HioImage::ImageOriginLocation>,
              _TextureMetadata>::iterator it =
         _textureRegistry.begin();
     while (it != _textureRegistry.end()){

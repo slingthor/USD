@@ -408,6 +408,10 @@ public:
         return binding;
     }
 
+    int GetNumReservedUniformBlockLocations() const {
+        return _numReservedUniformBlockLocations;
+    }
+
     int GetNumReservedTextureUnits() const {
         return _numReservedTextureUnits;
     }
@@ -449,6 +453,7 @@ protected:
     };
     typedef std::map<NameAndLevel, HdBinding> _BindingMap;
     mutable _BindingMap _bindingMap;
+    int _numReservedUniformBlockLocations;
     int _numReservedTextureUnits;
 };
 

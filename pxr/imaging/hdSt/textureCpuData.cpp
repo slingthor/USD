@@ -1,5 +1,5 @@
 //
-// Copyright 2016 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,48 +21,12 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef GARCH_IMAGE_REGISTRY_H
-#define GARCH_IMAGE_REGISTRY_H
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/garch/api.h"
-#include "pxr/base/tf/singleton.h"
-#include "pxr/base/tf/token.h"
-
-#include <memory>
-#include <string>
+#include "pxr/imaging/hdSt/textureCpuData.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-typedef std::shared_ptr<class GarchImage> GarchImageSharedPtr;
-
-class GarchRankedTypeMap;
-
-/// \class GarchImageRegistry
-///
-/// Manages plugin registration and loading for GarchImage subclasses.
-///
-class GarchImageRegistry : public TfSingleton<GarchImageRegistry> {
-public:
-    GARCH_API
-    static GarchImageRegistry& GetInstance();
-
-    GARCH_API
-    bool IsSupportedImageFile(std::string const & filename);
-
-private:
-    friend class TfSingleton<GarchImageRegistry>;
-    GarchImageRegistry();
-
-    friend class GarchImage;
-
-    GarchImageSharedPtr _ConstructImage(std::string const & filename);
-
-private:
-    std::unique_ptr<GarchRankedTypeMap> _typeMap;
-};
+HdStTextureCpuData::~HdStTextureCpuData() = default;
 
 PXR_NAMESPACE_CLOSE_SCOPE
-
-#endif // GARCH_IMAGE_REGISTRY_H

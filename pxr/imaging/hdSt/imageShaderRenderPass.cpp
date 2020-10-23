@@ -63,7 +63,6 @@ _ExecuteDraw(
     HdStRenderPassStateSharedPtr const& stRenderPassState,
     HdStResourceRegistrySharedPtr const& resourceRegistry)
 {
-    drawBatch->PrepareDraw(stRenderPassState, resourceRegistry);
     drawBatch->ExecuteDraw(stRenderPassState, resourceRegistry);
 }
 
@@ -165,6 +164,8 @@ HdSt_ImageShaderRenderPass::_Execute(
     
 	MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 	
+    _immediateBatch->PrepareDraw(stRenderPassState, resourceRegistry);
+
     // Create graphics work to render into aovs.
     const HgiGraphicsCmdsDesc desc =
         stRenderPassState->MakeGraphicsCmdsDesc(GetRenderIndex());

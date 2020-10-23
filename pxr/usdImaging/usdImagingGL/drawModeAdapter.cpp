@@ -32,7 +32,7 @@
 #include "pxr/imaging/hd/material.h"
 
 #include "pxr/imaging/hio/glslfx.h"
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/pxOsd/tokens.h"
 
 #include "pxr/usd/usdGeom/modelAPI.h"
@@ -459,6 +459,255 @@ UsdImagingGLDrawModeAdapter::GetDoubleSided(UsdPrim const& prim,
     return false;
 }
 
+/*virtual*/
+VtValue 
+UsdImagingGLDrawModeAdapter::Get(UsdPrim const& prim, 
+                                 SdfPath const& cachePath,
+                                 TfToken const& key,
+                                 UsdTimeCode time) const
+{
+    TRACE_FUNCTION();
+
+    VtValue value;
+    UsdGeomModelAPI model(prim);
+
+    if (key == HdTokens->displayColor) {
+        VtVec3fArray color = VtVec3fArray(1);
+        GfVec3f drawModeColor;
+        if (model) {
+            model.GetModelDrawModeColorAttr().Get(&drawModeColor);
+        } else {
+            drawModeColor = _schemaColor;
+        }
+
+        color[0] = drawModeColor;
+        value = color;
+
+    } else if (key == HdTokens->displayOpacity) {
+        VtFloatArray opacity = VtFloatArray(1);
+
+        // Full opacity.
+        opacity[0] = 1.0f;
+        value = opacity;
+
+    } else if (key == HdTokens->widths) {
+        VtFloatArray widths = VtFloatArray(1);
+        widths[0] = 1.0f;
+        value = widths;
+
+    } else if (key == HdTokens->points) {
+        TRACE_FUNCTION_SCOPE("points");
+        TfToken drawMode = UsdGeomTokens->default_;
+        _DrawModeMap::const_iterator it = _drawModeMap.find(cachePath);
+        if (TF_VERIFY(it != _drawModeMap.end())) {
+            drawMode = it->second;
+        }
+
+        VtValue topology;
+        VtValue points;
+        VtValue uv;
+        VtValue assign;
+        GfRange3d extent;
+        _ComputeGeometryData(prim, cachePath, time, drawMode, &topology, 
+            &points, &extent, &uv, &assign);
+        return points;
+
+    } else if (key == _tokens->cardsUv) {
+        TRACE_FUNCTION_SCOPE("cardsUV");
+        TfToken drawMode = UsdGeomTokens->default_;
+        _DrawModeMap::const_iterator it = _drawModeMap.find(cachePath);
+        if (TF_VERIFY(it != _drawModeMap.end())) {
+            drawMode = it->second;
+        }
+
+        VtValue topology;
+        VtValue points;
+        VtValue uv;
+        VtValue assign;
+        GfRange3d extent;
+        _ComputeGeometryData(prim, cachePath, time, drawMode, &topology, 
+            &points, &extent, &uv, &assign);
+        return uv;
+
+    } else if (key == _tokens->cardsTexAssign) {
+        TRACE_FUNCTION_SCOPE("cardsTexAssign");
+        TfToken drawMode = UsdGeomTokens->default_;
+        _DrawModeMap::const_iterator it = _drawModeMap.find(cachePath);
+        if (TF_VERIFY(it != _drawModeMap.end())) {
+            drawMode = it->second;
+        }
+
+        VtValue topology;
+        VtValue points;
+        VtValue uv;
+        VtValue assign;
+        GfRange3d extent;
+        _ComputeGeometryData(prim, cachePath, time, drawMode, &topology, 
+            &points, &extent, &uv, &assign);
+        return assign;
+
+    } else if (key == _tokens->displayRoughness) {
+        return VtValue(1.0f);
+    }
+
+    return value;
+}
+
+/*virtual*/
+SdfPath
+UsdImagingGLDrawModeAdapter::GetMaterialId(UsdPrim const& prim, 
+                                           SdfPath const& cachePath, 
+                                           UsdTimeCode time) const
+{
+    return _GetMaterialPath(prim);
+}
+
+/*virtual*/
+VtValue
+UsdImagingGLDrawModeAdapter::GetMaterialResource(UsdPrim const& prim, 
+                            SdfPath const& cachePath, 
+                            UsdTimeCode time) const
+{
+    if (!_IsMaterialPath(cachePath)) {
+        return BaseAdapter::GetMaterialResource(prim, cachePath, time);
+    }
+
+    UsdGeomModelAPI model(prim);
+
+    SdfAssetPath path(UsdImagingGLPackageDrawModeShader());
+
+    SdrRegistry &shaderReg = SdrRegistry::GetInstance();
+    SdrShaderNodeConstPtr sdrNode = 
+        shaderReg.GetShaderNodeFromAsset(
+            path, 
+            NdrTokenMap(), 
+            TfToken(), 
+            HioGlslfxTokens->glslfx);
+
+    // An sdr node representing the drawCards.glslfx should be added
+    // to the registry, so we don't expect this to fail.
+    if (!TF_VERIFY(sdrNode)) {
+        return VtValue();
+    }
+
+    // Generate material network with a terminal that points to
+    // the DrawMode glslfx shader.
+    TfToken const& terminalType = HdMaterialTerminalTokens->surface;
+    HdMaterialNetworkMap networkMap;
+    HdMaterialNetwork& network = networkMap.map[terminalType];
+    HdMaterialNode terminal;
+    terminal.path = cachePath;
+    terminal.identifier = sdrNode->GetIdentifier();
+
+    const TfToken textureNames[12] = {
+        _tokens->textureXPosColor,
+        _tokens->textureYPosColor,
+        _tokens->textureZPosColor,
+        _tokens->textureXNegColor,
+        _tokens->textureYNegColor,
+        _tokens->textureZNegColor,
+        _tokens->textureXPosOpacity,
+        _tokens->textureYPosOpacity,
+        _tokens->textureZPosOpacity,
+        _tokens->textureXNegOpacity,
+        _tokens->textureYNegOpacity,
+        _tokens->textureZNegOpacity
+    };
+
+    if (model) {
+        const TfToken textureAttrs[6] = {
+            UsdGeomTokens->modelCardTextureXPos,
+            UsdGeomTokens->modelCardTextureYPos,
+            UsdGeomTokens->modelCardTextureZPos,
+            UsdGeomTokens->modelCardTextureXNeg,
+            UsdGeomTokens->modelCardTextureYNeg,
+            UsdGeomTokens->modelCardTextureZNeg,
+        };
+
+        GfVec3f drawModeColor;
+        model.GetModelDrawModeColorAttr().Get(&drawModeColor);
+        VtValue fallback = VtValue(GfVec4f(
+            drawModeColor[0], drawModeColor[1], drawModeColor[2],
+            1.0f));
+
+        for (int i = 0; i < 6; ++i) {
+            SdfAssetPath textureFile;
+            prim.GetAttribute(textureAttrs[i]).Get(&textureFile, time);
+            if (!textureFile.GetAssetPath().empty()) {
+                SdfPath textureNodePath = _GetMaterialPath(prim)
+                    .AppendProperty(textureAttrs[i]);
+
+                // Make texture node
+                HdMaterialNode textureNode;
+                textureNode.path = textureNodePath;
+                textureNode.identifier = UsdImagingTokens->UsdUVTexture;
+                textureNode.parameters[_tokens->st] = _tokens->cardsUv;
+                textureNode.parameters[_tokens->fallback] = fallback;
+                textureNode.parameters[_tokens->file] = textureFile;
+                textureNode.parameters[_tokens->minFilter] =
+                    _tokens->linearMipmapLinear;
+                textureNode.parameters[_tokens->magFilter] =
+                    _tokens->linear;
+
+                // Insert connection between texture node and terminal color
+                // input
+                HdMaterialRelationship colorRel;
+                colorRel.inputId = textureNode.path;
+                colorRel.inputName = _tokens->rgb;
+                colorRel.outputId = terminal.path;
+                colorRel.outputName = textureNames[i];
+                network.relationships.emplace_back(std::move(colorRel));
+
+                // Insert connection between texture node and terminal 
+                // opacity input
+                HdMaterialRelationship opacityRel;
+                opacityRel.inputId = textureNode.path;
+                opacityRel.inputName = _tokens->a;
+                opacityRel.outputId = terminal.path;
+                opacityRel.outputName = textureNames[i + 6];
+                network.relationships.emplace_back(std::move(opacityRel));
+
+                // Insert texture node
+                network.nodes.emplace_back(std::move(textureNode));
+            } else {
+                terminal.parameters[textureNames[i]] = drawModeColor;
+                terminal.parameters[textureNames[i + 6]] = VtValue(1.f);
+            }
+        }
+    } else {
+        for (int i = 0; i < 6; ++i) {
+            terminal.parameters[textureNames[i]] = _schemaColor;
+            terminal.parameters[textureNames[i + 6]] = VtValue(1.f);
+        }
+    }
+
+    // Adding a primvar reader for the card assignment
+    // Make primvar reader node
+    SdfPath primvarNodePath = _GetMaterialPath(prim)
+        .AppendProperty(_tokens->cardsTexAssign);
+    HdMaterialNode primvarNode;
+    primvarNode.path = primvarNodePath;
+    primvarNode.identifier = UsdImagingTokens->UsdPrimvarReader_int;
+    primvarNode.parameters[_tokens->varname] = _tokens->cardsTexAssign;
+    primvarNode.parameters[_tokens->fallback] = VtValue(0);
+
+    // Insert connection between primvar reader node and terminal
+    HdMaterialRelationship relPrimvar;
+    relPrimvar.inputId = primvarNode.path;
+    relPrimvar.inputName = _tokens->result;
+    relPrimvar.outputId = terminal.path;
+    relPrimvar.outputName = _tokens->activeTexCard;
+    network.relationships.emplace_back(std::move(relPrimvar));
+
+    // Insert primvar reader node
+    network.nodes.emplace_back(std::move(primvarNode));
+
+    // Insert terminal and update material network
+    networkMap.terminals.push_back(terminal.path);
+    network.nodes.emplace_back(std::move(terminal));
+
+    return VtValue(networkMap);
+}
 
 void
 UsdImagingGLDrawModeAdapter::_CheckForTextureVariability(
@@ -527,193 +776,17 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
     UsdImagingValueCache* valueCache = _GetValueCache();
     UsdGeomModelAPI model(prim);
 
-    if (_IsMaterialPath(cachePath)) {
-
-        if (requestedBits & HdMaterial::DirtyResource) {
-
-            SdfAssetPath path(UsdImagingGLPackageDrawModeShader());
-            
-            SdrRegistry &shaderReg = SdrRegistry::GetInstance();
-            SdrShaderNodeConstPtr sdrNode = 
-                shaderReg.GetShaderNodeFromAsset(
-                    path, 
-                    NdrTokenMap(), 
-                    TfToken(), 
-                    HioGlslfxTokens->glslfx);
-
-            // An sdr node representing the drawCards.glslfx should be added
-            // to the registry, so we don't expect this to fail.
-            if (!TF_VERIFY(sdrNode)) {
-                return;
-            }
-
-            // Generate material network with a terminal that points to
-            // the DrawMode glslfx shader.
-            TfToken const& terminalType = HdMaterialTerminalTokens->surface;
-            HdMaterialNetworkMap networkMap;
-            HdMaterialNetwork& network = networkMap.map[terminalType];
-            HdMaterialNode terminal;
-            terminal.path = cachePath;
-            terminal.identifier = sdrNode->GetIdentifier();
-
-            const TfToken textureNames[12] = {
-                _tokens->textureXPosColor,
-                _tokens->textureYPosColor,
-                _tokens->textureZPosColor,
-                _tokens->textureXNegColor,
-                _tokens->textureYNegColor,
-                _tokens->textureZNegColor,
-                _tokens->textureXPosOpacity,
-                _tokens->textureYPosOpacity,
-                _tokens->textureZPosOpacity,
-                _tokens->textureXNegOpacity,
-                _tokens->textureYNegOpacity,
-                _tokens->textureZNegOpacity
-            };
-
-            if (model) {
-                const TfToken textureAttrs[6] = {
-                    UsdGeomTokens->modelCardTextureXPos,
-                    UsdGeomTokens->modelCardTextureYPos,
-                    UsdGeomTokens->modelCardTextureZPos,
-                    UsdGeomTokens->modelCardTextureXNeg,
-                    UsdGeomTokens->modelCardTextureYNeg,
-                    UsdGeomTokens->modelCardTextureZNeg,
-                };
-
-                GfVec3f drawModeColor;
-                model.GetModelDrawModeColorAttr().Get(&drawModeColor);
-                VtValue fallback = VtValue(GfVec4f(
-                    drawModeColor[0], drawModeColor[1], drawModeColor[2],
-                    1.0f));
-
-                for (int i = 0; i < 6; ++i) {
-                    SdfAssetPath textureFile;
-                    prim.GetAttribute(textureAttrs[i]).Get(&textureFile, time);
-                    if (!textureFile.GetAssetPath().empty()) {
-                        SdfPath textureNodePath = _GetMaterialPath(prim)
-                            .AppendProperty(textureAttrs[i]);
-
-                        // Make texture node
-                        HdMaterialNode textureNode;
-                        textureNode.path = textureNodePath;
-                        textureNode.identifier = UsdImagingTokens->UsdUVTexture;
-                        textureNode.parameters[_tokens->st] = _tokens->cardsUv;
-                        textureNode.parameters[_tokens->fallback] = fallback;
-                        textureNode.parameters[_tokens->file] = textureFile;
-                        textureNode.parameters[_tokens->minFilter] =
-                            _tokens->linearMipmapLinear;
-                        textureNode.parameters[_tokens->magFilter] =
-                            _tokens->linear;
-
-                        // Insert connection between texture node and terminal color
-                        // input
-                        HdMaterialRelationship colorRel;
-                        colorRel.inputId = textureNode.path;
-                        colorRel.inputName = _tokens->rgb;
-                        colorRel.outputId = terminal.path;
-                        colorRel.outputName = textureNames[i];
-                        network.relationships.emplace_back(std::move(colorRel));
-
-                        // Insert connection between texture node and terminal 
-                        // opacity input
-                        HdMaterialRelationship opacityRel;
-                        opacityRel.inputId = textureNode.path;
-                        opacityRel.inputName = _tokens->a;
-                        opacityRel.outputId = terminal.path;
-                        opacityRel.outputName = textureNames[i + 6];
-                        network.relationships.emplace_back(std::move(opacityRel));
-
-                        // Insert texture node
-                        network.nodes.emplace_back(std::move(textureNode));
-                    } else {
-                        terminal.parameters[textureNames[i]] = drawModeColor;
-                        terminal.parameters[textureNames[i + 6]] = VtValue(1.f);
-                    }
-                }
-            } else {
-                for (int i = 0; i < 6; ++i) {
-                    terminal.parameters[textureNames[i]] = _schemaColor;
-                    terminal.parameters[textureNames[i + 6]] = VtValue(1.f);
-                }
-            }
-
-            // Adding a primvar reader for the card assignment
-            // Make primvar reader node
-            SdfPath primvarNodePath = _GetMaterialPath(prim)
-                .AppendProperty(_tokens->cardsTexAssign);
-            HdMaterialNode primvarNode;
-            primvarNode.path = primvarNodePath;
-            primvarNode.identifier = UsdImagingTokens->UsdPrimvarReader_int;
-            primvarNode.parameters[_tokens->varname] = _tokens->cardsTexAssign;
-            primvarNode.parameters[_tokens->fallback] = VtValue(0);
-
-            // Insert connection between primvar reader node and terminal
-            HdMaterialRelationship relPrimvar;
-            relPrimvar.inputId = primvarNode.path;
-            relPrimvar.inputName = _tokens->result;
-            relPrimvar.outputId = terminal.path;
-            relPrimvar.outputName = _tokens->activeTexCard;
-            network.relationships.emplace_back(std::move(relPrimvar));
-
-            // Insert primvar reader node
-            network.nodes.emplace_back(std::move(primvarNode));
-
-            // Insert terminal and update material network
-            networkMap.terminals.push_back(terminal.path);
-            network.nodes.emplace_back(std::move(terminal));
-            valueCache->GetMaterialResource(cachePath) = VtValue(networkMap);
-        }
-
-        return;
-    }
-
     // Geometry aspect
     HdPrimvarDescriptorVector& primvars = valueCache->GetPrimvars(cachePath);
 
-    if (requestedBits & HdChangeTracker::DirtyTransform) {
-        // If the draw mode is instantiated on an instance, prim will be
-        // the instance prim, but we want to ignore transforms on that
-        // prim since the instance adapter will handle them.
-        if (prim.IsInstance()) {
-            valueCache->GetTransform(cachePath) = GfMatrix4d(1.0);
-        } else {
-            valueCache->GetTransform(cachePath) = GetTransform(prim, time);
-        }
-    }
-
-    if (requestedBits & HdChangeTracker::DirtyMaterialId) {
-        SdfPath materialPath = _GetMaterialPath(prim);
-        valueCache->GetMaterialId(cachePath) = materialPath;
-    }
-
     if (requestedBits & HdChangeTracker::DirtyWidths) {
-        VtFloatArray widths = VtFloatArray(1);
-        widths[0] = 1.0f;
-        valueCache->GetWidths(cachePath) = VtValue(widths);
         _MergePrimvar(&primvars, UsdGeomTokens->widths,
                       HdInterpolationConstant);
     }
 
     if (requestedBits & HdChangeTracker::DirtyPrimvar) {
-        VtVec3fArray color = VtVec3fArray(1);
-        GfVec3f drawModeColor;
-        if (model) {
-            model.GetModelDrawModeColorAttr().Get(&drawModeColor);
-        } else {
-            drawModeColor = _schemaColor;
-        }
-        color[0] = drawModeColor;
-        valueCache->GetColor(cachePath) = color;
-
         _MergePrimvar(&primvars, HdTokens->displayColor,
                       HdInterpolationConstant, HdPrimvarRoleTokens->color);
-
-        VtFloatArray opacity = VtFloatArray(1);
-        // Full opacity.
-        opacity[0] = 1.0f;
-        valueCache->GetOpacity(cachePath) = opacity;
-
         _MergePrimvar(&primvars, HdTokens->displayOpacity,
                       HdInterpolationConstant);
     }
@@ -734,10 +807,9 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
 
         VtValue topology;
         GfRange3d extent;
-        VtValue& points = valueCache->GetPoints(cachePath);
-        VtValue& uv = valueCache->GetPrimvar(cachePath, _tokens->cardsUv);
-        VtValue& assign = valueCache->GetPrimvar(cachePath, 
-            _tokens->cardsTexAssign);
+        VtValue points;
+        VtValue uv;
+        VtValue assign;
         _ComputeGeometryData(prim, cachePath, time, drawMode, &topology, 
             &points, &extent, &uv, &assign);
 
@@ -749,14 +821,13 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
                 HdInterpolationUniform);
 
             // XXX: backdoor into the material system.
-            valueCache->GetPrimvar(cachePath, _tokens->displayRoughness) =
-                VtValue(1.0f);
             _MergePrimvar(&primvars, _tokens->displayRoughness, 
                 HdInterpolationConstant);
         }
 
         // Merge "points" primvar
-        _MergePrimvar(&primvars, HdTokens->points,
+        _MergePrimvar(&primvars, 
+            HdTokens->points,
             HdInterpolationVertex,
             HdPrimvarRoleTokens->point);
     }
@@ -1191,7 +1262,7 @@ UsdImagingGLDrawModeAdapter::_GetMatrixFromImageMetadata(
         file = asset.GetAssetPath();
     }
 
-    GarchImageSharedPtr img = GarchImage::OpenForReading(file);
+    HioImageSharedPtr img = HioImage::OpenForReading(file);
     if (!img) {
         return false;
     }
@@ -1362,12 +1433,31 @@ UsdImagingGLDrawModeAdapter::_ComputeExtent(UsdPrim const& prim) const
     }
 }
 
+/*virtual*/
 HdCullStyle 
 UsdImagingGLDrawModeAdapter::GetCullStyle(UsdPrim const& prim,
                                           SdfPath const& cachePath,
                                           UsdTimeCode time) const
 {
     return HdCullStyleBack;
+}
+
+/*virtual*/
+GfMatrix4d 
+UsdImagingGLDrawModeAdapter::GetTransform(UsdPrim const& prim, 
+                                          SdfPath const& cachePath,
+                                          UsdTimeCode time,
+                                          bool ignoreRootTransform) const
+{
+    // If the draw mode is instantiated on an instance, prim will be
+    // the instance prim, but we want to ignore transforms on that
+    // prim since the instance adapter will handle them.
+    if (prim.IsInstance()) {
+        return GfMatrix4d(1.0);
+    } else {
+        return BaseAdapter::GetTransform(
+            prim, prim.GetPath(), time, ignoreRootTransform);
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

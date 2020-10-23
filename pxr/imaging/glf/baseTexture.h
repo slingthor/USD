@@ -87,7 +87,7 @@ protected:
     GlfBaseTexture();
 
     GLF_API
-    GlfBaseTexture(GarchImage::ImageOriginLocation originLocation);
+    GlfBaseTexture(HioImage::ImageOriginLocation originLocation);
 
     friend class GlfResourceFactory;
     

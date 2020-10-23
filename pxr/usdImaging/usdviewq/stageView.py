@@ -1310,10 +1310,11 @@ class StageView(QtOpenGL.QGLWidget):
         validFrameRange = (not self._selectionBrange.IsEmpty() and
             self._selectionBrange.GetMax() != self._selectionBrange.GetMin())
         if validFrameRange:
-            self.switchToFreeCamera()
+            self.switchToFreeCamera(False)
             self._dataModel.viewSettings.freeCamera.frameSelection(self._selectionBBox,
                 frameFit)
-            self.computeAndSetClosestDistance()
+            if self._dataModel.viewSettings.autoComputeClippingPlanes:
+                self.computeAndSetClosestDistance()
 
     def updateView(self, resetCam=False, forceComputeBBox=False, frameFit=1.1):
         '''Updates bounding boxes and camera. resetCam = True causes the camera to reframe
@@ -1387,7 +1388,7 @@ class StageView(QtOpenGL.QGLWidget):
     def getSelectionBBox(self):
         bbox = Gf.BBox3d()
         for n in self._dataModel.selection.getLCDPrims():
-            if n.IsActive() and not n.IsInMaster():
+            if n.IsActive() and not n.IsInPrototype():
                 primBBox = self._dataModel.computeWorldBound(n)
                 bbox = Gf.BBox3d.Combine(bbox, primBBox)
         return bbox

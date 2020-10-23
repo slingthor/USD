@@ -41,6 +41,7 @@ class HdStFieldTextureObject;
 class HdStPtexTextureObject;
 class HdStUdimTextureObject;
 class HdSt_SamplerObjectRegistry;
+using HgiBufferHandle = HgiHandle<class HgiBuffer>;
 using HgiSamplerHandle = HgiHandle<class HgiSampler>;
 
 using HdStSamplerObjectSharedPtr =
@@ -162,6 +163,12 @@ public:
 
     ~HdStPtexSamplerObject() override;
 
+    /// The GPU sampler object for the texels texture.
+    ///
+    const HgiSamplerHandle &GetTexelsSampler() const {
+        return _texelsSampler;
+    }
+
     /// The GL texture handle for bindless textures (as returned by
     /// glGetTextureHandleARB). This is for texels.
     ///
@@ -172,13 +179,14 @@ public:
     }
 
     /// Similar to GetGLTexelsTextureHandle but for layout.
-    uint64_t GetLayoutGLTextureHandle() const {
-        return _layoutGLTextureHandle;
+    const HgiBufferHandle &GetLayoutBufferHandle() const {
+        return _layoutBuffer;
     }
 
 private:
+    HgiSamplerHandle _texelsSampler;
     const uint64_t _texelsGLTextureHandle;
-    const uint64_t _layoutGLTextureHandle;
+    HgiBufferHandle _layoutBuffer;
 };
 
 /// \class HdStUdimSamplerObject
@@ -197,8 +205,7 @@ public:
 
     ~HdStUdimSamplerObject() override;
 
-    /// The GL sampler (as understood by glBindSampler) for the
-    /// texels texture.
+    /// The GPU sampler object for the texels texture.
     ///
     const HgiSamplerHandle &GetTexelsSampler() const {
         return _texelsSampler;

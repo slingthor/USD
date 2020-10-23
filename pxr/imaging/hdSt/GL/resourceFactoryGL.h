@@ -103,11 +103,6 @@ public:
     }
     
     HDST_API
-    virtual const char* const GetPtexTextureShaderFilename() const override {
-        return "ptexTextureGL.glslfx";
-    }
-      
-    HDST_API
     virtual HdStGLSLProgram *NewProgram(
         TfToken const &role, HdStResourceRegistry *const registry) const override;
       

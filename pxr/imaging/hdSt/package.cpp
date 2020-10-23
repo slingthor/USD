@@ -24,8 +24,6 @@
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 
-#include "pxr/imaging/hd/engine.h"
-
 #include "pxr/base/plug/plugin.h"
 #include "pxr/base/plug/thisPlugin.h"
 #include "pxr/base/tf/diagnostic.h"
@@ -63,7 +61,7 @@ HdStPackageDomeLightShader()
 TfToken
 HdStPackagePtexTextureShader()
 {
-    static TfToken s = _GetShaderPath(HdStResourceFactory::GetInstance()->GetPtexTextureShaderFilename());
+    static TfToken s = _GetShaderPath("ptexTexture.glslfx");
     return s;
 }
 
