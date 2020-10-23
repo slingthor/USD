@@ -134,7 +134,7 @@ protected:
     unsigned int _width = 0;
     unsigned int _height = 0;
     unsigned int _depth = 0;
-    HioFormat _hioFormat = HioFormatInvalid;
+    HioFormat _format = HioFormatInvalid;
     GarchTextureGPUHandle _imageArray;
     GarchTextureGPUHandle _layout;
     bool _loaded = false;

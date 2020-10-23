@@ -94,20 +94,15 @@ public:
     GARCH_API
     int ResizedDepth(int mipLevel = 0) const override;
 
-    HioFormat GetHioFormat() const override {
-        return _hioFormat;
+    HioFormat GetFormat() const override {
+        return _format;
     };
     
-    int GetNumChannels() const override {
-        return _numChannels;
-    }
-
     GARCH_API
     size_t TargetMemory() const override {
         return _targetMemory;
     };
 
-    GARCH_API
     WrapInfo GetWrapInfo() const override {
         return _wrapInfo;
     };
@@ -201,10 +196,9 @@ private:
 
     int _nativeWidth, _nativeHeight;
     int _resizedWidth, _resizedHeight;
-    int _numChannels;
     int _bytesPerPixel;
 
-    HioFormat _hioFormat;
+    HioFormat _format;
 
     WrapInfo _wrapInfo;
 

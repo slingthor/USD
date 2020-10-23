@@ -406,8 +406,8 @@ HdStUdimTextureObject::_Load()
         return;
     }
     
-    const HioFormat hioFormat = firstImageMips[0].image->GetHioFormat();
-    int numChannels = firstImageMips[0].image->GetNumChannels();
+    const HioFormat hioFormat = firstImageMips[0].image->GetFormat();
+    int numChannels = HioGetComponentCount(hioFormat);
     const size_t sizePerElem = HioGetDataSizeOfType(hioFormat);
     
     _hgiFormat = _GetPixelFormatForImage(hioFormat);
@@ -515,8 +515,7 @@ HdStUdimTextureObject::_Load()
                 HioImage::StorageSpec spec;
                 spec.width = mipSize.width;
                 spec.height = mipSize.height;
-                spec.numChannels = numChannels;
-                spec.hioFormat = hioFormat;
+                spec.format = hioFormat;
                 spec.flipped = true;
                 spec.data = mipData[mip].data() + (tileId * numBytesPerLayer);
                 const auto it = std::find_if(images.rbegin(), images.rend(),

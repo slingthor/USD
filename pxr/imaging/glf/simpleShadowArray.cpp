@@ -131,7 +131,7 @@ GlfSimpleShadowArray::EndCapture(size_t index)
         GfVec2i resolution = GetShadowMapSize(index);
         storage.width = resolution[0];
         storage.height = resolution[1];
-        storage.hioFormat = HioFormatFloat32;
+        storage.format = HioFormatFloat32;
 
         // In OpenGL, (0, 0) is the lower left corner.
         storage.flipped = true;

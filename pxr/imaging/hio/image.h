@@ -80,14 +80,12 @@ public:
     public:
         StorageSpec()
             : width(0), height(0), depth(0)
-            , numChannels(0)
-            , hioFormat(HioFormatInvalid)
+            , format(HioFormatInvalid)
             , flipped(false)
             , data(0) { }
 
         int width, height, depth;
-        int numChannels;
-        HioFormat hioFormat;
+        HioFormat format;
         bool flipped;
         void * data;
     };
@@ -155,10 +153,7 @@ public:
     virtual int GetHeight() const = 0;
 
     /// Returns the destination HioFormat.
-    virtual HioFormat GetHioFormat() const = 0;
-
-    /// Returns the number of channels.
-    virtual int GetNumChannels() const = 0;
+    virtual HioFormat GetFormat() const = 0;
 
     /// Returns the number of bytes per pixel.
     virtual int GetBytesPerPixel() const = 0;

@@ -120,13 +120,13 @@ GlfArrayTexture::_CreateTextures(
     glTexImage3D(
         GL_TEXTURE_2D_ARRAY,                            /* target         */
         0,                                              /* level          */
-        GlfGetGLInternalFormat(texDataVec[0]->GetHioFormat()),/* internalFormat */
+        GlfGetGLInternalFormat(texDataVec[0]->GetFormat()),/* internalFormat */
         texDataVec[0]->ResizedWidth(),                  /* width          */
         texDataVec[0]->ResizedHeight(),                 /* height         */
         _arraySize,                                     /* depth          */
         0,                                              /* border         */
-        GlfGetGLFormat(texDataVec[0]->GetHioFormat()),  /* format         */
-        GlfGetGLType(texDataVec[0]->GetHioFormat()),    /* type           */
+        GlfGetGLFormat(texDataVec[0]->GetFormat()),  /* format         */
+        GlfGetGLType(texDataVec[0]->GetFormat()),    /* type           */
         NULL);                                          /* data           */
     
     int memUsed = 0;
@@ -143,8 +143,8 @@ GlfArrayTexture::_CreateTextures(
                 texData->ResizedWidth(),                 /* width          */
                 texData->ResizedHeight(),                /* height         */
                 1,                                       /* depth          */
-                GlfGetGLFormat(texData->GetHioFormat()), /* format         */
-                GlfGetGLType(texData->GetHioFormat()),   /* type           */
+                GlfGetGLFormat(texData->GetFormat()), /* format         */
+                GlfGetGLType(texData->GetFormat()),   /* type           */
                 texData->GetRawBuffer());                /* data           */
             
             memUsed += texData->ComputeBytesUsed();

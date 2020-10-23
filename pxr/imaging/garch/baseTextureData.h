@@ -70,9 +70,7 @@ public:
 
     virtual int ResizedDepth(int mipLevel = 0) const = 0;
 
-    virtual HioFormat GetHioFormat() const = 0;
-
-    virtual int GetNumChannels() const = 0;
+    virtual HioFormat GetFormat() const = 0;
 
     virtual size_t TargetMemory() const = 0;
 
@@ -94,7 +92,7 @@ public:
     virtual int GetNumMipLevels() const = 0;
 
     virtual bool IsCompressed() const {
-        return HioIsCompressed(GetHioFormat());
+        return HioIsCompressed(GetFormat());
     }
 
 };

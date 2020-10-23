@@ -57,7 +57,7 @@ GarchVdbTextureData::GarchVdbTextureData(
       _resizedWidth(0), _resizedHeight(0), _resizedDepth(1),
       _bytesPerPixel(0),
       _numChannels(0),
-      _hioFormat(HioFormatUNorm8Vec3),
+      _format(HioFormatUNorm8Vec3),
       _size(0)
 {
 }
@@ -77,13 +77,8 @@ GarchVdbTextureData::NumDimensions() const
 }
 
 HioFormat
-GarchVdbTextureData::GetHioFormat() const {
-    return _hioFormat;
-}
-
-int
-GarchVdbTextureData::GetNumChannels() const {
-    return _numChannels;
+GarchVdbTextureData::GetFormat() const {
+    return _format;
 }
 
 size_t
@@ -546,10 +541,10 @@ GarchVdbTextureData::Read(int degradeLevel, bool generateMipmap,
     // Get grid transform 
     GfMatrix4d gridTransform = gridHolder->GetGridTransform();
     
-    // Get _bytesPerPixel & _hioFormat
+    // Get _bytesPerPixel & _format
     gridHolder->GetMetadata(&_bytesPerPixel,
-                            &_hioFormat);
-    _numChannels = HioGetComponentCount(_hioFormat);
+                            &_format);
+    _numChannels = HioGetComponentCount(_format);
 
     // Get tree bounding box to compute native dimensions and size
     const openvdb::CoordBBox &nativeTreeBoundingBox =

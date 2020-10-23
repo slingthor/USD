@@ -120,7 +120,7 @@ GarchUdimTexture::GetTextureInfo(bool forceLoad)
         ret["width"] = _width;
         ret["height"] = _height;
         ret["depth"] = _depth;
-        ret["format"] = _hioFormat;
+        ret["format"] = _format;
         if (!_tiles.empty()) {
             ret["imageFilePath"] = std::get<1>(_tiles.front());
         }
@@ -129,7 +129,7 @@ GarchUdimTexture::GetTextureInfo(bool forceLoad)
         ret["width"] = 0;
         ret["height"] = 0;
         ret["depth"] = 1;
-        ret["format"] = _hioFormat;
+        ret["format"] = _format;
     }
     ret["referenceCount"] = GetCurrentCount();
     return ret;

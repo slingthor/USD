@@ -45,7 +45,7 @@ struct RtxGlfImagePluginUserData {
     std::vector<HioImage::StorageSpec> mipLevels;
 };
 
-/// A Renderman Rtx texture plugin that uses GlfImage to read files,
+/// A Renderman Rtx texture plugin that uses HioImage to read files,
 /// allowing support for additional file types beyond .tex.
 class RtxGlfImagePlugin : public RtxPlugin {
 public:
@@ -148,7 +148,7 @@ RtxGlfImagePlugin::Open(TextureCtx& tCtx)
         }
     }
 
-    // Open GlfImage.
+    // Open HioImage.
     HioImageSharedPtr image = HioImage::OpenForReading(filename);
     if (!image) {
         m_msgHandler->ErrorAlways(
@@ -166,9 +166,9 @@ RtxGlfImagePlugin::Open(TextureCtx& tCtx)
     tCtx.minRes.Y = 1;
     tCtx.maxRes.X = image->GetWidth();
     tCtx.maxRes.Y = image->GetHeight();
-    tCtx.numChannels = image->GetNumChannels();
+    tCtx.numChannels = HioGetComponentCount(image->GetFormat());
     // Component data type.
-    HioType channelType = HioGetHioType(image->GetHioFormat());
+    HioType channelType = HioGetHioType(image->GetFormat());
     switch (channelType) {
     case HioTypeFloat:
         tCtx.dataType = TextureCtx::k_Float;
@@ -245,8 +245,7 @@ RtxGlfImagePlugin::Fill(TextureCtx& tCtx, FillRequest& fillReq)
             level.width = fillReq.imgRes.X;
             level.height = fillReq.imgRes.Y;
             level.depth = data->image->GetBytesPerPixel();
-            level.hioFormat = data->image->GetHioFormat();
-            level.numChannels = data->image->GetNumChannels();
+            level.format = data->image->GetFormat();
 
             if (tCtx.dataType != TextureCtx::k_Byte &&
                 tCtx.dataType != TextureCtx::k_Float) {
@@ -264,10 +263,10 @@ RtxGlfImagePlugin::Fill(TextureCtx& tCtx, FillRequest& fillReq)
 
     const bool isSRGB = data->image->IsColorSpaceSRGB();
     const HioType channelType =
-        HioGetHioType(data->image->GetHioFormat());
+        HioGetHioType(data->image->GetFormat());
 
-    const int numImageChannels = level.numChannels;
-    const int bytesPerChannel = HioGetDataSizeOfFormat(level.hioFormat);
+    const int numImageChannels = HioGetComponentCount(level.format);
+    const int bytesPerChannel = HioGetDataSizeOfType(channelType);
 
     // Copy out tile data, one row at a time.
     const int bytesPerImagePixel = level.depth;

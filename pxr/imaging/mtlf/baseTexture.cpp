@@ -199,7 +199,7 @@ MtlfBaseTexture::_UpdateTexture(GarchBaseTextureDataConstPtr texData)
         _currentWidth  = texData->ResizedWidth();
         _currentHeight = texData->ResizedHeight();
         _currentDepth  = texData->ResizedDepth();
-        _format        = texData->GetHioFormat();
+        _format        = texData->GetFormat();
         _hasWrapModeS  = texData->GetWrapInfo().hasWrapModeS;
         _hasWrapModeT  = texData->GetWrapInfo().hasWrapModeT;
         _hasWrapModeR  = texData->GetWrapInfo().hasWrapModeR;
@@ -284,13 +284,13 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             size_t pixelByteSize;
             int numPixels = texDataWidth * texDataHeight;
             int numChannels;
-            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GetHioFormat(), &pixelByteSize, &numChannels);
+            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GetFormat(), &pixelByteSize, &numChannels);
             int isThreeChannelTexture = numChannels == 3;
             
             void *texBuffer = texData->GetRawBuffer(0);
             if (isThreeChannelTexture) {
                 // Pad out 24bit formats to 32bit
-                texBuffer = PadImage(texData->GetHioFormat(), texData->GetRawBuffer(0), pixelByteSize, numPixels);
+                texBuffer = PadImage(texData->GetFormat(), texData->GetRawBuffer(0), pixelByteSize, numPixels);
             }
             
             if (!texData->IsCompressed()) {
@@ -423,7 +423,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
         } else {
             size_t pixelByteSize;
             int numChannels;
-            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GetHioFormat(), &pixelByteSize, &numChannels);
+            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GetFormat(), &pixelByteSize, &numChannels);
             bool isThreeChannelTexture = numChannels == 3;
 
             if (mtlFormat == MTLPixelFormatInvalid) {
@@ -463,7 +463,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                            
                             if (isThreeChannelTexture) {
                                 // Pad out 24bit formats to 32bit
-                                texBuffer = PadImage((*asyncOwnedTexData)->GetHioFormat(), (*asyncOwnedTexData)->GetRawBuffer(1), pixelByteSize, numPixels);
+                                texBuffer = PadImage((*asyncOwnedTexData)->GetFormat(), (*asyncOwnedTexData)->GetRawBuffer(1), pixelByteSize, numPixels);
                             }
 
                             [_textureName replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))
@@ -487,7 +487,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                     
                     if (isThreeChannelTexture) {
                         // Pad out 24bit formats to 32bit
-                        texBuffer = PadImage(texData->GetHioFormat(), texData->GetRawBuffer(1), pixelByteSize, numPixels);
+                        texBuffer = PadImage(texData->GetFormat(), texData->GetRawBuffer(1), pixelByteSize, numPixels);
                     }
                     
                     [_textureName replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))

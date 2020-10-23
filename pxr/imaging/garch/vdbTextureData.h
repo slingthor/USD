@@ -72,11 +72,8 @@ public:
     int ResizedDepth(int mipLevel = 0) const override;
 
     GARCH_API
-    HioFormat GetHioFormat() const override;
+    HioFormat GetFormat() const override;
     
-    GARCH_API
-    int GetNumChannels() const override;
-
     GARCH_API
     size_t TargetMemory() const override;
 
@@ -120,7 +117,7 @@ private:
     int _bytesPerPixel;
     int _numChannels;
 
-    HioFormat _hioFormat;
+    HioFormat _format;
 
     WrapInfo _wrapInfo;
 

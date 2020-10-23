@@ -625,7 +625,7 @@ GlfDrawTarget::WriteToFile(std::string const & name,
     HioImage::StorageSpec storage;
     storage.width = _size[0];
     storage.height = _size[1];
-    storage.hioFormat = GarchGetHioFormat(a->GetFormat(),
+    storage.format = GarchGetHioFormat(a->GetFormat(),
                                           a->GetType(),
                                           /* isSRGB */ isSRGB);
     storage.flipped = true;

@@ -204,11 +204,11 @@ using _ConversionFunction = _Data(*)(const void * data, size_t numTargetBytes);
 void
 _GetHgiFormatAndConversionFunction(
     const HioFormat hioFormat,
-    const int numChannels,
     const bool premultiplyAlpha,
     HgiFormat * const hgiFormat,
     _ConversionFunction * const conversionFunction)
 {
+    int numChannels = HioGetComponentCount(hioFormat);
     // Format dispatch, mostly we can just use the CPU buffer from
     // the texture data provided.
     switch(hioFormat) {
@@ -359,11 +359,10 @@ HdStGlfTextureCpuData::HdStGlfTextureCpuData(
     //   by modern graphics APIs)
     // - Pre-multiply alpha.
 
-    const HioFormat hioFormat = textureData->GetHioFormat();
+    const HioFormat hioFormat = textureData->GetFormat();
 
     _ConversionFunction conversionFunction = nullptr;
     _GetHgiFormatAndConversionFunction(hioFormat,
-                                       textureData->GetNumChannels(),
                                        premultiplyAlpha,
                                        &_textureDesc.format,
                                        &conversionFunction);

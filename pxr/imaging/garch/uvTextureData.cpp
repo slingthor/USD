@@ -75,9 +75,8 @@ GarchUVTextureData::GarchUVTextureData(std::string const &filePath,
     _targetMemory(0),
     _nativeWidth(0), _nativeHeight(0),
     _resizedWidth(0), _resizedHeight(0),
-    _numChannels(0),
     _bytesPerPixel(0),
-    _hioFormat(HioFormatUNorm8Vec3),
+    _format(HioFormatUNorm8Vec3),
     _size(0),
     _sourceColorSpace(sourceColorSpace)
 {
@@ -99,8 +98,8 @@ GarchUVTextureData_ComputeMemory(HioImageSharedPtr const &img,
     // extra 1/4 + 1/16 + 1/64 + 1/256 + ... of memory
     const double scale = generateMipmap ? 4.0 / 3 : 1.0;
 
-    if (HioIsCompressed(img->GetHioFormat())) {
-         return scale * HioGetDataSize(img->GetHioFormat(),
+    if (HioIsCompressed(img->GetFormat())) {
+         return scale * HioGetDataSize(img->GetFormat(),
                             GfVec3i(img->GetWidth(), img->GetHeight(), 1));
     }
 
@@ -232,8 +231,8 @@ GarchUVTextureData::_ReadDegradedImageInput(bool generateMipmap,
     for (int i = 1; i < numMipLevels; i++) {
         // Open the image and is requested to use the i-th
         // down-sampled image (mipLevel).
-        HioImageSharedPtr image = HioImage::OpenForReading(_filePath, 0, i,
-                                                               _sourceColorSpace);
+        HioImageSharedPtr image = HioImage::OpenForReading(_filePath, 0, i, 
+                                                           _sourceColorSpace);
 
         // If mipLevel could not be opened, return fullImage. We are
         // not supposed to hit this. HioImage will return the last
@@ -307,7 +306,7 @@ GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
 
     // Load the first mip to extract important data
     HioImageSharedPtr image = degradedImage.images[0];
-    _hioFormat = image->GetHioFormat();
+    _format = image->GetFormat();
 
     _targetMemory = _params.targetMemory;
     _wrapInfo.hasWrapModeS =
@@ -317,9 +316,8 @@ GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
     _size = 0;
     _nativeWidth = _resizedWidth = image->GetWidth();
     _nativeHeight = _resizedHeight = image->GetHeight();
-    _numChannels = image->GetNumChannels();
 
-    bool isCompressed = HioIsCompressed(_hioFormat);
+    bool isCompressed = HioIsCompressed(_format);
     bool needsCropping = _params.cropTop || _params.cropBottom ||
                          _params.cropLeft || _params.cropRight;
     bool needsResizeOnLoad = false;
@@ -332,7 +330,7 @@ GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
         // textureData is updated to include hioFormat 
         _bytesPerPixel = image->GetBytesPerPixel();
     } else {
-        _bytesPerPixel = HioGetDataSizeOfType(_hioFormat) * _numChannels;
+        _bytesPerPixel = HioGetDataSizeOfFormat(_format);
 
         if (needsCropping) {
             TRACE_FUNCTION_SCOPE("cropping");
@@ -381,7 +379,7 @@ GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
     }
 
     // Check if the image is providing a mip chain and check if it is valid
-    // If the user wants cropping/resize then the mip chain will be discarded.
+    // Also, if the user wants cropping/resize then the mip chain 
     // will be discarded.
     bool usePregeneratedMips = !needsResizeOnLoad && generateMipmap;
     int numMipLevels = usePregeneratedMips ? degradedImage.images.size() : 1;
@@ -396,19 +394,20 @@ GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
     for(int i = 0 ; i < numMipLevels; i++) {
         HioImageSharedPtr image = degradedImage.images[i];
         if (!image) {
-            TF_RUNTIME_ERROR("Unable to load mip from Texture '%s'.",
+            TF_RUNTIME_ERROR("Unable to load mip from Texture '%s'.", 
                 _filePath.c_str());
             return false;
         }
 
+        // Create the new mipmap
         Mip & mip  = _rawBufferMips[i];
         mip.width  = needsResizeOnLoad ? _resizedWidth : image->GetWidth();
         mip.height = needsResizeOnLoad ? _resizedHeight : image->GetHeight();
         
         const size_t numPixels = mip.width * mip.height;
-        mip.size   = isCompressed ? HioGetDataSize(_hioFormat,
+        mip.size   = isCompressed ? HioGetDataSize(_format,
                                         GfVec3i(mip.width, mip.height,1))
-                                    : numPixels * _bytesPerPixel;
+                                  : numPixels * _bytesPerPixel;
         mip.offset = _size;
         _size += mip.size;
     }
@@ -433,8 +432,7 @@ GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
 	
 	bool flipByDefault = GarchResourceFactory::GetInstance()->GetContextCaps().flipTexturesOnLoad;
 	
-    commonStorageSpec.hioFormat = _hioFormat;
-    commonStorageSpec.numChannels = _numChannels;
+    commonStorageSpec.format = _format;
     commonStorageSpec.flipped = (originLocation == HioImage::OriginLowerLeft) ?
                       (flipByDefault) : (!flipByDefault);
 
@@ -457,8 +455,7 @@ GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
             HioImage::StorageSpec storage;
             storage.width = mip.width;
             storage.height = mip.height;
-            storage.hioFormat = commonStorageSpec.hioFormat;
-            storage.numChannels = commonStorageSpec.numChannels;
+            storage.format = commonStorageSpec.format;
             storage.flipped = commonStorageSpec.flipped;
             storage.data = _rawBuffer.get() + mip.offset;
             

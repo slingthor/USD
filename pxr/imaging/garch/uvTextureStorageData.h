@@ -62,12 +62,8 @@ public:
         return 1;
     };
 
-    HioFormat GetHioFormat() const override {
-        return _hioFormat;
-    };
-
-    int GetNumChannels() const override {
-        return _numChannels;
+    HioFormat GetFormat() const override {
+        return _format;
     };
 
     size_t TargetMemory() const override {
@@ -120,8 +116,7 @@ private:
     // if _storageData is used for larger images
     VtValue _storageData; 
 
-    HioFormat _hioFormat;
-    int _numChannels;
+    HioFormat _format;
 
     WrapInfo _wrapInfo;
 

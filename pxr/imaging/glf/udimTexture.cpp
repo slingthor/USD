@@ -153,7 +153,7 @@ GlfUdimTexture::_CreateGPUResources(unsigned int numChannels,
         totalTextureMemory += currentMipMemory;
     }
 
-    GLenum format = GlfGetGLFormat(_hioFormat);
+    GLenum format = GlfGetGLFormat(_format);
     for (unsigned int mip = 0; mip < mipCount; ++mip) {
         _TextureSize const& mipSize = mips[mip];
         glTexSubImage3D(GL_TEXTURE_2D_ARRAY, mip, 0, 0, 0,

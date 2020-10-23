@@ -61,8 +61,7 @@ public:
     std::string const & GetFilename() const override;
     virtual int GetWidth() const override;
     virtual int GetHeight() const override;
-    virtual HioFormat GetHioFormat() const override;
-    virtual int GetNumChannels() const override;
+    virtual HioFormat GetFormat() const override;
     virtual int GetBytesPerPixel() const override;
     virtual int GetNumMipLevels() const override;
 
@@ -106,7 +105,7 @@ private:
     HioType _outputType;
     int _nchannels;
 
-    HioFormat _hioFormat;
+    HioFormat _format;
 
     SourceColorSpace _sourceColorSpace;
 };
@@ -147,9 +146,8 @@ Hio_StbImage::_GetInfoFromStorageSpec(HioImage::StorageSpec const & storage)
 {
     _width = storage.width;
     _height = storage.height;
-    _hioFormat = storage.hioFormat;
-    _outputType = HioGetHioType(storage.hioFormat);
-    _nchannels = storage.numChannels;
+    _format = storage.format;
+    _outputType = HioGetHioType(storage.format);
 }
 
 Hio_StbImage::Hio_StbImage()
@@ -280,16 +278,9 @@ Hio_StbImage::GetHeight() const
 
 /* virtual */
 HioFormat
-Hio_StbImage::GetHioFormat() const
+Hio_StbImage::GetFormat() const
 {
-    return _hioFormat;
-}
-
-/* virtual */
-int
-Hio_StbImage::GetNumChannels() const
-{
-    return _nchannels;
+    return _format;
 }
 
 /* virtual */
@@ -385,7 +376,7 @@ Hio_StbImage::_OpenForReading(std::string const & filename, int subimage,
         &_width, &_height, &_nchannels, &_gamma) &&
             subimage == 0 && mip == 0;
     
-    _hioFormat = HioGetFormat(_nchannels, _outputType, IsColorSpaceSRGB());
+    _format = HioGetFormat(_nchannels, _outputType, IsColorSpaceSRGB());
     return open;
 }
 
@@ -574,7 +565,7 @@ _Quantize(Hio_StbImage::StorageSpec const & storageIn,
 {
     // stb requires unsigned byte data to write non .hdr file formats.
     // We'll quantize the data ourselves here.
-    int numChannels = storageIn.numChannels;
+    int numChannels = HioGetComponentCount(storageIn.format);
     size_t numElements = storageIn.width * storageIn.height * numChannels;
 
     quantizedData.reset(new uint8_t[numElements]);
@@ -587,8 +578,7 @@ _Quantize(Hio_StbImage::StorageSpec const & storageIn,
     Hio_StbImage::StorageSpec quantizedSpec;
     quantizedSpec = storageIn; // shallow copy
     quantizedSpec.data = quantizedData.get();
-    quantizedSpec.numChannels = numChannels;
-    quantizedSpec.hioFormat = HioGetFormat(numChannels,
+    quantizedSpec.format = HioGetFormat(numChannels,
                                            HioTypeUnsignedByte,
                                            isSRGB);
     
@@ -612,7 +602,7 @@ Hio_StbImage::Write(StorageSpec const & storageIn,
 
     StorageSpec quantizedSpec;
     std::unique_ptr<uint8_t[]> quantizedData;
-    HioType type = HioGetHioType(storageIn.hioFormat);
+    HioType type = HioGetHioType(storageIn.format);
     bool isSRGB = IsColorSpaceSRGB();
 
     if (type == HioTypeFloat && fileExtension != "hdr") {

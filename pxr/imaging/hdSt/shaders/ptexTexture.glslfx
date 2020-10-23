@@ -89,18 +89,18 @@ void evalQuadraticBSpline(float u, out float B[3], out float BU[3])
     BU[2] = u;
 }
 
-PtexPacking getPtexPacking(isamplerBuffer packings, int faceID)
+PtexPacking getPtexPacking(const ushort * const packings, int faceID)
 {
     PtexPacking packing;
-    packing.page    = texelFetch(packings, faceID*6).x;
-    packing.nMipmap = texelFetch(packings, faceID*6+1).x;
-    packing.uOffset = texelFetch(packings, faceID*6+2).x;
-    packing.vOffset = texelFetch(packings, faceID*6+3).x;
-    int wh          = texelFetch(packings, faceID*6+5).x;
+    packing.page    = packings[faceID*6];
+    packing.nMipmap = packings[faceID*6+1];
+    packing.uOffset = packings[faceID*6+2];
+    packing.vOffset = packings[faceID*6+3];
+    int wh          = packings[faceID*6+5];
     packing.width   = 1 << (wh >> 8);
     packing.height  = 1 << (wh & 0xff);
 
-    int adjSizeDiffs = texelFetch(packings, faceID*6+4).x;
+    int adjSizeDiffs = packings[faceID*6+4];
     packing.adjSizeDiffs[0] = (adjSizeDiffs >> 12) & 0xf;
     packing.adjSizeDiffs[1] = (adjSizeDiffs >> 8) & 0xf;
     packing.adjSizeDiffs[2] = (adjSizeDiffs >> 4) & 0xf;
@@ -109,15 +109,15 @@ PtexPacking getPtexPacking(isamplerBuffer packings, int faceID)
     return packing;
 }
 
-PtexPacking getPtexPacking(isamplerBuffer packings, int faceID, int level)
+PtexPacking getPtexPacking(const ushort * const packings, int faceID, int level)
 {
     PtexPacking packing;
-    packing.page    = texelFetch(packings, faceID*6).x;
-    packing.nMipmap = texelFetch(packings, faceID*6+1).x;
-    packing.uOffset = texelFetch(packings, faceID*6+2).x;
-    packing.vOffset = texelFetch(packings, faceID*6+3).x;
-    int sizeDiffs   = texelFetch(packings, faceID*6+4).x;
-    int wh          = texelFetch(packings, faceID*6+5).x;
+    packing.page    = packings[faceID*6];
+    packing.nMipmap = packings[faceID*6+1];
+    packing.uOffset = packings[faceID*6+2];
+    packing.vOffset = packings[faceID*6+3];
+    int sizeDiffs   = packings[faceID*6+4];
+    int wh          = packings[faceID*6+5];
     int w = wh >> 8;
     int h = wh & 0xff;
 
@@ -138,7 +138,7 @@ PtexPacking getPtexPacking(isamplerBuffer packings, int faceID, int level)
 
 vec4 PtexLookupNearest(vec4 patchCoord,
                        sampler2DArray data,
-                       isamplerBuffer packings)
+                       const ushort * const packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
@@ -151,7 +151,7 @@ vec4 PtexLookupNearest(vec4 patchCoord,
 vec4 PtexLookupNearest(vec4 patchCoord,
                        int level,
                        sampler2DArray data,
-                       isamplerBuffer packings)
+                       const ushort * const packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
@@ -163,7 +163,7 @@ vec4 PtexLookupNearest(vec4 patchCoord,
 
 vec4 PtexLookupFast(vec4 patchCoord,
                     sampler2DArray data,
-                    isamplerBuffer packings)
+                    const ushort * const packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
@@ -178,7 +178,7 @@ vec4 PtexLookupFast(vec4 patchCoord,
 vec4 PtexLookupFast(vec4 patchCoord,
                     int level,
                     sampler2DArray data,
-                    isamplerBuffer packings)
+                    const ushort * const packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
@@ -193,7 +193,7 @@ vec4 PtexLookupFast(vec4 patchCoord,
 vec4 PtexLookup(vec4 patchCoord,
                 int level,
                 sampler2DArray data,
-                isamplerBuffer packings)
+                const ushort * const packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
@@ -228,14 +228,14 @@ vec4 PtexLookupQuadratic(thread vec4 &du,
                          vec4 patchCoord,
                          int level,
                          sampler2DArray data,
-                         isamplerBuffer packings)
+                         const ushort * const packings)
 #else
 vec4 PtexLookupQuadratic(out vec4 du,
                          out vec4 dv,
                          vec4 patchCoord,
                          int level,
                          sampler2DArray data,
-                         isamplerBuffer packings)
+                         const ushort * const packings)
 #endif
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
@@ -300,7 +300,7 @@ vec4 PtexLookupQuadratic(out vec4 du,
 vec4 PtexMipmapLookupNearest(vec4 patchCoord,
                              float level,
                              sampler2DArray data,
-                             isamplerBuffer packings)
+                             const ushort * const packings)
 {
 #if defined(SEAMLESS_MIPMAP)
     // diff level
@@ -325,7 +325,7 @@ vec4 PtexMipmapLookupNearest(vec4 patchCoord,
 vec4 PtexMipmapLookup(vec4 patchCoord,
                       float level,
                       sampler2DArray data,
-                      isamplerBuffer packings)
+                      const ushort * const packings)
 {
 #if defined(SEAMLESS_MIPMAP)
     // diff level
@@ -352,14 +352,14 @@ vec4 PtexMipmapLookupQuadratic(thread vec4 &du,
                                vec4 patchCoord,
                                float level,
                                sampler2DArray data,
-                               isamplerBuffer packings)
+                               const ushort * const packings)
 #else
 vec4 PtexMipmapLookupQuadratic(out vec4 du,
                                out vec4 dv,
                                vec4 patchCoord,
                                float level,
                                sampler2DArray data,
-                               isamplerBuffer packings)
+                               const ushort * const packings)
 #endif
 {
 #if defined(SEAMLESS_MIPMAP)
@@ -390,7 +390,7 @@ vec4 PtexMipmapLookupQuadratic(out vec4 du,
 vec4 PtexMipmapLookupQuadratic(vec4 patchCoord,
                                float level,
                                sampler2DArray data,
-                               isamplerBuffer packings)
+                               const ushort * const packings)
 {
     vec4 du, dv;
     return PtexMipmapLookupQuadratic(du, dv, patchCoord, level, data, packings);
@@ -407,7 +407,7 @@ uniform int ptexFaceOffset;
 
 #define GLOP_PTEX_TEXTURE_DECLARE(textureName) \
     uniform sampler2DArray textureName##_Data;      \
-    uniform isamplerBuffer textureName##_Packing;
+    uniform ushort textureName##_Packing;
 
 #define GLOP_PTEX_TEXTURE_LOOKUP(textureName, patchCoord) \
     GlopPtexTextureLookup(textureName##_Data,             \
@@ -416,7 +416,7 @@ uniform int ptexFaceOffset;
 
 vec4
 GlopPtexTextureLookup(sampler2DArray data,
-                      isamplerBuffer packings,
+                      const ushort * const packings,
                       vec4 patchCoord)
 {
     patchCoord.w += ptexFaceOffset;
@@ -467,18 +467,18 @@ void evalQuadraticBSpline(float u, thread float *B, thread float *BU)
     BU[2] = u;
 }
 
-PtexPacking getPtexPacking(texture_buffer<ushort> packings, uint faceID)
+PtexPacking getPtexPacking(const device ushort * const packings, uint faceID)
 {
     PtexPacking packing;
-    packing.page    = packings.read(faceID*6).x;
-    packing.nMipmap = packings.read(faceID*6+1).x;
-    packing.uOffset = packings.read(faceID*6+2).x;
-    packing.vOffset = packings.read(faceID*6+3).x;
-    int wh          = packings.read(faceID*6+5).x;
+    packing.page    = packings[faceID*6];
+    packing.nMipmap = packings[faceID*6+1];
+    packing.uOffset = packings[faceID*6+2];
+    packing.vOffset = packings[faceID*6+3];
+    int wh          = packings[faceID*6+5];
     packing.width   = 1 << (wh >> 8);
     packing.height  = 1 << (wh & 0xff);
 
-    int adjSizeDiffs = packings.read(faceID*6+4).x;
+    int adjSizeDiffs = packings[faceID*6+4];
     packing.adjSizeDiffs[0] = (adjSizeDiffs >> 12) & 0xf;
     packing.adjSizeDiffs[1] = (adjSizeDiffs >> 8) & 0xf;
     packing.adjSizeDiffs[2] = (adjSizeDiffs >> 4) & 0xf;
@@ -487,15 +487,15 @@ PtexPacking getPtexPacking(texture_buffer<ushort> packings, uint faceID)
     return packing;
 }
 
-PtexPacking getPtexPacking(texture_buffer<ushort> packings, uint faceID, int level)
+PtexPacking getPtexPacking(const device ushort * const packings, uint faceID, int level)
 {
     PtexPacking packing;
-    packing.page    = packings.read(faceID*6).x;
-    packing.nMipmap = packings.read(faceID*6+1).x;
-    packing.uOffset = packings.read(faceID*6+2).x;
-    packing.vOffset = packings.read(faceID*6+3).x;
-    int sizeDiffs   = packings.read(faceID*6+4).x;
-    int wh          = packings.read(faceID*6+5).x;
+    packing.page    = packings[faceID*6];
+    packing.nMipmap = packings[faceID*6+1];
+    packing.uOffset = packings[faceID*6+2];
+    packing.vOffset = packings[faceID*6+3];
+    int sizeDiffs   = packings[faceID*6+4];
+    int wh          = packings[faceID*6+5];
     int w = wh >> 8;
     int h = wh & 0xff;
 
@@ -516,7 +516,7 @@ PtexPacking getPtexPacking(texture_buffer<ushort> packings, uint faceID, int lev
 
 vec4 PtexLookupNearest(vec4 patchCoord,
                        texture2d_array<float> data,
-                       texture_buffer<ushort>  packings)
+                       const device ushort * const packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
@@ -529,7 +529,7 @@ vec4 PtexLookupNearest(vec4 patchCoord,
 vec4 PtexLookupNearest(vec4 patchCoord,
                        int level,
                        texture2d_array<float> data,
-                       texture_buffer<ushort>  packings)
+                       const device ushort * const packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
@@ -541,7 +541,7 @@ vec4 PtexLookupNearest(vec4 patchCoord,
 
 vec4 PtexLookupFast(vec4 patchCoord,
                     texture2d_array<float> data,
-                    texture_buffer<ushort> packings)
+                    const device ushort * const packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
@@ -556,7 +556,7 @@ vec4 PtexLookupFast(vec4 patchCoord,
 vec4 PtexLookupFast(vec4 patchCoord,
                     int level,
                     texture2d_array<float> data,
-                    texture_buffer<ushort> packings)
+                    const device ushort * const packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
@@ -571,7 +571,7 @@ vec4 PtexLookupFast(vec4 patchCoord,
 vec4 PtexLookup(vec4 patchCoord,
                 int level,
                 texture2d_array<float> data,
-                texture_buffer<ushort> packings)
+                const device ushort * const packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
@@ -605,7 +605,7 @@ vec4 PtexLookupQuadratic(thread vec4 &du,
                          vec4 patchCoord,
                          int level,
                          texture2d_array<float> data,
-                         texture_buffer<ushort> packings)
+                         const device ushort * const packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
@@ -669,7 +669,7 @@ vec4 PtexLookupQuadratic(thread vec4 &du,
 vec4 PtexMipmapLookupNearest(vec4 patchCoord,
                              float level,
                              texture2d_array<float> data,
-                             texture_buffer<ushort> packings)
+                             const device ushort * const packings)
 {
 #if defined(SEAMLESS_MIPMAP)
     // diff level
@@ -694,7 +694,7 @@ vec4 PtexMipmapLookupNearest(vec4 patchCoord,
 vec4 PtexMipmapLookup(vec4 patchCoord,
                       float level,
                       texture2d_array<float> data,
-                      texture_buffer<ushort> packings)
+                      const device ushort * const packings)
 {
 #if defined(SEAMLESS_MIPMAP)
     // diff level
@@ -720,7 +720,7 @@ vec4 PtexMipmapLookupQuadratic(thread vec4 &du,
                                vec4 patchCoord,
                                float level,
                                texture2d_array<float> data,
-                               texture_buffer<ushort> packings)
+                               const device ushort * const packings)
 {
 #if defined(SEAMLESS_MIPMAP)
     // diff level
@@ -750,7 +750,7 @@ vec4 PtexMipmapLookupQuadratic(thread vec4 &du,
 vec4 PtexMipmapLookupQuadratic(vec4 patchCoord,
                                float level,
                                texture2d_array<float> data,
-                               texture_buffer<ushort> packings)
+                               const device ushort * const packings)
 {
     vec4 du, dv;
     return PtexMipmapLookupQuadratic(du, dv, patchCoord, level, data, packings);
@@ -764,7 +764,7 @@ uniform int ptexFaceOffset;
 
 #define GLOP_PTEX_TEXTURE_DECLARE(textureName) \
     uniform texture2d_array<float> textureName##_Data;      \
-    uniform texture_buffer<ushort> textureName##_Packing;   \
+    uniform const device ushort * const textureName##_Packing;   \
     uniform sampler samplerName##_Data;
 
 #define GLOP_PTEX_TEXTURE_LOOKUP(textureName, patchCoord) \
@@ -775,7 +775,7 @@ uniform int ptexFaceOffset;
 
 vec4
 GlopPtexTextureLookup(texture2d_array<float> data,
-                      texture_buffer<ushort> packings,
+                      const device ushort * const packings,
                       sampler dataSampler,
                       vec4 patchCoord)
 {

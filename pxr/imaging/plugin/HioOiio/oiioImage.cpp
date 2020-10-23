@@ -76,8 +76,7 @@ public:
     std::string const & GetFilename() const override;
     int GetWidth() const override;
     int GetHeight() const override;
-    HioFormat GetHioFormat() const override;
-    int GetNumChannels() const override;
+    HioFormat GetFormat() const override;
     int GetBytesPerPixel() const override;
     int GetNumMipLevels() const override;
 
@@ -445,17 +444,10 @@ HioOIIO_Image::GetHeight() const
 
 /* virtual */
 HioFormat
-HioOIIO_Image::GetHioFormat() const
+HioOIIO_Image::GetFormat() const
 {
     return _GetHioFormatFromImageData(_imagespec.nchannels, _imagespec.format,
                                       IsColorSpaceSRGB());
-}
-
-/* virtual */
-int
-HioOIIO_Image::GetNumChannels() const
-{
-    return _imagespec.nchannels;
 }
 
 /* virtual */
@@ -759,7 +751,7 @@ HioOIIO_Image::ReadCropped(int const cropTop,
     }
 
     // Read pixel data
-    TypeDesc type = _GetOIIOBaseType(storage.hioFormat);
+    TypeDesc type = _GetOIIOBaseType(storage.format);
 
 #if OIIO_VERSION > 10603
     if (!image->get_pixels(ROI(0, storage.width, 0, storage.height, 0, 1),
@@ -790,8 +782,8 @@ bool
 HioOIIO_Image::Write(StorageSpec const & storage,
                      VtDictionary const & metadata)
 {
-    int nchannels = storage.numChannels;
-    TypeDesc format = _GetOIIOBaseType(storage.hioFormat);
+    int nchannels = HioGetComponentCount(storage.format);
+    TypeDesc format = _GetOIIOBaseType(storage.format);
     ImageSpec spec(storage.width, storage.height, nchannels, format);
 
     for (const std::pair<std::string, VtValue>& m : metadata) {

@@ -24,7 +24,6 @@
 
 #include "pxr/pxr.h"
 
-#include "pxr/imaging/glf/glew.h"
 #include "pxr/usdImaging/usdImagingGL/unitTestGLDrawing.h"
 
 #include "pxr/base/arch/systemInfo.h"
@@ -171,6 +170,7 @@ My_TestGLDrawing::InitTest()
         if(UsdImagingGLEngine::IsHydraEnabled()) {
             // set same parameter as GlfSimpleLightingContext::SetStateFromOpenGL
             // OpenGL defaults
+            UsdImagingGLEngine::ResourceFactoryGuard guard(_engine->GetResourceFactory());
             _lightingContext = GarchSimpleLightingContext::New();
             if (!IsEnabledSceneLights()) {
 	            GarchSimpleLight light;

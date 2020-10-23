@@ -46,25 +46,25 @@ static_assert(_CompileTimeValidateHioFormatSwitch(),
 
 static HioFormat _hioFormats[][4] = {
     { HioFormatUNorm8, HioFormatUNorm8Vec2,
-      HioFormatUNorm8Vec4, HioFormatUNorm8Vec4 },
+      HioFormatUNorm8Vec3, HioFormatUNorm8Vec4 },
     { HioFormatUNorm8srgb, HioFormatUNorm8Vec2srgb,
-      HioFormatUNorm8Vec4srgb, HioFormatUNorm8Vec4srgb },
+      HioFormatUNorm8Vec3srgb, HioFormatUNorm8Vec4srgb },
     { HioFormatSNorm8, HioFormatSNorm8Vec2,
-      HioFormatSNorm8Vec4, HioFormatSNorm8Vec4 },
+      HioFormatSNorm8Vec3, HioFormatSNorm8Vec4 },
     { HioFormatUInt16, HioFormatUInt16Vec2,
-      HioFormatUInt16Vec4, HioFormatUInt16Vec4 },
+      HioFormatUInt16Vec3, HioFormatUInt16Vec4 },
     { HioFormatInt16, HioFormatInt16Vec2,
-      HioFormatInt16Vec4, HioFormatInt16Vec4 },
+      HioFormatInt16Vec3, HioFormatInt16Vec4 },
     { HioFormatUInt32, HioFormatUInt32Vec2,
-      HioFormatUInt32Vec4, HioFormatUInt32Vec4 },
+      HioFormatUInt32Vec3, HioFormatUInt32Vec4 },
     { HioFormatInt32, HioFormatInt32Vec2,
-      HioFormatInt32Vec4, HioFormatInt32Vec4 },
+      HioFormatInt32Vec3, HioFormatInt32Vec4 },
     { HioFormatFloat16, HioFormatFloat16Vec2,
-      HioFormatFloat16Vec4, HioFormatFloat16Vec4 },
+      HioFormatFloat16Vec3, HioFormatFloat16Vec4 },
     { HioFormatFloat32, HioFormatFloat32Vec2,
-      HioFormatFloat32Vec4, HioFormatFloat32Vec4 },
+      HioFormatFloat32Vec3, HioFormatFloat32Vec4 },
     { HioFormatDouble64, HioFormatDouble64Vec2,
-      HioFormatDouble64Vec4, HioFormatDouble64Vec4 },
+      HioFormatDouble64Vec3, HioFormatDouble64Vec4 },
 };
 
 static_assert(
@@ -316,6 +316,7 @@ HioGetDataSizeOfType(HioType type)
     switch (type) {
         case HioTypeUnsignedByte:
         case HioTypeSignedByte:
+        case HioTypeUnsignedByteSRGB:
             return 1;
         case HioTypeUnsignedShort:
         case HioTypeSignedShort:
