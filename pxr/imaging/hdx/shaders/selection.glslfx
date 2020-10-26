@@ -360,8 +360,9 @@ bool IsPointSelected(int pointId)
 --  glsl Selection.Geometry.ElementSel
 /// Helper functions to determine if the element (face) is selected for either
 /// a given selection mode, or any of the modes.
-
+#if !defined(ARCH_GFX_METAL)
 int GetElementID(); // code gen
+#endif
 
 bool IsElementSelected(int mode)
 {
@@ -391,10 +392,11 @@ bool IsSelected()
 
 --- --------------------------------------------------------------------------
 -- glsl Selection.Geometry.WireSelOffset
-
+#if !defined(ARCH_GFX_METAL)
 int GetMaxNumSelectionHighlightModes();
 bool IsElementSelected(int mode);
 int GetElementID(); // code gen
+#endif
 
 vec4 ComputeSelectionOffset()
 {
