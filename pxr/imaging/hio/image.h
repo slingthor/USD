@@ -213,7 +213,7 @@ HioImage::GetSamplerMetadata(HioAddressDimension dim, T * param) const
     return true;
 }
 
-class HioImageFactoryBase : public TfType::FactoryBase {
+class HIO_API HioImageFactoryBase : public TfType::FactoryBase {
 public:
     virtual HioImageSharedPtr New() const = 0;
 };
