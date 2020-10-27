@@ -890,21 +890,21 @@ function(pxr_toplevel_prologue)
             # case we assume the files will be found there regardless
             # of IMPORTED_LOCATION.  Note, however, that the install
             # cannot be relocated in this case.
-            # if(NOT PXR_INSTALL_LOCATION AND TARGET usd_ms)
-            #     get_property(location TARGET usd_ms PROPERTY IMPORTED_LOCATION)
-            #     if(location)
-            #         # Remove filename and directory.
-            #         get_filename_component(parent "${location}" PATH)
-            #         get_filename_component(parent "${parent}" PATH)
-            #         get_filename_component(parent "${parent}" ABSOLUTE)
-            #         get_filename_component(prefix "${CMAKE_INSTALL_PREFIX}" ABSOLUTE)
-            #         if(NOT "${parent}" STREQUAL "${prefix}")
-            #             message("IMPORTED_LOCATION for usd_ms ${location} inconsistent with install directory ${CMAKE_INSTALL_PREFIX}.")
-            #             message(WARNING "May not find plugins at runtime.")
-            #         endif()
-            #     endif()
-            # endif()
-        else()
+        #     if(NOT PXR_INSTALL_LOCATION AND TARGET usd_ms)
+        #         get_property(location TARGET usd_ms PROPERTY IMPORTED_LOCATION)
+        #         if(location)
+        #             # Remove filename and directory.
+        #             get_filename_component(parent "${location}" PATH)
+        #             get_filename_component(parent "${parent}" PATH)
+        #             get_filename_component(parent "${parent}" ABSOLUTE)
+        #             get_filename_component(prefix "${CMAKE_INSTALL_PREFIX}" ABSOLUTE)
+        #             if(NOT "${parent}" STREQUAL "${prefix}")
+        #                 message("IMPORTED_LOCATION for usd_ms ${location} inconsistent with install directory ${CMAKE_INSTALL_PREFIX}.")
+        #                 message(WARNING "May not find plugins at runtime.")
+        #             endif()
+        #         endif()
+        #     endif()
+        # else()
             # Note that we ignore BUILD_SHARED_LIBS when building monolithic
             # when PXR_MONOLITHIC_IMPORT isn't set:  we always build an
             # archive library from the core libraries and then build a
@@ -982,43 +982,38 @@ function(pxr_toplevel_epilogue)
     #         )
     #     endif()
 
-    #     # Since we didn't add a dependency to usd_ms on usd_m above, we
-    #     # manually add it here along with compile definitions, include
-    #     # directories, etc
-    #     add_dependencies(usd_ms usd_m)
+        # Since we didn't add a dependency to usd_ms on usd_m above, we
+        # manually add it here along with compile definitions, include
+        # directories, etc
+        # add_dependencies(usd_ms usd_m)
 
-    #     # Add the stuff we didn't get because we didn't link against the
-    #     # usd_m target.
-    #     target_compile_definitions(usd_ms
-    #         PUBLIC
-    #             $<TARGET_PROPERTY:usd_m,INTERFACE_COMPILE_DEFINITIONS>
-    #     )
-    #     target_include_directories(usd_ms
-    #         PUBLIC
-    #             $<TARGET_PROPERTY:usd_m,INTERFACE_INCLUDE_DIRECTORIES>
-    #     )
-    #     target_include_directories(usd_ms
-    #         SYSTEM
-    #         PUBLIC
-    #             $<TARGET_PROPERTY:usd_m,INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>
-    #     )
-    #     foreach(lib ${PXR_OBJECT_LIBS})
-    #         get_property(libs TARGET ${lib} PROPERTY INTERFACE_LINK_LIBRARIES)
-    #         target_link_libraries(usd_ms
-    #             PUBLIC
-    #                 ${libs}
-    #         )
-    #     endforeach()
-    #     target_link_libraries(usd_ms
-    #         PUBLIC
-    #             ${PXR_MALLOC_LIBRARY}
-    #             ${PXR_THREAD_LIBS}
-    #     )
+        # Add the stuff we didn't get because we didn't link against the
+        # usd_m target.
+        # target_compile_definitions(usd_ms
+        #     PUBLIC
+        #         $<TARGET_PROPERTY:usd_m,INTERFACE_COMPILE_DEFINITIONS>
+        # )
+        # target_include_directories(usd_ms
+        #     PUBLIC
+        #         $<TARGET_PROPERTY:usd_m,INTERFACE_INCLUDE_DIRECTORIES>
+        # )
+        # foreach(lib ${PXR_OBJECT_LIBS})
+        #     get_property(libs TARGET ${lib} PROPERTY INTERFACE_LINK_LIBRARIES)
+        #     target_link_libraries(usd_ms
+        #         PUBLIC
+        #             ${libs}
+        #     )
+        # endforeach()
+        # target_link_libraries(usd_ms
+        #     PUBLIC
+        #         ${PXR_MALLOC_LIBRARY}
+        #         ${PXR_THREAD_LIBS}
+        # )
 
-    #     _pxr_init_rpath(rpath "${libInstallPrefix}")
-    #     _pxr_add_rpath(rpath "${CMAKE_INSTALL_PREFIX}/${PXR_INSTALL_SUBDIR}/lib")
-    #     _pxr_add_rpath(rpath "${CMAKE_INSTALL_PREFIX}/lib")
-    #     _pxr_install_rpath(rpath usd_ms)
+        _pxr_init_rpath(rpath "${libInstallPrefix}")
+        _pxr_add_rpath(rpath "${CMAKE_INSTALL_PREFIX}/${PXR_INSTALL_SUBDIR}/lib")
+        _pxr_add_rpath(rpath "${CMAKE_INSTALL_PREFIX}/lib")
+        # _pxr_install_rpath(rpath usd_ms)
     # endif()
 
     # Setup the plugins in the top epilogue to ensure that everybody has had a
@@ -1120,7 +1115,6 @@ function(pxr_monolithic_epilogue)
     # set(export "${export}#set_property(TARGET usd_ms PROPERTY IMPORTED_IMPLIB FIXME)\n")
     # set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_COMPILE_DEFINITIONS $<TARGET_PROPERTY:usd_m,INTERFACE_COMPILE_DEFINITIONS>)\n")
     # set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_INCLUDE_DIRECTORIES $<TARGET_PROPERTY:usd_m,INTERFACE_INCLUDE_DIRECTORIES>)\n")
-    # set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_SYSTEM_INCLUDE_DIRECTORIES $<TARGET_PROPERTY:usd_m,INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>)\n")
     # set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_LINK_LIBRARIES $<TARGET_PROPERTY:usd_m,INTERFACE_LINK_LIBRARIES>)\n")
     # file(GENERATE
     #     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/usd-imports-$<CONFIG>.cmake"
