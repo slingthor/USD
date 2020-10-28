@@ -406,11 +406,17 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
     if targetMacOS or targetIOS:
         osx_rpath = "-DCMAKE_MACOSX_RPATH=ON"
 
-    extraArgs = buildArgs
+    extraArgs = copy.deepcopy(buildArgs)
 
     # TEMPORARY WORKAROUND
     if targetMacOS or targetIOS:
         extraArgs.append('-DCMAKE_IGNORE_PATH="/usr/lib;/usr/local/lib;/lib" ')
+
+        # CMake 3.19.0 and later defaults to use Xcode's Modern Build System.
+        # This causes the external dependencies to fail with "Multiple commands produce the same output" errors.
+        # Fix: Force CMake to use the old build system.
+        if GetCMakeVersion() >= (3, 19, 0):
+            extraArgs.append('-T buildsystem=1')
 
     if context.buildUniversal and SupportsMacOSUniversalBinaries():
         extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
