@@ -1181,7 +1181,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             if context.buildUniversal and SupportsMacOSUniversalBinaries():
                 file.write('MAKESECONDARY:' + makeTBBCmdSecondary + '\n')
                 file.write('LIPO_RELEASE:' + ','.join(lipoCommandsRelease) + '\n')
-                file.write('LIPO_RELEASE:' + ','.join(lipoCommandsRelease) + '\n')
+                file.write('LIPO_DEBUG:' + ','.join(lipoCommandsDebug) + '\n')
 
         CopyDirectory(context, "include/serial", "include/serial")
         CopyDirectory(context, "include/tbb", "include/tbb")
