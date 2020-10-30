@@ -83,6 +83,8 @@ typedef GLvoid (*ArchGLCallbackType)(...);
 #define GL_RGBA8_SNORM 0x8F97
 #define GL_RGB32I 0x8D83
 #define GL_RGBA32I 0x8D82
+#define GL_RGBA16I 0x8D88
+#define GL_RGB16I 0x8D89
 #define GL_UNSIGNED_INT64_ARB 0x140F
 #define GL_SAMPLER_2D_ARRAY 0x8DC1
 #define GL_INT_SAMPLER_BUFFER 0x8DD0

@@ -74,7 +74,6 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
 , _workToFlush(false)
 , _encoder(nil)
 , _sampleCount(1)
-, _needsFlip(true)
 {
     if (!_device) {
 #if defined(ARCH_OS_MACOS)
@@ -338,14 +337,13 @@ HgiMetal::StartFrame(bool capture)
             CommitPrimaryCommandBuffer(CommitCommandBuffer_NoWait, true);
         }
     }
-    
-    _needsFlip = true;
 }
 
 void
 HgiMetal::EndFrame()
 {
     if (--_frameDepth == 0) {
+        [_commandQueue insertDebugCaptureBoundary];
         [_captureScopeFullFrame endScope];
         if ([[MTLCaptureManager sharedCaptureManager] isCapturing]) {
             [[MTLCaptureManager sharedCaptureManager] stopCapture];
@@ -360,10 +358,10 @@ HgiMetal::GetQueue() const
 }
 
 id<MTLCommandBuffer>
-HgiMetal::GetPrimaryCommandBuffer(bool flush)
+HgiMetal::GetPrimaryCommandBuffer(HgiCmds *requester, bool flush)
 {
     if (_workToFlush) {
-        if (_currentCmds) {
+        if (_currentCmds && requester != _currentCmds) {
             return nil;
         }
     }
@@ -434,8 +432,6 @@ bool
 HgiMetal::BeginMtlf()
 {
     // SOOOO TEMP and specialised!
-    _needsFlip = false;
-
     if (_encoder) {
         if (_encoder->_descriptor.colorTextures.size()) {
             _sampleCount = _encoder->_descriptor.colorTextures[0]->GetDescriptor().sampleCount;

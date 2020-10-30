@@ -60,6 +60,8 @@ using HgiDeviceCapabilities = HgiBits;
 ///   A two-dimensional texture.</li>
 /// <li>HgiTextureType3D:
 ///   A three-dimensional texture.</li>
+/// <li>HgiTextureType2DArray:
+///   An array of two-dimensional textures.</li>
 /// </ul>
 ///
 enum HgiTextureType
@@ -67,6 +69,7 @@ enum HgiTextureType
     HgiTextureType1D = 0,
     HgiTextureType2D,
     HgiTextureType3D,
+    HgiTextureType2DArray,
 
     HgiTextureTypeCount
 };
@@ -171,6 +174,8 @@ enum HgiSampleCount
     HgiSampleCount1  = 1,
     HgiSampleCount4  = 4,
     HgiSampleCount16 = 16,
+
+    HgiSampleCountEnd
 };
 
 /// \enum HgiAttachmentLoadOp
@@ -274,6 +279,8 @@ enum HgiShaderStageBits : HgiBits
     HgiShaderStageTessellationControl  = 1 << 3,
     HgiShaderStageTessellationEval     = 1 << 4,
     HgiShaderStageGeometry             = 1 << 5,
+
+    HgiShaderStageCustomBitsBegin      = 1 << 6,
 };
 using HgiShaderStage = HgiBits;
 

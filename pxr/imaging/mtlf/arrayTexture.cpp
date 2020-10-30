@@ -47,7 +47,7 @@ MtlfArrayTexture::MtlfArrayTexture(TfTokenVector const &imageFilePaths,
                                    unsigned int cropBottom,
                                    unsigned int cropLeft,
                                    unsigned int cropRight,
-                                   GarchImage::ImageOriginLocation originLocation)
+                                   HioImage::ImageOriginLocation originLocation)
 
 : GarchArrayTexture(imageFilePaths,
                     arraySize,

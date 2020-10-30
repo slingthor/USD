@@ -69,6 +69,14 @@ _GlTextureSubImageND(
     const void * pixels)
 {
     switch(textureType) {
+    case HgiTextureType1D:
+        glTextureSubImage1D(texture,
+                            level,
+                            offsets[0],
+                            dimensions[0],
+                            format,
+                            type,
+                            pixels);
     case HgiTextureType2D:
         glTextureSubImage2D(texture,
                             level,
@@ -79,6 +87,15 @@ _GlTextureSubImageND(
                             pixels);
         break;
     case HgiTextureType3D:
+        glTextureSubImage3D(texture,
+                            level,
+                            offsets[0], offsets[1], offsets[2],
+                            dimensions[0], dimensions[1], dimensions[2],
+                            format,
+                            type,
+                            pixels);
+        break;
+    case HgiTextureType2DArray:
         glTextureSubImage3D(texture,
                             level,
                             offsets[0], offsets[1], offsets[2],
@@ -164,11 +181,6 @@ HgiGLTexture::HgiGLTexture(HgiTextureDesc const & desc)
     : HgiTexture(desc)
     , _textureId(0)
 {
-    if (desc.layerCount > 1) {
-        // XXX Further below we are missing support for layered textures.
-        TF_CODING_ERROR("XXX Missing implementation for texture arrays");
-    }
-
     GLenum glInternalFormat = 0;
     GLenum glFormat = 0;
     GLenum glPixelType = 0;
@@ -211,7 +223,7 @@ HgiGLTexture::HgiGLTexture(HgiTextureDesc const & desc)
     }
 
     if (!_descriptor.debugName.empty()) {
-        glObjectLabel(GL_TEXTURE, _textureId,-1, _descriptor.debugName.c_str());
+        HgiGLObjectLabel(GL_TEXTURE, _textureId, _descriptor.debugName);
     }
 
     if (desc.sampleCount == HgiSampleCount1) {
@@ -244,6 +256,7 @@ HgiGLTexture::HgiGLTexture(HgiTextureDesc const & desc)
                 HgiGetMipInfos(
                     desc.format,
                     desc.dimensions,
+                    desc.layerCount,
                     desc.pixelsByteSize);
             const size_t mipLevels = std::min(
                 mipInfos.size(), size_t(desc.mipLevels));
@@ -352,7 +365,7 @@ HgiGLTexture::HgiGLTexture(HgiTextureViewDesc const & desc)
         desc.layerCount);
 
     if (!desc.debugName.empty()) {
-        glObjectLabel(GL_TEXTURE, _textureId,-1, desc.debugName.c_str());
+        HgiGLObjectLabel(GL_TEXTURE, _textureId, desc.debugName);
     }
 
     glTextureParameteri(_textureId, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

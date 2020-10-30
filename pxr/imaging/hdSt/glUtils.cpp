@@ -58,9 +58,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 // ---------------------------------------------------------------------------
 
 void
-HdStBufferRelocator::AddRange(GLintptr readOffset,
-                              GLintptr writeOffset,
-                              GLsizeiptr copySize)
+HdStBufferRelocator::AddRange(ptrdiff_t readOffset,
+                              ptrdiff_t writeOffset,
+                              ptrdiff_t copySize)
 {
     _CopyUnit unit(readOffset, writeOffset, copySize);
     if (_queue.empty() || (!_queue.back().Concat(unit))) {

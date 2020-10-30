@@ -569,6 +569,31 @@ struct _MmapStream {
     }
     
     inline void Read(void *dest, size_t nBytes) {
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+        const bool doRangeChecks = true;
+#else
+        const bool doRangeChecks = false;
+#endif
+
+        // Range check first.
+        if (doRangeChecks) {
+            char const *mapStart = _mapping->GetMapStart();
+            size_t mapLen = _mapping->GetLength();
+            
+            bool inRange = mapStart <= _cur &&
+                (_cur + nBytes) <= (mapStart + mapLen);
+            
+            if (ARCH_UNLIKELY(!inRange)) {
+                ptrdiff_t offset = _cur - mapStart;
+                TF_RUNTIME_ERROR(
+                    "Read out-of-bounds: %zd bytes at offset %td in "
+                    "a mapping of length %zd",
+                    nBytes, offset, mapLen);
+                memset(dest, 0x99, nBytes);
+                return;
+            }
+        }
+
         if (ARCH_UNLIKELY(_debugPageMap)) {
             auto mapStart = _mapping->GetMapStart();
             int64_t pageZero = GetPageNumber(mapStart);
@@ -612,6 +637,20 @@ struct _MmapStream {
 
     Vt_ArrayForeignDataSource *
     CreateZeroCopyDataSource(void *addr, size_t numBytes) {
+        char const *mapStart = _mapping->GetMapStart();
+        char const *chAddr = static_cast<char *>(addr);
+        size_t mapLen = _mapping->GetLength();
+        bool inRange = mapStart <= chAddr &&
+            (chAddr + numBytes) <= (mapStart + mapLen);
+        
+        if (ARCH_UNLIKELY(!inRange)) {
+            ptrdiff_t offset = chAddr - mapStart;
+            TF_RUNTIME_ERROR(
+                "Zero-copy data range out-of-bounds: %zd bytes at offset "
+                "%td in a mapping of length %zd",
+                numBytes, offset, mapLen);
+            return nullptr;
+        }
         return _mapping->AddRangeReference(addr, numBytes);
     }
 
@@ -1774,10 +1813,16 @@ _ReadUncompressedArray(
         // already -- it needs to know if it's taken the count from 0 to 1 or
         // not.
         void *addr = reader.src.TellMemoryAddress();
-        *out = std::move(
-            VtArray<T>(reader.src.CreateZeroCopyDataSource(addr, numBytes),
-                       static_cast<T *>(addr), size, /*addRef=*/false)
-            );
+
+        if (Vt_ArrayForeignDataSource *foreignSrc =
+            reader.src.CreateZeroCopyDataSource(addr, numBytes)) {
+            *out = VtArray<T>(
+                foreignSrc, static_cast<T *>(addr), size, /*addRef=*/false);
+        }
+        else {
+            // In case of error, return an empty array.
+            out->clear();
+        }
     }
     else {
         // Copy the data instead.
@@ -1795,24 +1840,54 @@ _ReadPossiblyCompressedArray(
     _ReadUncompressedArray(reader, rep, out, ver);
 }
 
-// Return true if compressed, false if not.
+struct _CompressedIntsReader
+{
+    template <class Reader, class Int>
+    void Read(Reader &reader, Int *out, size_t numInts) {
+        using Compressor = typename std::conditional<
+            sizeof(Int) == 4,
+            Usd_IntegerCompression,
+            Usd_IntegerCompression64>::type;
+        
+        _AllocateBufferAndWorkingSpace<Compressor>(numInts);
+        auto compressedSize = reader.template Read<uint64_t>();
+        if (compressedSize > _compBufferSize) {
+            // Don't read more than the available memory buffer.
+            compressedSize = _compBufferSize;
+        }
+        reader.ReadContiguous(_compBuffer.get(), compressedSize);
+        Compressor::DecompressFromBuffer(
+            _compBuffer.get(), compressedSize, out, numInts,
+            _workingSpace.get());
+    }
+
+private:
+    template <class Comp>
+    void _AllocateBufferAndWorkingSpace(size_t numInts) {
+        size_t reqBufferSize = Comp::GetCompressedBufferSize(numInts);
+        size_t reqWorkingSize = Comp::GetDecompressionWorkingSpaceSize(numInts);
+        if (reqBufferSize > _compBufferSize) {
+            _compBuffer.reset(new char[reqBufferSize]);
+            _compBufferSize = reqBufferSize;
+        }
+        if (reqWorkingSize > _workingSpaceSize) {
+            _workingSpace.reset(new char[reqWorkingSize]);
+            _workingSpaceSize = reqWorkingSize;
+        }
+    }
+    
+    std::unique_ptr<char[]> _compBuffer;
+    size_t _compBufferSize = 0;
+    std::unique_ptr<char[]> _workingSpace;
+    size_t _workingSpaceSize = 0;
+};
+
 template <class Reader, class Int>
 static inline void
-_ReadCompressedInts(Reader reader, Int *out, size_t size)
+_ReadCompressedInts(Reader &reader, Int *out, size_t size)
 {
-    using Compressor = typename std::conditional<
-        sizeof(Int) == 4,
-        Usd_IntegerCompression,
-        Usd_IntegerCompression64>::type;
-
-    size_t bufferSize = Compressor::GetCompressedBufferSize(size);
-    std::unique_ptr<char[]> compBuffer(
-        new char[bufferSize]);
-    auto compSize = reader.template Read<uint64_t>();
-    if (compSize <= bufferSize && compSize > 0) {
-        reader.ReadContiguous(compBuffer.get(), compSize);
-        Compressor::DecompressFromBuffer(compBuffer.get(), compSize, out, size);
-    }
+    _CompressedIntsReader r;
+    r.Read(reader, out, size);
 }
 
 template <class Reader, class T>
@@ -3154,29 +3229,17 @@ CrateFile::_ReadFieldSets(Reader reader)
             // Compressed fieldSets in 0.4.0.
             auto numFieldSets = reader.template Read<uint64_t>();
             _fieldSets.resize(numFieldSets);
-
-            // Create temporary space for decompressing.
-            size_t compressedBufferSize = 
-                Usd_IntegerCompression::GetCompressedBufferSize(numFieldSets);
-            std::unique_ptr<char[]> compBuffer(
-                new char[compressedBufferSize]);
             vector<uint32_t> tmp(numFieldSets);
-            std::unique_ptr<char[]> workingSpace(
-                new char[Usd_IntegerCompression::
-                         GetDecompressionWorkingSpaceSize(numFieldSets)]);
-
-            auto fsetsSize = reader.template Read<uint64_t>();
-
-            if (fsetsSize > compressedBufferSize) {
-                TF_RUNTIME_ERROR("Failed read fsets, buffer overflow.");
-            }
-            reader.ReadContiguous(compBuffer.get(), fsetsSize);
-            Usd_IntegerCompression::DecompressFromBuffer(
-                compBuffer.get(), fsetsSize, tmp.data(), numFieldSets,
-                workingSpace.get());
+            _ReadCompressedInts(reader, tmp.data(), numFieldSets);
             for (size_t i = 0; i != numFieldSets; ++i) {
                 _fieldSets[i].value = tmp[i];
             }
+        }
+
+        // FieldSets must be terminated by a default-constructed FieldIndex.
+        if (!_fieldSets.empty() && _fieldSets.back() != FieldIndex()) {
+            TF_RUNTIME_ERROR("Corrupt field sets in crate file");
+            _fieldSets.back() = FieldIndex();
         }
     }
 }
@@ -3194,29 +3257,15 @@ CrateFile::_ReadFields(Reader reader)
             // Compressed fields in 0.4.0.
             auto numFields = reader.template Read<uint64_t>();
             _fields.resize(numFields);
-
-            // Create temporary space for decompressing.
-            const size_t compressedBufferSize = Usd_IntegerCompression::GetCompressedBufferSize(numFields);
-            std::unique_ptr<char[]> compBuffer(
-                new char[compressedBufferSize]);
             vector<uint32_t> tmp(numFields);
-            auto fieldsSize = reader.template Read<uint64_t>();
-
-             if (ARCH_UNLIKELY(fieldsSize > compressedBufferSize)) {
-                 TF_RUNTIME_ERROR("Failed read fields, buffer overflow.");
-                 return;
-             }
-
-            reader.ReadContiguous(compBuffer.get(), fieldsSize);
-            Usd_IntegerCompression::DecompressFromBuffer(
-                compBuffer.get(), fieldsSize, tmp.data(), numFields);
+            _ReadCompressedInts(reader, tmp.data(), tmp.size());
             for (size_t i = 0; i != numFields; ++i) {
                 _fields[i].tokenIndex.value = tmp[i];
             }
 
-            // Value reps
+            // Compressed value reps.
             uint64_t repsSize = reader.template Read<uint64_t>();
-            compBuffer.reset(new char[repsSize]);
+            std::unique_ptr<char[]> compBuffer(new char[repsSize]);
             reader.ReadContiguous(compBuffer.get(), repsSize);
             vector<uint64_t> repsData;
             repsData.resize(numFields);
@@ -3251,53 +3300,23 @@ CrateFile::_ReadSpecs(Reader reader)
             _specs.resize(numSpecs);
 
             // Create temporary space for decompressing.
-            size_t compressedBufferSize =
-                Usd_IntegerCompression::GetCompressedBufferSize(numSpecs);
-            std::unique_ptr<char[]> compBuffer(
-                new char[compressedBufferSize]);
-            vector<uint32_t> tmp(_specs.size());
-            std::unique_ptr<char[]> workingSpace(
-                new char[Usd_IntegerCompression::
-                         GetDecompressionWorkingSpaceSize(numSpecs)]);
+            _CompressedIntsReader cr;
+            vector<uint32_t> tmp(numSpecs);
 
             // pathIndexes.
-            auto pathIndexesSize = reader.template Read<uint64_t>();
-            if (pathIndexesSize > compressedBufferSize) {
-                TF_RUNTIME_ERROR("Failed read pathIndexes, buffer overflow.");
-                return;
-            }
-            reader.ReadContiguous(compBuffer.get(), pathIndexesSize);
-            Usd_IntegerCompression::DecompressFromBuffer(
-                compBuffer.get(), pathIndexesSize, tmp.data(), numSpecs,
-                workingSpace.get());
+            cr.Read(reader, tmp.data(), numSpecs);
             for (size_t i = 0; i != numSpecs; ++i) {
                 _specs[i].pathIndex.value = tmp[i];
             }
 
             // fieldSetIndexes.
-            auto fsetIndexesSize = reader.template Read<uint64_t>();
-            if (fsetIndexesSize > compressedBufferSize) {
-                TF_RUNTIME_ERROR("Failed read fsetIndexes, buffer overflow.");
-                return;
-            }
-            reader.ReadContiguous(compBuffer.get(), fsetIndexesSize);
-            Usd_IntegerCompression::DecompressFromBuffer(
-                compBuffer.get(), fsetIndexesSize, tmp.data(), numSpecs,
-                workingSpace.get());
+            cr.Read(reader, tmp.data(), numSpecs);
             for (size_t i = 0; i != numSpecs; ++i) {
                 _specs[i].fieldSetIndex.value = tmp[i];
             }
             
             // specTypes.
-            auto specTypesSize = reader.template Read<uint64_t>();
-            if (specTypesSize > compressedBufferSize) {
-                TF_RUNTIME_ERROR("Failed read spectypes, buffer overflow.");
-                return;
-            }
-            reader.ReadContiguous(compBuffer.get(), specTypesSize);
-            Usd_IntegerCompression::DecompressFromBuffer(
-                compBuffer.get(), specTypesSize, tmp.data(), numSpecs,
-                workingSpace.get());
+            cr.Read(reader, tmp.data(), numSpecs);
             for (size_t i = 0; i != numSpecs; ++i) {
                 _specs[i].specType = static_cast<SdfSpecType>(tmp[i]);
             }
@@ -3339,6 +3358,7 @@ CrateFile::_ReadTokens(Reader reader, int64_t fileSize)
     auto numTokens = reader.template Read<uint64_t>();
 
     RawDataPtr chars;
+    char const *charsEnd = nullptr;
     uint64_t charsSize = 0;
     Version fileVer(_boot);
     if (fileVer < Version(0,4,0)) {
@@ -3347,6 +3367,7 @@ CrateFile::_ReadTokens(Reader reader, int64_t fileSize)
         // which we can just construct from the chars directly.
         auto tokensNumBytes = reader.template Read<uint64_t>();
         chars.reset(new char[tokensNumBytes]);
+        charsEnd = chars.get() + tokensNumBytes;
         reader.ReadContiguous(chars.get(), tokensNumBytes);
         charsSize = tokensNumBytes;
     } else {
@@ -3354,11 +3375,17 @@ CrateFile::_ReadTokens(Reader reader, int64_t fileSize)
         uint64_t uncompressedSize = reader.template Read<uint64_t>();
         uint64_t compressedSize = reader.template Read<uint64_t>();
         chars.reset(new char[uncompressedSize]);
+        charsEnd = chars.get() + uncompressedSize;
         RawDataPtr compressed(new char[compressedSize]);
         reader.ReadContiguous(compressed.get(), compressedSize);
         TfFastCompression::DecompressFromBuffer(
             compressed.get(), chars.get(), compressedSize, uncompressedSize);
-        charsSize = uncompressedSize;
+    }
+
+    // Check/ensure that we're null terminated.
+    if (chars.get() != charsEnd && charsEnd[-1] != '\0') {
+        TF_RUNTIME_ERROR("Tokens section not null-terminated in crate file");
+        const_cast<char *>(charsEnd)[-1] = '\0';
     }
 
     // Now we read that many null-terminated strings into _tokens.
@@ -3378,20 +3405,18 @@ CrateFile::_ReadTokens(Reader reader, int64_t fileSize)
         size_t index;
         char const *str;
     };
-    for (size_t i = 0; i != numTokens; ++i) {
-        // The number of tokens trying to be read might be larger
-        // than the number of tokens available in the valid char array range.
-        // Making sure here we're staying within bounds.
-        auto pOffset = p - chars.get();
-        if (ARCH_UNLIKELY(pOffset >= charsSize)) {
-            TF_RUNTIME_ERROR("Failed read tokens, buffer overflow.");
-            return;
-        }
+    size_t i = 0;
+    for (; p < charsEnd && i != numTokens; ++i) {
         MakeToken mt { &_tokens, i, p };
         wd.Run(mt);
         p += strlen(p) + 1;
     }
     wd.Wait();
+
+    if (i != numTokens) {
+        TF_RUNTIME_ERROR("Crate file claims %zu tokens, found %zu",
+                         numTokens, i);
+    }
 
     WorkSwapDestroyAsync(chars);
 }
@@ -3492,51 +3517,19 @@ CrateFile::_ReadCompressedPaths(Reader reader,
     // Read number of encoded paths.
     size_t numPaths = reader.template Read<uint64_t>();
     
-    pathIndexes.resize(numPaths);
-    elementTokenIndexes.resize(numPaths);
-    jumps.resize(numPaths);
-
-    // Create temporary space for decompressing.
-    size_t compressedBufferSize =
-        Usd_IntegerCompression::GetCompressedBufferSize(numPaths);
-    std::unique_ptr<char[]> compBuffer(
-        new char[compressedBufferSize]);
-    std::unique_ptr<char[]> workingSpace(
-        new char[Usd_IntegerCompression::
-                 GetDecompressionWorkingSpaceSize(numPaths)]);
+    _CompressedIntsReader cr;
 
     // pathIndexes.
-    auto pathIndexesSize = reader.template Read<uint64_t>();
-    if (pathIndexesSize > compressedBufferSize) {
-        TF_RUNTIME_ERROR("Failed read pathIndexes, buffer overflow.");
-        return;
-    }
-    reader.ReadContiguous(compBuffer.get(), pathIndexesSize);
-    Usd_IntegerCompression::DecompressFromBuffer(
-        compBuffer.get(), pathIndexesSize, pathIndexes.data(), numPaths,
-        workingSpace.get());
+    pathIndexes.resize(numPaths);
+    cr.Read(reader, pathIndexes.data(), numPaths);
 
     // elementTokenIndexes.
-    auto elementTokenIndexesSize = reader.template Read<uint64_t>();
-    if (elementTokenIndexesSize > compressedBufferSize) {
-        TF_RUNTIME_ERROR("Failed read elementTokenIndexes, buffer overflow.");
-        return;
-    }
-    reader.ReadContiguous(compBuffer.get(), elementTokenIndexesSize);
-    Usd_IntegerCompression::DecompressFromBuffer(
-        compBuffer.get(), elementTokenIndexesSize,
-        elementTokenIndexes.data(), numPaths, workingSpace.get());
+    elementTokenIndexes.resize(numPaths);
+    cr.Read(reader, elementTokenIndexes.data(), numPaths);
 
     // jumps.
-    auto jumpsSize = reader.template Read<uint64_t>();
-    if (jumpsSize > compressedBufferSize) {
-        TF_RUNTIME_ERROR("Failed read jumps, buffer overflow.");
-        return;
-    }
-    reader.ReadContiguous(compBuffer.get(), jumpsSize);
-    Usd_IntegerCompression::DecompressFromBuffer(
-        compBuffer.get(), jumpsSize, jumps.data(), numPaths,
-        workingSpace.get());
+    jumps.resize(numPaths);
+    cr.Read(reader, jumps.data(), numPaths);
 
     // Now build the paths.
     _BuildDecompressedPathsImpl(pathIndexes, elementTokenIndexes, jumps, 0,
@@ -3946,6 +3939,29 @@ CrateFile::_IsKnownSection(char const *name) {
     }
     return false;
 }
+
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+CrateFile::Field const &
+CrateFile::_GetEmptyField() const
+{
+    static Field empty;
+    return empty;
+}
+
+std::string const &
+CrateFile::_GetEmptyString() const
+{
+    static std::string empty;
+    return empty;
+}
+
+TfToken const &
+CrateFile::_GetEmptyToken() const
+{
+    static TfToken empty;
+    return empty;
+}
+#endif // PXR_PREFER_SAFETY_OVER_SPEED
 
 CrateFile::Spec::Spec(Spec_0_0_1 const &s) 
     : Spec(s.pathIndex, s.specType, s.fieldSetIndex) {}

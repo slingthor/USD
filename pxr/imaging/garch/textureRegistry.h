@@ -28,7 +28,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/api.h"
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/refPtr.h"
 #include "pxr/base/tf/singleton.h"
@@ -58,18 +58,18 @@ public:
 
     GARCH_API
     GarchTextureHandleRefPtr GetTextureHandle(const TfToken &texture,
-                                              GarchImage::ImageOriginLocation originLocation =
-                                              GarchImage::OriginUpperLeft);
+                                              HioImage::ImageOriginLocation originLocation =
+                                              HioImage::OriginUpperLeft);
     GARCH_API
     GarchTextureHandleRefPtr GetTextureHandle(const TfTokenVector &textures,
-                                              GarchImage::ImageOriginLocation originLocation =
-                                              GarchImage::OriginUpperLeft);
+                                              HioImage::ImageOriginLocation originLocation =
+                                              HioImage::OriginUpperLeft);
     GARCH_API
     GarchTextureHandleRefPtr GetTextureHandle(GarchTextureRefPtr texture);
     GARCH_API
     GarchTextureHandleRefPtr GetTextureHandle(
         const TfToken& texture,
-        GarchImage::ImageOriginLocation originLocation,
+        HioImage::ImageOriginLocation originLocation,
         const GarchTextureFactoryBase* textureFactory);
 
     // garbage collection methods
@@ -81,8 +81,8 @@ public:
     // Returns true if the registry contains a texture sampler for \a texture;
     GARCH_API
     bool HasTexture(const TfToken &texture,
-                    GarchImage::ImageOriginLocation originLocation =
-                                               GarchImage::OriginUpperLeft) const;
+                    HioImage::ImageOriginLocation originLocation =
+                                               HioImage::OriginUpperLeft) const;
 
     // diagnostics
     GARCH_API
@@ -98,12 +98,12 @@ private:
     GarchTextureRegistry();
 
     GarchTextureHandleRefPtr _CreateTexture(const TfToken &texture,
-                                  GarchImage::ImageOriginLocation originLocation);
+                                  HioImage::ImageOriginLocation originLocation);
     GarchTextureHandleRefPtr _CreateTexture(const TfTokenVector &textures,
                                   const size_t numTextures,
-    							  GarchImage::ImageOriginLocation originLocation);
+    							  HioImage::ImageOriginLocation originLocation);
     GarchTextureHandleRefPtr _CreateTexture(const TfToken &texture,
-                                  GarchImage::ImageOriginLocation originLocation,
+                                  HioImage::ImageOriginLocation originLocation,
                                   const GarchTextureFactoryBase *textureFactory);
 
     GarchTextureFactoryBase* _GetTextureFactory(const TfToken &filename);
@@ -140,7 +140,7 @@ private:
     };
 
 public:
-    typedef std::map<std::pair<TfToken, GarchImage::ImageOriginLocation>,
+    typedef std::map<std::pair<TfToken, HioImage::ImageOriginLocation>,
                      _TextureMetadata> TextureRegistryMap;
     typedef std::map<GarchTexturePtr, GarchTextureHandlePtr>
         TextureRegistryNonSharedMap;

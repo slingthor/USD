@@ -202,6 +202,10 @@ struct UsdGeomTokensType {
     /// 
     /// UsdGeomSubset
     const TfToken elementType;
+    /// \brief "exposure"
+    /// 
+    /// UsdGeomCamera
+    const TfToken exposure;
     /// \brief "extent"
     /// 
     /// UsdGeomCone, UsdGeomCapsule, UsdGeomCylinder, UsdGeomSphere, UsdGeomCube, UsdGeomBoundable

@@ -52,7 +52,6 @@ HdxFullscreenShader::HdxFullscreenShader(
     std::string const& debugName)
     : _hgi(hgi)
     , _debugName(debugName)
-    , _flipOnDraw(false)
     , _indexBuffer()
     , _vertexBuffer()
     , _shaderProgram()
@@ -262,22 +261,17 @@ HdxFullscreenShader::_CreateBufferResources()
      */
     static const size_t elementsPerVertex = 6;
 
-    static const float vertices[elementsPerVertex * 6] =
+    static const float vertices[elementsPerVertex * 3] =
     //      positions     |  uvs
         { -1,  3, 0, 1,     0, 2,
           -1, -1, 0, 1,     0, 0,
-           3, -1, 0, 1,     2, 0,
-          
-    // Flipped Y Uvs
-          -1,  3, 0, 1,     0, -1,
-          -1, -1, 0, 1,     0, 1,
-           3, -1, 0, 1,     2, 1 };
+           3, -1, 0, 1,     2, 0 };
 
     HgiBufferDesc vboDesc;
     vboDesc.debugName = "HdxFullscreenShader VertexBuffer";
     vboDesc.usage = HgiBufferUsageVertex;
     vboDesc.initialData = vertices;
-    vboDesc.byteSize = sizeof(vertices) * sizeof(vertices[0]);
+    vboDesc.byteSize = sizeof(vertices);
     vboDesc.vertexStride = elementsPerVertex * sizeof(vertices[0]);
     _vertexBuffer = _hgi->CreateBuffer(vboDesc);
 
@@ -477,10 +471,6 @@ HdxFullscreenShader::_CreateSampler()
     return true;
 }
 
-void HdxFullscreenShader::SetFlipOnDraw(bool flip)
-{
-    _flipOnDraw = flip;
-}
 
 void
 HdxFullscreenShader::Draw(
@@ -576,12 +566,7 @@ HdxFullscreenShader::_Draw(
     gfxCmds->BindVertexBuffers(0, {_vertexBuffer}, {0});
     GfVec4i vp = GfVec4i(0, 0, dimensions[0], dimensions[1]);
     gfxCmds->SetViewport(vp);
-    if (_flipOnDraw) {
-        gfxCmds->DrawIndexed(_indexBuffer, 3, 0, 3, 1);
-    }
-    else {
-        gfxCmds->DrawIndexed(_indexBuffer, 3, 0, 0, 1);
-    }
+    gfxCmds->DrawIndexed(_indexBuffer, 3, 0, 0, 1);
     gfxCmds->PopDebugGroup();
 
     // Done recording commands, submit work.

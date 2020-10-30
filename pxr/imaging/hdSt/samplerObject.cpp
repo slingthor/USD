@@ -24,9 +24,11 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/samplerObject.h"
+#include "pxr/imaging/hdSt/ptexTextureObject.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/samplerObjectRegistry.h"
 #include "pxr/imaging/hdSt/textureObject.h"
+#include "pxr/imaging/hdSt/udimTextureObject.h"
 #include "pxr/imaging/hdSt/hgiConversions.h"
 
 #include "pxr/imaging/glf/diagnostic.h"
@@ -120,50 +122,6 @@ _GenSampler(HdSt_SamplerObjectRegistry * const samplerObjectRegistry,
 
 // Get texture sampler handle for bindless textures.
 static
-GLuint64EXT
-_GenGLTextureSamplerHandle(const GLuint textureName,
-                           HgiSamplerHandle const &samplerHandle,
-                           const bool createBindlessHandle)
-{
-    if (!createBindlessHandle) {
-        return 0;
-    }
-
-    if (textureName == 0) {
-        return 0;
-    }
-
-    HgiSampler * const sampler = samplerHandle.Get();
-    if (sampler == nullptr) {
-        return 0;
-    }
-    
-#if defined(___PXR_OPENGL_SUPPORT_ENABLED)
-    HgiGLSampler * const glSampler = dynamic_cast<HgiGLSampler*>(sampler);
-    if (glSampler == nullptr) {
-        TF_CODING_ERROR("Only OpenGL samplers supported");
-        return 0;
-    }
-    const GLuint samplerName = glSampler->GetSamplerId();
-    if (samplerName == 0) {
-        return 0;
-    }
-    const GLuint64EXT result =
-        glGetTextureSamplerHandleARB(textureName, samplerName);
-
-    glMakeTextureHandleResidentARB(result);
-
-    GLF_POST_PENDING_GL_ERRORS();
-
-    return result;
-#else
-    TF_CODING_ERROR("OpenGL not enabled");
-    return 0;
-#endif
-}
-
-// Get texture sampler handle for bindless textures.
-static
 GLuint64EXT 
 _GenGLTextureSamplerHandle(HgiTextureHandle const &textureHandle,
                            HgiSamplerHandle const &samplerHandle,
@@ -184,8 +142,35 @@ _GenGLTextureSamplerHandle(HgiTextureHandle const &textureHandle,
         return 0;
     }
 
-    return _GenGLTextureSamplerHandle(
-        glTexture->GetTextureId(), samplerHandle, createBindlessHandle);
+    GLuint textureName = glTexture->GetTextureId();
+    if (textureName == 0) {
+        return 0;
+    }
+
+    HgiSampler * const sampler = samplerHandle.Get();
+    if (sampler == nullptr) {
+        return 0;
+    }
+    
+    HgiGLSampler * const glSampler = dynamic_cast<HgiGLSampler*>(sampler);
+    if (glSampler == nullptr) {
+        TF_CODING_ERROR("Only OpenGL samplers supported");
+        return 0;
+    }
+
+    const GLuint samplerName = glSampler->GetSamplerId();
+    if (samplerName == 0) {
+        return 0;
+    }
+
+    const GLuint64EXT result =
+        glGetTextureSamplerHandleARB(textureName, samplerName);
+
+    glMakeTextureHandleResidentARB(result);
+
+    GLF_POST_PENDING_GL_ERRORS();
+
+    return result;
 #else
     TF_CODING_ERROR("OpenGL not enabled");
     return 0;
@@ -216,6 +201,23 @@ _GenGlTextureHandle(const GLuint textureName,
     TF_CODING_ERROR("OpenGL not enabled");
     return 0;
 #endif
+}
+
+// Get texture handle for bindless textures.
+static
+GLuint64EXT
+_GenGlTextureHandle(HgiTextureHandle const &texture,
+                    const bool createGLTextureHandle)
+{
+    if (!createGLTextureHandle) {
+        return 0;
+    }
+
+    if (!texture) {
+        return 0;
+    }
+
+    return _GenGlTextureHandle(texture->GetRawResource(), true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -336,6 +338,16 @@ HdStFieldSamplerObject::~HdStFieldSamplerObject()
 ///////////////////////////////////////////////////////////////////////////////
 // Ptex sampler
 
+// Wrap modes such as repeat or mirror do not make sense for ptex, so set them
+// to clamp.
+static
+HdSamplerParameters PTEX_SAMPLER_PARAMETERS{
+    HdWrapClamp,
+    HdWrapClamp,
+    HdWrapClamp,
+    HdMinFilterLinear,
+    HdMagFilterLinear};
+
 HdStPtexSamplerObject::HdStPtexSamplerObject(
     HdStPtexTextureObject const &ptexTexture,
     // samplerParameters are ignored are ptex
@@ -343,22 +355,16 @@ HdStPtexSamplerObject::HdStPtexSamplerObject(
     const bool createBindlessHandle,
     HdSt_SamplerObjectRegistry * const samplerObjectRegistry)
   : HdStSamplerObject(samplerObjectRegistry)
+  , _texelsSampler(
+      _GenSampler(
+          samplerObjectRegistry,
+          PTEX_SAMPLER_PARAMETERS,
+          ptexTexture.IsValid()))
   , _texelsGLTextureHandle(
       _GenGlTextureHandle(
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-          ptexTexture.GetTexelGLTextureName(),
-#else
-          0,
-#endif
+          ptexTexture.GetTexelTexture(),
           createBindlessHandle && ptexTexture.IsValid()))
-  , _layoutGLTextureHandle(
-      _GenGlTextureHandle(
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-          ptexTexture.GetLayoutGLTextureName(),
-#else
-          0,
-#endif
-          createBindlessHandle && ptexTexture.IsValid()))
+  , _layoutBuffer(ptexTexture.GetLayoutBuffer())
 {
 }
 
@@ -380,7 +386,7 @@ HdSamplerParameters UDIM_SAMPLER_PARAMETERS{
     HdWrapClamp,
     HdWrapClamp,
     HdWrapClamp,
-    HdMinFilterLinear,
+    HdMinFilterLinearMipmapLinear,
     HdMagFilterLinear};
 
 HdStUdimSamplerObject::HdStUdimSamplerObject(
@@ -396,20 +402,12 @@ HdStUdimSamplerObject::HdStUdimSamplerObject(
           udimTexture.IsValid()))
   , _texelsGLTextureHandle(
       _GenGLTextureSamplerHandle(
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-          udimTexture.GetTexelGLTextureName(),
-#else
-          0,
-#endif
+          udimTexture.GetTexelTexture(),
           _texelsSampler,
           createBindlessHandle && udimTexture.IsValid()))
   , _layoutGLTextureHandle(
       _GenGlTextureHandle(
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-          udimTexture.GetLayoutGLTextureName(),
-#else
-          0,
-#endif
+          udimTexture.GetLayoutTexture(),
           createBindlessHandle && udimTexture.IsValid()))
 {
 }

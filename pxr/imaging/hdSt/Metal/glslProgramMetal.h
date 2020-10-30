@@ -202,7 +202,13 @@ public:
     void BindSampler(
         const TfToken &name,
         id<MTLSamplerState> samplerId) const;
-        
+
+    HDST_API
+    void BindBuffer(
+        const TfToken &name,
+        id<MTLBuffer> bufferId,
+        bool fragment) const;
+
     HDST_API
     void UpdateUniformBinding(std::string const &name, int index);
 

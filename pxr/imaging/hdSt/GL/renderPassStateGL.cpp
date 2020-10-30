@@ -137,6 +137,7 @@ HdStRenderPassStateGL::Bind()
     if (!_alphaToCoverageUseDefault) {
         if (_alphaToCoverageEnabled) {
             glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+            glEnable(GL_SAMPLE_ALPHA_TO_ONE);
         } else {
             glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
         }
@@ -180,6 +181,7 @@ HdStRenderPassStateGL::Unbind()
     
     glDisable(GL_POLYGON_OFFSET_FILL);
     glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+    glDisable(GL_SAMPLE_ALPHA_TO_ONE);
     glDisable(GL_PROGRAM_POINT_SIZE);
     glDisable(GL_STENCIL_TEST);
     glDepthFunc(GL_LESS);

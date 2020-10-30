@@ -45,6 +45,11 @@
 
 #include <fstream>
 
+// APPLE METAL
+#include "pxr/imaging/hdSt/Metal/resourceFactoryMetal.h"
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/hgiMetal/hgi.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
@@ -88,6 +93,9 @@ public:
 private:
     UsdImagingGL_UnitTestGLDrawing *_unitTest;
     GarchDrawTargetRefPtr _drawTarget;
+ 
+    // APPLE METAL
+    HgiUniquePtr _hgi;
 };
 
 UsdImagingGL_UnitTestWindow::UsdImagingGL_UnitTestWindow(
@@ -110,7 +118,14 @@ UsdImagingGL_UnitTestWindow::OnInitializeGL()
     GlfRegisterDefaultDebugOutputMessageCallback();
     GlfContextCaps::InitInstance();
 #endif
-
+    // APPLE METAL
+    _hgi = Hgi::CreatePlatformDefaultHgi();
+    MtlfMetalContext::CreateMetalContext(dynamic_cast<HgiMetal*>(_hgi.get()));
+    HdStResourceFactoryInterface *resourceFactory = new HdStResourceFactoryMetal();
+    GarchResourceFactory::GetInstance().SetResourceFactory(
+        dynamic_cast<GarchResourceFactoryInterface*>(resourceFactory));
+    HdStResourceFactory::GetInstance().SetResourceFactory(resourceFactory);
+    
     //
     // Create an offscreen draw target which is the same size as this
     // widget and initialize the unit test with the draw target bound.

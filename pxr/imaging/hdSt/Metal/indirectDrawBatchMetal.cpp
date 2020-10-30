@@ -114,14 +114,14 @@ HdSt_IndirectDrawBatchMetal::_ExecuteDraw(_DrawingProgram &program, int batchCou
                 " - stride: %zu\n",
                program.GetGeometricShader()->GetPrimitiveMode(),
                0, batchCount,
-               _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
+               _dispatchBuffer->GetCommandNumUints()*sizeof(uint32_t));
 
         TF_FATAL_CODING_ERROR("Not Implemented");
 //        glMultiDrawArraysIndirect(
 //            program.GetGeometricShader()->GetPrimitiveMode(),
 //            0, // draw command always starts with 0
 //            batchCount,
-//            _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
+//            _dispatchBuffer->GetCommandNumUints()*sizeof(uint32_t));
     } else {
         TF_DEBUG(HD_MDI).Msg("MDI Drawing Elements:\n"
                 " - primitive mode: %d\n"
@@ -131,7 +131,7 @@ HdSt_IndirectDrawBatchMetal::_ExecuteDraw(_DrawingProgram &program, int batchCou
                 " - stride: %zu\n",
                program.GetGeometricShader()->GetPrimitiveMode(),
                0, batchCount,
-               _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
+               _dispatchBuffer->GetCommandNumUints()*sizeof(uint32_t));
 
 //        TF_FATAL_CODING_ERROR("Not Implemented");
 //        glMultiDrawElementsIndirect(
@@ -139,7 +139,7 @@ HdSt_IndirectDrawBatchMetal::_ExecuteDraw(_DrawingProgram &program, int batchCou
 //            GL_UNSIGNED_INT,
 //            0, // draw command always starts with 0
 //            batchCount,
-//            _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
+//            _dispatchBuffer->GetCommandNumUints()*sizeof(uint32_t));
     }
 }
 

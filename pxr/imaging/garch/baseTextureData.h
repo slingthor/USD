@@ -26,7 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/api.h"
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/utils.h"
 #include "pxr/imaging/garch/gl.h"
 #include "pxr/base/tf/declarePtrs.h"
@@ -46,7 +46,7 @@ class GarchBaseTextureData : public TfRefBase,
 {
 public:
     GARCH_API
-    virtual ~GarchBaseTextureData();
+    virtual ~GarchBaseTextureData() override;
 
     struct WrapInfo {
         WrapInfo() :
@@ -70,11 +70,7 @@ public:
 
     virtual int ResizedDepth(int mipLevel = 0) const = 0;
 
-    virtual GLenum GLInternalFormat() const = 0;
-
-    virtual GLenum GLFormat() const = 0;
-
-    virtual GLenum GLType() const = 0;
+    virtual HioFormat GetFormat() const = 0;
 
     virtual size_t TargetMemory() const = 0;
 
@@ -86,8 +82,8 @@ public:
 
     virtual bool Read(int degradeLevel, 
                       bool generateMipmap, 
-                      GarchImage::ImageOriginLocation originLocation =
-                                                 GarchImage::OriginUpperLeft) = 0;
+                      HioImage::ImageOriginLocation originLocation =
+                                                 HioImage::OriginUpperLeft) = 0;
     
     virtual bool HasRawBuffer(int mipLevel = 0) const = 0;
 
@@ -95,16 +91,9 @@ public:
 
     virtual int GetNumMipLevels() const = 0;
 
-    virtual bool IsCompressed() const;
-    
-    static size_t _ComputeNumMipLevels(size_t width,
-                                       size_t height,
-                                       size_t depth);
-protected:
-    // Map image format and type and encoding to GL format.
-    GARCH_API
-    static GLenum _GLInternalFormatFromImageData(
-        GLenum format, GLenum type, bool isSRGB);
+    virtual bool IsCompressed() const {
+        return HioIsCompressed(GetFormat());
+    }
 
 };
 

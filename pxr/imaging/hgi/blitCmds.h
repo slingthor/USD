@@ -30,7 +30,6 @@
 #include "pxr/imaging/hgi/cmds.h"
 #include "pxr/imaging/hgi/texture.h"
 #include <memory>
-#include <unordered_map>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -65,7 +64,8 @@ public:
     virtual void PopDebugGroup() = 0;
 
     /// Copy a texture resource from GPU to CPU.
-    /// This call is blocking until the data is ready to be read on CPU.
+    /// Synchronization between GPU writes and CPU reads must be managed by
+    /// the client by supplying the correct 'wait' flags in SubmitCmds.
     HGI_API
     virtual void CopyTextureGpuToCpu(HgiTextureGpuToCpuOp const& copyOp) = 0;
 
@@ -83,6 +83,8 @@ public:
     virtual void CopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp) = 0;
 
     /// Copy new data from GPU into CPU buffer.
+    /// Synchronization between GPU writes and CPU reads must be managed by
+    /// the client by supplying the correct 'wait' flags in SubmitCmds.
     HGI_API
     virtual void CopyBufferGpuToCpu(HgiBufferGpuToCpuOp const& copyOp) = 0;
 
@@ -97,20 +99,6 @@ protected:
 private:
     HgiBlitCmds & operator=(const HgiBlitCmds&) = delete;
     HgiBlitCmds(const HgiBlitCmds&) = delete;
-    
-    struct BufferFlushListEntry {
-        BufferFlushListEntry(HgiBufferHandle const& _buffer,
-                             uint64_t _start, uint64_t _end) {
-            buffer = _buffer;
-            start = _start;
-            end = _end;
-        }
-        HgiBufferHandle buffer;
-        uint64_t start;
-        uint64_t end;
-    };
-
-    std::unordered_map<class HgiBuffer*, BufferFlushListEntry> queuedBuffers;
 };
 
 

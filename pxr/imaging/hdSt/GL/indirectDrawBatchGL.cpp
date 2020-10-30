@@ -75,7 +75,6 @@ static const GLuint64 HD_CULL_RESULT_TIMEOUT_NS = 5e9; // XXX how long to wait?
 HdSt_IndirectDrawBatchGL::HdSt_IndirectDrawBatchGL(
     HdStDrawItemInstance * drawItemInstance)
 : HdSt_IndirectDrawBatch(drawItemInstance)
-, _resultBuffer(0)
 {
     _Init(drawItemInstance);
 }
@@ -191,13 +190,13 @@ HdSt_IndirectDrawBatchGL::_ExecuteDraw(_DrawingProgram &program, int batchCount)
                 " - stride: %zu\n",
                program.GetGeometricShader()->GetPrimitiveMode(),
                0, batchCount,
-               _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
+               _dispatchBuffer->GetCommandNumUints()*sizeof(uint32_t));
 
         glMultiDrawArraysIndirect(
             program.GetGeometricShader()->GetPrimitiveMode(),
             0, // draw command always starts with 0
             batchCount,
-            _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
+            _dispatchBuffer->GetCommandNumUints()*sizeof(uint32_t));
     } else {
         TF_DEBUG(HD_MDI).Msg("MDI Drawing Elements:\n"
                 " - primitive mode: %d\n"
@@ -207,14 +206,14 @@ HdSt_IndirectDrawBatchGL::_ExecuteDraw(_DrawingProgram &program, int batchCount)
                 " - stride: %zu\n",
                program.GetGeometricShader()->GetPrimitiveMode(),
                0, batchCount,
-               _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
+               _dispatchBuffer->GetCommandNumUints()*sizeof(uint32_t));
 
         glMultiDrawElementsIndirect(
             program.GetGeometricShader()->GetPrimitiveMode(),
             GL_UNSIGNED_INT,
             0, // draw command always starts with 0
             batchCount,
-            _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
+            _dispatchBuffer->GetCommandNumUints()*sizeof(uint32_t));
     }
 }
 

@@ -252,6 +252,8 @@ private:
     void _CreatePresentTask();
 
     void _SetCameraParamForTasks(SdfPath const& id);
+    void _SetViewportForTasks();
+    void _UpdateAovDimensions(GfVec3i const& dimensions);
 
     void _SetBlendStateForMaterialTag(TfToken const& materialTag,
                                       HdxRenderTaskParams *renderParams) const;
@@ -264,6 +266,7 @@ private:
     bool _ColorizeQuantizationEnabled() const;
     bool _AovsSupported() const;
     bool _CamerasSupported() const;
+    bool _UsingAovs() const;
 
     // Helper function for renderbuffer management.
     SdfPath _GetRenderTaskPath(TfToken const& materialTag) const;
@@ -360,6 +363,8 @@ private:
     SdfPathVector _aovBufferIds;
     TfTokenVector _aovOutputs;
     TfToken _viewportAov;
+
+    GfVec4d _viewport;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

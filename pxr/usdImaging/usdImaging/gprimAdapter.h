@@ -45,16 +45,17 @@ class UsdGeomGprim;
 /// Gprim data support, such as visibility, doubleSided, extent, displayColor,
 /// displayOpacity, purpose, and transform.
 ///
-class UsdImagingGprimAdapter : public UsdImagingPrimAdapter {
+class UsdImagingGprimAdapter : public UsdImagingPrimAdapter
+{
 public:
-    typedef UsdImagingPrimAdapter BaseAdapter;
+    using BaseAdapter = UsdImagingPrimAdapter;
 
     UsdImagingGprimAdapter()
         : UsdImagingPrimAdapter()
     {}
 
     USDIMAGING_API
-    virtual ~UsdImagingGprimAdapter();
+    ~UsdImagingGprimAdapter() override;
 
     // ---------------------------------------------------------------------- //
     /// \name Parallel Setup and Resolve
@@ -62,20 +63,20 @@ public:
 
     /// Thread Safe.
     USDIMAGING_API
-    virtual void TrackVariability(UsdPrim const& prim,
-                                  SdfPath const& cachePath,
-                                  HdDirtyBits* timeVaryingBits,
-                                  UsdImagingInstancerContext const* 
-                                      instancerContext = NULL) const override;
+    void TrackVariability(UsdPrim const& prim,
+                          SdfPath const& cachePath,
+                          HdDirtyBits* timeVaryingBits,
+                          UsdImagingInstancerContext const* 
+                              instancerContext = nullptr) const override;
 
     /// Thread Safe.
     USDIMAGING_API
-    virtual void UpdateForTime(UsdPrim const& prim,
-                               SdfPath const& cachePath, 
-                               UsdTimeCode time,
-                               HdDirtyBits requestedBits,
-                               UsdImagingInstancerContext const* 
-                                   instancerContext = NULL) const override;
+    void UpdateForTime(UsdPrim const& prim,
+                       SdfPath const& cachePath, 
+                       UsdTimeCode time,
+                       HdDirtyBits requestedBits,
+                       UsdImagingInstancerContext const* 
+                           instancerContext = nullptr) const override;
 
     // ---------------------------------------------------------------------- //
     /// \name Change Processing 
@@ -134,7 +135,6 @@ public:
     /// a prim. This is useful for implicit primitives.
     USDIMAGING_API
     virtual VtValue GetPoints(UsdPrim const& prim,
-                              SdfPath const& cachePath,
                               UsdTimeCode time) const;
 
     /// Returns color and Usd interpolation token for a given
@@ -183,7 +183,17 @@ public:
                         SdfPath const& cachePath, 
                         UsdTimeCode time) const override;
 
-
+    USDIMAGING_API
+    SdfPath GetMaterialId(UsdPrim const& prim, 
+                          SdfPath const& cachePath, 
+                          UsdTimeCode time) const override;
+    /// Gets the value of the parameter named key for the given prim (which
+    /// has the given cache path) and given time.
+    USDIMAGING_API
+    VtValue Get(UsdPrim const& prim,
+                SdfPath const& cachePath,
+                TfToken const& key,
+                UsdTimeCode time) const override;
 
 protected:
 

@@ -31,6 +31,8 @@
 
 #include "pxr/imaging/garch/texture.h"
 
+#include "pxr/imaging/hio/types.h"
+
 #include <string>
 #include <vector>
 #include <tuple>
@@ -58,16 +60,16 @@ public:
     };
     
     struct _MipDesc {
-        _MipDesc(const _TextureSize& s, GarchImageSharedPtr&& i) :
+        _MipDesc(const _TextureSize& s, HioImageSharedPtr&& i) :
         size(s), image(std::move(i)) { }
         _TextureSize size;
-        GarchImageSharedPtr image;
+        HioImageSharedPtr image;
     };
     
     using _MipDescArray = std::vector<_MipDesc>;
     
     _MipDescArray _GetMipLevels(const TfToken& filePath,
-                                GarchImage::SourceColorSpace sourceColorSpace);
+                                HioImage::SourceColorSpace sourceColorSpace);
 
     GARCH_API
     virtual ~GarchUdimTexture();
@@ -75,10 +77,10 @@ public:
     GARCH_API
     static GarchUdimTextureRefPtr New(
         TfToken const& imageFilePath,
-        GarchImage::ImageOriginLocation originLocation,
+        HioImage::ImageOriginLocation originLocation,
         std::vector<std::tuple<int, TfToken>>&& tiles,
         bool const premultiplyAlpha = false,
-        GarchImage::SourceColorSpace sourceColorSpace = GarchImage::Raw); // APPLE METAL: GarchImage
+        HioImage::SourceColorSpace sourceColorSpace = HioImage::Raw); // APPLE METAL: HioImage
 
     GARCH_API
     GarchTexture::BindingVector GetBindings(
@@ -104,10 +106,10 @@ protected:
     GARCH_API
     GarchUdimTexture(
         TfToken const& imageFilePath,
-        GarchImage::ImageOriginLocation originLocation,
+        HioImage::ImageOriginLocation originLocation,
         std::vector<std::tuple<int, TfToken>>&& tiles,
         bool const premultiplyAlpha,
-        GarchImage::SourceColorSpace sourceColorSpace); // APPLE METAL: GarchImage
+        HioImage::SourceColorSpace sourceColorSpace); // APPLE METAL: HioImage
 
     GARCH_API
     virtual void _ReadTexture() override;
@@ -132,12 +134,12 @@ protected:
     unsigned int _width = 0;
     unsigned int _height = 0;
     unsigned int _depth = 0;
-    unsigned int _format = 0;
+    HioFormat _format = HioFormatInvalid;
     GarchTextureGPUHandle _imageArray;
     GarchTextureGPUHandle _layout;
     bool _loaded = false;
     bool _premultiplyAlpha = false;
-    GarchImage::SourceColorSpace _sourceColorSpace = GarchImage::Auto; // APPLE METAL: GarchImage
+    HioImage::SourceColorSpace _sourceColorSpace = HioImage::Auto; // APPLE METAL: HioImage
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -83,11 +83,6 @@ public:
     GARCH_API
     virtual ~GarchPtexTexture();
 
-    /// Creates a new instance.
-    GARCH_API
-    static GarchPtexTextureRefPtr New(const TfToken &imageFilePath,
-									  const bool premultiplyAlpha=false);
-
     /// GarchTexture overrides
     GARCH_API
     virtual BindingVector GetBindings(TfToken const & identifier,

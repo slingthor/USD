@@ -26,6 +26,7 @@
 #define PXR_IMAGING_HD_ST_TEXTURE_CPU_DATA_H
 
 #include "pxr/pxr.h"
+#include "pxr/imaging/hdSt/api.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -38,7 +39,8 @@ struct HgiTextureDesc;
 ///
 class HdStTextureCpuData {
 public:
-    virtual ~HdStTextureCpuData() = default;
+    HDST_API
+    virtual ~HdStTextureCpuData();
 
     /// The metadata of the texture (width, height, ...) including a
     /// pointer to the CPU data (as initialData).

@@ -26,7 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/api.h"
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/baseTextureData.h"
 
 #include <memory>
@@ -73,12 +73,12 @@ public:
         unsigned int cropBottom,
         unsigned int cropLeft,
         unsigned int cropRight,
-        GarchImage::SourceColorSpace sourceColorSpace=GarchImage::Auto);
+        HioImage::SourceColorSpace sourceColorSpace=HioImage::Auto);
 
     GARCH_API
     static GarchUVTextureDataRefPtr
     New(std::string const &filePath, Params const &params, 
-        GarchImage::SourceColorSpace sourceColorSpace=GarchImage::Auto);
+        HioImage::SourceColorSpace sourceColorSpace=HioImage::Auto);
 
     int NumDimensions() const override;
 
@@ -94,27 +94,15 @@ public:
     GARCH_API
     int ResizedDepth(int mipLevel = 0) const override;
 
-    GARCH_API
-    GLenum GLInternalFormat() const override {
-        return _glInternalFormat;
+    HioFormat GetFormat() const override {
+        return _format;
     };
-
-    GARCH_API
-    GLenum GLFormat() const override {
-        return _glFormat;
-    };
-
-    GARCH_API
-    GLenum GLType() const override {
-        return _glType;
-    };
-
+    
     GARCH_API
     size_t TargetMemory() const override {
         return _targetMemory;
     };
 
-    GARCH_API
     WrapInfo GetWrapInfo() const override {
         return _wrapInfo;
     };
@@ -135,8 +123,8 @@ public:
     bool Read(
 		int degradeLevel,
 		bool generateMipmap,
-        GarchImage::ImageOriginLocation originLocation =
-            GarchImage::OriginUpperLeft) override;
+        HioImage::ImageOriginLocation originLocation =
+            HioImage::OriginUpperLeft) override;
 
     GARCH_API
     int GetNumMipLevels() const override;
@@ -160,7 +148,7 @@ private:
     // 512x256, scaleX=0.25 and scaleY=0.25).
     struct _DegradedImageInput {
         _DegradedImageInput(double scaleX, double scaleY, 
-            GarchImageSharedPtr image) : scaleX(scaleX), scaleY(scaleY)
+            HioImageSharedPtr image) : scaleX(scaleX), scaleY(scaleY)
         { 
             images.push_back(image);
         }
@@ -171,10 +159,10 @@ private:
 
         double         scaleX;
         double         scaleY;
-        std::vector<GarchImageSharedPtr> images;
+        std::vector<HioImageSharedPtr> images;
     };
 
-    // Reads an image using GarchImage. If possible and requested, it will
+    // Reads an image using HioImage. If possible and requested, it will
     // load a down-sampled version (when mipmapped .tex file) of the image.
     // If targetMemory is > 0, it will iterate through the down-sampled version
     // until the estimated required GPU memory is smaller than targetMemory.
@@ -192,13 +180,13 @@ private:
                                                     int startMip, 
                                                     int lastMip);
 
-    // Given a GarchImage it will return the number of mip levels that 
+    // Given a HioImage it will return the number of mip levels that
     // are actually valid to be loaded to the GPU. For instance, it will
     // drop textures with non valid OpenGL pyramids.
-    int _GetNumMipLevelsValid(const GarchImageSharedPtr image) const;
+    int _GetNumMipLevelsValid(const HioImageSharedPtr image) const;
 
     GarchUVTextureData(std::string const &filePath, Params const &params, 
-                     GarchImage::SourceColorSpace sourceColorSpace);
+                     HioImage::SourceColorSpace sourceColorSpace);
     virtual ~GarchUVTextureData();
         
     const std::string _filePath;
@@ -210,7 +198,7 @@ private:
     int _resizedWidth, _resizedHeight;
     int _bytesPerPixel;
 
-    GLenum  _glInternalFormat, _glFormat, _glType;
+    HioFormat _format;
 
     WrapInfo _wrapInfo;
 
@@ -219,7 +207,7 @@ private:
     std::unique_ptr<unsigned char[]> _rawBuffer;
     std::vector<Mip> _rawBufferMips;
 
-    GarchImage::SourceColorSpace _sourceColorSpace;
+    HioImage::SourceColorSpace _sourceColorSpace;
 };
 
 

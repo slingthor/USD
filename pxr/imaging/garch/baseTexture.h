@@ -28,7 +28,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/api.h"
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/texture.h"
 
 #include "pxr/base/tf/declarePtrs.h"
@@ -92,7 +92,7 @@ protected:
     GarchBaseTexture();
     
     GARCH_API
-    GarchBaseTexture(GarchImage::ImageOriginLocation originLocation);
+    GarchBaseTexture(HioImage::ImageOriginLocation originLocation);
     
     GARCH_API
     virtual void _OnMemoryRequestedDirty() override final;

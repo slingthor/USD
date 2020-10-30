@@ -67,8 +67,8 @@ public:
         unsigned int cropBottom = 0,
         unsigned int cropLeft   = 0,
         unsigned int cropRight  = 0,
-        GarchImage::ImageOriginLocation originLocation =
-                            GarchImage::OriginUpperLeft);
+        HioImage::ImageOriginLocation originLocation =
+                            HioImage::OriginUpperLeft);
 
     MTLF_API
     static MtlfArrayTextureRefPtr New(
@@ -78,8 +78,8 @@ public:
         unsigned int cropBottom = 0,
         unsigned int cropLeft   = 0,
         unsigned int cropRight  = 0,
-        GarchImage::ImageOriginLocation originLocation =
-                            GarchImage::OriginUpperLeft);
+        HioImage::ImageOriginLocation originLocation =
+                            HioImage::OriginUpperLeft);
 
     MTLF_API
     static bool IsSupportedImageFile(TfToken const &imageFilePath);
@@ -98,8 +98,8 @@ protected:
         unsigned int cropBottom,
         unsigned int cropLeft,
         unsigned int cropRight,
-        GarchImage::ImageOriginLocation originLocation =
-                        GarchImage::OriginUpperLeft);
+        HioImage::ImageOriginLocation originLocation =
+                        HioImage::OriginUpperLeft);
     
     friend class MtlfResourceFactory;
 

@@ -96,6 +96,7 @@ if (X11_FOUND OR APPLE)
             hd
             garch
             glf
+            mtlf
             usd
             usdUtils
             usdImaging

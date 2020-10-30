@@ -176,7 +176,7 @@ void HdStRenderDelegateMetal::PrepareRender(
     // hydra orients all geometry during topological processing so that
     // front faces have ccw winding. We disable culling because culling
     // is handled by fragment shader discard.
-    if (params.flipFrontFacing) {
+    if (!params.flipFrontFacing) {
         context->SetFrontFaceWinding(MTLWindingClockwise);
     } else {
         context->SetFrontFaceWinding(MTLWindingCounterClockwise);
@@ -199,9 +199,9 @@ void HdStRenderDelegateMetal::PrepareRender(
     }
     
     if (params.enableIdRender) {
-        context->SetAlphaCoverageEnable(false);
+        context->SetAlphaCoverageEnable(false, false);
     } else if (params.enableSampleAlphaToCoverage) {
-        context->SetAlphaCoverageEnable(true);
+        context->SetAlphaCoverageEnable(true, false);
     }
 }
 

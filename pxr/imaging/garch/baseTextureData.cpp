@@ -24,62 +24,12 @@
 
 #include "pxr/imaging/garch/baseTextureData.h"
 
-#include "pxr/imaging/garch/utils.h"
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 
 GarchBaseTextureData::~GarchBaseTextureData()
 {
     /* nothing */
-}
-
-/* static */
-GLenum
-GarchBaseTextureData::_GLInternalFormatFromImageData(
-    GLenum format, GLenum type, bool isSRGB)
-{
-    int numElements = GarchGetNumElements(format);
-    bool g =  (numElements == 1);
-    bool a =  (numElements == 4);
-
-    switch (type) {
-    case GL_UNSIGNED_SHORT:
-    case GL_UNSIGNED_INT:
-        return g ? GL_R16 : (a ? GL_RGBA16 : GL_RGB16);        
-    case GL_HALF_FLOAT:
-        return g ? GL_R16F : (a ? GL_RGBA16F : GL_RGB16F);
-    case GL_FLOAT:
-    case GL_DOUBLE:
-        return g ? GL_R32F : (a ? GL_RGBA32F : GL_RGB32F);
-    case GL_UNSIGNED_BYTE:
-    default:
-        return g ? GL_RED : (a ? (isSRGB ? GL_SRGB_ALPHA : GL_RGBA)
-                               : (isSRGB ? GL_SRGB : GL_RGB));
-    }
-}
-/* static */
-size_t
-GarchBaseTextureData::_ComputeNumMipLevels(size_t width, size_t height, size_t depth)
-{
-    const size_t maxDim = std::max({width, height, depth});
-
-    for (size_t i = 1; i < 8 * sizeof(int) - 1; i++) {
-        const size_t powerTwo = 1 << i;
-        if (powerTwo > maxDim) {
-            return i;
-        }
-    }
-    
-    // Can never be reached, but compiler doesn't know that.
-    return 1;
-}
-
-
-bool GarchBaseTextureData::IsCompressed() const
-{
-    return (GLFormat() == GL_COMPRESSED_RGBA_BPTC_UNORM ||
-            GLFormat() == GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

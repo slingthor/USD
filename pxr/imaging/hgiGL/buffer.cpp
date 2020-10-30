@@ -42,7 +42,7 @@ HgiGLBuffer::HgiGLBuffer(HgiBufferDesc const & desc)
     glCreateBuffers(1, &_bufferId);
 
     if (!_descriptor.debugName.empty()) {
-        glObjectLabel(GL_BUFFER, _bufferId, -1, _descriptor.debugName.c_str());
+        HgiGLObjectLabel(GL_BUFFER, _bufferId,  _descriptor.debugName);
     }
 
     if ((_descriptor.usage & HgiBufferUsageVertex)  ||
@@ -119,6 +119,10 @@ HgiGLBuffer::GetCPUStagingAddress()
     if (!_cpuStaging) {
         _cpuStaging = malloc(_descriptor.byteSize);
     }
+
+    // This lets the client code memcpy into the cpu staging buffer directly.
+    // The staging data must be explicitely copied to the GPU buffer
+    // via CopyBufferCpuToGpu cmd by the client.
     return _cpuStaging;
 }
 

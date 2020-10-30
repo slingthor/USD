@@ -29,7 +29,7 @@
 
 #include "pxr/imaging/hdSt/textureCpuData.h"
 #include "pxr/imaging/hgi/texture.h"
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/base/tf/declarePtrs.h"
 
 #include <memory>
@@ -57,7 +57,7 @@ public:
         bool premultiplyAlpha = true);
 
     HDST_API
-    ~HdStGlfTextureCpuData();
+    ~HdStGlfTextureCpuData() override;
     
     HDST_API
     const HgiTextureDesc &GetTextureDesc() const override;

@@ -580,6 +580,39 @@ HdStGLSLProgramMSL::BindSampler(
         samplerBinding->_stage);
 }
 
+void
+HdStGLSLProgramMSL::BindBuffer(
+    const TfToken &name,
+    id<MTLBuffer> bufferId,
+    bool fragment) const
+{
+    std::string bufferName("bufferBind_" + name.GetString());
+    TfToken bufferNameToken(bufferName, TfToken::Immortal);
+   
+    MSL_ShaderBinding const* const bufferBinding = MSL_FindBinding(
+        _bindingMap,
+        bufferNameToken,
+        kMSL_BindingType_UniformBuffer,
+        0xFFFFFFFF,
+        0);
+
+    if(!bufferBinding) {
+        TF_FATAL_CODING_ERROR("Could not bind a buffer to the shader?!");
+    }
+ 
+    if (fragment) {
+        MtlfMetalContext::GetMetalContext()->SetFragmentBuffer(
+            bufferBinding->_index,
+            bufferId,
+            bufferNameToken);
+    } else {
+        MtlfMetalContext::GetMetalContext()->SetVertexBuffer(
+            bufferBinding->_index,
+            bufferId,
+            bufferNameToken);
+    }
+}
+
 void HdStGLSLProgramMSL::BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
 {
     // XXX: there's an issue where other shaders try to use textures.

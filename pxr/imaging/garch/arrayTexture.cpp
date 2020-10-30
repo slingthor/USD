@@ -46,7 +46,7 @@ GarchArrayTextureRefPtr GarchArrayTexture::New(TfTokenVector const &imageFilePat
                                                unsigned int cropBottom,
                                                unsigned int cropLeft,
                                                unsigned int cropRight,
-                                               GarchImage::ImageOriginLocation originLocation)
+                                               HioImage::ImageOriginLocation originLocation)
 {
     if (imageFilePaths.empty()) {
         // Need atleast one valid image file path.
@@ -69,7 +69,7 @@ GarchArrayTexture::New(
     unsigned int cropBottom,
     unsigned int cropLeft,
     unsigned int cropRight,
-    GarchImage::ImageOriginLocation originLocation)
+    HioImage::ImageOriginLocation originLocation)
 {
     TfTokenVector imageFilePathTokens(imageFilePaths.begin(), imageFilePaths.end());
 
@@ -92,7 +92,7 @@ GarchArrayTexture::GarchArrayTexture(
     unsigned int cropBottom,
     unsigned int cropLeft,
     unsigned int cropRight,
-    GarchImage::ImageOriginLocation originLocation)
+    HioImage::ImageOriginLocation originLocation)
     
     : GarchUVTexture(this,
                      imageFilePaths[0],

@@ -80,11 +80,11 @@ GarchTexture::GarchTexture( )
     : _memoryUsed(0)
     , _memoryRequested(INT_MAX)
     , _contentsID(_GetNewContentsID())
-    , _originLocation(GarchImage::OriginUpperLeft)
+    , _originLocation(HioImage::OriginUpperLeft)
 {
 }
 
-GarchTexture::GarchTexture(GarchImage::ImageOriginLocation originLocation)
+GarchTexture::GarchTexture(HioImage::ImageOriginLocation originLocation)
     : _memoryUsed(0)
     , _memoryRequested(INT_MAX)
     , _contentsID(_GetNewContentsID())
@@ -162,7 +162,7 @@ GarchTexture::_UpdateContentsID()
     _contentsID = _GetNewContentsID();
 }
 
-GarchImage::ImageOriginLocation
+HioImage::ImageOriginLocation
 GarchTexture::GetOriginLocation() const
 {
     return _originLocation;
@@ -171,7 +171,7 @@ GarchTexture::GetOriginLocation() const
 bool
 GarchTexture::IsOriginLowerLeft() const
 {
-    return _originLocation == GarchImage::OriginLowerLeft;
+    return _originLocation == HioImage::OriginLowerLeft;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

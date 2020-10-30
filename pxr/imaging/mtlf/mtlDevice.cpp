@@ -295,6 +295,7 @@ void MtlfMetalContext::Init()
     
     blendState.blendEnable = false;
     blendState.alphaCoverageEnable = false;
+    blendState.alphaToOneEnable = false;
     blendState.rgbBlendOp = MTLBlendOperationAdd;
     blendState.alphaBlendOp = MTLBlendOperationAdd;
     blendState.sourceColorFactor = MTLBlendFactorSourceAlpha;
@@ -726,9 +727,10 @@ void MtlfMetalContext::SetDepthComparisonFunction(MTLCompareFunction comparisonF
     depthState.depthCompareFunction = comparisonFn;
 }
 
-void MtlfMetalContext::SetAlphaCoverageEnable(bool _alphaCoverageEnable)
+void MtlfMetalContext::SetAlphaCoverageEnable(bool alphaCoverageEnable, bool alphaToOneEnable)
 {
-    blendState.alphaCoverageEnable = _alphaCoverageEnable;
+    blendState.alphaCoverageEnable = alphaCoverageEnable;
+    blendState.alphaToOneEnable = alphaToOneEnable;
 }
 
 void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, bool _enableMVA)
@@ -896,9 +898,21 @@ void MtlfMetalContext::SetUniformBuffer(
     threadState.boundBuffers.push_back(bufferInfo);
 }
 
-void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name)
+void MtlfMetalContext::SetVertexBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name)
 {
     BufferBinding *bufferInfo = new BufferBinding{index, buffer, name, kMSL_ProgramStage_Vertex, 0, true};
+    threadState.boundBuffers.push_back(bufferInfo);
+
+    if (name == points) {
+        threadState.vertexPositionBuffer = buffer;
+    }
+    
+    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
+}
+
+void MtlfMetalContext::SetFragmentBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name)
+{
+    BufferBinding *bufferInfo = new BufferBinding{index, buffer, name, kMSL_ProgramStage_Fragment, 0, true};
     threadState.boundBuffers.push_back(bufferInfo);
 
     if (name == points) {
@@ -979,6 +993,7 @@ void MtlfMetalContext::SetRenderPipelineState()
     boost::hash_combine(hashVal, wq->currentColourAttachmentsHash);
     boost::hash_combine(hashVal, blendState.blendEnable);
     boost::hash_combine(hashVal, blendState.alphaCoverageEnable);
+    boost::hash_combine(hashVal, blendState.alphaToOneEnable);
     boost::hash_combine(hashVal, blendState.rgbBlendOp);
     boost::hash_combine(hashVal, blendState.alphaBlendOp);
     boost::hash_combine(hashVal, blendState.sourceColorFactor);
@@ -1054,7 +1069,13 @@ void MtlfMetalContext::SetRenderPipelineState()
             else {
                 renderPipelineStateDescriptor.alphaToCoverageEnabled = NO;
             }
-            
+
+            if (blendState.alphaToOneEnable) {
+                renderPipelineStateDescriptor.alphaToOneEnabled = YES;
+            } else {
+                renderPipelineStateDescriptor.alphaToOneEnabled = NO;
+            }
+
             for (int i = 0; i < METAL_MAX_COLOR_ATTACHMENTS; i++) {
                 if (!wq->currentRenderPassDescriptor.colorAttachments[i].texture) {
                     break;
@@ -1772,7 +1793,16 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
                 TF_FATAL_CODING_ERROR("Can ony pass null renderPassDescriptor if the render encoder is currently active");
             }
             wq->currentRenderEncoder = [wq->commandBuffer renderCommandEncoderWithDescriptor: wq->currentRenderPassDescriptor];
-            //_PatchRenderPassDescriptor();
+            double w = 0.0;
+            double h = 0.0;
+            if (wq->currentRenderPassDescriptor.colorAttachments[0].texture) {
+                w = wq->currentRenderPassDescriptor.colorAttachments[0].texture.width;
+                h = wq->currentRenderPassDescriptor.colorAttachments[0].texture.height;
+            } else if (wq->currentRenderPassDescriptor.depthAttachment) {
+                w = wq->currentRenderPassDescriptor.depthAttachment.texture.width;
+                h = wq->currentRenderPassDescriptor.depthAttachment.texture.height;
+            }
+            [wq->currentRenderEncoder setViewport:(MTLViewport){0, h, w, -h, 0.0, 1.0}];
 
             // Since the encoder is new we'll need to emit all the state again
             threadState.dirtyRenderState = 0xffffffff;

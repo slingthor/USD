@@ -78,7 +78,6 @@ private:
         int32_t samplerColorLoc;
         int32_t samplerDepthLoc;
         uint32_t blitTexSizeUniform;
-        int32_t blitDepthScaleOffsetUniform;
     };
 
     struct VertexAttribState {
@@ -91,7 +90,7 @@ private:
         void* pointer;
     };
 
-    void _BlitToOpenGL(GfVec4i const& compRegion, bool flipY, int shaderIndex);
+    void _BlitToOpenGL(GfVec4i const& compRegion, int shaderIndex);
     void _FreeTransientTextureCacheRefs();
     void _CaptureOpenGlState();
     void _RestoreOpenGlState();
