@@ -1,24 +1,25 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>FindCURL &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>FindCURL &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="FindCurses" href="FindCurses.html" />
-    <link rel="prev" title="FindCups" href="FindCups.html" />
+    <link rel="prev" title="FindCUDAToolkit" href="FindCUDAToolkit.html" />
   
  
 
@@ -33,7 +34,7 @@
           <a href="FindCurses.html" title="FindCurses"
              accesskey="N">next</a> |</li>
         <li class="right" >
-          <a href="FindCups.html" title="FindCups"
+          <a href="FindCUDAToolkit.html" title="FindCUDAToolkit"
              accesskey="P">previous</a> |</li>
   <li>
     <img src="../_static/cmake-logo-16.png" alt=""
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" accesskey="U">cmake-modules(7)</a> &#187;</li> 
@@ -74,16 +75,24 @@ curl has been found.</p>
 <div class="section" id="result-variables">
 <h2>Result Variables<a class="headerlink" href="#result-variables" title="Permalink to this headline">¶</a></h2>
 <p>This module defines the following variables:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">CURL_FOUND</span></code></dt>
-<dd>“True” if <code class="docutils literal notranslate"><span class="pre">curl</span></code> found.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">CURL_INCLUDE_DIRS</span></code></dt>
-<dd>where to find <code class="docutils literal notranslate"><span class="pre">curl</span></code>/<code class="docutils literal notranslate"><span class="pre">curl.h</span></code>, etc.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">CURL_LIBRARIES</span></code></dt>
-<dd>List of libraries when using <code class="docutils literal notranslate"><span class="pre">curl</span></code>.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">CURL_VERSION_STRING</span></code></dt>
-<dd>The version of <code class="docutils literal notranslate"><span class="pre">curl</span></code> found.</dd>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">CURL_FOUND</span></code></dt><dd><p>“True” if <code class="docutils literal notranslate"><span class="pre">curl</span></code> found.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">CURL_INCLUDE_DIRS</span></code></dt><dd><p>where to find <code class="docutils literal notranslate"><span class="pre">curl</span></code>/<code class="docutils literal notranslate"><span class="pre">curl.h</span></code>, etc.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">CURL_LIBRARIES</span></code></dt><dd><p>List of libraries when using <code class="docutils literal notranslate"><span class="pre">curl</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">CURL_VERSION_STRING</span></code></dt><dd><p>The version of <code class="docutils literal notranslate"><span class="pre">curl</span></code> found.</p>
+</dd>
 </dl>
+</div>
+<div class="section" id="curl-cmake">
+<h2>CURL CMake<a class="headerlink" href="#curl-cmake" title="Permalink to this headline">¶</a></h2>
+<p>If CURL was built using the CMake buildsystem then it provides its own
+<code class="docutils literal notranslate"><span class="pre">CURLConfig.cmake</span></code> file for use with the <span class="target" id="index-0-command:find_package"></span><a class="reference internal" href="../command/find_package.html#command:find_package" title="find_package"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">find_package()</span></code></a> command’s
+config mode. This module looks for this file and, if found,
+returns its results with no further action.</p>
+<p>Set <code class="docutils literal notranslate"><span class="pre">CURL_NO_CURL_CMAKE</span></code> to <code class="docutils literal notranslate"><span class="pre">ON</span></code> to disable this search.</p>
 </div>
 </div>
 
@@ -93,18 +102,19 @@ curl has been found.</p>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <h3><a href="../index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">FindCURL</a><ul>
 <li><a class="reference internal" href="#imported-targets">IMPORTED Targets</a></li>
 <li><a class="reference internal" href="#result-variables">Result Variables</a></li>
+<li><a class="reference internal" href="#curl-cmake">CURL CMake</a></li>
 </ul>
 </li>
 </ul>
 
   <h4>Previous topic</h4>
-  <p class="topless"><a href="FindCups.html"
-                        title="previous chapter">FindCups</a></p>
+  <p class="topless"><a href="FindCUDAToolkit.html"
+                        title="previous chapter">FindCUDAToolkit</a></p>
   <h4>Next topic</h4>
   <p class="topless"><a href="FindCurses.html"
                         title="next chapter">FindCurses</a></p>
@@ -116,13 +126,11 @@ curl has been found.</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -141,7 +149,7 @@ curl has been found.</p>
           <a href="FindCurses.html" title="FindCurses"
              >next</a> |</li>
         <li class="right" >
-          <a href="FindCups.html" title="FindCups"
+          <a href="FindCUDAToolkit.html" title="FindCUDAToolkit"
              >previous</a> |</li>
   <li>
     <img src="../_static/cmake-logo-16.png" alt=""
@@ -151,15 +159,15 @@ curl has been found.</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" >cmake-modules(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

@@ -1,24 +1,25 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>target_sources &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>target_sources &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="try_compile" href="try_compile.html" />
-    <link rel="prev" title="target_link_options" href="target_link_options.html" />
+    <link rel="prev" title="target_precompile_headers" href="target_precompile_headers.html" />
   
  
 
@@ -33,7 +34,7 @@
           <a href="try_compile.html" title="try_compile"
              accesskey="N">next</a> |</li>
         <li class="right" >
-          <a href="target_link_options.html" title="target_link_options"
+          <a href="target_precompile_headers.html" title="target_precompile_headers"
              accesskey="P">previous</a> |</li>
   <li>
     <img src="../_static/cmake-logo-16.png" alt=""
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-commands.7.html" accesskey="U">cmake-commands(7)</a> &#187;</li> 
@@ -57,24 +58,29 @@
             
   <div class="section" id="target-sources">
 <span id="command:target_sources"></span><h1>target_sources<a class="headerlink" href="#target-sources" title="Permalink to this headline">¶</a></h1>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 3.1.</span></p>
+</div>
 <p>Add sources to a target.</p>
 <div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nf">target_sources(</span><span class="nv">&lt;target&gt;</span><span class="w"></span>
 <span class="w">  </span><span class="o">&lt;</span><span class="no">INTERFACE</span><span class="p">|</span><span class="no">PUBLIC</span><span class="p">|</span><span class="no">PRIVATE</span><span class="o">&gt;</span><span class="w"> </span><span class="p">[</span><span class="nb">items1...</span><span class="p">]</span><span class="w"></span>
 <span class="w">  </span><span class="p">[</span><span class="o">&lt;</span><span class="no">INTERFACE</span><span class="p">|</span><span class="no">PUBLIC</span><span class="p">|</span><span class="no">PRIVATE</span><span class="o">&gt;</span><span class="w"> </span><span class="p">[</span><span class="nb">items2...</span><span class="p">]</span><span class="w"> </span><span class="p">...]</span><span class="nf">)</span><span class="w"></span>
 </pre></div>
 </div>
-<p>Specifies sources to use when compiling a given target.  Relative
-source file paths are interpreted as being relative to the current
+<p>Specifies sources to use when building a target and/or its dependents.
+Relative source file paths are interpreted as being relative to the current
 source directory (i.e. <span class="target" id="index-0-variable:CMAKE_CURRENT_SOURCE_DIR"></span><a class="reference internal" href="../variable/CMAKE_CURRENT_SOURCE_DIR.html#variable:CMAKE_CURRENT_SOURCE_DIR" title="CMAKE_CURRENT_SOURCE_DIR"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_CURRENT_SOURCE_DIR</span></code></a>).  The
 named <code class="docutils literal notranslate"><span class="pre">&lt;target&gt;</span></code> must have been created by a command such as
 <span class="target" id="index-0-command:add_executable"></span><a class="reference internal" href="add_executable.html#command:add_executable" title="add_executable"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">add_executable()</span></code></a> or <span class="target" id="index-0-command:add_library"></span><a class="reference internal" href="add_library.html#command:add_library" title="add_library"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">add_library()</span></code></a> and must not be an
 <a class="reference internal" href="../manual/cmake-buildsystem.7.html#alias-targets"><span class="std std-ref">ALIAS target</span></a>.</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">INTERFACE</span></code>, <code class="docutils literal notranslate"><span class="pre">PUBLIC</span></code> and <code class="docutils literal notranslate"><span class="pre">PRIVATE</span></code> keywords are required to
-specify the scope of the following arguments.  <code class="docutils literal notranslate"><span class="pre">PRIVATE</span></code> and <code class="docutils literal notranslate"><span class="pre">PUBLIC</span></code>
+specify the scope of the items following them.  <code class="docutils literal notranslate"><span class="pre">PRIVATE</span></code> and <code class="docutils literal notranslate"><span class="pre">PUBLIC</span></code>
 items will populate the <span class="target" id="index-0-prop_tgt:SOURCES"></span><a class="reference internal" href="../prop_tgt/SOURCES.html#prop_tgt:SOURCES" title="SOURCES"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">SOURCES</span></code></a> property of
-<code class="docutils literal notranslate"><span class="pre">&lt;target&gt;</span></code>.  <code class="docutils literal notranslate"><span class="pre">PUBLIC</span></code> and <code class="docutils literal notranslate"><span class="pre">INTERFACE</span></code> items will populate the
-<span class="target" id="index-0-prop_tgt:INTERFACE_SOURCES"></span><a class="reference internal" href="../prop_tgt/INTERFACE_SOURCES.html#prop_tgt:INTERFACE_SOURCES" title="INTERFACE_SOURCES"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">INTERFACE_SOURCES</span></code></a> property of <code class="docutils literal notranslate"><span class="pre">&lt;target&gt;</span></code>.
-(<a class="reference internal" href="../manual/cmake-buildsystem.7.html#imported-targets"><span class="std std-ref">IMPORTED targets</span></a> only support <code class="docutils literal notranslate"><span class="pre">INTERFACE</span></code> items.)
+<code class="docutils literal notranslate"><span class="pre">&lt;target&gt;</span></code>, which are used when building the target itself.
+<code class="docutils literal notranslate"><span class="pre">PUBLIC</span></code> and <code class="docutils literal notranslate"><span class="pre">INTERFACE</span></code> items will populate the
+<span class="target" id="index-0-prop_tgt:INTERFACE_SOURCES"></span><a class="reference internal" href="../prop_tgt/INTERFACE_SOURCES.html#prop_tgt:INTERFACE_SOURCES" title="INTERFACE_SOURCES"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">INTERFACE_SOURCES</span></code></a> property of <code class="docutils literal notranslate"><span class="pre">&lt;target&gt;</span></code>, which are used
+when building dependents.  (<a class="reference internal" href="../manual/cmake-buildsystem.7.html#imported-targets"><span class="std std-ref">IMPORTED targets</span></a>
+only support <code class="docutils literal notranslate"><span class="pre">INTERFACE</span></code> items because they are not build targets.)
 The following arguments specify sources.  Repeated calls for the same
 <code class="docutils literal notranslate"><span class="pre">&lt;target&gt;</span></code> append items in the order called.</p>
 <p>Arguments to <code class="docutils literal notranslate"><span class="pre">target_sources</span></code> may use “generator expressions”
@@ -92,8 +98,8 @@ handling of relative source file paths.</p>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
   <h4>Previous topic</h4>
-  <p class="topless"><a href="target_link_options.html"
-                        title="previous chapter">target_link_options</a></p>
+  <p class="topless"><a href="target_precompile_headers.html"
+                        title="previous chapter">target_precompile_headers</a></p>
   <h4>Next topic</h4>
   <p class="topless"><a href="try_compile.html"
                         title="next chapter">try_compile</a></p>
@@ -105,13 +111,11 @@ handling of relative source file paths.</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -130,7 +134,7 @@ handling of relative source file paths.</p>
           <a href="try_compile.html" title="try_compile"
              >next</a> |</li>
         <li class="right" >
-          <a href="target_link_options.html" title="target_link_options"
+          <a href="target_precompile_headers.html" title="target_precompile_headers"
              >previous</a> |</li>
   <li>
     <img src="../_static/cmake-logo-16.png" alt=""
@@ -140,15 +144,15 @@ handling of relative source file paths.</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-commands.7.html" >cmake-commands(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

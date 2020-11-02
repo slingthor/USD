@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>FindCUDA &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>FindCUDA &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" accesskey="U">cmake-modules(7)</a> &#187;</li> 
@@ -58,16 +59,20 @@
   <div class="section" id="findcuda">
 <span id="module:FindCUDA"></span><h1>FindCUDA<a class="headerlink" href="#findcuda" title="Permalink to this headline">¶</a></h1>
 <div class="deprecated">
-<p><span class="versionmodified">Deprecated since version 3.10: </span>Superseded by first-class support for the CUDA language in CMake.</p>
+<p><span class="versionmodified deprecated">Deprecated since version 3.10: </span>Superseded by first-class support for the CUDA language in CMake.
+Superseded by the <span class="target" id="index-0-module:FindCUDAToolkit"></span><a class="reference internal" href="FindCUDAToolkit.html#module:FindCUDAToolkit" title="FindCUDAToolkit"><code class="xref cmake cmake-module docutils literal notranslate"><span class="pre">FindCUDAToolkit</span></code></a> for CUDA toolkit libraries.</p>
 </div>
 <div class="section" id="replacement">
 <h2>Replacement<a class="headerlink" href="#replacement" title="Permalink to this headline">¶</a></h2>
-<p>It is no longer necessary to use this module or call <code class="docutils literal notranslate"><span class="pre">find_package(CUDA)</span></code>.
-Instead, list <code class="docutils literal notranslate"><span class="pre">CUDA</span></code> among the languages named in the top-level
-call to the <span class="target" id="index-0-command:project"></span><a class="reference internal" href="../command/project.html#command:project" title="project"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">project()</span></code></a> command, or call the
+<p>It is no longer necessary to use this module or call <code class="docutils literal notranslate"><span class="pre">find_package(CUDA)</span></code>
+for compiling CUDA code. Instead, list <code class="docutils literal notranslate"><span class="pre">CUDA</span></code> among the languages named
+in the top-level call to the <span class="target" id="index-0-command:project"></span><a class="reference internal" href="../command/project.html#command:project" title="project"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">project()</span></code></a> command, or call the
 <span class="target" id="index-0-command:enable_language"></span><a class="reference internal" href="../command/enable_language.html#command:enable_language" title="enable_language"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">enable_language()</span></code></a> command with <code class="docutils literal notranslate"><span class="pre">CUDA</span></code>.
 Then one can add CUDA (<code class="docutils literal notranslate"><span class="pre">.cu</span></code>) sources to programs directly
 in calls to <span class="target" id="index-0-command:add_library"></span><a class="reference internal" href="../command/add_library.html#command:add_library" title="add_library"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">add_library()</span></code></a> and <span class="target" id="index-0-command:add_executable"></span><a class="reference internal" href="../command/add_executable.html#command:add_executable" title="add_executable"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">add_executable()</span></code></a>.</p>
+<p>To find and use the CUDA toolkit libraries the <span class="target" id="index-1-module:FindCUDAToolkit"></span><a class="reference internal" href="FindCUDAToolkit.html#module:FindCUDAToolkit" title="FindCUDAToolkit"><code class="xref cmake cmake-module docutils literal notranslate"><span class="pre">FindCUDAToolkit</span></code></a>
+module has superseded this module.  It works whether or not the <code class="docutils literal notranslate"><span class="pre">CUDA</span></code>
+language is enabled.</p>
 </div>
 <div class="section" id="documentation-of-deprecated-usage">
 <h2>Documentation of Deprecated Usage<a class="headerlink" href="#documentation-of-deprecated-usage" title="Permalink to this headline">¶</a></h2>
@@ -396,7 +401,8 @@ CUDA_nppial_LIBRARY   -- NVIDIA Performance Primitives lib (image processing).
 CUDA_nppicc_LIBRARY   -- NVIDIA Performance Primitives lib (image processing).
                          Only available for CUDA version 9.0.
 CUDA_nppicom_LIBRARY  -- NVIDIA Performance Primitives lib (image processing).
-                         Only available for CUDA version 9.0.
+                         Only available for CUDA version 9.0 - 10.2.
+                         Replaced by nvjpeg.
 CUDA_nppidei_LIBRARY  -- NVIDIA Performance Primitives lib (image processing).
                          Only available for CUDA version 9.0.
 CUDA_nppif_LIBRARY    -- NVIDIA Performance Primitives lib (image processing).
@@ -419,6 +425,11 @@ CUDA_nvcuvenc_LIBRARY -- CUDA Video Encoder library.
 CUDA_nvcuvid_LIBRARY  -- CUDA Video Decoder library.
                          Only available for CUDA version 3.2+.
                          Windows only.
+CUDA_nvToolsExt_LIBRARY
+                      -- NVIDA CUDA Tools Extension library.
+                         Available for CUDA version 5+.
+CUDA_OpenCL_LIBRARY   -- NVIDA CUDA OpenCL library.
+                         Available for CUDA version 5+.
 </pre></div>
 </div>
 </div>
@@ -430,7 +441,7 @@ CUDA_nvcuvid_LIBRARY  -- CUDA Video Decoder library.
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <h3><a href="../index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">FindCUDA</a><ul>
 <li><a class="reference internal" href="#replacement">Replacement</a></li>
@@ -453,13 +464,11 @@ CUDA_nvcuvid_LIBRARY  -- CUDA Video Decoder library.
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -488,15 +497,15 @@ CUDA_nvcuvid_LIBRARY  -- CUDA Video Decoder library.
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" >cmake-modules(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>FortranCInterface &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>FortranCInterface &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" accesskey="U">cmake-modules(7)</a> &#187;</li> 
@@ -63,57 +64,57 @@ languages interact.</p>
 <div class="section" id="module-variables">
 <h2>Module Variables<a class="headerlink" href="#module-variables" title="Permalink to this headline">¶</a></h2>
 <p>Variables that indicate if the mangling is found:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_GLOBAL_FOUND</span></code></dt>
-<dd>Global subroutines and functions.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE_FOUND</span></code></dt>
-<dd>Module subroutines and functions (declared by “MODULE PROCEDURE”).</dd>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_GLOBAL_FOUND</span></code></dt><dd><p>Global subroutines and functions.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE_FOUND</span></code></dt><dd><p>Module subroutines and functions (declared by “MODULE PROCEDURE”).</p>
+</dd>
 </dl>
 <p>This module also provides the following variables to specify
 the detected mangling, though a typical use case does not need
 to reference them and can use the <a class="reference internal" href="#module-functions">Module Functions</a> below.</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_GLOBAL_PREFIX</span></code></dt>
-<dd>Prefix for a global symbol without an underscore.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_GLOBAL_SUFFIX</span></code></dt>
-<dd>Suffix for a global symbol without an underscore.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_GLOBAL_CASE</span></code></dt>
-<dd>The case for a global symbol without an underscore,
-either <code class="docutils literal notranslate"><span class="pre">UPPER</span></code> or <code class="docutils literal notranslate"><span class="pre">LOWER</span></code>.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_GLOBAL__PREFIX</span></code></dt>
-<dd>Prefix for a global symbol with an underscore.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_GLOBAL__SUFFIX</span></code></dt>
-<dd>Suffix for a global symbol with an underscore.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_GLOBAL__CASE</span></code></dt>
-<dd>The case for a global symbol with an underscore,
-either <code class="docutils literal notranslate"><span class="pre">UPPER</span></code> or <code class="docutils literal notranslate"><span class="pre">LOWER</span></code>.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE_PREFIX</span></code></dt>
-<dd>Prefix for a module symbol without an underscore.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE_MIDDLE</span></code></dt>
-<dd>Middle of a module symbol without an underscore that appears
-between the name of the module and the name of the symbol.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE_SUFFIX</span></code></dt>
-<dd>Suffix for a module symbol without an underscore.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE_CASE</span></code></dt>
-<dd>The case for a module symbol without an underscore,
-either <code class="docutils literal notranslate"><span class="pre">UPPER</span></code> or <code class="docutils literal notranslate"><span class="pre">LOWER</span></code>.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE__PREFIX</span></code></dt>
-<dd>Prefix for a module symbol with an underscore.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE__MIDDLE</span></code></dt>
-<dd>Middle of a module symbol with an underscore that appears
-between the name of the module and the name of the symbol.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE__SUFFIX</span></code></dt>
-<dd>Suffix for a module symbol with an underscore.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE__CASE</span></code></dt>
-<dd>The case for a module symbol with an underscore,
-either <code class="docutils literal notranslate"><span class="pre">UPPER</span></code> or <code class="docutils literal notranslate"><span class="pre">LOWER</span></code>.</dd>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_GLOBAL_PREFIX</span></code></dt><dd><p>Prefix for a global symbol without an underscore.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_GLOBAL_SUFFIX</span></code></dt><dd><p>Suffix for a global symbol without an underscore.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_GLOBAL_CASE</span></code></dt><dd><p>The case for a global symbol without an underscore,
+either <code class="docutils literal notranslate"><span class="pre">UPPER</span></code> or <code class="docutils literal notranslate"><span class="pre">LOWER</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_GLOBAL__PREFIX</span></code></dt><dd><p>Prefix for a global symbol with an underscore.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_GLOBAL__SUFFIX</span></code></dt><dd><p>Suffix for a global symbol with an underscore.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_GLOBAL__CASE</span></code></dt><dd><p>The case for a global symbol with an underscore,
+either <code class="docutils literal notranslate"><span class="pre">UPPER</span></code> or <code class="docutils literal notranslate"><span class="pre">LOWER</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE_PREFIX</span></code></dt><dd><p>Prefix for a module symbol without an underscore.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE_MIDDLE</span></code></dt><dd><p>Middle of a module symbol without an underscore that appears
+between the name of the module and the name of the symbol.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE_SUFFIX</span></code></dt><dd><p>Suffix for a module symbol without an underscore.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE_CASE</span></code></dt><dd><p>The case for a module symbol without an underscore,
+either <code class="docutils literal notranslate"><span class="pre">UPPER</span></code> or <code class="docutils literal notranslate"><span class="pre">LOWER</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE__PREFIX</span></code></dt><dd><p>Prefix for a module symbol with an underscore.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE__MIDDLE</span></code></dt><dd><p>Middle of a module symbol with an underscore that appears
+between the name of the module and the name of the symbol.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE__SUFFIX</span></code></dt><dd><p>Suffix for a module symbol with an underscore.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">FortranCInterface_MODULE__CASE</span></code></dt><dd><p>The case for a module symbol with an underscore,
+either <code class="docutils literal notranslate"><span class="pre">UPPER</span></code> or <code class="docutils literal notranslate"><span class="pre">LOWER</span></code>.</p>
+</dd>
 </dl>
 </div>
 <div class="section" id="module-functions">
 <h2>Module Functions<a class="headerlink" href="#module-functions" title="Permalink to this headline">¶</a></h2>
 <dl class="command">
 <dt id="command:fortrancinterface_header">
-<code class="descname">FortranCInterface_HEADER</code><a class="headerlink" href="#command:fortrancinterface_header" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">FortranCInterface_HEADER</code><a class="headerlink" href="#command:fortrancinterface_header" title="Permalink to this definition">¶</a></dt>
 <dd><p>The <code class="docutils literal notranslate"><span class="pre">FortranCInterface_HEADER</span></code> function is provided to generate a
 C header file containing macros to mangle symbol names:</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>FortranCInterface_HEADER(&lt;file&gt;
@@ -131,36 +132,35 @@ C header file containing macros to mangle symbol names:</p>
 </div>
 <p>These macros mangle four categories of Fortran symbols, respectively:</p>
 <ul class="simple">
-<li>Global symbols without ‘_’: <code class="docutils literal notranslate"><span class="pre">call</span> <span class="pre">mysub()</span></code></li>
-<li>Global symbols with ‘_’   : <code class="docutils literal notranslate"><span class="pre">call</span> <span class="pre">my_sub()</span></code></li>
-<li>Module symbols without ‘_’: <code class="docutils literal notranslate"><span class="pre">use</span> <span class="pre">mymod;</span> <span class="pre">call</span> <span class="pre">mysub()</span></code></li>
-<li>Module symbols with ‘_’   : <code class="docutils literal notranslate"><span class="pre">use</span> <span class="pre">mymod;</span> <span class="pre">call</span> <span class="pre">my_sub()</span></code></li>
+<li><p>Global symbols without ‘_’: <code class="docutils literal notranslate"><span class="pre">call</span> <span class="pre">mysub()</span></code></p></li>
+<li><p>Global symbols with ‘_’   : <code class="docutils literal notranslate"><span class="pre">call</span> <span class="pre">my_sub()</span></code></p></li>
+<li><p>Module symbols without ‘_’: <code class="docutils literal notranslate"><span class="pre">use</span> <span class="pre">mymod;</span> <span class="pre">call</span> <span class="pre">mysub()</span></code></p></li>
+<li><p>Module symbols with ‘_’   : <code class="docutils literal notranslate"><span class="pre">use</span> <span class="pre">mymod;</span> <span class="pre">call</span> <span class="pre">my_sub()</span></code></p></li>
 </ul>
 <p>If mangling for a category is not known, its macro is left undefined.
 All macros require raw names in both lower case and upper case.</p>
 <p>The options are:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">MACRO_NAMESPACE</span></code></dt>
-<dd>Replace the default <code class="docutils literal notranslate"><span class="pre">FortranCInterface_</span></code> prefix with a given
-namespace <code class="docutils literal notranslate"><span class="pre">&lt;macro-ns&gt;</span></code>.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">SYMBOLS</span></code></dt>
-<dd><p class="first">List symbols to mangle automatically with C preprocessor definitions:</p>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">MACRO_NAMESPACE</span></code></dt><dd><p>Replace the default <code class="docutils literal notranslate"><span class="pre">FortranCInterface_</span></code> prefix with a given
+namespace <code class="docutils literal notranslate"><span class="pre">&lt;macro-ns&gt;</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">SYMBOLS</span></code></dt><dd><p>List symbols to mangle automatically with C preprocessor definitions:</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>&lt;function&gt;          ==&gt; #define &lt;ns&gt;&lt;function&gt; ...
 &lt;module&gt;:&lt;function&gt; ==&gt; #define &lt;ns&gt;&lt;module&gt;_&lt;function&gt; ...
 </pre></div>
 </div>
-<p class="last">If the mangling for some symbol is not known then no preprocessor
+<p>If the mangling for some symbol is not known then no preprocessor
 definition is created, and a warning is displayed.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">SYMBOL_NAMESPACE</span></code></dt>
-<dd>Prefix all preprocessor definitions generated by the <code class="docutils literal notranslate"><span class="pre">SYMBOLS</span></code>
-option with a given namespace <code class="docutils literal notranslate"><span class="pre">&lt;ns&gt;</span></code>.</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">SYMBOL_NAMESPACE</span></code></dt><dd><p>Prefix all preprocessor definitions generated by the <code class="docutils literal notranslate"><span class="pre">SYMBOLS</span></code>
+option with a given namespace <code class="docutils literal notranslate"><span class="pre">&lt;ns&gt;</span></code>.</p>
+</dd>
 </dl>
 </dd></dl>
 
 <dl class="command">
 <dt id="command:fortrancinterface_verify">
-<code class="descname">FortranCInterface_VERIFY</code><a class="headerlink" href="#command:fortrancinterface_verify" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">FortranCInterface_VERIFY</code><a class="headerlink" href="#command:fortrancinterface_verify" title="Permalink to this definition">¶</a></dt>
 <dd><p>The <code class="docutils literal notranslate"><span class="pre">FortranCInterface_VERIFY</span></code> function is provided to verify
 that the Fortran and C/C++ compilers work together:</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>FortranCInterface_VERIFY([CXX] [QUIET])
@@ -228,7 +228,7 @@ are not needed.)</p>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <h3><a href="../index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">FortranCInterface</a><ul>
 <li><a class="reference internal" href="#module-variables">Module Variables</a></li>
@@ -253,13 +253,11 @@ are not needed.)</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -288,15 +286,15 @@ are not needed.)</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" >cmake-modules(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

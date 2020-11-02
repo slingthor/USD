@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>FindDCMTK &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>FindDCMTK &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" accesskey="U">cmake-modules(7)</a> &#187;</li> 
@@ -70,8 +71,8 @@ DCMTK_DIR           - (optional) Source directory for DCMTK
 <p>This module is able to find a version of DCMTK that does or does not export
 a <em>DCMTKConfig.cmake</em> file. It applies a two step process:</p>
 <ul class="simple">
-<li>Step 1:  Attempt to find DCMTK version providing a <em>DCMTKConfig.cmake</em> file.</li>
-<li>Step 2:  If step 1 failed, rely on <em>FindDCMTK.cmake</em> to set <cite>DCMTK_*</cite> variables details below.</li>
+<li><p>Step 1:  Attempt to find DCMTK version providing a <em>DCMTKConfig.cmake</em> file.</p></li>
+<li><p>Step 2:  If step 1 failed, rely on <em>FindDCMTK.cmake</em> to set <cite>DCMTK_*</cite> variables details below.</p></li>
 </ul>
 <p><a class="reference external" href="http://git.dcmtk.org/web?p=dcmtk.git;a=commit;h=662ae187c493c6b9a73dd5e3875372cebd0c11fe">Recent DCMTK</a>
 provides a <em>DCMTKConfig.cmake</em> <span class="target" id="index-0-manual:cmake-packages(7)"></span><a class="reference internal" href="../manual/cmake-packages.7.html#manual:cmake-packages(7)" title="cmake-packages(7)"><code class="xref cmake cmake-manual docutils literal notranslate"><span class="pre">package</span> <span class="pre">configuration</span> <span class="pre">file</span></code></a>. To exclusively use the package configuration file
@@ -82,63 +83,64 @@ This requires official DCMTK snapshot <em>3.6.1_20140617</em> or newer.</p>
 to support different versions of DCMTK.</p>
 <p>On any given system, the following combinations of DCMTK versions could be
 considered:</p>
-<table border="1" class="docutils">
+<table class="docutils align-default">
 <colgroup>
-<col width="11%" />
-<col width="30%" />
-<col width="32%" />
-<col width="27%" />
+<col style="width: 11%" />
+<col style="width: 30%" />
+<col style="width: 32%" />
+<col style="width: 27%" />
 </colgroup>
-<tbody valign="top">
-<tr class="row-odd"><td>&#160;</td>
-<td>SYSTEM DCMTK</td>
-<td>LOCAL DCMTK</td>
-<td>Supported ?</td>
+<tbody>
+<tr class="row-odd"><td></td>
+<td><p>SYSTEM DCMTK</p></td>
+<td><p>LOCAL DCMTK</p></td>
+<td><p>Supported ?</p></td>
 </tr>
-<tr class="row-even"><td>Case A</td>
-<td>NA</td>
-<td>[ ] DCMTKConfig</td>
-<td>YES</td>
+<tr class="row-even"><td><p>Case A</p></td>
+<td><p>NA</p></td>
+<td><p>[ ] DCMTKConfig</p></td>
+<td><p>YES</p></td>
 </tr>
-<tr class="row-odd"><td>Case B</td>
-<td>NA</td>
-<td>[X] DCMTKConfig</td>
-<td>YES</td>
+<tr class="row-odd"><td><p>Case B</p></td>
+<td><p>NA</p></td>
+<td><p>[X] DCMTKConfig</p></td>
+<td><p>YES</p></td>
 </tr>
-<tr class="row-even"><td>Case C</td>
-<td>[ ] DCMTKConfig</td>
-<td>NA</td>
-<td>YES</td>
+<tr class="row-even"><td><p>Case C</p></td>
+<td><p>[ ] DCMTKConfig</p></td>
+<td><p>NA</p></td>
+<td><p>YES</p></td>
 </tr>
-<tr class="row-odd"><td>Case D</td>
-<td>[X] DCMTKConfig</td>
-<td>NA</td>
-<td>YES</td>
+<tr class="row-odd"><td><p>Case D</p></td>
+<td><p>[X] DCMTKConfig</p></td>
+<td><p>NA</p></td>
+<td><p>YES</p></td>
 </tr>
-<tr class="row-even"><td>Case E</td>
-<td>[ ] DCMTKConfig</td>
-<td>[ ] DCMTKConfig</td>
-<td>YES (*)</td>
+<tr class="row-even"><td><p>Case E</p></td>
+<td><p>[ ] DCMTKConfig</p></td>
+<td><p>[ ] DCMTKConfig</p></td>
+<td><p>YES (*)</p></td>
 </tr>
-<tr class="row-odd"><td>Case F</td>
-<td>[X] DCMTKConfig</td>
-<td>[ ] DCMTKConfig</td>
-<td>NO</td>
+<tr class="row-odd"><td><p>Case F</p></td>
+<td><p>[X] DCMTKConfig</p></td>
+<td><p>[ ] DCMTKConfig</p></td>
+<td><p>NO</p></td>
 </tr>
-<tr class="row-even"><td>Case G</td>
-<td>[ ] DCMTKConfig</td>
-<td>[X] DCMTKConfig</td>
-<td>YES</td>
+<tr class="row-even"><td><p>Case G</p></td>
+<td><p>[ ] DCMTKConfig</p></td>
+<td><p>[X] DCMTKConfig</p></td>
+<td><p>YES</p></td>
 </tr>
-<tr class="row-odd"><td>Case H</td>
-<td>[X] DCMTKConfig</td>
-<td>[X] DCMTKConfig</td>
-<td>YES</td>
+<tr class="row-odd"><td><p>Case H</p></td>
+<td><p>[X] DCMTKConfig</p></td>
+<td><p>[X] DCMTKConfig</p></td>
+<td><p>YES</p></td>
 </tr>
 </tbody>
 </table>
 <blockquote>
-<div>(*) See Troubleshooting section.</div></blockquote>
+<div><p>(*) See Troubleshooting section.</p>
+</div></blockquote>
 <p>Legend:</p>
 <blockquote>
 <div><p>NA ……………: Means that no System or Local DCMTK is available</p>
@@ -160,7 +162,7 @@ documentation.</p>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <h3><a href="../index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">FindDCMTK</a><ul>
 <li><a class="reference internal" href="#compatibility">Compatibility</a></li>
@@ -183,13 +185,11 @@ documentation.</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -218,15 +218,15 @@ documentation.</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" >cmake-modules(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

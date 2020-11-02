@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>cmake-toolchains(7) &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>cmake-toolchains(7) &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
  
       </ul>
@@ -59,29 +60,33 @@
 <div class="contents topic" id="contents">
 <p class="topic-title first">Contents</p>
 <ul class="simple">
-<li><a class="reference internal" href="#cmake-toolchains-7" id="id7">cmake-toolchains(7)</a><ul>
-<li><a class="reference internal" href="#introduction" id="id8">Introduction</a></li>
-<li><a class="reference internal" href="#languages" id="id9">Languages</a></li>
-<li><a class="reference internal" href="#variables-and-properties" id="id10">Variables and Properties</a></li>
-<li><a class="reference internal" href="#toolchain-features" id="id11">Toolchain Features</a></li>
-<li><a class="reference internal" href="#cross-compiling" id="id12">Cross Compiling</a><ul>
-<li><a class="reference internal" href="#cross-compiling-for-linux" id="id13">Cross Compiling for Linux</a></li>
-<li><a class="reference internal" href="#cross-compiling-for-the-cray-linux-environment" id="id14">Cross Compiling for the Cray Linux Environment</a></li>
-<li><a class="reference internal" href="#cross-compiling-using-clang" id="id15">Cross Compiling using Clang</a></li>
-<li><a class="reference internal" href="#cross-compiling-for-qnx" id="id16">Cross Compiling for QNX</a></li>
-<li><a class="reference internal" href="#cross-compiling-for-windows-ce" id="id17">Cross Compiling for Windows CE</a></li>
-<li><a class="reference internal" href="#cross-compiling-for-windows-10-universal-applications" id="id18">Cross Compiling for Windows 10 Universal Applications</a></li>
-<li><a class="reference internal" href="#cross-compiling-for-windows-phone" id="id19">Cross Compiling for Windows Phone</a></li>
-<li><a class="reference internal" href="#cross-compiling-for-windows-store" id="id20">Cross Compiling for Windows Store</a></li>
-<li><a class="reference internal" href="#cross-compiling-for-android" id="id21">Cross Compiling for Android</a><ul>
-<li><a class="reference internal" href="#cross-compiling-for-android-with-the-ndk" id="id22">Cross Compiling for Android with the NDK</a></li>
-<li><a class="reference internal" href="#cross-compiling-for-android-with-a-standalone-toolchain" id="id23">Cross Compiling for Android with a Standalone Toolchain</a></li>
-<li><a class="reference internal" href="#cross-compiling-for-android-with-nvidia-nsight-tegra-visual-studio-edition" id="id24">Cross Compiling for Android with NVIDIA Nsight Tegra Visual Studio Edition</a></li>
+<li><p><a class="reference internal" href="#cmake-toolchains-7" id="id7">cmake-toolchains(7)</a></p>
+<ul>
+<li><p><a class="reference internal" href="#introduction" id="id8">Introduction</a></p></li>
+<li><p><a class="reference internal" href="#languages" id="id9">Languages</a></p></li>
+<li><p><a class="reference internal" href="#variables-and-properties" id="id10">Variables and Properties</a></p></li>
+<li><p><a class="reference internal" href="#toolchain-features" id="id11">Toolchain Features</a></p></li>
+<li><p><a class="reference internal" href="#cross-compiling" id="id12">Cross Compiling</a></p>
+<ul>
+<li><p><a class="reference internal" href="#cross-compiling-for-linux" id="id13">Cross Compiling for Linux</a></p></li>
+<li><p><a class="reference internal" href="#cross-compiling-for-the-cray-linux-environment" id="id14">Cross Compiling for the Cray Linux Environment</a></p></li>
+<li><p><a class="reference internal" href="#cross-compiling-using-clang" id="id15">Cross Compiling using Clang</a></p></li>
+<li><p><a class="reference internal" href="#cross-compiling-for-qnx" id="id16">Cross Compiling for QNX</a></p></li>
+<li><p><a class="reference internal" href="#cross-compiling-for-windows-ce" id="id17">Cross Compiling for Windows CE</a></p></li>
+<li><p><a class="reference internal" href="#cross-compiling-for-windows-10-universal-applications" id="id18">Cross Compiling for Windows 10 Universal Applications</a></p></li>
+<li><p><a class="reference internal" href="#cross-compiling-for-windows-phone" id="id19">Cross Compiling for Windows Phone</a></p></li>
+<li><p><a class="reference internal" href="#cross-compiling-for-windows-store" id="id20">Cross Compiling for Windows Store</a></p></li>
+<li><p><a class="reference internal" href="#cross-compiling-for-android" id="id21">Cross Compiling for Android</a></p>
+<ul>
+<li><p><a class="reference internal" href="#cross-compiling-for-android-with-the-ndk" id="id22">Cross Compiling for Android with the NDK</a></p></li>
+<li><p><a class="reference internal" href="#cross-compiling-for-android-with-a-standalone-toolchain" id="id23">Cross Compiling for Android with a Standalone Toolchain</a></p></li>
+<li><p><a class="reference internal" href="#cross-compiling-for-android-with-nvidia-nsight-tegra-visual-studio-edition" id="id24">Cross Compiling for Android with NVIDIA Nsight Tegra Visual Studio Edition</a></p></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#cross-compiling-for-ios-tvos-or-watchos" id="id25">Cross Compiling for iOS, tvOS, or watchOS</a><ul>
-<li><a class="reference internal" href="#code-signing" id="id26">Code Signing</a></li>
-<li><a class="reference internal" href="#switching-between-device-and-simulator" id="id27">Switching Between Device and Simulator</a></li>
+<li><p><a class="reference internal" href="#cross-compiling-for-ios-tvos-or-watchos" id="id25">Cross Compiling for iOS, tvOS, or watchOS</a></p>
+<ul>
+<li><p><a class="reference internal" href="#code-signing" id="id26">Code Signing</a></p></li>
+<li><p><a class="reference internal" href="#switching-between-device-and-simulator" id="id27">Switching Between Device and Simulator</a></p></li>
 </ul>
 </li>
 </ul>
@@ -276,6 +281,8 @@ value to those supported compilers when compiling:</p>
 <span class="nf">set(</span><span class="no">CMAKE_C_COMPILER_TARGET</span><span class="w"> </span><span class="o">${</span><span class="nt">arch</span><span class="o">}</span><span class="nf">)</span><span class="w"></span>
 <span class="nf">set(</span><span class="no">CMAKE_CXX_COMPILER</span><span class="w"> </span><span class="no">QCC</span><span class="nf">)</span><span class="w"></span>
 <span class="nf">set(</span><span class="no">CMAKE_CXX_COMPILER_TARGET</span><span class="w"> </span><span class="o">${</span><span class="nt">arch</span><span class="o">}</span><span class="nf">)</span><span class="w"></span>
+
+<span class="nf">set(</span><span class="no">CMAKE_SYSROOT</span><span class="w"> </span><span class="o">$ENV{</span><span class="nt">QNX_TARGET</span><span class="o">}</span><span class="nf">)</span><span class="w"></span>
 </pre></div>
 </div>
 </div>
@@ -339,92 +346,94 @@ Windows Store may look like this:</p>
 <span class="target" id="index-3-variable:CMAKE_SYSTEM_NAME"></span><a class="reference internal" href="../variable/CMAKE_SYSTEM_NAME.html#variable:CMAKE_SYSTEM_NAME" title="CMAKE_SYSTEM_NAME"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSTEM_NAME</span></code></a> variable to <code class="docutils literal notranslate"><span class="pre">Android</span></code>.  Further configuration
 is specific to the Android development environment to be used.</p>
 <p>For <a class="reference internal" href="cmake-generators.7.html#visual-studio-generators"><span class="std std-ref">Visual Studio Generators</span></a>, CMake expects <a class="reference internal" href="#cross-compiling-for-android-with-nvidia-nsight-tegra-visual-studio-edition"><span class="std std-ref">NVIDIA Nsight Tegra
-Visual Studio Edition</span></a> to be installed.  See that section for further
-configuration details.</p>
+Visual Studio Edition</span></a> or the <a class="reference internal" href="#cross-compiling-for-android-with-the-ndk"><span class="std std-ref">Visual Studio tools for Android</span></a> to be installed. See those sections
+for further configuration details.</p>
 <p>For <a class="reference internal" href="cmake-generators.7.html#makefile-generators"><span class="std std-ref">Makefile Generators</span></a> and the <span class="target" id="index-0-generator:Ninja"></span><a class="reference internal" href="../generator/Ninja.html#generator:Ninja" title="Ninja"><code class="xref cmake cmake-generator docutils literal notranslate"><span class="pre">Ninja</span></code></a> generator,
 CMake expects one of these environments:</p>
 <ul class="simple">
-<li><a class="reference internal" href="#cross-compiling-for-android-with-the-ndk"><span class="std std-ref">NDK</span></a></li>
-<li><a class="reference internal" href="#cross-compiling-for-android-with-a-standalone-toolchain"><span class="std std-ref">Standalone Toolchain</span></a></li>
+<li><p><a class="reference internal" href="#cross-compiling-for-android-with-the-ndk"><span class="std std-ref">NDK</span></a></p></li>
+<li><p><a class="reference internal" href="#cross-compiling-for-android-with-a-standalone-toolchain"><span class="std std-ref">Standalone Toolchain</span></a></p></li>
 </ul>
 <p>CMake uses the following steps to select one of the environments:</p>
 <ul class="simple">
-<li>If the <span class="target" id="index-0-variable:CMAKE_ANDROID_NDK"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_NDK.html#variable:CMAKE_ANDROID_NDK" title="CMAKE_ANDROID_NDK"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_NDK</span></code></a> variable is set, the NDK at the
-specified location will be used.</li>
-<li>Else, if the <span class="target" id="index-0-variable:CMAKE_ANDROID_STANDALONE_TOOLCHAIN"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_STANDALONE_TOOLCHAIN.html#variable:CMAKE_ANDROID_STANDALONE_TOOLCHAIN" title="CMAKE_ANDROID_STANDALONE_TOOLCHAIN"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_STANDALONE_TOOLCHAIN</span></code></a> variable
-is set, the Standalone Toolchain at the specified location will be used.</li>
-<li>Else, if the <span class="target" id="index-1-variable:CMAKE_SYSROOT"></span><a class="reference internal" href="../variable/CMAKE_SYSROOT.html#variable:CMAKE_SYSROOT" title="CMAKE_SYSROOT"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSROOT</span></code></a> variable is set to a directory
+<li><p>If the <span class="target" id="index-0-variable:CMAKE_ANDROID_NDK"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_NDK.html#variable:CMAKE_ANDROID_NDK" title="CMAKE_ANDROID_NDK"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_NDK</span></code></a> variable is set, the NDK at the
+specified location will be used.</p></li>
+<li><p>Else, if the <span class="target" id="index-0-variable:CMAKE_ANDROID_STANDALONE_TOOLCHAIN"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_STANDALONE_TOOLCHAIN.html#variable:CMAKE_ANDROID_STANDALONE_TOOLCHAIN" title="CMAKE_ANDROID_STANDALONE_TOOLCHAIN"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_STANDALONE_TOOLCHAIN</span></code></a> variable
+is set, the Standalone Toolchain at the specified location will be used.</p></li>
+<li><p>Else, if the <span class="target" id="index-1-variable:CMAKE_SYSROOT"></span><a class="reference internal" href="../variable/CMAKE_SYSROOT.html#variable:CMAKE_SYSROOT" title="CMAKE_SYSROOT"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSROOT</span></code></a> variable is set to a directory
 of the form <code class="docutils literal notranslate"><span class="pre">&lt;ndk&gt;/platforms/android-&lt;api&gt;/arch-&lt;arch&gt;</span></code>, the <code class="docutils literal notranslate"><span class="pre">&lt;ndk&gt;</span></code>
 part will be used as the value of <span class="target" id="index-1-variable:CMAKE_ANDROID_NDK"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_NDK.html#variable:CMAKE_ANDROID_NDK" title="CMAKE_ANDROID_NDK"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_NDK</span></code></a> and the
-NDK will be used.</li>
-<li>Else, if the <span class="target" id="index-2-variable:CMAKE_SYSROOT"></span><a class="reference internal" href="../variable/CMAKE_SYSROOT.html#variable:CMAKE_SYSROOT" title="CMAKE_SYSROOT"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSROOT</span></code></a> variable is set to a directory of the
+NDK will be used.</p></li>
+<li><p>Else, if the <span class="target" id="index-2-variable:CMAKE_SYSROOT"></span><a class="reference internal" href="../variable/CMAKE_SYSROOT.html#variable:CMAKE_SYSROOT" title="CMAKE_SYSROOT"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSROOT</span></code></a> variable is set to a directory of the
 form <code class="docutils literal notranslate"><span class="pre">&lt;standalone-toolchain&gt;/sysroot</span></code>, the <code class="docutils literal notranslate"><span class="pre">&lt;standalone-toolchain&gt;</span></code> part
 will be used as the value of <span class="target" id="index-1-variable:CMAKE_ANDROID_STANDALONE_TOOLCHAIN"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_STANDALONE_TOOLCHAIN.html#variable:CMAKE_ANDROID_STANDALONE_TOOLCHAIN" title="CMAKE_ANDROID_STANDALONE_TOOLCHAIN"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_STANDALONE_TOOLCHAIN</span></code></a>
-and the Standalone Toolchain will be used.</li>
-<li>Else, if a cmake variable <code class="docutils literal notranslate"><span class="pre">ANDROID_NDK</span></code> is set it will be used
-as the value of <span class="target" id="index-2-variable:CMAKE_ANDROID_NDK"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_NDK.html#variable:CMAKE_ANDROID_NDK" title="CMAKE_ANDROID_NDK"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_NDK</span></code></a>, and the NDK will be used.</li>
-<li>Else, if a cmake variable <code class="docutils literal notranslate"><span class="pre">ANDROID_STANDALONE_TOOLCHAIN</span></code> is set, it will be
+and the Standalone Toolchain will be used.</p></li>
+<li><p>Else, if a cmake variable <code class="docutils literal notranslate"><span class="pre">ANDROID_NDK</span></code> is set it will be used
+as the value of <span class="target" id="index-2-variable:CMAKE_ANDROID_NDK"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_NDK.html#variable:CMAKE_ANDROID_NDK" title="CMAKE_ANDROID_NDK"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_NDK</span></code></a>, and the NDK will be used.</p></li>
+<li><p>Else, if a cmake variable <code class="docutils literal notranslate"><span class="pre">ANDROID_STANDALONE_TOOLCHAIN</span></code> is set, it will be
 used as the value of <span class="target" id="index-2-variable:CMAKE_ANDROID_STANDALONE_TOOLCHAIN"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_STANDALONE_TOOLCHAIN.html#variable:CMAKE_ANDROID_STANDALONE_TOOLCHAIN" title="CMAKE_ANDROID_STANDALONE_TOOLCHAIN"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_STANDALONE_TOOLCHAIN</span></code></a>, and the
-Standalone Toolchain will be used.</li>
-<li>Else, if an environment variable <code class="docutils literal notranslate"><span class="pre">ANDROID_NDK_ROOT</span></code> or
+Standalone Toolchain will be used.</p></li>
+<li><p>Else, if an environment variable <code class="docutils literal notranslate"><span class="pre">ANDROID_NDK_ROOT</span></code> or
 <code class="docutils literal notranslate"><span class="pre">ANDROID_NDK</span></code> is set, it will be used as the value of
-<span class="target" id="index-3-variable:CMAKE_ANDROID_NDK"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_NDK.html#variable:CMAKE_ANDROID_NDK" title="CMAKE_ANDROID_NDK"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_NDK</span></code></a>, and the NDK will be used.</li>
-<li>Else, if an environment variable <code class="docutils literal notranslate"><span class="pre">ANDROID_STANDALONE_TOOLCHAIN</span></code> is
+<span class="target" id="index-3-variable:CMAKE_ANDROID_NDK"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_NDK.html#variable:CMAKE_ANDROID_NDK" title="CMAKE_ANDROID_NDK"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_NDK</span></code></a>, and the NDK will be used.</p></li>
+<li><p>Else, if an environment variable <code class="docutils literal notranslate"><span class="pre">ANDROID_STANDALONE_TOOLCHAIN</span></code> is
 set then it will be used as the value of
 <span class="target" id="index-3-variable:CMAKE_ANDROID_STANDALONE_TOOLCHAIN"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_STANDALONE_TOOLCHAIN.html#variable:CMAKE_ANDROID_STANDALONE_TOOLCHAIN" title="CMAKE_ANDROID_STANDALONE_TOOLCHAIN"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_STANDALONE_TOOLCHAIN</span></code></a>, and the Standalone
-Toolchain will be used.</li>
-<li>Else, an error diagnostic will be issued that neither the NDK or
-Standalone Toolchain can be found.</li>
+Toolchain will be used.</p></li>
+<li><p>Else, an error diagnostic will be issued that neither the NDK or
+Standalone Toolchain can be found.</p></li>
 </ul>
 <div class="section" id="cross-compiling-for-android-with-the-ndk">
 <span id="id2"></span><h4><a class="toc-backref" href="#id22">Cross Compiling for Android with the NDK</a><a class="headerlink" href="#cross-compiling-for-android-with-the-ndk" title="Permalink to this headline">¶</a></h4>
-<p>A toolchain file may configure <a class="reference internal" href="cmake-generators.7.html#makefile-generators"><span class="std std-ref">Makefile Generators</span></a> or the
-<span class="target" id="index-1-generator:Ninja"></span><a class="reference internal" href="../generator/Ninja.html#generator:Ninja" title="Ninja"><code class="xref cmake cmake-generator docutils literal notranslate"><span class="pre">Ninja</span></code></a> generator to target Android for cross-compiling.</p>
+<p>A toolchain file may configure <a class="reference internal" href="cmake-generators.7.html#makefile-generators"><span class="std std-ref">Makefile Generators</span></a>,
+<a class="reference internal" href="cmake-generators.7.html#ninja-generators"><span class="std std-ref">Ninja Generators</span></a>, or <a class="reference internal" href="cmake-generators.7.html#visual-studio-generators"><span class="std std-ref">Visual Studio Generators</span></a> to target
+Android for cross-compiling.</p>
 <p>Configure use of an Android NDK with the following variables:</p>
-<dl class="docutils">
-<dt><span class="target" id="index-4-variable:CMAKE_SYSTEM_NAME"></span><a class="reference internal" href="../variable/CMAKE_SYSTEM_NAME.html#variable:CMAKE_SYSTEM_NAME" title="CMAKE_SYSTEM_NAME"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSTEM_NAME</span></code></a></dt>
-<dd>Set to <code class="docutils literal notranslate"><span class="pre">Android</span></code>.  Must be specified to enable cross compiling
-for Android.</dd>
-<dt><span class="target" id="index-2-variable:CMAKE_SYSTEM_VERSION"></span><a class="reference internal" href="../variable/CMAKE_SYSTEM_VERSION.html#variable:CMAKE_SYSTEM_VERSION" title="CMAKE_SYSTEM_VERSION"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSTEM_VERSION</span></code></a></dt>
-<dd><p class="first">Set to the Android API level.  If not specified, the value is
+<dl class="simple">
+<dt><span class="target" id="index-4-variable:CMAKE_SYSTEM_NAME"></span><a class="reference internal" href="../variable/CMAKE_SYSTEM_NAME.html#variable:CMAKE_SYSTEM_NAME" title="CMAKE_SYSTEM_NAME"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSTEM_NAME</span></code></a></dt><dd><p>Set to <code class="docutils literal notranslate"><span class="pre">Android</span></code>.  Must be specified to enable cross compiling
+for Android.</p>
+</dd>
+<dt><span class="target" id="index-2-variable:CMAKE_SYSTEM_VERSION"></span><a class="reference internal" href="../variable/CMAKE_SYSTEM_VERSION.html#variable:CMAKE_SYSTEM_VERSION" title="CMAKE_SYSTEM_VERSION"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSTEM_VERSION</span></code></a></dt><dd><p>Set to the Android API level.  If not specified, the value is
 determined as follows:</p>
-<ul class="last simple">
-<li>If the <span class="target" id="index-0-variable:CMAKE_ANDROID_API"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_API.html#variable:CMAKE_ANDROID_API" title="CMAKE_ANDROID_API"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_API</span></code></a> variable is set, its value
-is used as the API level.</li>
-<li>If the <span class="target" id="index-3-variable:CMAKE_SYSROOT"></span><a class="reference internal" href="../variable/CMAKE_SYSROOT.html#variable:CMAKE_SYSROOT" title="CMAKE_SYSROOT"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSROOT</span></code></a> variable is set, the API level is
-detected from the NDK directory structure containing the sysroot.</li>
-<li>Otherwise, the latest API level available in the NDK is used.</li>
+<ul class="simple">
+<li><p>If the <span class="target" id="index-0-variable:CMAKE_ANDROID_API"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_API.html#variable:CMAKE_ANDROID_API" title="CMAKE_ANDROID_API"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_API</span></code></a> variable is set, its value
+is used as the API level.</p></li>
+<li><p>If the <span class="target" id="index-3-variable:CMAKE_SYSROOT"></span><a class="reference internal" href="../variable/CMAKE_SYSROOT.html#variable:CMAKE_SYSROOT" title="CMAKE_SYSROOT"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSROOT</span></code></a> variable is set, the API level is
+detected from the NDK directory structure containing the sysroot.</p></li>
+<li><p>Otherwise, the latest API level available in the NDK is used.</p></li>
 </ul>
 </dd>
-<dt><span class="target" id="index-0-variable:CMAKE_ANDROID_ARCH_ABI"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_ARCH_ABI.html#variable:CMAKE_ANDROID_ARCH_ABI" title="CMAKE_ANDROID_ARCH_ABI"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_ARCH_ABI</span></code></a></dt>
-<dd>Set to the Android ABI (architecture).  If not specified, this
+<dt><span class="target" id="index-0-variable:CMAKE_ANDROID_ARCH_ABI"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_ARCH_ABI.html#variable:CMAKE_ANDROID_ARCH_ABI" title="CMAKE_ANDROID_ARCH_ABI"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_ARCH_ABI</span></code></a></dt><dd><p>Set to the Android ABI (architecture).  If not specified, this
 variable will default to <code class="docutils literal notranslate"><span class="pre">armeabi</span></code>.
 The <span class="target" id="index-0-variable:CMAKE_ANDROID_ARCH"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_ARCH.html#variable:CMAKE_ANDROID_ARCH" title="CMAKE_ANDROID_ARCH"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_ARCH</span></code></a> variable will be computed
 from <code class="docutils literal notranslate"><span class="pre">CMAKE_ANDROID_ARCH_ABI</span></code> automatically.
 Also see the <span class="target" id="index-0-variable:CMAKE_ANDROID_ARM_MODE"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_ARM_MODE.html#variable:CMAKE_ANDROID_ARM_MODE" title="CMAKE_ANDROID_ARM_MODE"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_ARM_MODE</span></code></a> and
-<span class="target" id="index-0-variable:CMAKE_ANDROID_ARM_NEON"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_ARM_NEON.html#variable:CMAKE_ANDROID_ARM_NEON" title="CMAKE_ANDROID_ARM_NEON"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_ARM_NEON</span></code></a> variables.</dd>
-<dt><span class="target" id="index-4-variable:CMAKE_ANDROID_NDK"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_NDK.html#variable:CMAKE_ANDROID_NDK" title="CMAKE_ANDROID_NDK"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_NDK</span></code></a></dt>
-<dd>Set to the absolute path to the Android NDK root directory.
+<span class="target" id="index-0-variable:CMAKE_ANDROID_ARM_NEON"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_ARM_NEON.html#variable:CMAKE_ANDROID_ARM_NEON" title="CMAKE_ANDROID_ARM_NEON"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_ARM_NEON</span></code></a> variables.</p>
+</dd>
+<dt><span class="target" id="index-4-variable:CMAKE_ANDROID_NDK"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_NDK.html#variable:CMAKE_ANDROID_NDK" title="CMAKE_ANDROID_NDK"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_NDK</span></code></a></dt><dd><p>Set to the absolute path to the Android NDK root directory.
 A <code class="docutils literal notranslate"><span class="pre">${CMAKE_ANDROID_NDK}/platforms</span></code> directory must exist.
 If not specified, a default for this variable will be chosen
-as specified <a class="reference internal" href="#cross-compiling-for-android"><span class="std std-ref">above</span></a>.</dd>
-<dt><span class="target" id="index-0-variable:CMAKE_ANDROID_NDK_DEPRECATED_HEADERS"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_NDK_DEPRECATED_HEADERS.html#variable:CMAKE_ANDROID_NDK_DEPRECATED_HEADERS" title="CMAKE_ANDROID_NDK_DEPRECATED_HEADERS"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_NDK_DEPRECATED_HEADERS</span></code></a></dt>
-<dd>Set to a true value to use the deprecated per-api-level headers
+as specified <a class="reference internal" href="#cross-compiling-for-android"><span class="std std-ref">above</span></a>.</p>
+</dd>
+<dt><span class="target" id="index-0-variable:CMAKE_ANDROID_NDK_DEPRECATED_HEADERS"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_NDK_DEPRECATED_HEADERS.html#variable:CMAKE_ANDROID_NDK_DEPRECATED_HEADERS" title="CMAKE_ANDROID_NDK_DEPRECATED_HEADERS"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_NDK_DEPRECATED_HEADERS</span></code></a></dt><dd><p>Set to a true value to use the deprecated per-api-level headers
 instead of the unified headers.  If not specified, the default will
-be false unless using a NDK that does not provide unified headers.</dd>
-<dt><span class="target" id="index-0-variable:CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION.html#variable:CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION" title="CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION</span></code></a></dt>
-<dd>Set to the version of the NDK toolchain to be selected as the compiler.
-If not specified, the default will be the latest available GCC toolchain.</dd>
-<dt><span class="target" id="index-0-variable:CMAKE_ANDROID_STL_TYPE"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_STL_TYPE.html#variable:CMAKE_ANDROID_STL_TYPE" title="CMAKE_ANDROID_STL_TYPE"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_STL_TYPE</span></code></a></dt>
-<dd>Set to specify which C++ standard library to use.  If not specified,
-a default will be selected as described in the variable documentation.</dd>
+be false unless using a NDK that does not provide unified headers.</p>
+</dd>
+<dt><span class="target" id="index-0-variable:CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION.html#variable:CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION" title="CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION</span></code></a></dt><dd><p>On NDK r19 or above, this variable must be unset or set to <code class="docutils literal notranslate"><span class="pre">clang</span></code>.
+On NDK r18 or below, set this to the version of the NDK toolchain to
+be selected as the compiler.  If not specified, the default will be
+the latest available GCC toolchain.</p>
+</dd>
+<dt><span class="target" id="index-0-variable:CMAKE_ANDROID_STL_TYPE"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_STL_TYPE.html#variable:CMAKE_ANDROID_STL_TYPE" title="CMAKE_ANDROID_STL_TYPE"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_STL_TYPE</span></code></a></dt><dd><p>Set to specify which C++ standard library to use.  If not specified,
+a default will be selected as described in the variable documentation.</p>
+</dd>
 </dl>
 <p>The following variables will be computed and provided automatically:</p>
-<dl class="docutils">
-<dt><span class="target" id="index-0-variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX"></span><a class="reference internal" href="../variable/CMAKE_LANG_ANDROID_TOOLCHAIN_PREFIX.html#variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX" title="CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX</span></code></a></dt>
-<dd>The absolute path prefix to the binutils in the NDK toolchain.</dd>
-<dt><span class="target" id="index-0-variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX"></span><a class="reference internal" href="../variable/CMAKE_LANG_ANDROID_TOOLCHAIN_SUFFIX.html#variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX" title="CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX</span></code></a></dt>
-<dd>The host platform suffix of the binutils in the NDK toolchain.</dd>
+<dl class="simple">
+<dt><span class="target" id="index-0-variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX"></span><a class="reference internal" href="../variable/CMAKE_LANG_ANDROID_TOOLCHAIN_PREFIX.html#variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX" title="CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX</span></code></a></dt><dd><p>The absolute path prefix to the binutils in the NDK toolchain.</p>
+</dd>
+<dt><span class="target" id="index-0-variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX"></span><a class="reference internal" href="../variable/CMAKE_LANG_ANDROID_TOOLCHAIN_SUFFIX.html#variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX" title="CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX</span></code></a></dt><dd><p>The host platform suffix of the binutils in the NDK toolchain.</p>
+</dd>
 </dl>
 <p>For example, a toolchain file might contain:</p>
 <div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nf">set(</span><span class="no">CMAKE_SYSTEM_NAME</span><span class="w"> </span><span class="nb">Android</span><span class="nf">)</span><span class="w"></span>
@@ -447,37 +456,37 @@ a default will be selected as described in the variable documentation.</dd>
 <div class="section" id="cross-compiling-for-android-with-a-standalone-toolchain">
 <span id="id3"></span><h4><a class="toc-backref" href="#id23">Cross Compiling for Android with a Standalone Toolchain</a><a class="headerlink" href="#cross-compiling-for-android-with-a-standalone-toolchain" title="Permalink to this headline">¶</a></h4>
 <p>A toolchain file may configure <a class="reference internal" href="cmake-generators.7.html#makefile-generators"><span class="std std-ref">Makefile Generators</span></a> or the
-<span class="target" id="index-2-generator:Ninja"></span><a class="reference internal" href="../generator/Ninja.html#generator:Ninja" title="Ninja"><code class="xref cmake cmake-generator docutils literal notranslate"><span class="pre">Ninja</span></code></a> generator to target Android for cross-compiling
+<span class="target" id="index-1-generator:Ninja"></span><a class="reference internal" href="../generator/Ninja.html#generator:Ninja" title="Ninja"><code class="xref cmake cmake-generator docutils literal notranslate"><span class="pre">Ninja</span></code></a> generator to target Android for cross-compiling
 using a standalone toolchain.</p>
 <p>Configure use of an Android standalone toolchain with the following variables:</p>
-<dl class="docutils">
-<dt><span class="target" id="index-5-variable:CMAKE_SYSTEM_NAME"></span><a class="reference internal" href="../variable/CMAKE_SYSTEM_NAME.html#variable:CMAKE_SYSTEM_NAME" title="CMAKE_SYSTEM_NAME"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSTEM_NAME</span></code></a></dt>
-<dd>Set to <code class="docutils literal notranslate"><span class="pre">Android</span></code>.  Must be specified to enable cross compiling
-for Android.</dd>
-<dt><span class="target" id="index-4-variable:CMAKE_ANDROID_STANDALONE_TOOLCHAIN"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_STANDALONE_TOOLCHAIN.html#variable:CMAKE_ANDROID_STANDALONE_TOOLCHAIN" title="CMAKE_ANDROID_STANDALONE_TOOLCHAIN"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_STANDALONE_TOOLCHAIN</span></code></a></dt>
-<dd>Set to the absolute path to the standalone toolchain root directory.
+<dl class="simple">
+<dt><span class="target" id="index-5-variable:CMAKE_SYSTEM_NAME"></span><a class="reference internal" href="../variable/CMAKE_SYSTEM_NAME.html#variable:CMAKE_SYSTEM_NAME" title="CMAKE_SYSTEM_NAME"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSTEM_NAME</span></code></a></dt><dd><p>Set to <code class="docutils literal notranslate"><span class="pre">Android</span></code>.  Must be specified to enable cross compiling
+for Android.</p>
+</dd>
+<dt><span class="target" id="index-4-variable:CMAKE_ANDROID_STANDALONE_TOOLCHAIN"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_STANDALONE_TOOLCHAIN.html#variable:CMAKE_ANDROID_STANDALONE_TOOLCHAIN" title="CMAKE_ANDROID_STANDALONE_TOOLCHAIN"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_STANDALONE_TOOLCHAIN</span></code></a></dt><dd><p>Set to the absolute path to the standalone toolchain root directory.
 A <code class="docutils literal notranslate"><span class="pre">${CMAKE_ANDROID_STANDALONE_TOOLCHAIN}/sysroot</span></code> directory
 must exist.
 If not specified, a default for this variable will be chosen
-as specified <a class="reference internal" href="#cross-compiling-for-android"><span class="std std-ref">above</span></a>.</dd>
-<dt><span class="target" id="index-1-variable:CMAKE_ANDROID_ARM_MODE"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_ARM_MODE.html#variable:CMAKE_ANDROID_ARM_MODE" title="CMAKE_ANDROID_ARM_MODE"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_ARM_MODE</span></code></a></dt>
-<dd>When the standalone toolchain targets ARM, optionally set this to <code class="docutils literal notranslate"><span class="pre">ON</span></code>
+as specified <a class="reference internal" href="#cross-compiling-for-android"><span class="std std-ref">above</span></a>.</p>
+</dd>
+<dt><span class="target" id="index-1-variable:CMAKE_ANDROID_ARM_MODE"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_ARM_MODE.html#variable:CMAKE_ANDROID_ARM_MODE" title="CMAKE_ANDROID_ARM_MODE"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_ARM_MODE</span></code></a></dt><dd><p>When the standalone toolchain targets ARM, optionally set this to <code class="docutils literal notranslate"><span class="pre">ON</span></code>
 to target 32-bit ARM instead of 16-bit Thumb.
-See variable documentation for details.</dd>
-<dt><span class="target" id="index-1-variable:CMAKE_ANDROID_ARM_NEON"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_ARM_NEON.html#variable:CMAKE_ANDROID_ARM_NEON" title="CMAKE_ANDROID_ARM_NEON"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_ARM_NEON</span></code></a></dt>
-<dd>When the standalone toolchain targets ARM v7, optionally set thisto <code class="docutils literal notranslate"><span class="pre">ON</span></code>
-to target ARM NEON devices.  See variable documentation for details.</dd>
+See variable documentation for details.</p>
+</dd>
+<dt><span class="target" id="index-1-variable:CMAKE_ANDROID_ARM_NEON"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_ARM_NEON.html#variable:CMAKE_ANDROID_ARM_NEON" title="CMAKE_ANDROID_ARM_NEON"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_ARM_NEON</span></code></a></dt><dd><p>When the standalone toolchain targets ARM v7, optionally set thisto <code class="docutils literal notranslate"><span class="pre">ON</span></code>
+to target ARM NEON devices.  See variable documentation for details.</p>
+</dd>
 </dl>
 <p>The following variables will be computed and provided automatically:</p>
-<dl class="docutils">
-<dt><span class="target" id="index-3-variable:CMAKE_SYSTEM_VERSION"></span><a class="reference internal" href="../variable/CMAKE_SYSTEM_VERSION.html#variable:CMAKE_SYSTEM_VERSION" title="CMAKE_SYSTEM_VERSION"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSTEM_VERSION</span></code></a></dt>
-<dd>The Android API level detected from the standalone toolchain.</dd>
-<dt><span class="target" id="index-1-variable:CMAKE_ANDROID_ARCH_ABI"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_ARCH_ABI.html#variable:CMAKE_ANDROID_ARCH_ABI" title="CMAKE_ANDROID_ARCH_ABI"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_ARCH_ABI</span></code></a></dt>
-<dd>The Android ABI detected from the standalone toolchain.</dd>
-<dt><span class="target" id="index-1-variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX"></span><a class="reference internal" href="../variable/CMAKE_LANG_ANDROID_TOOLCHAIN_PREFIX.html#variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX" title="CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX</span></code></a></dt>
-<dd>The absolute path prefix to the <code class="docutils literal notranslate"><span class="pre">binutils</span></code> in the standalone toolchain.</dd>
-<dt><span class="target" id="index-1-variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX"></span><a class="reference internal" href="../variable/CMAKE_LANG_ANDROID_TOOLCHAIN_SUFFIX.html#variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX" title="CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX</span></code></a></dt>
-<dd>The host platform suffix of the <code class="docutils literal notranslate"><span class="pre">binutils</span></code> in the standalone toolchain.</dd>
+<dl class="simple">
+<dt><span class="target" id="index-3-variable:CMAKE_SYSTEM_VERSION"></span><a class="reference internal" href="../variable/CMAKE_SYSTEM_VERSION.html#variable:CMAKE_SYSTEM_VERSION" title="CMAKE_SYSTEM_VERSION"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSTEM_VERSION</span></code></a></dt><dd><p>The Android API level detected from the standalone toolchain.</p>
+</dd>
+<dt><span class="target" id="index-1-variable:CMAKE_ANDROID_ARCH_ABI"></span><a class="reference internal" href="../variable/CMAKE_ANDROID_ARCH_ABI.html#variable:CMAKE_ANDROID_ARCH_ABI" title="CMAKE_ANDROID_ARCH_ABI"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ANDROID_ARCH_ABI</span></code></a></dt><dd><p>The Android ABI detected from the standalone toolchain.</p>
+</dd>
+<dt><span class="target" id="index-1-variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX"></span><a class="reference internal" href="../variable/CMAKE_LANG_ANDROID_TOOLCHAIN_PREFIX.html#variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX" title="CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_PREFIX</span></code></a></dt><dd><p>The absolute path prefix to the <code class="docutils literal notranslate"><span class="pre">binutils</span></code> in the standalone toolchain.</p>
+</dd>
+<dt><span class="target" id="index-1-variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX"></span><a class="reference internal" href="../variable/CMAKE_LANG_ANDROID_TOOLCHAIN_SUFFIX.html#variable:CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX" title="CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_&lt;LANG&gt;_ANDROID_TOOLCHAIN_SUFFIX</span></code></a></dt><dd><p>The host platform suffix of the <code class="docutils literal notranslate"><span class="pre">binutils</span></code> in the standalone toolchain.</p>
+</dd>
 </dl>
 <p>For example, a toolchain file might contain:</p>
 <div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nf">set(</span><span class="no">CMAKE_SYSTEM_NAME</span><span class="w"> </span><span class="nb">Android</span><span class="nf">)</span><span class="w"></span>
@@ -502,23 +511,23 @@ to build using NVIDIA Nsight Tegra targeting Android may look like this:</p>
 the Nsight Tegra “Toolchain Version” value.</p>
 <p>See also target properties:</p>
 <ul class="simple">
-<li><span class="target" id="index-0-prop_tgt:ANDROID_ANT_ADDITIONAL_OPTIONS"></span><a class="reference internal" href="../prop_tgt/ANDROID_ANT_ADDITIONAL_OPTIONS.html#prop_tgt:ANDROID_ANT_ADDITIONAL_OPTIONS" title="ANDROID_ANT_ADDITIONAL_OPTIONS"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_ANT_ADDITIONAL_OPTIONS</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_API_MIN"></span><a class="reference internal" href="../prop_tgt/ANDROID_API_MIN.html#prop_tgt:ANDROID_API_MIN" title="ANDROID_API_MIN"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_API_MIN</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_API"></span><a class="reference internal" href="../prop_tgt/ANDROID_API.html#prop_tgt:ANDROID_API" title="ANDROID_API"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_API</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_ARCH"></span><a class="reference internal" href="../prop_tgt/ANDROID_ARCH.html#prop_tgt:ANDROID_ARCH" title="ANDROID_ARCH"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_ARCH</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_ASSETS_DIRECTORIES"></span><a class="reference internal" href="../prop_tgt/ANDROID_ASSETS_DIRECTORIES.html#prop_tgt:ANDROID_ASSETS_DIRECTORIES" title="ANDROID_ASSETS_DIRECTORIES"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_ASSETS_DIRECTORIES</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_GUI"></span><a class="reference internal" href="../prop_tgt/ANDROID_GUI.html#prop_tgt:ANDROID_GUI" title="ANDROID_GUI"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_GUI</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_JAR_DEPENDENCIES"></span><a class="reference internal" href="../prop_tgt/ANDROID_JAR_DEPENDENCIES.html#prop_tgt:ANDROID_JAR_DEPENDENCIES" title="ANDROID_JAR_DEPENDENCIES"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_JAR_DEPENDENCIES</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_JAR_DIRECTORIES"></span><a class="reference internal" href="../prop_tgt/ANDROID_JAR_DIRECTORIES.html#prop_tgt:ANDROID_JAR_DIRECTORIES" title="ANDROID_JAR_DIRECTORIES"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_JAR_DIRECTORIES</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_JAVA_SOURCE_DIR"></span><a class="reference internal" href="../prop_tgt/ANDROID_JAVA_SOURCE_DIR.html#prop_tgt:ANDROID_JAVA_SOURCE_DIR" title="ANDROID_JAVA_SOURCE_DIR"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_JAVA_SOURCE_DIR</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_NATIVE_LIB_DEPENDENCIES"></span><a class="reference internal" href="../prop_tgt/ANDROID_NATIVE_LIB_DEPENDENCIES.html#prop_tgt:ANDROID_NATIVE_LIB_DEPENDENCIES" title="ANDROID_NATIVE_LIB_DEPENDENCIES"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_NATIVE_LIB_DEPENDENCIES</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_NATIVE_LIB_DIRECTORIES"></span><a class="reference internal" href="../prop_tgt/ANDROID_NATIVE_LIB_DIRECTORIES.html#prop_tgt:ANDROID_NATIVE_LIB_DIRECTORIES" title="ANDROID_NATIVE_LIB_DIRECTORIES"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_NATIVE_LIB_DIRECTORIES</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_PROCESS_MAX"></span><a class="reference internal" href="../prop_tgt/ANDROID_PROCESS_MAX.html#prop_tgt:ANDROID_PROCESS_MAX" title="ANDROID_PROCESS_MAX"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_PROCESS_MAX</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_PROGUARD_CONFIG_PATH"></span><a class="reference internal" href="../prop_tgt/ANDROID_PROGUARD_CONFIG_PATH.html#prop_tgt:ANDROID_PROGUARD_CONFIG_PATH" title="ANDROID_PROGUARD_CONFIG_PATH"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_PROGUARD_CONFIG_PATH</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_PROGUARD"></span><a class="reference internal" href="../prop_tgt/ANDROID_PROGUARD.html#prop_tgt:ANDROID_PROGUARD" title="ANDROID_PROGUARD"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_PROGUARD</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_SECURE_PROPS_PATH"></span><a class="reference internal" href="../prop_tgt/ANDROID_SECURE_PROPS_PATH.html#prop_tgt:ANDROID_SECURE_PROPS_PATH" title="ANDROID_SECURE_PROPS_PATH"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_SECURE_PROPS_PATH</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_SKIP_ANT_STEP"></span><a class="reference internal" href="../prop_tgt/ANDROID_SKIP_ANT_STEP.html#prop_tgt:ANDROID_SKIP_ANT_STEP" title="ANDROID_SKIP_ANT_STEP"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_SKIP_ANT_STEP</span></code></a></li>
-<li><span class="target" id="index-0-prop_tgt:ANDROID_STL_TYPE"></span><a class="reference internal" href="../prop_tgt/ANDROID_STL_TYPE.html#prop_tgt:ANDROID_STL_TYPE" title="ANDROID_STL_TYPE"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_STL_TYPE</span></code></a></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_ANT_ADDITIONAL_OPTIONS"></span><a class="reference internal" href="../prop_tgt/ANDROID_ANT_ADDITIONAL_OPTIONS.html#prop_tgt:ANDROID_ANT_ADDITIONAL_OPTIONS" title="ANDROID_ANT_ADDITIONAL_OPTIONS"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_ANT_ADDITIONAL_OPTIONS</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_API_MIN"></span><a class="reference internal" href="../prop_tgt/ANDROID_API_MIN.html#prop_tgt:ANDROID_API_MIN" title="ANDROID_API_MIN"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_API_MIN</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_API"></span><a class="reference internal" href="../prop_tgt/ANDROID_API.html#prop_tgt:ANDROID_API" title="ANDROID_API"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_API</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_ARCH"></span><a class="reference internal" href="../prop_tgt/ANDROID_ARCH.html#prop_tgt:ANDROID_ARCH" title="ANDROID_ARCH"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_ARCH</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_ASSETS_DIRECTORIES"></span><a class="reference internal" href="../prop_tgt/ANDROID_ASSETS_DIRECTORIES.html#prop_tgt:ANDROID_ASSETS_DIRECTORIES" title="ANDROID_ASSETS_DIRECTORIES"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_ASSETS_DIRECTORIES</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_GUI"></span><a class="reference internal" href="../prop_tgt/ANDROID_GUI.html#prop_tgt:ANDROID_GUI" title="ANDROID_GUI"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_GUI</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_JAR_DEPENDENCIES"></span><a class="reference internal" href="../prop_tgt/ANDROID_JAR_DEPENDENCIES.html#prop_tgt:ANDROID_JAR_DEPENDENCIES" title="ANDROID_JAR_DEPENDENCIES"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_JAR_DEPENDENCIES</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_JAR_DIRECTORIES"></span><a class="reference internal" href="../prop_tgt/ANDROID_JAR_DIRECTORIES.html#prop_tgt:ANDROID_JAR_DIRECTORIES" title="ANDROID_JAR_DIRECTORIES"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_JAR_DIRECTORIES</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_JAVA_SOURCE_DIR"></span><a class="reference internal" href="../prop_tgt/ANDROID_JAVA_SOURCE_DIR.html#prop_tgt:ANDROID_JAVA_SOURCE_DIR" title="ANDROID_JAVA_SOURCE_DIR"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_JAVA_SOURCE_DIR</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_NATIVE_LIB_DEPENDENCIES"></span><a class="reference internal" href="../prop_tgt/ANDROID_NATIVE_LIB_DEPENDENCIES.html#prop_tgt:ANDROID_NATIVE_LIB_DEPENDENCIES" title="ANDROID_NATIVE_LIB_DEPENDENCIES"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_NATIVE_LIB_DEPENDENCIES</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_NATIVE_LIB_DIRECTORIES"></span><a class="reference internal" href="../prop_tgt/ANDROID_NATIVE_LIB_DIRECTORIES.html#prop_tgt:ANDROID_NATIVE_LIB_DIRECTORIES" title="ANDROID_NATIVE_LIB_DIRECTORIES"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_NATIVE_LIB_DIRECTORIES</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_PROCESS_MAX"></span><a class="reference internal" href="../prop_tgt/ANDROID_PROCESS_MAX.html#prop_tgt:ANDROID_PROCESS_MAX" title="ANDROID_PROCESS_MAX"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_PROCESS_MAX</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_PROGUARD_CONFIG_PATH"></span><a class="reference internal" href="../prop_tgt/ANDROID_PROGUARD_CONFIG_PATH.html#prop_tgt:ANDROID_PROGUARD_CONFIG_PATH" title="ANDROID_PROGUARD_CONFIG_PATH"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_PROGUARD_CONFIG_PATH</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_PROGUARD"></span><a class="reference internal" href="../prop_tgt/ANDROID_PROGUARD.html#prop_tgt:ANDROID_PROGUARD" title="ANDROID_PROGUARD"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_PROGUARD</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_SECURE_PROPS_PATH"></span><a class="reference internal" href="../prop_tgt/ANDROID_SECURE_PROPS_PATH.html#prop_tgt:ANDROID_SECURE_PROPS_PATH" title="ANDROID_SECURE_PROPS_PATH"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_SECURE_PROPS_PATH</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_SKIP_ANT_STEP"></span><a class="reference internal" href="../prop_tgt/ANDROID_SKIP_ANT_STEP.html#prop_tgt:ANDROID_SKIP_ANT_STEP" title="ANDROID_SKIP_ANT_STEP"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_SKIP_ANT_STEP</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_tgt:ANDROID_STL_TYPE"></span><a class="reference internal" href="../prop_tgt/ANDROID_STL_TYPE.html#prop_tgt:ANDROID_STL_TYPE" title="ANDROID_STL_TYPE"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ANDROID_STL_TYPE</span></code></a></p></li>
 </ul>
 </div>
 </div>
@@ -526,7 +535,7 @@ the Nsight Tegra “Toolchain Version” value.</p>
 <span id="id5"></span><h3><a class="toc-backref" href="#id25">Cross Compiling for iOS, tvOS, or watchOS</a><a class="headerlink" href="#cross-compiling-for-ios-tvos-or-watchos" title="Permalink to this headline">¶</a></h3>
 <p>For cross-compiling to iOS, tvOS, or watchOS, the <span class="target" id="index-0-generator:Xcode"></span><a class="reference internal" href="../generator/Xcode.html#generator:Xcode" title="Xcode"><code class="xref cmake cmake-generator docutils literal notranslate"><span class="pre">Xcode</span></code></a>
 generator is recommended.  The <span class="target" id="index-0-generator:Unix Makefiles"></span><a class="reference internal" href="../generator/Unix Makefiles.html#generator:Unix Makefiles" title="Unix Makefiles"><code class="xref cmake cmake-generator docutils literal notranslate"><span class="pre">Unix</span> <span class="pre">Makefiles</span></code></a> or
-<span class="target" id="index-3-generator:Ninja"></span><a class="reference internal" href="../generator/Ninja.html#generator:Ninja" title="Ninja"><code class="xref cmake cmake-generator docutils literal notranslate"><span class="pre">Ninja</span></code></a> generators can also be used, but they require the
+<span class="target" id="index-2-generator:Ninja"></span><a class="reference internal" href="../generator/Ninja.html#generator:Ninja" title="Ninja"><code class="xref cmake cmake-generator docutils literal notranslate"><span class="pre">Ninja</span></code></a> generators can also be used, but they require the
 project to handle more areas like target CPU selection and code signing.</p>
 <p>Any of the three systems can be targeted by setting the
 <span class="target" id="index-6-variable:CMAKE_SYSTEM_NAME"></span><a class="reference internal" href="../variable/CMAKE_SYSTEM_NAME.html#variable:CMAKE_SYSTEM_NAME" title="CMAKE_SYSTEM_NAME"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_SYSTEM_NAME</span></code></a> variable to a value from the table below.
@@ -535,35 +544,35 @@ a different SDK (e.g. a simulator) can be selected by setting the
 <span class="target" id="index-0-variable:CMAKE_OSX_SYSROOT"></span><a class="reference internal" href="../variable/CMAKE_OSX_SYSROOT.html#variable:CMAKE_OSX_SYSROOT" title="CMAKE_OSX_SYSROOT"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_OSX_SYSROOT</span></code></a> variable, although this should rarely be
 necessary (see <a class="reference internal" href="#switching-between-device-and-simulator"><span class="std std-ref">Switching Between Device and Simulator</span></a> below).
 A list of available SDKs can be obtained by running <code class="docutils literal notranslate"><span class="pre">xcodebuild</span> <span class="pre">-showsdks</span></code>.</p>
-<table border="1" class="docutils">
+<table class="docutils align-default">
 <colgroup>
-<col width="12%" />
-<col width="28%" />
-<col width="33%" />
-<col width="27%" />
+<col style="width: 12%" />
+<col style="width: 28%" />
+<col style="width: 33%" />
+<col style="width: 27%" />
 </colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head">OS</th>
-<th class="head">CMAKE_SYSTEM_NAME</th>
-<th class="head">Device SDK (default)</th>
-<th class="head">Simulator SDK</th>
+<thead>
+<tr class="row-odd"><th class="head"><p>OS</p></th>
+<th class="head"><p>CMAKE_SYSTEM_NAME</p></th>
+<th class="head"><p>Device SDK (default)</p></th>
+<th class="head"><p>Simulator SDK</p></th>
 </tr>
 </thead>
-<tbody valign="top">
-<tr class="row-even"><td>iOS</td>
-<td>iOS</td>
-<td>iphoneos</td>
-<td>iphonesimulator</td>
+<tbody>
+<tr class="row-even"><td><p>iOS</p></td>
+<td><p>iOS</p></td>
+<td><p>iphoneos</p></td>
+<td><p>iphonesimulator</p></td>
 </tr>
-<tr class="row-odd"><td>tvOS</td>
-<td>tvOS</td>
-<td>appletvos</td>
-<td>appletvsimulator</td>
+<tr class="row-odd"><td><p>tvOS</p></td>
+<td><p>tvOS</p></td>
+<td><p>appletvos</p></td>
+<td><p>appletvsimulator</p></td>
 </tr>
-<tr class="row-even"><td>watchOS</td>
-<td>watchOS</td>
-<td>watchos</td>
-<td>watchsimulator</td>
+<tr class="row-even"><td><p>watchOS</p></td>
+<td><p>watchOS</p></td>
+<td><p>watchos</p></td>
+<td><p>watchsimulator</p></td>
 </tr>
 </tbody>
 </table>
@@ -643,12 +652,12 @@ details only for the configured SDK/platform, so they can be problematic
 if wanting to switch between device and simulator builds. You can follow
 the next rules to make device + simulator configuration work:</p>
 <ul class="simple">
-<li>Use explicit <code class="docutils literal notranslate"><span class="pre">-l</span></code> linker flag,
-e.g. <code class="docutils literal notranslate"><span class="pre">target_link_libraries(foo</span> <span class="pre">PUBLIC</span> <span class="pre">&quot;-lz&quot;)</span></code></li>
-<li>Use explicit <code class="docutils literal notranslate"><span class="pre">-framework</span></code> linker flag,
-e.g. <code class="docutils literal notranslate"><span class="pre">target_link_libraries(foo</span> <span class="pre">PUBLIC</span> <span class="pre">&quot;-framework</span> <span class="pre">CoreFoundation&quot;)</span></code></li>
-<li>Use <span class="target" id="index-1-command:find_package"></span><a class="reference internal" href="../command/find_package.html#command:find_package" title="find_package"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">find_package()</span></code></a> only for libraries installed with
-<span class="target" id="index-0-variable:CMAKE_IOS_INSTALL_COMBINED"></span><a class="reference internal" href="../variable/CMAKE_IOS_INSTALL_COMBINED.html#variable:CMAKE_IOS_INSTALL_COMBINED" title="CMAKE_IOS_INSTALL_COMBINED"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_IOS_INSTALL_COMBINED</span></code></a> feature</li>
+<li><p>Use explicit <code class="docutils literal notranslate"><span class="pre">-l</span></code> linker flag,
+e.g. <code class="docutils literal notranslate"><span class="pre">target_link_libraries(foo</span> <span class="pre">PUBLIC</span> <span class="pre">&quot;-lz&quot;)</span></code></p></li>
+<li><p>Use explicit <code class="docutils literal notranslate"><span class="pre">-framework</span></code> linker flag,
+e.g. <code class="docutils literal notranslate"><span class="pre">target_link_libraries(foo</span> <span class="pre">PUBLIC</span> <span class="pre">&quot;-framework</span> <span class="pre">CoreFoundation&quot;)</span></code></p></li>
+<li><p>Use <span class="target" id="index-1-command:find_package"></span><a class="reference internal" href="../command/find_package.html#command:find_package" title="find_package"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">find_package()</span></code></a> only for libraries installed with
+<span class="target" id="index-0-variable:CMAKE_IOS_INSTALL_COMBINED"></span><a class="reference internal" href="../variable/CMAKE_IOS_INSTALL_COMBINED.html#variable:CMAKE_IOS_INSTALL_COMBINED" title="CMAKE_IOS_INSTALL_COMBINED"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_IOS_INSTALL_COMBINED</span></code></a> feature</p></li>
 </ul>
 </div>
 </div>
@@ -661,7 +670,7 @@ e.g. <code class="docutils literal notranslate"><span class="pre">target_link_li
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <h3><a href="../index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">cmake-toolchains(7)</a><ul>
 <li><a class="reference internal" href="#introduction">Introduction</a></li>
@@ -708,13 +717,11 @@ e.g. <code class="docutils literal notranslate"><span class="pre">target_link_li
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -743,14 +750,14 @@ e.g. <code class="docutils literal notranslate"><span class="pre">target_link_li
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
  
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

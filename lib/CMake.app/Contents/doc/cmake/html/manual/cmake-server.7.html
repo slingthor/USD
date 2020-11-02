@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>cmake-server(7) &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>cmake-server(7) &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
  
       </ul>
@@ -59,36 +60,41 @@
 <div class="contents topic" id="contents">
 <p class="topic-title first">Contents</p>
 <ul class="simple">
-<li><a class="reference internal" href="#cmake-server-7" id="id1">cmake-server(7)</a><ul>
-<li><a class="reference internal" href="#introduction" id="id2">Introduction</a></li>
-<li><a class="reference internal" href="#operation" id="id3">Operation</a></li>
-<li><a class="reference internal" href="#debugging" id="id4">Debugging</a></li>
-<li><a class="reference internal" href="#protocol-api" id="id5">Protocol API</a><ul>
-<li><a class="reference internal" href="#general-message-layout" id="id6">General Message Layout</a><ul>
-<li><a class="reference internal" href="#type-reply" id="id7">Type “reply”</a></li>
-<li><a class="reference internal" href="#type-error" id="id8">Type “error”</a></li>
-<li><a class="reference internal" href="#type-progress" id="id9">Type “progress”</a></li>
-<li><a class="reference internal" href="#type-message" id="id10">Type “message”</a></li>
-<li><a class="reference internal" href="#type-signal" id="id11">Type “signal”</a></li>
+<li><p><a class="reference internal" href="#cmake-server-7" id="id1">cmake-server(7)</a></p>
+<ul>
+<li><p><a class="reference internal" href="#introduction" id="id2">Introduction</a></p></li>
+<li><p><a class="reference internal" href="#operation" id="id3">Operation</a></p></li>
+<li><p><a class="reference internal" href="#debugging" id="id4">Debugging</a></p></li>
+<li><p><a class="reference internal" href="#protocol-api" id="id5">Protocol API</a></p>
+<ul>
+<li><p><a class="reference internal" href="#general-message-layout" id="id6">General Message Layout</a></p>
+<ul>
+<li><p><a class="reference internal" href="#type-reply" id="id7">Type “reply”</a></p></li>
+<li><p><a class="reference internal" href="#type-error" id="id8">Type “error”</a></p></li>
+<li><p><a class="reference internal" href="#type-progress" id="id9">Type “progress”</a></p></li>
+<li><p><a class="reference internal" href="#type-message" id="id10">Type “message”</a></p></li>
+<li><p><a class="reference internal" href="#type-signal" id="id11">Type “signal”</a></p></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#specific-signals" id="id12">Specific Signals</a><ul>
-<li><a class="reference internal" href="#dirty-signal" id="id13">“dirty” Signal</a></li>
-<li><a class="reference internal" href="#filechange-signal" id="id14">“fileChange” Signal</a></li>
+<li><p><a class="reference internal" href="#specific-signals" id="id12">Specific Signals</a></p>
+<ul>
+<li><p><a class="reference internal" href="#dirty-signal" id="id13">“dirty” Signal</a></p></li>
+<li><p><a class="reference internal" href="#filechange-signal" id="id14">“fileChange” Signal</a></p></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#specific-message-types" id="id15">Specific Message Types</a><ul>
-<li><a class="reference internal" href="#type-hello" id="id16">Type “hello”</a></li>
-<li><a class="reference internal" href="#type-handshake" id="id17">Type “handshake”</a></li>
-<li><a class="reference internal" href="#type-globalsettings" id="id18">Type “globalSettings”</a></li>
-<li><a class="reference internal" href="#type-setglobalsettings" id="id19">Type “setGlobalSettings”</a></li>
-<li><a class="reference internal" href="#type-configure" id="id20">Type “configure”</a></li>
-<li><a class="reference internal" href="#type-compute" id="id21">Type “compute”</a></li>
-<li><a class="reference internal" href="#type-codemodel" id="id22">Type “codemodel”</a></li>
-<li><a class="reference internal" href="#type-ctestinfo" id="id23">Type “ctestInfo”</a></li>
-<li><a class="reference internal" href="#type-cmakeinputs" id="id24">Type “cmakeInputs”</a></li>
-<li><a class="reference internal" href="#type-cache" id="id25">Type “cache”</a></li>
-<li><a class="reference internal" href="#type-filesystemwatchers" id="id26">Type “fileSystemWatchers”</a></li>
+<li><p><a class="reference internal" href="#specific-message-types" id="id15">Specific Message Types</a></p>
+<ul>
+<li><p><a class="reference internal" href="#type-hello" id="id16">Type “hello”</a></p></li>
+<li><p><a class="reference internal" href="#type-handshake" id="id17">Type “handshake”</a></p></li>
+<li><p><a class="reference internal" href="#type-globalsettings" id="id18">Type “globalSettings”</a></p></li>
+<li><p><a class="reference internal" href="#type-setglobalsettings" id="id19">Type “setGlobalSettings”</a></p></li>
+<li><p><a class="reference internal" href="#type-configure" id="id20">Type “configure”</a></p></li>
+<li><p><a class="reference internal" href="#type-compute" id="id21">Type “compute”</a></p></li>
+<li><p><a class="reference internal" href="#type-codemodel" id="id22">Type “codemodel”</a></p></li>
+<li><p><a class="reference internal" href="#type-ctestinfo" id="id23">Type “ctestInfo”</a></p></li>
+<li><p><a class="reference internal" href="#type-cmakeinputs" id="id24">Type “cmakeInputs”</a></p></li>
+<li><p><a class="reference internal" href="#type-cache" id="id25">Type “cache”</a></p></li>
+<li><p><a class="reference internal" href="#type-filesystemwatchers" id="id26">Type “fileSystemWatchers”</a></p></li>
 </ul>
 </li>
 </ul>
@@ -98,7 +104,7 @@
 </ul>
 </div>
 <div class="deprecated">
-<p><span class="versionmodified">Deprecated since version 3.15: </span>This will be removed from a future version of CMake.
+<p><span class="versionmodified deprecated">Deprecated since version 3.15: </span>This will be removed from a future version of CMake.
 Clients should use the <span class="target" id="index-0-manual:cmake-file-api(7)"></span><a class="reference internal" href="cmake-file-api.7.html#manual:cmake-file-api(7)" title="cmake-file-api(7)"><code class="xref cmake cmake-manual docutils literal notranslate"><span class="pre">cmake-file-api(7)</span></code></a> instead.</p>
 </div>
 <div class="section" id="introduction">
@@ -114,24 +120,24 @@ and build properties which differ based on
 <span class="target" id="index-0-manual:cmake-generator-expressions(7)"></span><a class="reference internal" href="cmake-generator-expressions.7.html#manual:cmake-generator-expressions(7)" title="cmake-generator-expressions(7)"><code class="xref cmake cmake-manual docutils literal notranslate"><span class="pre">generation-time</span> <span class="pre">context</span></code></a>
 including:</p>
 <ul class="simple">
-<li>The Platform (eg, Windows, APPLE, Linux).</li>
-<li>The build configuration (eg, Debug, Release, Coverage).</li>
-<li>The Compiler (eg, MSVC, GCC, Clang) and compiler version.</li>
-<li>The language of the source files compiled.</li>
-<li>Available compile features (eg CXX variadic templates).</li>
-<li>CMake policies.</li>
+<li><p>The Platform (eg, Windows, APPLE, Linux).</p></li>
+<li><p>The build configuration (eg, Debug, Release, Coverage).</p></li>
+<li><p>The Compiler (eg, MSVC, GCC, Clang) and compiler version.</p></li>
+<li><p>The language of the source files compiled.</p></li>
+<li><p>Available compile features (eg CXX variadic templates).</p></li>
+<li><p>CMake policies.</p></li>
 </ul>
 <p>The protocol aims to provide information to tooling to satisfy several
 needs:</p>
 <ol class="arabic simple">
-<li>Provide a complete and easily parsed source of all information relevant
+<li><p>Provide a complete and easily parsed source of all information relevant
 to the tooling as it relates to the source code.  There should be no need
 for tooling to parse generated buildsystems to access include directories
-or compile definitions for example.</li>
-<li>Semantic information about the CMake buildsystem itself.</li>
-<li>Provide a stable interface for reading the information in the CMake cache.</li>
-<li>Information for determining when cmake needs to be re-run as a result of
-file changes.</li>
+or compile definitions for example.</p></li>
+<li><p>Semantic information about the CMake buildsystem itself.</p></li>
+<li><p>Provide a stable interface for reading the information in the CMake cache.</p></li>
+<li><p>Information for determining when cmake needs to be re-run as a result of
+file changes.</p></li>
 </ol>
 </div>
 <div class="section" id="operation">
@@ -333,12 +339,12 @@ need to depend on a specific minor version.</p>
 <p>Protocol version 1.0 requires the following attributes to be set:</p>
 <blockquote>
 <div><ul class="simple">
-<li>“sourceDirectory” with a path to the sources</li>
-<li>“buildDirectory” with a path to the build directory</li>
-<li>“generator” with the generator name</li>
-<li>“extraGenerator” (optional!) with the extra generator to be used</li>
-<li>“platform” with the generator platform (if supported by the generator)</li>
-<li>“toolset” with the generator toolset (if supported by the generator)</li>
+<li><p>“sourceDirectory” with a path to the sources</p></li>
+<li><p>“buildDirectory” with a path to the build directory</p></li>
+<li><p>“generator” with the generator name</p></li>
+<li><p>“extraGenerator” (optional!) with the extra generator to be used</p></li>
+<li><p>“platform” with the generator platform (if supported by the generator)</p></li>
+<li><p>“toolset” with the generator toolset (if supported by the generator)</p></li>
 </ul>
 </div></blockquote>
 <p>Protocol version 1.2 makes all but the build directory optional, provided
@@ -483,95 +489,95 @@ configuration objects. Configuration objects are used to destinquish between
 different configurations the build directory might have enabled. While most
 generators only support one configuration, others might support several.</p>
 <p>Each configuration object can have the following keys:</p>
-<dl class="docutils">
-<dt>“name”</dt>
-<dd>contains the name of the configuration. The name may be empty.</dd>
-<dt>“projects”</dt>
-<dd>contains a list of project objects, one for each build project.</dd>
+<dl class="simple">
+<dt>“name”</dt><dd><p>contains the name of the configuration. The name may be empty.</p>
+</dd>
+<dt>“projects”</dt><dd><p>contains a list of project objects, one for each build project.</p>
+</dd>
 </dl>
 <p>Project objects define one (sub-)project defined in the cmake build system.</p>
 <p>Each project object can have the following keys:</p>
-<dl class="docutils">
-<dt>“name”</dt>
-<dd>contains the (sub-)projects name.</dd>
-<dt>“minimumCMakeVersion”</dt>
-<dd>contains the minimum cmake version allowed for this project, null if the
-project doesn’t specify one.</dd>
-<dt>“hasInstallRule”</dt>
-<dd>true if the project contains any install rules, false otherwise.</dd>
-<dt>“sourceDirectory”</dt>
-<dd>contains the current source directory</dd>
-<dt>“buildDirectory”</dt>
-<dd>contains the current build directory.</dd>
-<dt>“targets”</dt>
-<dd>contains a list of build system target objects.</dd>
+<dl class="simple">
+<dt>“name”</dt><dd><p>contains the (sub-)projects name.</p>
+</dd>
+<dt>“minimumCMakeVersion”</dt><dd><p>contains the minimum cmake version allowed for this project, null if the
+project doesn’t specify one.</p>
+</dd>
+<dt>“hasInstallRule”</dt><dd><p>true if the project contains any install rules, false otherwise.</p>
+</dd>
+<dt>“sourceDirectory”</dt><dd><p>contains the current source directory</p>
+</dd>
+<dt>“buildDirectory”</dt><dd><p>contains the current build directory.</p>
+</dd>
+<dt>“targets”</dt><dd><p>contains a list of build system target objects.</p>
+</dd>
 </dl>
 <p>Target objects define individual build targets for a certain configuration.</p>
 <p>Each target object can have the following keys:</p>
-<dl class="docutils">
-<dt>“name”</dt>
-<dd>contains the name of the target.</dd>
-<dt>“type”</dt>
-<dd>defines the type of build of the target. Possible values are
+<dl class="simple">
+<dt>“name”</dt><dd><p>contains the name of the target.</p>
+</dd>
+<dt>“type”</dt><dd><p>defines the type of build of the target. Possible values are
 “STATIC_LIBRARY”, “MODULE_LIBRARY”, “SHARED_LIBRARY”, “OBJECT_LIBRARY”,
-“EXECUTABLE”, “UTILITY” and “INTERFACE_LIBRARY”.</dd>
-<dt>“fullName”</dt>
-<dd>contains the full name of the build result (incl. extensions, etc.).</dd>
-<dt>“sourceDirectory”</dt>
-<dd>contains the current source directory.</dd>
-<dt>“buildDirectory”</dt>
-<dd>contains the current build directory.</dd>
-<dt>“isGeneratorProvided”</dt>
-<dd>true if the target is auto-created by a generator, false otherwise</dd>
-<dt>“hasInstallRule”</dt>
-<dd>true if the target contains any install rules, false otherwise.</dd>
-<dt>“installPaths”</dt>
-<dd>full path to the destination directories defined by target install rules.</dd>
-<dt>“artifacts”</dt>
-<dd>with a list of build artifacts. The list is sorted with the most
+“EXECUTABLE”, “UTILITY” and “INTERFACE_LIBRARY”.</p>
+</dd>
+<dt>“fullName”</dt><dd><p>contains the full name of the build result (incl. extensions, etc.).</p>
+</dd>
+<dt>“sourceDirectory”</dt><dd><p>contains the current source directory.</p>
+</dd>
+<dt>“buildDirectory”</dt><dd><p>contains the current build directory.</p>
+</dd>
+<dt>“isGeneratorProvided”</dt><dd><p>true if the target is auto-created by a generator, false otherwise</p>
+</dd>
+<dt>“hasInstallRule”</dt><dd><p>true if the target contains any install rules, false otherwise.</p>
+</dd>
+<dt>“installPaths”</dt><dd><p>full path to the destination directories defined by target install rules.</p>
+</dd>
+<dt>“artifacts”</dt><dd><p>with a list of build artifacts. The list is sorted with the most
 important artifacts first (e.g. a .DLL file is listed before a
-.PDB file on windows).</dd>
-<dt>“linkerLanguage”</dt>
-<dd>contains the language of the linker used to produce the artifact.</dd>
-<dt>“linkLibraries”</dt>
-<dd>with a list of libraries to link to. This value is encoded in the
-system’s native shell format.</dd>
-<dt>“linkFlags”</dt>
-<dd>with a list of flags to pass to the linker. This value is encoded in
-the system’s native shell format.</dd>
-<dt>“linkLanguageFlags”</dt>
-<dd>with the flags for a compiler using the linkerLanguage. This value is
-encoded in the system’s native shell format.</dd>
-<dt>“frameworkPath”</dt>
-<dd>with the framework path (on Apple computers). This value is encoded
-in the system’s native shell format.</dd>
-<dt>“linkPath”</dt>
-<dd>with the link path. This value is encoded in the system’s native shell
-format.</dd>
-<dt>“sysroot”</dt>
-<dd>with the sysroot path.</dd>
-<dt>“fileGroups”</dt>
-<dd>contains the source files making up the target.</dd>
+.PDB file on windows).</p>
+</dd>
+<dt>“linkerLanguage”</dt><dd><p>contains the language of the linker used to produce the artifact.</p>
+</dd>
+<dt>“linkLibraries”</dt><dd><p>with a list of libraries to link to. This value is encoded in the
+system’s native shell format.</p>
+</dd>
+<dt>“linkFlags”</dt><dd><p>with a list of flags to pass to the linker. This value is encoded in
+the system’s native shell format.</p>
+</dd>
+<dt>“linkLanguageFlags”</dt><dd><p>with the flags for a compiler using the linkerLanguage. This value is
+encoded in the system’s native shell format.</p>
+</dd>
+<dt>“frameworkPath”</dt><dd><p>with the framework path (on Apple computers). This value is encoded
+in the system’s native shell format.</p>
+</dd>
+<dt>“linkPath”</dt><dd><p>with the link path. This value is encoded in the system’s native shell
+format.</p>
+</dd>
+<dt>“sysroot”</dt><dd><p>with the sysroot path.</p>
+</dd>
+<dt>“fileGroups”</dt><dd><p>contains the source files making up the target.</p>
+</dd>
 </dl>
 <p>FileGroups are used to group sources using similar settings together.</p>
 <p>Each fileGroup object may contain the following keys:</p>
-<dl class="docutils">
-<dt>“language”</dt>
-<dd>contains the programming language used by all files in the group.</dd>
-<dt>“compileFlags”</dt>
-<dd>with a string containing all the flags passed to the compiler
+<dl class="simple">
+<dt>“language”</dt><dd><p>contains the programming language used by all files in the group.</p>
+</dd>
+<dt>“compileFlags”</dt><dd><p>with a string containing all the flags passed to the compiler
 when building any of the files in this group. This value is encoded in
-the system’s native shell format.</dd>
-<dt>“includePath”</dt>
-<dd>with a list of include paths. Each include path is an object
+the system’s native shell format.</p>
+</dd>
+<dt>“includePath”</dt><dd><p>with a list of include paths. Each include path is an object
 containing a “path” with the actual include path and “isSystem” with a bool
 value informing whether this is a normal include or a system include. This
-value is encoded in the system’s native shell format.</dd>
-<dt>“defines”</dt>
-<dd>with a list of defines in the form “SOMEVALUE” or “SOMEVALUE=42”. This
-value is encoded in the system’s native shell format.</dd>
-<dt>“sources”</dt>
-<dd>with a list of source files.</dd>
+value is encoded in the system’s native shell format.</p>
+</dd>
+<dt>“defines”</dt><dd><p>with a list of defines in the form “SOMEVALUE” or “SOMEVALUE=42”. This
+value is encoded in the system’s native shell format.</p>
+</dd>
+<dt>“sources”</dt><dd><p>with a list of source files.</p>
+</dd>
 </dl>
 <p>All file paths in the fileGroup are either absolute or relative to the
 sourceDirectory of the target.</p>
@@ -635,35 +641,35 @@ configuration objects. Configuration objects are used to destinquish between
 different configurations the build directory might have enabled. While most
 generators only support one configuration, others might support several.</p>
 <p>Each configuration object can have the following keys:</p>
-<dl class="docutils">
-<dt>“name”</dt>
-<dd>contains the name of the configuration. The name may be empty.</dd>
-<dt>“projects”</dt>
-<dd>contains a list of project objects, one for each build project.</dd>
+<dl class="simple">
+<dt>“name”</dt><dd><p>contains the name of the configuration. The name may be empty.</p>
+</dd>
+<dt>“projects”</dt><dd><p>contains a list of project objects, one for each build project.</p>
+</dd>
 </dl>
 <p>Project objects define one (sub-)project defined in the cmake build system.</p>
 <p>Each project object can have the following keys:</p>
-<dl class="docutils">
-<dt>“name”</dt>
-<dd>contains the (sub-)projects name.</dd>
-<dt>“ctestInfo”</dt>
-<dd>contains a list of test objects.</dd>
+<dl class="simple">
+<dt>“name”</dt><dd><p>contains the (sub-)projects name.</p>
+</dd>
+<dt>“ctestInfo”</dt><dd><p>contains a list of test objects.</p>
+</dd>
 </dl>
 <p>Each test object can have the following keys:</p>
-<dl class="docutils">
-<dt>“ctestName”</dt>
-<dd>contains the name of the test.</dd>
-<dt>“ctestCommand”</dt>
-<dd>contains the test command.</dd>
-<dt>“properties”</dt>
-<dd>contains a list of test property objects.</dd>
+<dl class="simple">
+<dt>“ctestName”</dt><dd><p>contains the name of the test.</p>
+</dd>
+<dt>“ctestCommand”</dt><dd><p>contains the test command.</p>
+</dd>
+<dt>“properties”</dt><dd><p>contains a list of test property objects.</p>
+</dd>
 </dl>
 <p>Each test property object can have the following keys:</p>
-<dl class="docutils">
-<dt>“key”</dt>
-<dd>contains the test property key.</dd>
-<dt>“value”</dt>
-<dd>contains the test property value.</dd>
+<dl class="simple">
+<dt>“key”</dt><dd><p>contains the test property key.</p>
+</dd>
+<dt>“value”</dt><dd><p>contains the test property value.</p>
+</dd>
 </dl>
 </div>
 <div class="section" id="type-cmakeinputs">
@@ -764,7 +770,7 @@ command will report on the files and directories watched.</p>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <h3><a href="../index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">cmake-server(7)</a><ul>
 <li><a class="reference internal" href="#introduction">Introduction</a></li>
@@ -818,13 +824,11 @@ command will report on the files and directories watched.</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -853,14 +857,14 @@ command will report on the files and directories watched.</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
  
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

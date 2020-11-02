@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>CheckIPOSupported &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>CheckIPOSupported &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" accesskey="U">cmake-modules(7)</a> &#187;</li> 
@@ -57,27 +58,30 @@
             
   <div class="section" id="checkiposupported">
 <span id="module:CheckIPOSupported"></span><h1>CheckIPOSupported<a class="headerlink" href="#checkiposupported" title="Permalink to this headline">¶</a></h1>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 3.9.</span></p>
+</div>
 <p>Check whether the compiler supports an interprocedural optimization (IPO/LTO).
 Use this before enabling the <span class="target" id="index-0-prop_tgt:INTERPROCEDURAL_OPTIMIZATION"></span><a class="reference internal" href="../prop_tgt/INTERPROCEDURAL_OPTIMIZATION.html#prop_tgt:INTERPROCEDURAL_OPTIMIZATION" title="INTERPROCEDURAL_OPTIMIZATION"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">INTERPROCEDURAL_OPTIMIZATION</span></code></a> target
 property.</p>
 <dl class="command">
 <dt id="command:check_ipo_supported">
-<code class="descname">check_ipo_supported</code><a class="headerlink" href="#command:check_ipo_supported" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">check_ipo_supported</code><a class="headerlink" href="#command:check_ipo_supported" title="Permalink to this definition">¶</a></dt>
 <dd><div class="highlight-none notranslate"><div class="highlight"><pre><span></span>check_ipo_supported([RESULT &lt;result&gt;] [OUTPUT &lt;output&gt;]
                     [LANGUAGES &lt;lang&gt;...])
 </pre></div>
 </div>
 <p>Options are:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">RESULT</span> <span class="pre">&lt;result&gt;</span></code></dt>
-<dd>Set <code class="docutils literal notranslate"><span class="pre">&lt;result&gt;</span></code> variable to <code class="docutils literal notranslate"><span class="pre">YES</span></code> if IPO is supported by the
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">RESULT</span> <span class="pre">&lt;result&gt;</span></code></dt><dd><p>Set <code class="docutils literal notranslate"><span class="pre">&lt;result&gt;</span></code> variable to <code class="docutils literal notranslate"><span class="pre">YES</span></code> if IPO is supported by the
 compiler and <code class="docutils literal notranslate"><span class="pre">NO</span></code> otherwise.  If this option is not given then
-the command will issue a fatal error if IPO is not supported.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">OUTPUT</span> <span class="pre">&lt;output&gt;</span></code></dt>
-<dd>Set <code class="docutils literal notranslate"><span class="pre">&lt;output&gt;</span></code> variable with details about any error.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">LANGUAGES</span> <span class="pre">&lt;lang&gt;...</span></code></dt>
-<dd>Specify languages whose compilers to check.
-Languages <code class="docutils literal notranslate"><span class="pre">C</span></code>, <code class="docutils literal notranslate"><span class="pre">CXX</span></code>, and <code class="docutils literal notranslate"><span class="pre">Fortran</span></code> are supported.</dd>
+the command will issue a fatal error if IPO is not supported.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OUTPUT</span> <span class="pre">&lt;output&gt;</span></code></dt><dd><p>Set <code class="docutils literal notranslate"><span class="pre">&lt;output&gt;</span></code> variable with details about any error.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">LANGUAGES</span> <span class="pre">&lt;lang&gt;...</span></code></dt><dd><p>Specify languages whose compilers to check.
+Languages <code class="docutils literal notranslate"><span class="pre">C</span></code>, <code class="docutils literal notranslate"><span class="pre">CXX</span></code>, and <code class="docutils literal notranslate"><span class="pre">Fortran</span></code> are supported.</p>
+</dd>
 </dl>
 </dd></dl>
 
@@ -107,7 +111,7 @@ module will return error in this case. See policy <span class="target" id="index
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <h3><a href="../index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">CheckIPOSupported</a><ul>
 <li><a class="reference internal" href="#examples">Examples</a></li>
@@ -129,13 +133,11 @@ module will return error in this case. See policy <span class="target" id="index
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -164,15 +166,15 @@ module will return error in this case. See policy <span class="target" id="index
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" >cmake-modules(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

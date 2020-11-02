@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>FindThreads &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>FindThreads &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" accesskey="U">cmake-modules(7)</a> &#187;</li> 
@@ -58,25 +59,46 @@
   <div class="section" id="findthreads">
 <span id="module:FindThreads"></span><h1>FindThreads<a class="headerlink" href="#findthreads" title="Permalink to this headline">¶</a></h1>
 <p>This module determines the thread library of the system.</p>
-<p>The following variables are set</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>CMAKE_THREAD_LIBS_INIT     - the thread library
-CMAKE_USE_WIN32_THREADS_INIT - using WIN32 threads?
-CMAKE_USE_PTHREADS_INIT    - are we using pthreads
-CMAKE_HP_PTHREADS_INIT     - are we using hp pthreads
-</pre></div>
+<div class="section" id="imported-targets">
+<h2>Imported Targets<a class="headerlink" href="#imported-targets" title="Permalink to this headline">¶</a></h2>
+<p>This module defines the following <span class="target" id="index-0-prop_tgt:IMPORTED"></span><a class="reference internal" href="../prop_tgt/IMPORTED.html#prop_tgt:IMPORTED" title="IMPORTED"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">IMPORTED</span></code></a> target:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">Threads::Threads</span></code></dt><dd><p>The thread library, if found.</p>
+</dd>
+</dl>
 </div>
-<p>The following import target is created</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Threads::Threads
-</pre></div>
+<div class="section" id="result-variables">
+<h2>Result Variables<a class="headerlink" href="#result-variables" title="Permalink to this headline">¶</a></h2>
+<p>The following variables are set:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">Threads_FOUND</span></code></dt><dd><p>If a supported thread library was found.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">CMAKE_THREAD_LIBS_INIT</span></code></dt><dd><p>The thread library to use. This may be empty if the thread functions
+are provided by the system libraries and no special flags are needed
+to use them.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">CMAKE_USE_WIN32_THREADS_INIT</span></code></dt><dd><p>If the found thread library is the win32 one.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">CMAKE_USE_PTHREADS_INIT</span></code></dt><dd><p>If the found thread library is pthread compatible.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">CMAKE_HP_PTHREADS_INIT</span></code></dt><dd><p>If the found thread library is the HP thread library.</p>
+</dd>
+</dl>
 </div>
-<p>If the use of the -pthread compiler and linker flag is preferred then the
-caller can set</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>THREADS_PREFER_PTHREAD_FLAG
-</pre></div>
+<div class="section" id="variables-affecting-behavior">
+<h2>Variables Affecting Behavior<a class="headerlink" href="#variables-affecting-behavior" title="Permalink to this headline">¶</a></h2>
+<dl class="variable">
+<dt id="variable:THREADS_PREFER_PTHREAD_FLAG">
+<code class="sig-name descname">THREADS_PREFER_PTHREAD_FLAG</code><a class="headerlink" href="#variable:THREADS_PREFER_PTHREAD_FLAG" title="Permalink to this definition">¶</a></dt>
+<dd><p>If the use of the -pthread compiler and linker flag is preferred then
+the caller can set this variable to TRUE. The compiler flag can only be
+used with the imported target. Use of both the imported target as well
+as this switch is highly recommended for new code.</p>
+<p>This variable has no effect if the system libraries provide the
+thread functions, i.e. when <code class="docutils literal notranslate"><span class="pre">CMAKE_THREAD_LIBS_INIT</span></code> will be empty.</p>
+</dd></dl>
+
 </div>
-<p>The compiler flag can only be used with the imported
-target. Use of both the imported target as well as this switch is highly
-recommended for new code.</p>
 </div>
 
 
@@ -85,6 +107,16 @@ recommended for new code.</p>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">FindThreads</a><ul>
+<li><a class="reference internal" href="#imported-targets">Imported Targets</a></li>
+<li><a class="reference internal" href="#result-variables">Result Variables</a></li>
+<li><a class="reference internal" href="#variables-affecting-behavior">Variables Affecting Behavior</a></li>
+</ul>
+</li>
+</ul>
+
   <h4>Previous topic</h4>
   <p class="topless"><a href="FindTclStub.html"
                         title="previous chapter">FindTclStub</a></p>
@@ -99,13 +131,11 @@ recommended for new code.</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -134,15 +164,15 @@ recommended for new code.</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" >cmake-modules(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>
