@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>CMAKE_FIND_LIBRARY_CUSTOM_LIB_SUFFIX &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>CMAKE_FIND_LIBRARY_CUSTOM_LIB_SUFFIX &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-variables.7.html" accesskey="U">cmake-variables(7)</a> &#187;</li> 
@@ -57,14 +58,17 @@
             
   <div class="section" id="cmake-find-library-custom-lib-suffix">
 <span id="variable:CMAKE_FIND_LIBRARY_CUSTOM_LIB_SUFFIX"></span><h1>CMAKE_FIND_LIBRARY_CUSTOM_LIB_SUFFIX<a class="headerlink" href="#cmake-find-library-custom-lib-suffix" title="Permalink to this headline">¶</a></h1>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 3.9.</span></p>
+</div>
 <p>Specify a <code class="docutils literal notranslate"><span class="pre">&lt;suffix&gt;</span></code> to tell the <span class="target" id="index-0-command:find_library"></span><a class="reference internal" href="../command/find_library.html#command:find_library" title="find_library"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">find_library()</span></code></a> command to
 search in a <code class="docutils literal notranslate"><span class="pre">lib&lt;suffix&gt;</span></code> directory before each <code class="docutils literal notranslate"><span class="pre">lib</span></code> directory that
 would normally be searched.</p>
 <p>This overrides the behavior of related global properties:</p>
 <ul class="simple">
-<li><span class="target" id="index-0-prop_gbl:FIND_LIBRARY_USE_LIB32_PATHS"></span><a class="reference internal" href="../prop_gbl/FIND_LIBRARY_USE_LIB32_PATHS.html#prop_gbl:FIND_LIBRARY_USE_LIB32_PATHS" title="FIND_LIBRARY_USE_LIB32_PATHS"><code class="xref cmake cmake-prop_gbl docutils literal notranslate"><span class="pre">FIND_LIBRARY_USE_LIB32_PATHS</span></code></a></li>
-<li><span class="target" id="index-0-prop_gbl:FIND_LIBRARY_USE_LIB64_PATHS"></span><a class="reference internal" href="../prop_gbl/FIND_LIBRARY_USE_LIB64_PATHS.html#prop_gbl:FIND_LIBRARY_USE_LIB64_PATHS" title="FIND_LIBRARY_USE_LIB64_PATHS"><code class="xref cmake cmake-prop_gbl docutils literal notranslate"><span class="pre">FIND_LIBRARY_USE_LIB64_PATHS</span></code></a></li>
-<li><span class="target" id="index-0-prop_gbl:FIND_LIBRARY_USE_LIBX32_PATHS"></span><a class="reference internal" href="../prop_gbl/FIND_LIBRARY_USE_LIBX32_PATHS.html#prop_gbl:FIND_LIBRARY_USE_LIBX32_PATHS" title="FIND_LIBRARY_USE_LIBX32_PATHS"><code class="xref cmake cmake-prop_gbl docutils literal notranslate"><span class="pre">FIND_LIBRARY_USE_LIBX32_PATHS</span></code></a></li>
+<li><p><span class="target" id="index-0-prop_gbl:FIND_LIBRARY_USE_LIB32_PATHS"></span><a class="reference internal" href="../prop_gbl/FIND_LIBRARY_USE_LIB32_PATHS.html#prop_gbl:FIND_LIBRARY_USE_LIB32_PATHS" title="FIND_LIBRARY_USE_LIB32_PATHS"><code class="xref cmake cmake-prop_gbl docutils literal notranslate"><span class="pre">FIND_LIBRARY_USE_LIB32_PATHS</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_gbl:FIND_LIBRARY_USE_LIB64_PATHS"></span><a class="reference internal" href="../prop_gbl/FIND_LIBRARY_USE_LIB64_PATHS.html#prop_gbl:FIND_LIBRARY_USE_LIB64_PATHS" title="FIND_LIBRARY_USE_LIB64_PATHS"><code class="xref cmake cmake-prop_gbl docutils literal notranslate"><span class="pre">FIND_LIBRARY_USE_LIB64_PATHS</span></code></a></p></li>
+<li><p><span class="target" id="index-0-prop_gbl:FIND_LIBRARY_USE_LIBX32_PATHS"></span><a class="reference internal" href="../prop_gbl/FIND_LIBRARY_USE_LIBX32_PATHS.html#prop_gbl:FIND_LIBRARY_USE_LIBX32_PATHS" title="FIND_LIBRARY_USE_LIBX32_PATHS"><code class="xref cmake cmake-prop_gbl docutils literal notranslate"><span class="pre">FIND_LIBRARY_USE_LIBX32_PATHS</span></code></a></p></li>
 </ul>
 </div>
 
@@ -88,13 +92,11 @@ would normally be searched.</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -123,15 +125,15 @@ would normally be searched.</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-variables.7.html" >cmake-variables(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

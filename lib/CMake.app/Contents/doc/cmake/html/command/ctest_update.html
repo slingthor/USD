@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>ctest_update &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>ctest_update &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-commands.7.html" accesskey="U">cmake-commands(7)</a> &#187;</li> 
@@ -67,21 +68,21 @@
 <p>Update the source tree from version control and record results in
 <code class="docutils literal notranslate"><span class="pre">Update.xml</span></code> for submission with the <span class="target" id="index-0-command:ctest_submit"></span><a class="reference internal" href="ctest_submit.html#command:ctest_submit" title="ctest_submit"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">ctest_submit()</span></code></a> command.</p>
 <p>The options are:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">SOURCE</span> <span class="pre">&lt;source-dir&gt;</span></code></dt>
-<dd>Specify the source directory.  If not given, the
-<span class="target" id="index-0-variable:CTEST_SOURCE_DIRECTORY"></span><a class="reference internal" href="../variable/CTEST_SOURCE_DIRECTORY.html#variable:CTEST_SOURCE_DIRECTORY" title="CTEST_SOURCE_DIRECTORY"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CTEST_SOURCE_DIRECTORY</span></code></a> variable is used.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">RETURN_VALUE</span> <span class="pre">&lt;result-var&gt;</span></code></dt>
-<dd>Store in the <code class="docutils literal notranslate"><span class="pre">&lt;result-var&gt;</span></code> variable the number of files
-updated or <code class="docutils literal notranslate"><span class="pre">-1</span></code> on error.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">CAPTURE_CMAKE_ERROR</span> <span class="pre">&lt;result-var&gt;</span></code></dt>
-<dd>Store in the <code class="docutils literal notranslate"><span class="pre">&lt;result-var&gt;</span></code> variable -1 if there are any errors running
-the command and prevent ctest from returning non-zero if an error occurs.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">QUIET</span></code></dt>
-<dd>Tell CTest to suppress most non-error messages that it would
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">SOURCE</span> <span class="pre">&lt;source-dir&gt;</span></code></dt><dd><p>Specify the source directory.  If not given, the
+<span class="target" id="index-0-variable:CTEST_SOURCE_DIRECTORY"></span><a class="reference internal" href="../variable/CTEST_SOURCE_DIRECTORY.html#variable:CTEST_SOURCE_DIRECTORY" title="CTEST_SOURCE_DIRECTORY"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CTEST_SOURCE_DIRECTORY</span></code></a> variable is used.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">RETURN_VALUE</span> <span class="pre">&lt;result-var&gt;</span></code></dt><dd><p>Store in the <code class="docutils literal notranslate"><span class="pre">&lt;result-var&gt;</span></code> variable the number of files
+updated or <code class="docutils literal notranslate"><span class="pre">-1</span></code> on error.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">CAPTURE_CMAKE_ERROR</span> <span class="pre">&lt;result-var&gt;</span></code></dt><dd><p>Store in the <code class="docutils literal notranslate"><span class="pre">&lt;result-var&gt;</span></code> variable -1 if there are any errors running
+the command and prevent ctest from returning non-zero if an error occurs.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">QUIET</span></code></dt><dd><p>Tell CTest to suppress most non-error messages that it would
 have otherwise printed to the console.  CTest will still report
 the new revision of the repository and any conflicting files
-that were found.</dd>
+that were found.</p>
+</dd>
 </dl>
 <p>The update always follows the version control branch currently checked
 out in the source directory.  See the <a class="reference internal" href="../manual/ctest.1.html#ctest-update-step"><span class="std std-ref">CTest Update Step</span></a>
@@ -109,13 +110,11 @@ of <code class="docutils literal notranslate"><span class="pre">ctest_update()</
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -144,15 +143,15 @@ of <code class="docutils literal notranslate"><span class="pre">ctest_update()</
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-commands.7.html" >cmake-commands(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

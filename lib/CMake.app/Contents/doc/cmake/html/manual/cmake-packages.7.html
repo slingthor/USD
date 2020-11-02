@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>cmake-packages(7) &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>cmake-packages(7) &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
  
       </ul>
@@ -59,32 +60,38 @@
 <div class="contents topic" id="contents">
 <p class="topic-title first">Contents</p>
 <ul class="simple">
-<li><a class="reference internal" href="#cmake-packages-7" id="id8">cmake-packages(7)</a><ul>
-<li><a class="reference internal" href="#introduction" id="id9">Introduction</a></li>
-<li><a class="reference internal" href="#using-packages" id="id10">Using Packages</a><ul>
-<li><a class="reference internal" href="#config-file-packages" id="id11">Config-file Packages</a></li>
-<li><a class="reference internal" href="#find-module-packages" id="id12">Find-module Packages</a></li>
+<li><p><a class="reference internal" href="#cmake-packages-7" id="id8">cmake-packages(7)</a></p>
+<ul>
+<li><p><a class="reference internal" href="#introduction" id="id9">Introduction</a></p></li>
+<li><p><a class="reference internal" href="#using-packages" id="id10">Using Packages</a></p>
+<ul>
+<li><p><a class="reference internal" href="#config-file-packages" id="id11">Config-file Packages</a></p></li>
+<li><p><a class="reference internal" href="#find-module-packages" id="id12">Find-module Packages</a></p></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#package-layout" id="id13">Package Layout</a><ul>
-<li><a class="reference internal" href="#package-configuration-file" id="id14">Package Configuration File</a></li>
-<li><a class="reference internal" href="#package-version-file" id="id15">Package Version File</a></li>
+<li><p><a class="reference internal" href="#package-layout" id="id13">Package Layout</a></p>
+<ul>
+<li><p><a class="reference internal" href="#package-configuration-file" id="id14">Package Configuration File</a></p></li>
+<li><p><a class="reference internal" href="#package-version-file" id="id15">Package Version File</a></p></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#creating-packages" id="id16">Creating Packages</a><ul>
-<li><a class="reference internal" href="#creating-a-package-configuration-file" id="id17">Creating a Package Configuration File</a><ul>
-<li><a class="reference internal" href="#creating-a-package-configuration-file-for-the-build-tree" id="id18">Creating a Package Configuration File for the Build Tree</a></li>
+<li><p><a class="reference internal" href="#creating-packages" id="id16">Creating Packages</a></p>
+<ul>
+<li><p><a class="reference internal" href="#creating-a-package-configuration-file" id="id17">Creating a Package Configuration File</a></p>
+<ul>
+<li><p><a class="reference internal" href="#creating-a-package-configuration-file-for-the-build-tree" id="id18">Creating a Package Configuration File for the Build Tree</a></p></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#creating-relocatable-packages" id="id19">Creating Relocatable Packages</a></li>
+<li><p><a class="reference internal" href="#creating-relocatable-packages" id="id19">Creating Relocatable Packages</a></p></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#package-registry" id="id20">Package Registry</a><ul>
-<li><a class="reference internal" href="#user-package-registry" id="id21">User Package Registry</a></li>
-<li><a class="reference internal" href="#system-package-registry" id="id22">System Package Registry</a></li>
-<li><a class="reference internal" href="#disabling-the-package-registry" id="id23">Disabling the Package Registry</a></li>
-<li><a class="reference internal" href="#package-registry-example" id="id24">Package Registry Example</a></li>
-<li><a class="reference internal" href="#package-registry-ownership" id="id25">Package Registry Ownership</a></li>
+<li><p><a class="reference internal" href="#package-registry" id="id20">Package Registry</a></p>
+<ul>
+<li><p><a class="reference internal" href="#user-package-registry" id="id21">User Package Registry</a></p></li>
+<li><p><a class="reference internal" href="#system-package-registry" id="id22">System Package Registry</a></p></li>
+<li><p><a class="reference internal" href="#disabling-the-package-registry" id="id23">Disabling the Package Registry</a></p></li>
+<li><p><a class="reference internal" href="#package-registry-example" id="id24">Package Registry Example</a></p></li>
+<li><p><a class="reference internal" href="#package-registry-ownership" id="id25">Package Registry Ownership</a></p></li>
 </ul>
 </li>
 </ul>
@@ -245,34 +252,34 @@ the <code class="docutils literal notranslate"><span class="pre">.cmake</span></
 files.</p>
 <p>When the <span class="target" id="index-9-command:find_package"></span><a class="reference internal" href="../command/find_package.html#command:find_package" title="find_package"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">find_package()</span></code></a> command loads a version file it first sets the
 following variables:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_FIND_NAME</span></code></dt>
-<dd>The <code class="docutils literal notranslate"><span class="pre">&lt;PackageName&gt;</span></code></dd>
-<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_FIND_VERSION</span></code></dt>
-<dd>Full requested version string</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_FIND_VERSION_MAJOR</span></code></dt>
-<dd>Major version if requested, else 0</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_FIND_VERSION_MINOR</span></code></dt>
-<dd>Minor version if requested, else 0</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_FIND_VERSION_PATCH</span></code></dt>
-<dd>Patch version if requested, else 0</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_FIND_VERSION_TWEAK</span></code></dt>
-<dd>Tweak version if requested, else 0</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_FIND_VERSION_COUNT</span></code></dt>
-<dd>Number of version components, 0 to 4</dd>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_FIND_NAME</span></code></dt><dd><p>The <code class="docutils literal notranslate"><span class="pre">&lt;PackageName&gt;</span></code></p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_FIND_VERSION</span></code></dt><dd><p>Full requested version string</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_FIND_VERSION_MAJOR</span></code></dt><dd><p>Major version if requested, else 0</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_FIND_VERSION_MINOR</span></code></dt><dd><p>Minor version if requested, else 0</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_FIND_VERSION_PATCH</span></code></dt><dd><p>Patch version if requested, else 0</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_FIND_VERSION_TWEAK</span></code></dt><dd><p>Tweak version if requested, else 0</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_FIND_VERSION_COUNT</span></code></dt><dd><p>Number of version components, 0 to 4</p>
+</dd>
 </dl>
 <p>The version file must use these variables to check whether it is compatible or
 an exact match for the requested version and set the following variables with
 results:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_VERSION</span></code></dt>
-<dd>Full provided version string</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_VERSION_EXACT</span></code></dt>
-<dd>True if version is exact match</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_VERSION_COMPATIBLE</span></code></dt>
-<dd>True if version is compatible</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_VERSION_UNSUITABLE</span></code></dt>
-<dd>True if unsuitable as any version</dd>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_VERSION</span></code></dt><dd><p>Full provided version string</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_VERSION_EXACT</span></code></dt><dd><p>True if version is exact match</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_VERSION_COMPATIBLE</span></code></dt><dd><p>True if version is compatible</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">PACKAGE_VERSION_UNSUITABLE</span></code></dt><dd><p>True if unsuitable as any version</p>
+</dd>
 </dl>
 <p>Version files are loaded in a nested scope so they are free to set any variables
 they wish as part of their computation. The find_package command wipes out the
@@ -280,19 +287,19 @@ scope when the version file has completed and it has checked the output
 variables. When the version file claims to be an acceptable match for the
 requested version the find_package command sets the following variables for
 use by the project:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">&lt;PackageName&gt;_VERSION</span></code></dt>
-<dd>Full provided version string</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">&lt;PackageName&gt;_VERSION_MAJOR</span></code></dt>
-<dd>Major version if provided, else 0</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">&lt;PackageName&gt;_VERSION_MINOR</span></code></dt>
-<dd>Minor version if provided, else 0</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">&lt;PackageName&gt;_VERSION_PATCH</span></code></dt>
-<dd>Patch version if provided, else 0</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">&lt;PackageName&gt;_VERSION_TWEAK</span></code></dt>
-<dd>Tweak version if provided, else 0</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">&lt;PackageName&gt;_VERSION_COUNT</span></code></dt>
-<dd>Number of version components, 0 to 4</dd>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">&lt;PackageName&gt;_VERSION</span></code></dt><dd><p>Full provided version string</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">&lt;PackageName&gt;_VERSION_MAJOR</span></code></dt><dd><p>Major version if provided, else 0</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">&lt;PackageName&gt;_VERSION_MINOR</span></code></dt><dd><p>Minor version if provided, else 0</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">&lt;PackageName&gt;_VERSION_PATCH</span></code></dt><dd><p>Patch version if provided, else 0</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">&lt;PackageName&gt;_VERSION_TWEAK</span></code></dt><dd><p>Tweak version if provided, else 0</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">&lt;PackageName&gt;_VERSION_COUNT</span></code></dt><dd><p>Number of version components, 0 to 4</p>
+</dd>
 </dl>
 <p>The variables report the version of the package that was actually found.
 The <code class="docutils literal notranslate"><span class="pre">&lt;PackageName&gt;</span></code> part of their name matches the argument given to the
@@ -555,15 +562,15 @@ because their development pre-dated this approach.  This may improve
 incrementally over time.  Workarounds to create relocatable packages
 using such modules include:</p>
 <ul class="simple">
-<li>When building the package, specify each <code class="docutils literal notranslate"><span class="pre">Foo_LIBRARY</span></code> cache
+<li><p>When building the package, specify each <code class="docutils literal notranslate"><span class="pre">Foo_LIBRARY</span></code> cache
 entry as just a library name, e.g. <code class="docutils literal notranslate"><span class="pre">-DFoo_LIBRARY=foo</span></code>.  This
 tells the corresponding find module to populate the <code class="docutils literal notranslate"><span class="pre">Foo_LIBRARIES</span></code>
 with just <code class="docutils literal notranslate"><span class="pre">foo</span></code> to ask the linker to search for the library
-instead of hard-coding a path.</li>
-<li>Or, after installing the package content but before creating the
+instead of hard-coding a path.</p></li>
+<li><p>Or, after installing the package content but before creating the
 package installation binary for redistribution, manually replace
 the absolute paths with placeholders for substitution by the
-installation tool when the package is installed.</li>
+installation tool when the package is installed.</p></li>
 </ul>
 </div>
 </div>
@@ -572,8 +579,8 @@ installation tool when the package is installed.</li>
 <p>CMake provides two central locations to register packages that have
 been built or installed anywhere on a system:</p>
 <ul class="simple">
-<li><a class="reference internal" href="#user-package-registry">User Package Registry</a></li>
-<li><a class="reference internal" href="#system-package-registry">System Package Registry</a></li>
+<li><p><a class="reference internal" href="#user-package-registry">User Package Registry</a></p></li>
+<li><p><a class="reference internal" href="#system-package-registry">System Package Registry</a></p></li>
 </ul>
 <p>The registries are especially useful to help projects find packages in
 non-standard install locations or directly in their own build trees.
@@ -631,17 +638,22 @@ containing the package configuration file.</p>
 <p>In some cases using the Package Registries is not desirable. CMake
 allows one to disable them using the following variables:</p>
 <ul class="simple">
-<li>The <span class="target" id="index-2-command:export"></span><a class="reference internal" href="../command/export.html#command:export" title="export"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">export(PACKAGE)</span></code></a> command does not populate the user
+<li><p>The <span class="target" id="index-2-command:export"></span><a class="reference internal" href="../command/export.html#command:export" title="export"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">export(PACKAGE)</span></code></a> command does not populate the user
 package registry when <span class="target" id="index-0-policy:CMP0090"></span><a class="reference internal" href="../policy/CMP0090.html#policy:CMP0090" title="CMP0090"><code class="xref cmake cmake-policy docutils literal notranslate"><span class="pre">CMP0090</span></code></a> is set to <code class="docutils literal notranslate"><span class="pre">NEW</span></code> unless the
 <span class="target" id="index-0-variable:CMAKE_EXPORT_PACKAGE_REGISTRY"></span><a class="reference internal" href="../variable/CMAKE_EXPORT_PACKAGE_REGISTRY.html#variable:CMAKE_EXPORT_PACKAGE_REGISTRY" title="CMAKE_EXPORT_PACKAGE_REGISTRY"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_EXPORT_PACKAGE_REGISTRY</span></code></a> variable explicitly enables it.
 When <span class="target" id="index-1-policy:CMP0090"></span><a class="reference internal" href="../policy/CMP0090.html#policy:CMP0090" title="CMP0090"><code class="xref cmake cmake-policy docutils literal notranslate"><span class="pre">CMP0090</span></code></a> is <em>not</em> set to <code class="docutils literal notranslate"><span class="pre">NEW</span></code> then
 <span class="target" id="index-3-command:export"></span><a class="reference internal" href="../command/export.html#command:export" title="export"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">export(PACKAGE)</span></code></a> populates the user package registry unless
 the <span class="target" id="index-0-variable:CMAKE_EXPORT_NO_PACKAGE_REGISTRY"></span><a class="reference internal" href="../variable/CMAKE_EXPORT_NO_PACKAGE_REGISTRY.html#variable:CMAKE_EXPORT_NO_PACKAGE_REGISTRY" title="CMAKE_EXPORT_NO_PACKAGE_REGISTRY"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_EXPORT_NO_PACKAGE_REGISTRY</span></code></a> variable explicitly
-disables it.</li>
-<li><span class="target" id="index-0-variable:CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY"></span><a class="reference internal" href="../variable/CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY.html#variable:CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY" title="CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY</span></code></a> disables the
-User Package Registry in all the <span class="target" id="index-15-command:find_package"></span><a class="reference internal" href="../command/find_package.html#command:find_package" title="find_package"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">find_package()</span></code></a> calls.</li>
-<li><span class="target" id="index-0-variable:CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY"></span><a class="reference internal" href="../variable/CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY.html#variable:CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY" title="CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY</span></code></a> disables
-the System Package Registry in all the <span class="target" id="index-16-command:find_package"></span><a class="reference internal" href="../command/find_package.html#command:find_package" title="find_package"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">find_package()</span></code></a> calls.</li>
+disables it.</p></li>
+<li><p><span class="target" id="index-0-variable:CMAKE_FIND_USE_PACKAGE_REGISTRY"></span><a class="reference internal" href="../variable/CMAKE_FIND_USE_PACKAGE_REGISTRY.html#variable:CMAKE_FIND_USE_PACKAGE_REGISTRY" title="CMAKE_FIND_USE_PACKAGE_REGISTRY"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_FIND_USE_PACKAGE_REGISTRY</span></code></a> disables the
+User Package Registry in all the <span class="target" id="index-15-command:find_package"></span><a class="reference internal" href="../command/find_package.html#command:find_package" title="find_package"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">find_package()</span></code></a> calls when
+set to <code class="docutils literal notranslate"><span class="pre">FALSE</span></code>.</p></li>
+<li><p>Deprecated <span class="target" id="index-0-variable:CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY"></span><a class="reference internal" href="../variable/CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY.html#variable:CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY" title="CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY</span></code></a> disables the
+User Package Registry in all the <span class="target" id="index-16-command:find_package"></span><a class="reference internal" href="../command/find_package.html#command:find_package" title="find_package"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">find_package()</span></code></a> calls when set
+to <code class="docutils literal notranslate"><span class="pre">TRUE</span></code>. This variable is ignored when
+<span class="target" id="index-1-variable:CMAKE_FIND_USE_PACKAGE_REGISTRY"></span><a class="reference internal" href="../variable/CMAKE_FIND_USE_PACKAGE_REGISTRY.html#variable:CMAKE_FIND_USE_PACKAGE_REGISTRY" title="CMAKE_FIND_USE_PACKAGE_REGISTRY"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_FIND_USE_PACKAGE_REGISTRY</span></code></a> has been set.</p></li>
+<li><p><span class="target" id="index-0-variable:CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY"></span><a class="reference internal" href="../variable/CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY.html#variable:CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY" title="CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY</span></code></a> disables
+the System Package Registry in all the <span class="target" id="index-17-command:find_package"></span><a class="reference internal" href="../command/find_package.html#command:find_package" title="find_package"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">find_package()</span></code></a> calls.</p></li>
 </ul>
 </div>
 <div class="section" id="package-registry-example">
@@ -674,7 +686,7 @@ $ cat ~/.cmake/packages/MyPackage/f92c1db873a1937f3100706657c63e07
 entries for a single package is unspecified and the entry names
 (hashes in this example) have no meaning.  Registered locations may
 contain package version files (<code class="docutils literal notranslate"><span class="pre">MyPackageConfigVersion.cmake</span></code>) to
-tell <span class="target" id="index-17-command:find_package"></span><a class="reference internal" href="../command/find_package.html#command:find_package" title="find_package"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">find_package()</span></code></a> whether a specific location is suitable
+tell <span class="target" id="index-18-command:find_package"></span><a class="reference internal" href="../command/find_package.html#command:find_package" title="find_package"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">find_package()</span></code></a> whether a specific location is suitable
 for the version requested.</p>
 </div>
 <div class="section" id="package-registry-ownership">
@@ -685,7 +697,7 @@ entry and the corresponding uninstaller is responsible for removing it.</p>
 <p>The <span class="target" id="index-5-command:export"></span><a class="reference internal" href="../command/export.html#command:export" title="export"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">export(PACKAGE)</span></code></a> command populates the user package registry
 with the location of a project build tree.  Build trees tend to be deleted by
 developers and have no “uninstall” event that could trigger removal of their
-entries.  In order to keep the registries clean the <span class="target" id="index-18-command:find_package"></span><a class="reference internal" href="../command/find_package.html#command:find_package" title="find_package"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">find_package()</span></code></a>
+entries.  In order to keep the registries clean the <span class="target" id="index-19-command:find_package"></span><a class="reference internal" href="../command/find_package.html#command:find_package" title="find_package"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">find_package()</span></code></a>
 command automatically removes stale entries it encounters if it has sufficient
 permissions.  CMake provides no interface to remove an entry referencing an
 existing build tree once <span class="target" id="index-6-command:export"></span><a class="reference internal" href="../command/export.html#command:export" title="export"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">export(PACKAGE)</span></code></a> has been invoked.
@@ -701,7 +713,7 @@ tree then the entry referencing the location will be considered stale.</p>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <h3><a href="../index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">cmake-packages(7)</a><ul>
 <li><a class="reference internal" href="#introduction">Introduction</a></li>
@@ -749,13 +761,11 @@ tree then the entry referencing the location will be considered stale.</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -784,14 +794,14 @@ tree then the entry referencing the location will be considered stale.</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
  
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

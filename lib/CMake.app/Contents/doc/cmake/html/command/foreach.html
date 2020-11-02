@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>foreach &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>foreach &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-commands.7.html" accesskey="U">cmake-commands(7)</a> &#187;</li> 
@@ -92,7 +93,7 @@ The three arguments <code class="docutils literal notranslate"><span class="pre"
 all be nonnegative integers, and <code class="docutils literal notranslate"><span class="pre">&lt;stop&gt;</span></code> must not be
 smaller than <code class="docutils literal notranslate"><span class="pre">&lt;start&gt;</span></code>; otherwise you enter the danger zone
 of undocumented behavior that may change in future releases.</p>
-<div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nf">foreach(</span><span class="nb">loop_var</span><span class="w"> </span><span class="no">IN</span><span class="w"> </span><span class="p">[</span><span class="no">LISTS</span><span class="w"> </span><span class="p">[</span><span class="nv">&lt;lists&gt;</span><span class="p">]]</span><span class="w"> </span><span class="p">[</span><span class="no">ITEMS</span><span class="w"> </span><span class="p">[</span><span class="nv">&lt;items&gt;</span><span class="p">]]</span><span class="nf">)</span><span class="w"></span>
+<div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nf">foreach(</span><span class="nv">&lt;loop_var&gt;</span><span class="w"> </span><span class="no">IN</span><span class="w"> </span><span class="p">[</span><span class="no">LISTS</span><span class="w"> </span><span class="p">[</span><span class="nv">&lt;lists&gt;</span><span class="p">]]</span><span class="w"> </span><span class="p">[</span><span class="no">ITEMS</span><span class="w"> </span><span class="p">[</span><span class="nv">&lt;items&gt;</span><span class="p">]]</span><span class="nf">)</span><span class="w"></span>
 </pre></div>
 </div>
 <p>In this variant, <code class="docutils literal notranslate"><span class="pre">&lt;lists&gt;</span></code> is a whitespace or semicolon
@@ -125,6 +126,45 @@ processed:</p>
 -- X=8
 </pre></div>
 </div>
+<div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nf">foreach(</span><span class="nv">&lt;loop_var&gt;...</span><span class="w"> </span><span class="no">IN</span><span class="w"> </span><span class="no">ZIP_LISTS</span><span class="w"> </span><span class="nv">&lt;lists&gt;</span><span class="nf">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>In this variant, <code class="docutils literal notranslate"><span class="pre">&lt;lists&gt;</span></code> is a whitespace or semicolon
+separated list of list-valued variables. The <code class="docutils literal notranslate"><span class="pre">foreach</span></code>
+command iterates over each list simultaneously setting the
+iteration variables as follows:</p>
+<ul class="simple">
+<li><p>if the only <code class="docutils literal notranslate"><span class="pre">loop_var</span></code> given, then it sets a series of
+<code class="docutils literal notranslate"><span class="pre">loop_var_N</span></code> variables to the current item from the
+corresponding list;</p></li>
+<li><p>if multiple variable names passed, their count should match
+the lists variables count;</p></li>
+<li><p>if any of the lists are shorter, the corresponding iteration
+variable is not defined for the current iteration.</p></li>
+</ul>
+<div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nf">list(</span><span class="no">APPEND</span><span class="w"> </span><span class="nb">English</span><span class="w"> </span><span class="nb">one</span><span class="w"> </span><span class="nb">two</span><span class="w"> </span><span class="nb">three</span><span class="w"> </span><span class="nb">four</span><span class="nf">)</span><span class="w"></span>
+<span class="nf">list(</span><span class="no">APPEND</span><span class="w"> </span><span class="nb">Bahasa</span><span class="w"> </span><span class="nb">satu</span><span class="w"> </span><span class="nb">dua</span><span class="w"> </span><span class="nb">tiga</span><span class="nf">)</span><span class="w"></span>
+
+<span class="nf">foreach(</span><span class="nb">num</span><span class="w"> </span><span class="no">IN</span><span class="w"> </span><span class="no">ZIP_LISTS</span><span class="w"> </span><span class="nb">English</span><span class="w"> </span><span class="nb">Bahasa</span><span class="nf">)</span><span class="w"></span>
+<span class="w">    </span><span class="nf">message(</span><span class="no">STATUS</span><span class="w"> </span><span class="s">&quot;num_0=${num_0}, num_1=${num_1}&quot;</span><span class="nf">)</span><span class="w"></span>
+<span class="nf">endforeach()</span><span class="w"></span>
+
+<span class="nf">foreach(</span><span class="nb">en</span><span class="w"> </span><span class="nb">ba</span><span class="w"> </span><span class="no">IN</span><span class="w"> </span><span class="no">ZIP_LISTS</span><span class="w"> </span><span class="nb">English</span><span class="w"> </span><span class="nb">Bahasa</span><span class="nf">)</span><span class="w"></span>
+<span class="w">    </span><span class="nf">message(</span><span class="no">STATUS</span><span class="w"> </span><span class="s">&quot;en=${en}, ba=${ba}&quot;</span><span class="nf">)</span><span class="w"></span>
+<span class="nf">endforeach()</span><span class="w"></span>
+</pre></div>
+</div>
+<p>yields</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-- num_0=one, num_1=satu
+-- num_0=two, num_1=dua
+-- num_0=three, num_1=tiga
+-- num_0=four, num_1=
+-- en=one, ba=satu
+-- en=two, ba=dua
+-- en=three, ba=tiga
+-- en=four, ba=
+</pre></div>
+</div>
 </div>
 
 
@@ -147,13 +187,11 @@ processed:</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -182,15 +220,15 @@ processed:</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-commands.7.html" >cmake-commands(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

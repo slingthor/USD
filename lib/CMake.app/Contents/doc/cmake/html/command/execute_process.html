@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>execute_process &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>execute_process &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-commands.7.html" accesskey="U">cmake-commands(7)</a> &#187;</li> 
@@ -74,7 +75,10 @@
 <span class="w">                </span><span class="p">[</span><span class="no">COMMAND_ECHO</span><span class="w"> </span><span class="nv">&lt;where&gt;</span><span class="p">]</span><span class="w"></span>
 <span class="w">                </span><span class="p">[</span><span class="no">OUTPUT_STRIP_TRAILING_WHITESPACE</span><span class="p">]</span><span class="w"></span>
 <span class="w">                </span><span class="p">[</span><span class="no">ERROR_STRIP_TRAILING_WHITESPACE</span><span class="p">]</span><span class="w"></span>
-<span class="w">                </span><span class="p">[</span><span class="no">ENCODING</span><span class="w"> </span><span class="nv">&lt;name&gt;</span><span class="p">]</span><span class="nf">)</span><span class="w"></span>
+<span class="w">                </span><span class="p">[</span><span class="no">ENCODING</span><span class="w"> </span><span class="nv">&lt;name&gt;</span><span class="p">]</span><span class="w"></span>
+<span class="w">                </span><span class="p">[</span><span class="no">ECHO_OUTPUT_VARIABLE</span><span class="p">]</span><span class="w"></span>
+<span class="w">                </span><span class="p">[</span><span class="no">ECHO_ERROR_VARIABLE</span><span class="p">]</span><span class="w"></span>
+<span class="w">                </span><span class="p">[</span><span class="no">COMMAND_ERROR_IS_FATAL</span><span class="w"> </span><span class="o">&lt;</span><span class="no">ANY</span><span class="p">|</span><span class="no">LAST</span><span class="o">&gt;</span><span class="p">]</span><span class="nf">)</span><span class="w"></span>
 </pre></div>
 </div>
 <p>Runs the given sequence of one or more commands.</p>
@@ -82,71 +86,87 @@
 output of each process piped to the standard input of the next.
 A single standard error pipe is used for all processes.</p>
 <p>Options:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">COMMAND</span></code></dt>
-<dd><p class="first">A child process command line.</p>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">COMMAND</span></code></dt><dd><p>A child process command line.</p>
 <p>CMake executes the child process using operating system APIs directly.
 All arguments are passed VERBATIM to the child process.
 No intermediate shell is used, so shell operators such as <code class="docutils literal notranslate"><span class="pre">&gt;</span></code>
 are treated as normal arguments.
 (Use the <code class="docutils literal notranslate"><span class="pre">INPUT_*</span></code>, <code class="docutils literal notranslate"><span class="pre">OUTPUT_*</span></code>, and <code class="docutils literal notranslate"><span class="pre">ERROR_*</span></code> options to
 redirect stdin, stdout, and stderr.)</p>
-<p class="last">If a sequential execution of multiple commands is required, use multiple
+<p>If a sequential execution of multiple commands is required, use multiple
 <span class="target" id="index-0-command:execute_process"></span><a class="reference internal" href="#command:execute_process" title="execute_process"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">execute_process()</span></code></a> calls with a single <code class="docutils literal notranslate"><span class="pre">COMMAND</span></code> argument.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">WORKING_DIRECTORY</span></code></dt>
-<dd>The named directory will be set as the current working directory of
-the child processes.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">TIMEOUT</span></code></dt>
-<dd>After the specified number of seconds (fractions allowed), all unfinished
+<dt><code class="docutils literal notranslate"><span class="pre">WORKING_DIRECTORY</span></code></dt><dd><p>The named directory will be set as the current working directory of
+the child processes.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">TIMEOUT</span></code></dt><dd><p>After the specified number of seconds (fractions allowed), all unfinished
 child processes will be terminated, and the <code class="docutils literal notranslate"><span class="pre">RESULT_VARIABLE</span></code> will be
-set to a string mentioning the “timeout”.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">RESULT_VARIABLE</span></code></dt>
-<dd>The variable will be set to contain the result of last child process.
+set to a string mentioning the “timeout”.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">RESULT_VARIABLE</span></code></dt><dd><p>The variable will be set to contain the result of last child process.
 This will be an integer return code from the last child or a string
-describing an error condition.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">RESULTS_VARIABLE</span> <span class="pre">&lt;variable&gt;</span></code></dt>
-<dd>The variable will be set to contain the result of all processes as a
+describing an error condition.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">RESULTS_VARIABLE</span> <span class="pre">&lt;variable&gt;</span></code></dt><dd><p>The variable will be set to contain the result of all processes as a
 <a class="reference internal" href="../manual/cmake-language.7.html#cmake-language-lists"><span class="std std-ref">semicolon-separated list</span></a>, in order of the
 given <code class="docutils literal notranslate"><span class="pre">COMMAND</span></code> arguments.  Each entry will be an integer return code
-from the corresponding child or a string describing an error condition.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">OUTPUT_VARIABLE</span></code>, <code class="docutils literal notranslate"><span class="pre">ERROR_VARIABLE</span></code></dt>
-<dd>The variable named will be set with the contents of the standard output
+from the corresponding child or a string describing an error condition.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OUTPUT_VARIABLE</span></code>, <code class="docutils literal notranslate"><span class="pre">ERROR_VARIABLE</span></code></dt><dd><p>The variable named will be set with the contents of the standard output
 and standard error pipes, respectively.  If the same variable is named
-for both pipes their output will be merged in the order produced.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">INPUT_FILE,</span> <span class="pre">OUTPUT_FILE</span></code>, <code class="docutils literal notranslate"><span class="pre">ERROR_FILE</span></code></dt>
-<dd>The file named will be attached to the standard input of the first
+for both pipes their output will be merged in the order produced.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">INPUT_FILE,</span> <span class="pre">OUTPUT_FILE</span></code>, <code class="docutils literal notranslate"><span class="pre">ERROR_FILE</span></code></dt><dd><p>The file named will be attached to the standard input of the first
 process, standard output of the last process, or standard error of
 all processes, respectively.  If the same file is named for both
-output and error then it will be used for both.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">OUTPUT_QUIET</span></code>, <code class="docutils literal notranslate"><span class="pre">ERROR_QUIET</span></code></dt>
-<dd>The standard output or standard error results will be quietly ignored.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">COMMAND_ECHO</span> <span class="pre">&lt;where&gt;</span></code></dt>
-<dd>The command being run will be echo’ed to <code class="docutils literal notranslate"><span class="pre">&lt;where&gt;</span></code> with <code class="docutils literal notranslate"><span class="pre">&lt;where&gt;</span></code>
+output and error then it will be used for both.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OUTPUT_QUIET</span></code>, <code class="docutils literal notranslate"><span class="pre">ERROR_QUIET</span></code></dt><dd><p>The standard output or standard error results will be quietly ignored.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">COMMAND_ECHO</span> <span class="pre">&lt;where&gt;</span></code></dt><dd><p>The command being run will be echo’ed to <code class="docutils literal notranslate"><span class="pre">&lt;where&gt;</span></code> with <code class="docutils literal notranslate"><span class="pre">&lt;where&gt;</span></code>
 being set to one of <code class="docutils literal notranslate"><span class="pre">STDERR</span></code>, <code class="docutils literal notranslate"><span class="pre">STDOUT</span></code> or <code class="docutils literal notranslate"><span class="pre">NONE</span></code>.
 See the <span class="target" id="index-0-variable:CMAKE_EXECUTE_PROCESS_COMMAND_ECHO"></span><a class="reference internal" href="../variable/CMAKE_EXECUTE_PROCESS_COMMAND_ECHO.html#variable:CMAKE_EXECUTE_PROCESS_COMMAND_ECHO" title="CMAKE_EXECUTE_PROCESS_COMMAND_ECHO"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_EXECUTE_PROCESS_COMMAND_ECHO</span></code></a> variable for a way
-to control the default behavior when this option is not present.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">ENCODING</span> <span class="pre">&lt;name&gt;</span></code></dt>
-<dd><p class="first">On Windows, the encoding that is used to decode output from the process.
+to control the default behavior when this option is not present.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">ENCODING</span> <span class="pre">&lt;name&gt;</span></code></dt><dd><p>On Windows, the encoding that is used to decode output from the process.
 Ignored on other platforms.
 Valid encoding names are:</p>
-<dl class="last docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">NONE</span></code></dt>
-<dd>Perform no decoding.  This assumes that the process output is encoded
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">NONE</span></code></dt><dd><p>Perform no decoding.  This assumes that the process output is encoded
 in the same way as CMake’s internal encoding (UTF-8).
-This is the default.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">AUTO</span></code></dt>
-<dd>Use the current active console’s codepage or if that isn’t
-available then use ANSI.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">ANSI</span></code></dt>
-<dd>Use the ANSI codepage.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">OEM</span></code></dt>
-<dd>Use the original equipment manufacturer (OEM) code page.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">UTF8</span></code> or <code class="docutils literal notranslate"><span class="pre">UTF-8</span></code></dt>
-<dd>Use the UTF-8 codepage. Prior to CMake 3.11.0, only <code class="docutils literal notranslate"><span class="pre">UTF8</span></code> was accepted
+This is the default.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">AUTO</span></code></dt><dd><p>Use the current active console’s codepage or if that isn’t
+available then use ANSI.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">ANSI</span></code></dt><dd><p>Use the ANSI codepage.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OEM</span></code></dt><dd><p>Use the original equipment manufacturer (OEM) code page.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">UTF8</span></code> or <code class="docutils literal notranslate"><span class="pre">UTF-8</span></code></dt><dd><p>Use the UTF-8 codepage. Prior to CMake 3.11.0, only <code class="docutils literal notranslate"><span class="pre">UTF8</span></code> was accepted
 for this encoding. In CMake 3.11.0, <code class="docutils literal notranslate"><span class="pre">UTF-8</span></code> was added for consistency with
-the <a class="reference external" href="https://www.ietf.org/rfc/rfc3629">UTF-8 RFC</a> naming convention.</dd>
+the <a class="reference external" href="https://www.ietf.org/rfc/rfc3629">UTF-8 RFC</a> naming convention.</p>
+</dd>
 </dl>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">ECHO_OUTPUT_VARIABLE</span></code>, <code class="docutils literal notranslate"><span class="pre">ECHO_ERROR_VARIABLE</span></code></dt><dd><p>The standard output or standard error will not be exclusively redirected to
+the configured variables.</p>
+<p>The output will be duplicated, it will be sent into the configured variables
+and also on standard output or standard error.</p>
+<p>This is analogous to the <code class="docutils literal notranslate"><span class="pre">tee</span></code> Unix command.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">COMMAND_ERROR_IS_FATAL</span> <span class="pre">&lt;ANY|LAST&gt;</span></code></dt><dd><p>The option following <code class="docutils literal notranslate"><span class="pre">COMMAND_ERROR_IS_FATAL</span></code> determines the behavior when
+an error is encountered:</p>
+<blockquote>
+<div><p><code class="docutils literal notranslate"><span class="pre">ANY</span></code>
+If any of the commands in the list of commands fail, the
+<code class="docutils literal notranslate"><span class="pre">execute_process()</span></code> command halts with an error.</p>
+<p><code class="docutils literal notranslate"><span class="pre">LAST</span></code>
+If the last command in the list of commands fails, the
+<code class="docutils literal notranslate"><span class="pre">execute_process()</span></code> command halts with an error.  Commands earlier in the
+list will not cause a fatal error.</p>
+</div></blockquote>
 </dd>
 </dl>
 <p>If more than one <code class="docutils literal notranslate"><span class="pre">OUTPUT_*</span></code> or <code class="docutils literal notranslate"><span class="pre">ERROR_*</span></code> option is given for the
@@ -181,13 +201,11 @@ build time.</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -216,15 +234,15 @@ build time.</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-commands.7.html" >cmake-commands(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

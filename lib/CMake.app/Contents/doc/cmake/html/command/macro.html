@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>macro &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>macro &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-commands.7.html" accesskey="U">cmake-commands(7)</a> &#187;</li> 
@@ -86,11 +87,14 @@ between CMake macros and <span class="target" id="index-0-command:function"></sp
 <div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nf">foo()</span><span class="w"></span>
 <span class="nf">Foo()</span><span class="w"></span>
 <span class="nf">FOO()</span><span class="w"></span>
+<span class="nf">cmake_language(</span><span class="no">CALL</span><span class="w"> </span><span class="nb">foo</span><span class="nf">)</span><span class="w"></span>
 </pre></div>
 </div>
 <p>and so on. However, it is strongly recommended to stay with the
 case chosen in the macro definition.  Typically macros use
 all-lowercase names.</p>
+<p>The <span class="target" id="index-0-command:cmake_language"></span><a class="reference internal" href="cmake_language.html#command:cmake_language" title="cmake_language"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">cmake_language(CALL</span> <span class="pre">...)</span></code></a> command can also be used to
+invoke the macro.</p>
 </div>
 <div class="section" id="arguments">
 <h2>Arguments<a class="headerlink" href="#arguments" title="Permalink to this headline">¶</a></h2>
@@ -127,6 +131,11 @@ consequence that a <span class="target" id="index-0-command:return"></span><a cl
 just terminate execution of the macro; rather, control is returned
 from the scope of the macro call.  To avoid confusion, it is recommended
 to avoid <span class="target" id="index-1-command:return"></span><a class="reference internal" href="return.html#command:return" title="return"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">return()</span></code></a> in macros altogether.</p>
+<p>Unlike a function, the <span class="target" id="index-0-variable:CMAKE_CURRENT_FUNCTION"></span><a class="reference internal" href="../variable/CMAKE_CURRENT_FUNCTION.html#variable:CMAKE_CURRENT_FUNCTION" title="CMAKE_CURRENT_FUNCTION"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_CURRENT_FUNCTION</span></code></a>,
+<span class="target" id="index-0-variable:CMAKE_CURRENT_FUNCTION_LIST_DIR"></span><a class="reference internal" href="../variable/CMAKE_CURRENT_FUNCTION_LIST_DIR.html#variable:CMAKE_CURRENT_FUNCTION_LIST_DIR" title="CMAKE_CURRENT_FUNCTION_LIST_DIR"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_CURRENT_FUNCTION_LIST_DIR</span></code></a>,
+<span class="target" id="index-0-variable:CMAKE_CURRENT_FUNCTION_LIST_FILE"></span><a class="reference internal" href="../variable/CMAKE_CURRENT_FUNCTION_LIST_FILE.html#variable:CMAKE_CURRENT_FUNCTION_LIST_FILE" title="CMAKE_CURRENT_FUNCTION_LIST_FILE"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_CURRENT_FUNCTION_LIST_FILE</span></code></a>,
+<span class="target" id="index-0-variable:CMAKE_CURRENT_FUNCTION_LIST_LINE"></span><a class="reference internal" href="../variable/CMAKE_CURRENT_FUNCTION_LIST_LINE.html#variable:CMAKE_CURRENT_FUNCTION_LIST_LINE" title="CMAKE_CURRENT_FUNCTION_LIST_LINE"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_CURRENT_FUNCTION_LIST_LINE</span></code></a> variables are not
+set for a macro.</p>
 </div>
 <div class="section" id="argument-caveats">
 <span id="id2"></span><h2>Argument Caveats<a class="headerlink" href="#argument-caveats" title="Permalink to this headline">¶</a></h2>
@@ -175,7 +184,7 @@ should look at the function command.</p>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <h3><a href="../index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">macro</a><ul>
 <li><a class="reference internal" href="#invocation">Invocation</a></li>
@@ -200,13 +209,11 @@ should look at the function command.</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -235,15 +242,15 @@ should look at the function command.</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-commands.7.html" >cmake-commands(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>install &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>install &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-commands.7.html" accesskey="U">cmake-commands(7)</a> &#187;</li> 
@@ -60,42 +61,48 @@
 <p>Specify rules to run at install time.</p>
 <div class="section" id="synopsis">
 <h2>Synopsis<a class="headerlink" href="#synopsis" title="Permalink to this headline">¶</a></h2>
-<pre class="literal-block">
-install(<a class="reference internal" href="#targets">TARGETS</a> &lt;target&gt;... [...])
+<pre class="literal-block">install(<a class="reference internal" href="#targets">TARGETS</a> &lt;target&gt;... [...])
 install({<a class="reference internal" href="#files">FILES</a> | <a class="reference internal" href="#programs">PROGRAMS</a>} &lt;file&gt;... [...])
 install(<a class="reference internal" href="#directory">DIRECTORY</a> &lt;dir&gt;... [...])
 install(<a class="reference internal" href="#script">SCRIPT</a> &lt;file&gt; [...])
 install(<a class="reference internal" href="#code">CODE</a> &lt;code&gt; [...])
-install(<a class="reference internal" href="#export">EXPORT</a> &lt;export-name&gt; [...])
-</pre>
+install(<a class="reference internal" href="#export">EXPORT</a> &lt;export-name&gt; [...])</pre>
 </div>
 <div class="section" id="introduction">
 <h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h2>
-<p>This command generates installation rules for a project.  Rules
-specified by calls to this command within a source directory are
-executed in order during installation.  The order across directories
-is not defined.</p>
+<p>This command generates installation rules for a project.  Install rules
+specified by calls to the <code class="docutils literal notranslate"><span class="pre">install()</span></code> command within a source directory
+are executed in order during installation.  Install rules in subdirectories
+added by calls to the <span class="target" id="index-0-command:add_subdirectory"></span><a class="reference internal" href="add_subdirectory.html#command:add_subdirectory" title="add_subdirectory"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">add_subdirectory()</span></code></a> command are interleaved
+with those in the parent directory to run in the order declared (see
+policy <span class="target" id="index-0-policy:CMP0082"></span><a class="reference internal" href="../policy/CMP0082.html#policy:CMP0082" title="CMP0082"><code class="xref cmake cmake-policy docutils literal notranslate"><span class="pre">CMP0082</span></code></a>).</p>
 <p>There are multiple signatures for this command.  Some of them define
 installation options for files and targets.  Options common to
 multiple signatures are covered here but they are valid only for
 signatures that specify them.  The common options are:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">DESTINATION</span></code></dt>
-<dd>Specify the directory on disk to which a file will be installed.
-If a full path (with a leading slash or drive letter) is given
-it is used directly.  If a relative path is given it is interpreted
-relative to the value of the <span class="target" id="index-0-variable:CMAKE_INSTALL_PREFIX"></span><a class="reference internal" href="../variable/CMAKE_INSTALL_PREFIX.html#variable:CMAKE_INSTALL_PREFIX" title="CMAKE_INSTALL_PREFIX"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_INSTALL_PREFIX</span></code></a> variable.
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">DESTINATION</span></code></dt><dd><p>Specify the directory on disk to which a file will be installed.
+Arguments can be relative or absolute paths.</p>
+<p>If a relative path is given it is interpreted relative to the value
+of the <span class="target" id="index-0-variable:CMAKE_INSTALL_PREFIX"></span><a class="reference internal" href="../variable/CMAKE_INSTALL_PREFIX.html#variable:CMAKE_INSTALL_PREFIX" title="CMAKE_INSTALL_PREFIX"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_INSTALL_PREFIX</span></code></a> variable.
 The prefix can be relocated at install time using the <code class="docutils literal notranslate"><span class="pre">DESTDIR</span></code>
 mechanism explained in the <span class="target" id="index-1-variable:CMAKE_INSTALL_PREFIX"></span><a class="reference internal" href="../variable/CMAKE_INSTALL_PREFIX.html#variable:CMAKE_INSTALL_PREFIX" title="CMAKE_INSTALL_PREFIX"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_INSTALL_PREFIX</span></code></a> variable
-documentation.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">PERMISSIONS</span></code></dt>
-<dd>Specify permissions for installed files.  Valid permissions are
+documentation.</p>
+<p>If an absolute path (with a leading slash or drive letter) is given
+it is used verbatim.</p>
+<p>As absolute paths are not supported by <span class="target" id="index-0-manual:cpack(1)"></span><a class="reference internal" href="../manual/cpack.1.html#manual:cpack(1)" title="cpack(1)"><code class="xref cmake cmake-manual docutils literal notranslate"><span class="pre">cpack</span></code></a> installer
+generators, it is preferable to use relative paths throughout.
+In particular, there is no need to make paths absolute by prepending
+<span class="target" id="index-2-variable:CMAKE_INSTALL_PREFIX"></span><a class="reference internal" href="../variable/CMAKE_INSTALL_PREFIX.html#variable:CMAKE_INSTALL_PREFIX" title="CMAKE_INSTALL_PREFIX"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_INSTALL_PREFIX</span></code></a>; this prefix is used by default if
+the DESTINATION is a relative path.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">PERMISSIONS</span></code></dt><dd><p>Specify permissions for installed files.  Valid permissions are
 <code class="docutils literal notranslate"><span class="pre">OWNER_READ</span></code>, <code class="docutils literal notranslate"><span class="pre">OWNER_WRITE</span></code>, <code class="docutils literal notranslate"><span class="pre">OWNER_EXECUTE</span></code>, <code class="docutils literal notranslate"><span class="pre">GROUP_READ</span></code>,
 <code class="docutils literal notranslate"><span class="pre">GROUP_WRITE</span></code>, <code class="docutils literal notranslate"><span class="pre">GROUP_EXECUTE</span></code>, <code class="docutils literal notranslate"><span class="pre">WORLD_READ</span></code>, <code class="docutils literal notranslate"><span class="pre">WORLD_WRITE</span></code>,
 <code class="docutils literal notranslate"><span class="pre">WORLD_EXECUTE</span></code>, <code class="docutils literal notranslate"><span class="pre">SETUID</span></code>, and <code class="docutils literal notranslate"><span class="pre">SETGID</span></code>.  Permissions that do
-not make sense on certain platforms are ignored on those platforms.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">CONFIGURATIONS</span></code></dt>
-<dd><p class="first">Specify a list of build configurations for which the install rule
+not make sense on certain platforms are ignored on those platforms.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">CONFIGURATIONS</span></code></dt><dd><p>Specify a list of build configurations for which the install rule
 applies (Debug, Release, etc.). Note that the values specified for
 this option only apply to options listed AFTER the <code class="docutils literal notranslate"><span class="pre">CONFIGURATIONS</span></code>
 option. For example, to set separate install paths for the Debug and
@@ -108,27 +115,27 @@ Release configurations, do the following:</p>
 <span class="w">        </span><span class="no">RUNTIME</span><span class="w"> </span><span class="no">DESTINATION</span><span class="w"> </span><span class="na">Release/bin</span><span class="nf">)</span><span class="w"></span>
 </pre></div>
 </div>
-<p class="last">Note that <code class="docutils literal notranslate"><span class="pre">CONFIGURATIONS</span></code> appears BEFORE <code class="docutils literal notranslate"><span class="pre">RUNTIME</span> <span class="pre">DESTINATION</span></code>.</p>
+<p>Note that <code class="docutils literal notranslate"><span class="pre">CONFIGURATIONS</span></code> appears BEFORE <code class="docutils literal notranslate"><span class="pre">RUNTIME</span> <span class="pre">DESTINATION</span></code>.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">COMPONENT</span></code></dt>
-<dd>Specify an installation component name with which the install rule
+<dt><code class="docutils literal notranslate"><span class="pre">COMPONENT</span></code></dt><dd><p>Specify an installation component name with which the install rule
 is associated, such as “runtime” or “development”.  During
 component-specific installation only install rules associated with
 the given component name will be executed.  During a full installation
 all components are installed unless marked with <code class="docutils literal notranslate"><span class="pre">EXCLUDE_FROM_ALL</span></code>.
 If <code class="docutils literal notranslate"><span class="pre">COMPONENT</span></code> is not provided a default component “Unspecified” is
 created.  The default component name may be controlled with the
-<span class="target" id="index-0-variable:CMAKE_INSTALL_DEFAULT_COMPONENT_NAME"></span><a class="reference internal" href="../variable/CMAKE_INSTALL_DEFAULT_COMPONENT_NAME.html#variable:CMAKE_INSTALL_DEFAULT_COMPONENT_NAME" title="CMAKE_INSTALL_DEFAULT_COMPONENT_NAME"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_INSTALL_DEFAULT_COMPONENT_NAME</span></code></a> variable.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">EXCLUDE_FROM_ALL</span></code></dt>
-<dd>Specify that the file is excluded from a full installation and only
-installed as part of a component-specific installation</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">RENAME</span></code></dt>
-<dd>Specify a name for an installed file that may be different from the
+<span class="target" id="index-0-variable:CMAKE_INSTALL_DEFAULT_COMPONENT_NAME"></span><a class="reference internal" href="../variable/CMAKE_INSTALL_DEFAULT_COMPONENT_NAME.html#variable:CMAKE_INSTALL_DEFAULT_COMPONENT_NAME" title="CMAKE_INSTALL_DEFAULT_COMPONENT_NAME"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_INSTALL_DEFAULT_COMPONENT_NAME</span></code></a> variable.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">EXCLUDE_FROM_ALL</span></code></dt><dd><p>Specify that the file is excluded from a full installation and only
+installed as part of a component-specific installation</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">RENAME</span></code></dt><dd><p>Specify a name for an installed file that may be different from the
 original file.  Renaming is allowed only when a single file is
-installed by the command.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">OPTIONAL</span></code></dt>
-<dd>Specify that it is not an error if the file to be installed does
-not exist.</dd>
+installed by the command.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OPTIONAL</span></code></dt><dd><p>Specify that it is not an error if the file to be installed does
+not exist.</p>
+</dd>
 </dl>
 <p>Command signatures that install files may print messages during
 installation.  Use the <span class="target" id="index-0-variable:CMAKE_INSTALL_MESSAGE"></span><a class="reference internal" href="../variable/CMAKE_INSTALL_MESSAGE.html#variable:CMAKE_INSTALL_MESSAGE" title="CMAKE_INSTALL_MESSAGE"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_INSTALL_MESSAGE</span></code></a> variable
@@ -158,45 +165,59 @@ Windows platforms are unaffected.</p>
 </pre></div>
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">TARGETS</span></code> form specifies rules for installing targets from a
-project.  There are several kinds of target files that may be installed:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">ARCHIVE</span></code></dt>
-<dd>Static libraries are treated as <code class="docutils literal notranslate"><span class="pre">ARCHIVE</span></code> targets, except those
-marked with the <code class="docutils literal notranslate"><span class="pre">FRAMEWORK</span></code> property on macOS (see <code class="docutils literal notranslate"><span class="pre">FRAMEWORK</span></code>
-below.) For DLL platforms (all Windows-based systems including
-Cygwin), the DLL import library is treated as an <code class="docutils literal notranslate"><span class="pre">ARCHIVE</span></code> target.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">LIBRARY</span></code></dt>
-<dd>Module libraries are always treated as <code class="docutils literal notranslate"><span class="pre">LIBRARY</span></code> targets. For non-
-DLL platforms shared libraries are treated as <code class="docutils literal notranslate"><span class="pre">LIBRARY</span></code> targets,
-except those marked with the <code class="docutils literal notranslate"><span class="pre">FRAMEWORK</span></code> property on macOS (see
-<code class="docutils literal notranslate"><span class="pre">FRAMEWORK</span></code> below.)</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">RUNTIME</span></code></dt>
-<dd>Executables are treated as <code class="docutils literal notranslate"><span class="pre">RUNTIME</span></code> objects, except those marked
-with the <code class="docutils literal notranslate"><span class="pre">MACOSX_BUNDLE</span></code> property on macOS (see <code class="docutils literal notranslate"><span class="pre">BUNDLE</span></code> below.)
-For DLL platforms (all Windows-based systems including Cygwin), the
-DLL part of a shared library is treated as a <code class="docutils literal notranslate"><span class="pre">RUNTIME</span></code> target.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">OBJECTS</span></code></dt>
-<dd>Object libraries (a simple group of object files) are always treated
-as <code class="docutils literal notranslate"><span class="pre">OBJECTS</span></code> targets.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">FRAMEWORK</span></code></dt>
-<dd>Both static and shared libraries marked with the <code class="docutils literal notranslate"><span class="pre">FRAMEWORK</span></code>
-property are treated as <code class="docutils literal notranslate"><span class="pre">FRAMEWORK</span></code> targets on macOS.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">BUNDLE</span></code></dt>
-<dd>Executables marked with the <span class="target" id="index-0-prop_tgt:MACOSX_BUNDLE"></span><a class="reference internal" href="../prop_tgt/MACOSX_BUNDLE.html#prop_tgt:MACOSX_BUNDLE" title="MACOSX_BUNDLE"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">MACOSX_BUNDLE</span></code></a> property are treated as
-<code class="docutils literal notranslate"><span class="pre">BUNDLE</span></code> targets on macOS.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">PUBLIC_HEADER</span></code></dt>
-<dd>Any <span class="target" id="index-0-prop_tgt:PUBLIC_HEADER"></span><a class="reference internal" href="../prop_tgt/PUBLIC_HEADER.html#prop_tgt:PUBLIC_HEADER" title="PUBLIC_HEADER"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">PUBLIC_HEADER</span></code></a> files associated with a library are installed in
+project.  There are several kinds of target <a class="reference internal" href="../manual/cmake-buildsystem.7.html#output-artifacts"><span class="std std-ref">Output Artifacts</span></a>
+that may be installed:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">ARCHIVE</span></code></dt><dd><p>Target artifacts of this kind include:</p>
+<ul class="simple">
+<li><p><em>Static libraries</em>
+(except on macOS when marked as <code class="docutils literal notranslate"><span class="pre">FRAMEWORK</span></code>, see below);</p></li>
+<li><p><em>DLL import libraries</em>
+(on all Windows-based systems including Cygwin; they have extension
+<code class="docutils literal notranslate"><span class="pre">.lib</span></code>, in contrast to the <code class="docutils literal notranslate"><span class="pre">.dll</span></code> libraries that go to <code class="docutils literal notranslate"><span class="pre">RUNTIME</span></code>);</p></li>
+<li><p>On AIX, the <em>linker import file</em> created for executables with
+<span class="target" id="index-0-prop_tgt:ENABLE_EXPORTS"></span><a class="reference internal" href="../prop_tgt/ENABLE_EXPORTS.html#prop_tgt:ENABLE_EXPORTS" title="ENABLE_EXPORTS"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">ENABLE_EXPORTS</span></code></a> enabled.</p></li>
+</ul>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">LIBRARY</span></code></dt><dd><p>Target artifacts of this kind include:</p>
+<ul class="simple">
+<li><p><em>Shared libraries</em>, except</p>
+<ul>
+<li><p>DLLs (these go to <code class="docutils literal notranslate"><span class="pre">RUNTIME</span></code>, see below),</p></li>
+<li><p>on macOS when marked as <code class="docutils literal notranslate"><span class="pre">FRAMEWORK</span></code> (see below).</p></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">RUNTIME</span></code></dt><dd><p>Target artifacts of this kind include:</p>
+<ul class="simple">
+<li><p><em>Executables</em>
+(except on macOS when marked as <code class="docutils literal notranslate"><span class="pre">MACOSX_BUNDLE</span></code>, see <code class="docutils literal notranslate"><span class="pre">BUNDLE</span></code> below);</p></li>
+<li><p>DLLs (on all Windows-based systems including Cygwin; note that the
+accompanying import libraries are of kind <code class="docutils literal notranslate"><span class="pre">ARCHIVE</span></code>).</p></li>
+</ul>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OBJECTS</span></code></dt><dd><p>Object files associated with <em>object libraries</em>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">FRAMEWORK</span></code></dt><dd><p>Both static and shared libraries marked with the <code class="docutils literal notranslate"><span class="pre">FRAMEWORK</span></code>
+property are treated as <code class="docutils literal notranslate"><span class="pre">FRAMEWORK</span></code> targets on macOS.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">BUNDLE</span></code></dt><dd><p>Executables marked with the <span class="target" id="index-0-prop_tgt:MACOSX_BUNDLE"></span><a class="reference internal" href="../prop_tgt/MACOSX_BUNDLE.html#prop_tgt:MACOSX_BUNDLE" title="MACOSX_BUNDLE"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">MACOSX_BUNDLE</span></code></a> property are treated as
+<code class="docutils literal notranslate"><span class="pre">BUNDLE</span></code> targets on macOS.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">PUBLIC_HEADER</span></code></dt><dd><p>Any <span class="target" id="index-0-prop_tgt:PUBLIC_HEADER"></span><a class="reference internal" href="../prop_tgt/PUBLIC_HEADER.html#prop_tgt:PUBLIC_HEADER" title="PUBLIC_HEADER"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">PUBLIC_HEADER</span></code></a> files associated with a library are installed in
 the destination specified by the <code class="docutils literal notranslate"><span class="pre">PUBLIC_HEADER</span></code> argument on non-Apple
 platforms. Rules defined by this argument are ignored for <span class="target" id="index-0-prop_tgt:FRAMEWORK"></span><a class="reference internal" href="../prop_tgt/FRAMEWORK.html#prop_tgt:FRAMEWORK" title="FRAMEWORK"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">FRAMEWORK</span></code></a>
 libraries on Apple platforms because the associated files are installed
 into the appropriate locations inside the framework folder. See
-<span class="target" id="index-1-prop_tgt:PUBLIC_HEADER"></span><a class="reference internal" href="../prop_tgt/PUBLIC_HEADER.html#prop_tgt:PUBLIC_HEADER" title="PUBLIC_HEADER"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">PUBLIC_HEADER</span></code></a> for details.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">PRIVATE_HEADER</span></code></dt>
-<dd>Similar to <code class="docutils literal notranslate"><span class="pre">PUBLIC_HEADER</span></code>, but for <code class="docutils literal notranslate"><span class="pre">PRIVATE_HEADER</span></code> files. See
-<span class="target" id="index-0-prop_tgt:PRIVATE_HEADER"></span><a class="reference internal" href="../prop_tgt/PRIVATE_HEADER.html#prop_tgt:PRIVATE_HEADER" title="PRIVATE_HEADER"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">PRIVATE_HEADER</span></code></a> for details.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">RESOURCE</span></code></dt>
-<dd>Similar to <code class="docutils literal notranslate"><span class="pre">PUBLIC_HEADER</span></code> and <code class="docutils literal notranslate"><span class="pre">PRIVATE_HEADER</span></code>, but for
-<code class="docutils literal notranslate"><span class="pre">RESOURCE</span></code> files. See <span class="target" id="index-0-prop_tgt:RESOURCE"></span><a class="reference internal" href="../prop_tgt/RESOURCE.html#prop_tgt:RESOURCE" title="RESOURCE"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">RESOURCE</span></code></a> for details.</dd>
+<span class="target" id="index-1-prop_tgt:PUBLIC_HEADER"></span><a class="reference internal" href="../prop_tgt/PUBLIC_HEADER.html#prop_tgt:PUBLIC_HEADER" title="PUBLIC_HEADER"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">PUBLIC_HEADER</span></code></a> for details.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">PRIVATE_HEADER</span></code></dt><dd><p>Similar to <code class="docutils literal notranslate"><span class="pre">PUBLIC_HEADER</span></code>, but for <code class="docutils literal notranslate"><span class="pre">PRIVATE_HEADER</span></code> files. See
+<span class="target" id="index-0-prop_tgt:PRIVATE_HEADER"></span><a class="reference internal" href="../prop_tgt/PRIVATE_HEADER.html#prop_tgt:PRIVATE_HEADER" title="PRIVATE_HEADER"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">PRIVATE_HEADER</span></code></a> for details.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">RESOURCE</span></code></dt><dd><p>Similar to <code class="docutils literal notranslate"><span class="pre">PUBLIC_HEADER</span></code> and <code class="docutils literal notranslate"><span class="pre">PRIVATE_HEADER</span></code>, but for
+<code class="docutils literal notranslate"><span class="pre">RESOURCE</span></code> files. See <span class="target" id="index-0-prop_tgt:RESOURCE"></span><a class="reference internal" href="../prop_tgt/RESOURCE.html#prop_tgt:RESOURCE" title="RESOURCE"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">RESOURCE</span></code></a> for details.</p>
+</dd>
 </dl>
 <p>For each of these arguments given, the arguments following them only apply
 to the target or file type specified in the argument. If none is given, the
@@ -216,38 +237,38 @@ but they are handled differently (see the discussion of this topic toward the
 end of this section).</p>
 <p>The following table shows the target types with their associated variables and
 built-in defaults that apply when no destination is given:</p>
-<table border="1" class="docutils">
+<table class="docutils align-default">
 <colgroup>
-<col width="25%" />
-<col width="44%" />
-<col width="31%" />
+<col style="width: 25%" />
+<col style="width: 44%" />
+<col style="width: 31%" />
 </colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head">Target Type</th>
-<th class="head">GNUInstallDirs Variable</th>
-<th class="head">Built-In Default</th>
+<thead>
+<tr class="row-odd"><th class="head"><p>Target Type</p></th>
+<th class="head"><p>GNUInstallDirs Variable</p></th>
+<th class="head"><p>Built-In Default</p></th>
 </tr>
 </thead>
-<tbody valign="top">
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">RUNTIME</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_BINDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">bin</span></code></td>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">RUNTIME</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_BINDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bin</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><code class="docutils literal notranslate"><span class="pre">LIBRARY</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LIBDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">lib</span></code></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">LIBRARY</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LIBDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">lib</span></code></p></td>
 </tr>
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">ARCHIVE</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LIBDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">lib</span></code></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ARCHIVE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LIBDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">lib</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><code class="docutils literal notranslate"><span class="pre">PRIVATE_HEADER</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_INCLUDEDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">include</span></code></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">PRIVATE_HEADER</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_INCLUDEDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">include</span></code></p></td>
 </tr>
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">PUBLIC_HEADER</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_INCLUDEDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">include</span></code></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">PUBLIC_HEADER</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_INCLUDEDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">include</span></code></p></td>
 </tr>
 </tbody>
 </table>
@@ -273,9 +294,8 @@ subdirectory that follows the above recommendation:</p>
 </div>
 <p>In addition to the common options listed above, each target can accept
 the following additional arguments:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">NAMELINK_COMPONENT</span></code></dt>
-<dd><p class="first">On some platforms a versioned shared library has a symbolic link such
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">NAMELINK_COMPONENT</span></code></dt><dd><p>On some platforms a versioned shared library has a symbolic link such
 as:</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>lib&lt;name&gt;.so -&gt; lib&lt;name&gt;.so.1
 </pre></div>
@@ -307,47 +327,45 @@ only the library will be installed, without the headers and namelink.</p>
 runtime and development packages. For example, on Debian systems, the
 library is expected to be in the runtime package, and the headers and
 namelink are expected to be in the development package.</p>
-<p class="last">See the <span class="target" id="index-0-prop_tgt:VERSION"></span><a class="reference internal" href="../prop_tgt/VERSION.html#prop_tgt:VERSION" title="VERSION"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">VERSION</span></code></a> and <span class="target" id="index-0-prop_tgt:SOVERSION"></span><a class="reference internal" href="../prop_tgt/SOVERSION.html#prop_tgt:SOVERSION" title="SOVERSION"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">SOVERSION</span></code></a> target properties for
+<p>See the <span class="target" id="index-0-prop_tgt:VERSION"></span><a class="reference internal" href="../prop_tgt/VERSION.html#prop_tgt:VERSION" title="VERSION"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">VERSION</span></code></a> and <span class="target" id="index-0-prop_tgt:SOVERSION"></span><a class="reference internal" href="../prop_tgt/SOVERSION.html#prop_tgt:SOVERSION" title="SOVERSION"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">SOVERSION</span></code></a> target properties for
 details on creating versioned shared libraries.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">NAMELINK_ONLY</span></code></dt>
-<dd><p class="first">This option causes the installation of only the namelink when a library
+<dt><code class="docutils literal notranslate"><span class="pre">NAMELINK_ONLY</span></code></dt><dd><p>This option causes the installation of only the namelink when a library
 target is installed. On platforms where versioned shared libraries do not
 have namelinks or when a library is not versioned, the <code class="docutils literal notranslate"><span class="pre">NAMELINK_ONLY</span></code>
 option installs nothing. It is an error to use this parameter outside of a
 <code class="docutils literal notranslate"><span class="pre">LIBRARY</span></code> block.</p>
-<p class="last">When <code class="docutils literal notranslate"><span class="pre">NAMELINK_ONLY</span></code> is given, either <code class="docutils literal notranslate"><span class="pre">NAMELINK_COMPONENT</span></code> or
+<p>When <code class="docutils literal notranslate"><span class="pre">NAMELINK_ONLY</span></code> is given, either <code class="docutils literal notranslate"><span class="pre">NAMELINK_COMPONENT</span></code> or
 <code class="docutils literal notranslate"><span class="pre">COMPONENT</span></code> may be used to specify the installation component of the
 namelink, but <code class="docutils literal notranslate"><span class="pre">COMPONENT</span></code> should generally be preferred.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">NAMELINK_SKIP</span></code></dt>
-<dd><p class="first">Similar to <code class="docutils literal notranslate"><span class="pre">NAMELINK_ONLY</span></code>, but it has the opposite effect: it causes the
+<dt><code class="docutils literal notranslate"><span class="pre">NAMELINK_SKIP</span></code></dt><dd><p>Similar to <code class="docutils literal notranslate"><span class="pre">NAMELINK_ONLY</span></code>, but it has the opposite effect: it causes the
 installation of library files other than the namelink when a library target
 is installed. When neither <code class="docutils literal notranslate"><span class="pre">NAMELINK_ONLY</span></code> or <code class="docutils literal notranslate"><span class="pre">NAMELINK_SKIP</span></code> are given,
 both portions are installed. On platforms where versioned shared libraries
 do not have symlinks or when a library is not versioned, <code class="docutils literal notranslate"><span class="pre">NAMELINK_SKIP</span></code>
 installs the library. It is an error to use this parameter outside of a
 <code class="docutils literal notranslate"><span class="pre">LIBRARY</span></code> block.</p>
-<p class="last">If <code class="docutils literal notranslate"><span class="pre">NAMELINK_SKIP</span></code> is specified, <code class="docutils literal notranslate"><span class="pre">NAMELINK_COMPONENT</span></code> has no effect. It
+<p>If <code class="docutils literal notranslate"><span class="pre">NAMELINK_SKIP</span></code> is specified, <code class="docutils literal notranslate"><span class="pre">NAMELINK_COMPONENT</span></code> has no effect. It
 is not recommended to use <code class="docutils literal notranslate"><span class="pre">NAMELINK_SKIP</span></code> in conjunction with
 <code class="docutils literal notranslate"><span class="pre">NAMELINK_COMPONENT</span></code>.</p>
 </dd>
 </dl>
 <p>The <a class="reference internal" href="#install-targets">install(TARGETS)</a> command can also accept the following options at the
 top level:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">EXPORT</span></code></dt>
-<dd>This option associates the installed target files with an export called
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">EXPORT</span></code></dt><dd><p>This option associates the installed target files with an export called
 <code class="docutils literal notranslate"><span class="pre">&lt;export-name&gt;</span></code>.  It must appear before any target options.  To actually
 install the export file itself, call <a class="reference internal" href="#install-export">install(EXPORT)</a>, documented below.
 See documentation of the <span class="target" id="index-0-prop_tgt:EXPORT_NAME"></span><a class="reference internal" href="../prop_tgt/EXPORT_NAME.html#prop_tgt:EXPORT_NAME" title="EXPORT_NAME"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">EXPORT_NAME</span></code></a> target property to change
-the name of the exported target.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">INCLUDES</span> <span class="pre">DESTINATION</span></code></dt>
-<dd>This option specifies a list of directories which will be added to the
+the name of the exported target.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">INCLUDES</span> <span class="pre">DESTINATION</span></code></dt><dd><p>This option specifies a list of directories which will be added to the
 <span class="target" id="index-0-prop_tgt:INTERFACE_INCLUDE_DIRECTORIES"></span><a class="reference internal" href="../prop_tgt/INTERFACE_INCLUDE_DIRECTORIES.html#prop_tgt:INTERFACE_INCLUDE_DIRECTORIES" title="INTERFACE_INCLUDE_DIRECTORIES"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">INTERFACE_INCLUDE_DIRECTORIES</span></code></a> target property of the
 <code class="docutils literal notranslate"><span class="pre">&lt;targets&gt;</span></code> when exported by the <a class="reference internal" href="#install-export">install(EXPORT)</a> command. If a
 relative path is specified, it is treated as relative to the
-<code class="docutils literal notranslate"><span class="pre">$&lt;INSTALL_PREFIX&gt;</span></code>.</dd>
+<code class="docutils literal notranslate"><span class="pre">$&lt;INSTALL_PREFIX&gt;</span></code>.</p>
+</dd>
 </dl>
 <p>One or more groups of properties may be specified in a single call to
 the <code class="docutils literal notranslate"><span class="pre">TARGETS</span></code> form of this command.  A target may be installed more than
@@ -418,70 +436,70 @@ built-in default if that variable is not defined.  See the table below for
 the supported file types and their corresponding variables and built-in
 defaults.  Projects can provide a <code class="docutils literal notranslate"><span class="pre">DESTINATION</span></code> argument instead of a
 file type if they wish to explicitly define the install destination.</p>
-<table border="1" class="docutils">
+<table class="docutils align-default">
 <colgroup>
-<col width="28%" />
-<col width="41%" />
-<col width="30%" />
+<col style="width: 28%" />
+<col style="width: 41%" />
+<col style="width: 30%" />
 </colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head"><code class="docutils literal notranslate"><span class="pre">TYPE</span></code> Argument</th>
-<th class="head">GNUInstallDirs Variable</th>
-<th class="head">Built-In Default</th>
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">TYPE</span></code> Argument</p></th>
+<th class="head"><p>GNUInstallDirs Variable</p></th>
+<th class="head"><p>Built-In Default</p></th>
 </tr>
 </thead>
-<tbody valign="top">
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">BIN</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_BINDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">bin</span></code></td>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BIN</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_BINDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bin</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><code class="docutils literal notranslate"><span class="pre">SBIN</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_SBINDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">sbin</span></code></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">SBIN</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_SBINDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sbin</span></code></p></td>
 </tr>
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">LIB</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LIBDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">lib</span></code></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">LIB</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LIBDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">lib</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><code class="docutils literal notranslate"><span class="pre">INCLUDE</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_INCLUDEDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">include</span></code></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">INCLUDE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_INCLUDEDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">include</span></code></p></td>
 </tr>
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">SYSCONF</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_SYSCONFDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">etc</span></code></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">SYSCONF</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_SYSCONFDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">etc</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><code class="docutils literal notranslate"><span class="pre">SHAREDSTATE</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_SHARESTATEDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">com</span></code></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">SHAREDSTATE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_SHARESTATEDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">com</span></code></p></td>
 </tr>
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">LOCALSTATE</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LOCALSTATEDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">var</span></code></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">LOCALSTATE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LOCALSTATEDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">var</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><code class="docutils literal notranslate"><span class="pre">RUNSTATE</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_RUNSTATEDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">&lt;LOCALSTATE</span> <span class="pre">dir&gt;/run</span></code></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">RUNSTATE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_RUNSTATEDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&lt;LOCALSTATE</span> <span class="pre">dir&gt;/run</span></code></p></td>
 </tr>
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">DATA</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_DATADIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;</span></code></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DATA</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_DATADIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><code class="docutils literal notranslate"><span class="pre">INFO</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_INFODIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/info</span></code></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">INFO</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_INFODIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/info</span></code></p></td>
 </tr>
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">LOCALE</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LOCALEDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/locale</span></code></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">LOCALE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LOCALEDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/locale</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><code class="docutils literal notranslate"><span class="pre">MAN</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_MANDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/man</span></code></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MAN</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_MANDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/man</span></code></p></td>
 </tr>
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">DOC</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_DOCDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/doc</span></code></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DOC</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_DOCDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/doc</span></code></p></td>
 </tr>
 </tbody>
 </table>
@@ -585,70 +603,70 @@ is not defined.  See the table below for the supported file types and their
 corresponding variables and built-in defaults.  Projects can provide a
 <code class="docutils literal notranslate"><span class="pre">DESTINATION</span></code> argument instead of a file type if they wish to explicitly
 define the install destination.</p>
-<table border="1" class="docutils">
+<table class="docutils align-default">
 <colgroup>
-<col width="28%" />
-<col width="41%" />
-<col width="30%" />
+<col style="width: 28%" />
+<col style="width: 41%" />
+<col style="width: 30%" />
 </colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head"><code class="docutils literal notranslate"><span class="pre">TYPE</span></code> Argument</th>
-<th class="head">GNUInstallDirs Variable</th>
-<th class="head">Built-In Default</th>
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">TYPE</span></code> Argument</p></th>
+<th class="head"><p>GNUInstallDirs Variable</p></th>
+<th class="head"><p>Built-In Default</p></th>
 </tr>
 </thead>
-<tbody valign="top">
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">BIN</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_BINDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">bin</span></code></td>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BIN</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_BINDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bin</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><code class="docutils literal notranslate"><span class="pre">SBIN</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_SBINDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">sbin</span></code></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">SBIN</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_SBINDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sbin</span></code></p></td>
 </tr>
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">LIB</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LIBDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">lib</span></code></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">LIB</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LIBDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">lib</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><code class="docutils literal notranslate"><span class="pre">INCLUDE</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_INCLUDEDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">include</span></code></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">INCLUDE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_INCLUDEDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">include</span></code></p></td>
 </tr>
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">SYSCONF</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_SYSCONFDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">etc</span></code></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">SYSCONF</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_SYSCONFDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">etc</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><code class="docutils literal notranslate"><span class="pre">SHAREDSTATE</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_SHARESTATEDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">com</span></code></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">SHAREDSTATE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_SHARESTATEDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">com</span></code></p></td>
 </tr>
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">LOCALSTATE</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LOCALSTATEDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">var</span></code></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">LOCALSTATE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LOCALSTATEDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">var</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><code class="docutils literal notranslate"><span class="pre">RUNSTATE</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_RUNSTATEDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">&lt;LOCALSTATE</span> <span class="pre">dir&gt;/run</span></code></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">RUNSTATE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_RUNSTATEDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&lt;LOCALSTATE</span> <span class="pre">dir&gt;/run</span></code></p></td>
 </tr>
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">DATA</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_DATADIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;</span></code></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DATA</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_DATADIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><code class="docutils literal notranslate"><span class="pre">INFO</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_INFODIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/info</span></code></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">INFO</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_INFODIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/info</span></code></p></td>
 </tr>
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">LOCALE</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LOCALEDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/locale</span></code></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">LOCALE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_LOCALEDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/locale</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><code class="docutils literal notranslate"><span class="pre">MAN</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_MANDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/man</span></code></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MAN</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_MANDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/man</span></code></p></td>
 </tr>
-<tr class="row-even"><td><code class="docutils literal notranslate"><span class="pre">DOC</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_DOCDIR}</span></code></td>
-<td><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/doc</span></code></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DOC</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">${CMAKE_INSTALL_DOCDIR}</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&lt;DATAROOT</span> <span class="pre">dir&gt;/doc</span></code></p></td>
 </tr>
 </tbody>
 </table>
@@ -716,6 +734,14 @@ configurations.  The <code class="docutils literal notranslate"><span class="pre
 present, causes the contents of the properties matching
 <code class="docutils literal notranslate"><span class="pre">(IMPORTED_)?LINK_INTERFACE_LIBRARIES(_&lt;CONFIG&gt;)?</span></code> to be exported, when
 policy <span class="target" id="index-0-policy:CMP0022"></span><a class="reference internal" href="../policy/CMP0022.html#policy:CMP0022" title="CMP0022"><code class="xref cmake cmake-policy docutils literal notranslate"><span class="pre">CMP0022</span></code></a> is <code class="docutils literal notranslate"><span class="pre">NEW</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The installed <code class="docutils literal notranslate"><span class="pre">&lt;export-name&gt;.cmake</span></code> file may come with additional
+per-configuration <code class="docutils literal notranslate"><span class="pre">&lt;export-name&gt;-*.cmake</span></code> files to be loaded by
+globbing.  Do not use an export name that is the same as the package
+name in combination with installing a <code class="docutils literal notranslate"><span class="pre">&lt;package-name&gt;-config.cmake</span></code>
+file or the latter may be incorrectly matched by the glob and loaded.</p>
+</div>
 <p>When a <code class="docutils literal notranslate"><span class="pre">COMPONENT</span></code> option is given, the listed <code class="docutils literal notranslate"><span class="pre">&lt;component&gt;</span></code> implicitly
 depends on all components mentioned in the export set. The exported
 <code class="docutils literal notranslate"><span class="pre">&lt;name&gt;.cmake</span></code> file will require each of the exported components to be
@@ -753,8 +779,8 @@ may load this file with the include command and reference the <code class="docut
 executable from the installation tree using the imported target name
 <code class="docutils literal notranslate"><span class="pre">mp_myexe</span></code> as if the target were built in its own tree.</p>
 <div class="admonition note">
-<p class="first admonition-title">Note</p>
-<p class="last">This command supercedes the <span class="target" id="index-0-command:install_targets"></span><a class="reference internal" href="install_targets.html#command:install_targets" title="install_targets"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">install_targets()</span></code></a> command and
+<p class="admonition-title">Note</p>
+<p>This command supercedes the <span class="target" id="index-0-command:install_targets"></span><a class="reference internal" href="install_targets.html#command:install_targets" title="install_targets"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">install_targets()</span></code></a> command and
 the <span class="target" id="index-0-prop_tgt:PRE_INSTALL_SCRIPT"></span><a class="reference internal" href="../prop_tgt/PRE_INSTALL_SCRIPT.html#prop_tgt:PRE_INSTALL_SCRIPT" title="PRE_INSTALL_SCRIPT"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">PRE_INSTALL_SCRIPT</span></code></a> and <span class="target" id="index-0-prop_tgt:POST_INSTALL_SCRIPT"></span><a class="reference internal" href="../prop_tgt/POST_INSTALL_SCRIPT.html#prop_tgt:POST_INSTALL_SCRIPT" title="POST_INSTALL_SCRIPT"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">POST_INSTALL_SCRIPT</span></code></a>
 target properties.  It also replaces the <code class="docutils literal notranslate"><span class="pre">FILES</span></code> forms of the
 <span class="target" id="index-0-command:install_files"></span><a class="reference internal" href="install_files.html#command:install_files" title="install_files"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">install_files()</span></code></a> and <span class="target" id="index-0-command:install_programs"></span><a class="reference internal" href="install_programs.html#command:install_programs" title="install_programs"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">install_programs()</span></code></a> commands.
@@ -766,23 +792,28 @@ is not defined.</p>
 </div>
 <div class="section" id="generated-installation-script">
 <h2>Generated Installation Script<a class="headerlink" href="#generated-installation-script" title="Permalink to this headline">¶</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Use of this feature is not recommended. Please consider using the
+<code class="docutils literal notranslate"><span class="pre">--install</span></code> argument of <span class="target" id="index-0-manual:cmake(1)"></span><a class="reference internal" href="../manual/cmake.1.html#manual:cmake(1)" title="cmake(1)"><code class="xref cmake cmake-manual docutils literal notranslate"><span class="pre">cmake(1)</span></code></a> instead.</p>
+</div>
 <p>The <code class="docutils literal notranslate"><span class="pre">install()</span></code> command generates a file, <code class="docutils literal notranslate"><span class="pre">cmake_install.cmake</span></code>, inside
 the build directory, which is used internally by the generated install target
 and by CPack. You can also invoke this script manually with <code class="docutils literal notranslate"><span class="pre">cmake</span> <span class="pre">-P</span></code>. This
 script accepts several variables:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">COMPONENT</span></code></dt>
-<dd>Set this variable to install only a single CPack component as opposed to all
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">COMPONENT</span></code></dt><dd><p>Set this variable to install only a single CPack component as opposed to all
 of them. For example, if you only want to install the <code class="docutils literal notranslate"><span class="pre">Development</span></code>
-component, run <code class="docutils literal notranslate"><span class="pre">cmake</span> <span class="pre">-DCOMPONENT=Development</span> <span class="pre">-P</span> <span class="pre">cmake_install.cmake</span></code>.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">BUILD_TYPE</span></code></dt>
-<dd>Set this variable to change the build type if you are using a multi-config
+component, run <code class="docutils literal notranslate"><span class="pre">cmake</span> <span class="pre">-DCOMPONENT=Development</span> <span class="pre">-P</span> <span class="pre">cmake_install.cmake</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">BUILD_TYPE</span></code></dt><dd><p>Set this variable to change the build type if you are using a multi-config
 generator. For example, to install with the <code class="docutils literal notranslate"><span class="pre">Debug</span></code> configuration, run
-<code class="docutils literal notranslate"><span class="pre">cmake</span> <span class="pre">-DBUILD_TYPE=Debug</span> <span class="pre">-P</span> <span class="pre">cmake_install.cmake</span></code>.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">DESTDIR</span></code></dt>
-<dd>This is an environment variable rather than a CMake variable. It allows you
+<code class="docutils literal notranslate"><span class="pre">cmake</span> <span class="pre">-DBUILD_TYPE=Debug</span> <span class="pre">-P</span> <span class="pre">cmake_install.cmake</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">DESTDIR</span></code></dt><dd><p>This is an environment variable rather than a CMake variable. It allows you
 to change the installation prefix on UNIX systems. See <span class="target" id="index-0-envvar:DESTDIR"></span><a class="reference internal" href="../envvar/DESTDIR.html#envvar:DESTDIR" title="DESTDIR"><code class="xref cmake cmake-envvar docutils literal notranslate"><span class="pre">DESTDIR</span></code></a> for
-details.</dd>
+details.</p>
+</dd>
 </dl>
 </div>
 </div>
@@ -793,7 +824,7 @@ details.</dd>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <h3><a href="../index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">install</a><ul>
 <li><a class="reference internal" href="#synopsis">Synopsis</a></li>
@@ -822,13 +853,11 @@ details.</dd>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -857,15 +886,15 @@ details.</dd>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-commands.7.html" >cmake-commands(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

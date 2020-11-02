@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>FindODBC &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>FindODBC &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" accesskey="U">cmake-modules(7)</a> &#187;</li> 
@@ -57,6 +58,9 @@
             
   <div class="section" id="findodbc">
 <span id="module:FindODBC"></span><h1>FindODBC<a class="headerlink" href="#findodbc" title="Permalink to this headline">¶</a></h1>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 3.12.</span></p>
+</div>
 <p>Find an Open Database Connectivity (ODBC) include directory and library.</p>
 <p>On Windows, when building with Visual Studio, this module assumes the ODBC
 library is provided by the available Windows SDK.</p>
@@ -65,7 +69,7 @@ unixODBC or iODBC implementations of ODBC API.
 This module reads hint about location of the config program:</p>
 <dl class="variable">
 <dt id="variable:ODBC_CONFIG">
-<code class="descname">ODBC_CONFIG</code><a class="headerlink" href="#variable:ODBC_CONFIG" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">ODBC_CONFIG</code><a class="headerlink" href="#variable:ODBC_CONFIG" title="Permalink to this definition">¶</a></dt>
 <dd><p>Location of odbc_config or iodbc-config program</p>
 </dd></dl>
 
@@ -78,7 +82,7 @@ and library in list of known locations.</p>
 <p>This module defines the following <span class="target" id="index-0-prop_tgt:IMPORTED"></span><a class="reference internal" href="../prop_tgt/IMPORTED.html#prop_tgt:IMPORTED" title="IMPORTED"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">IMPORTED</span></code></a> targets:</p>
 <dl class="variable">
 <dt id="variable:ODBC::ODBC">
-<code class="descname">ODBC::ODBC</code><a class="headerlink" href="#variable:ODBC::ODBC" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">ODBC::ODBC</code><a class="headerlink" href="#variable:ODBC::ODBC" title="Permalink to this definition">¶</a></dt>
 <dd><p>Imported target for using the ODBC library, if found.</p>
 </dd></dl>
 
@@ -87,13 +91,13 @@ and library in list of known locations.</p>
 <h2>Result variables<a class="headerlink" href="#result-variables" title="Permalink to this headline">¶</a></h2>
 <dl class="variable">
 <dt id="variable:ODBC_FOUND">
-<code class="descname">ODBC_FOUND</code><a class="headerlink" href="#variable:ODBC_FOUND" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">ODBC_FOUND</code><a class="headerlink" href="#variable:ODBC_FOUND" title="Permalink to this definition">¶</a></dt>
 <dd><p>Set to true if ODBC library found, otherwise false or undefined.</p>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:ODBC_INCLUDE_DIRS">
-<code class="descname">ODBC_INCLUDE_DIRS</code><a class="headerlink" href="#variable:ODBC_INCLUDE_DIRS" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">ODBC_INCLUDE_DIRS</code><a class="headerlink" href="#variable:ODBC_INCLUDE_DIRS" title="Permalink to this definition">¶</a></dt>
 <dd><p>Paths to include directories listed in one variable for use by ODBC client.
 May be empty on Windows, where the include directory corresponding to the
 expected Windows SDK is already available in the compilation environment.</p>
@@ -101,7 +105,7 @@ expected Windows SDK is already available in the compilation environment.</p>
 
 <dl class="variable">
 <dt id="variable:ODBC_LIBRARIES">
-<code class="descname">ODBC_LIBRARIES</code><a class="headerlink" href="#variable:ODBC_LIBRARIES" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">ODBC_LIBRARIES</code><a class="headerlink" href="#variable:ODBC_LIBRARIES" title="Permalink to this definition">¶</a></dt>
 <dd><p>Paths to libraries to linked against to use ODBC.
 May just a library name on Windows, where the library directory corresponding
 to the expected Windows SDK is already available in the compilation environment.</p>
@@ -109,7 +113,7 @@ to the expected Windows SDK is already available in the compilation environment.
 
 <dl class="variable">
 <dt>
-<code class="descname">ODBC_CONFIG</code></dt>
+<code class="sig-name descname">ODBC_CONFIG</code></dt>
 <dd><p>Path to unixODBC or iODBC config program, if found or specified.</p>
 </dd></dl>
 
@@ -120,13 +124,13 @@ to the expected Windows SDK is already available in the compilation environment.
 reads hints about search locations from the following variables:</p>
 <dl class="variable">
 <dt id="variable:ODBC_INCLUDE_DIR">
-<code class="descname">ODBC_INCLUDE_DIR</code><a class="headerlink" href="#variable:ODBC_INCLUDE_DIR" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">ODBC_INCLUDE_DIR</code><a class="headerlink" href="#variable:ODBC_INCLUDE_DIR" title="Permalink to this definition">¶</a></dt>
 <dd><p>Path to ODBC include directory with <code class="docutils literal notranslate"><span class="pre">sql.h</span></code> header.</p>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:ODBC_LIBRARY">
-<code class="descname">ODBC_LIBRARY</code><a class="headerlink" href="#variable:ODBC_LIBRARY" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">ODBC_LIBRARY</code><a class="headerlink" href="#variable:ODBC_LIBRARY" title="Permalink to this definition">¶</a></dt>
 <dd><p>Path to ODBC library to be linked.</p>
 </dd></dl>
 
@@ -147,7 +151,7 @@ This module does not allow to search for a specific ODBC driver.</p>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <h3><a href="../index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">FindODBC</a><ul>
 <li><a class="reference internal" href="#imported-targets">Imported targets</a></li>
@@ -172,13 +176,11 @@ This module does not allow to search for a specific ODBC driver.</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -207,15 +209,15 @@ This module does not allow to search for a specific ODBC driver.</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" >cmake-modules(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

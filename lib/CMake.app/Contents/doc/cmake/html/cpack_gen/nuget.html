@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>CPack NuGet Generator &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>CPack NuGet Generator &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cpack-generators.7.html" accesskey="U">cpack-generators(7)</a> &#187;</li> 
@@ -76,52 +77,51 @@ a “C” identifier).</p>
 <p>List of CPack NuGet generator specific variables:</p>
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_COMPONENT_INSTALL">
-<code class="descname">CPACK_NUGET_COMPONENT_INSTALL</code><a class="headerlink" href="#variable:CPACK_NUGET_COMPONENT_INSTALL" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_COMPONENT_INSTALL</code><a class="headerlink" href="#variable:CPACK_NUGET_COMPONENT_INSTALL" title="Permalink to this definition">¶</a></dt>
 <dd><p>Enable component packaging for CPack NuGet generator</p>
 <ul class="simple">
-<li>Mandatory : NO</li>
-<li>Default   : OFF</li>
+<li><p>Mandatory : NO</p></li>
+<li><p>Default   : OFF</p></li>
 </ul>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_NAME">
-<code class="descname">CPACK_NUGET_PACKAGE_NAME</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_NAME" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_NAME</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_NAME" title="Permalink to this definition">¶</a></dt>
 <dt id="variable:CPACK_NUGET_&lt;compName&gt;_PACKAGE_NAME">
-<code class="descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_NAME</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_NAME" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_NAME</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_NAME" title="Permalink to this definition">¶</a></dt>
 <dd><p>The NUGET package name.</p>
 <ul class="simple">
-<li>Mandatory : YES</li>
-<li>Default   : <span class="target" id="index-0-variable:CPACK_PACKAGE_NAME"></span><a class="reference internal" href="../module/CPack.html#variable:CPACK_PACKAGE_NAME" title="CPACK_PACKAGE_NAME"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_PACKAGE_NAME</span></code></a></li>
+<li><p>Mandatory : YES</p></li>
+<li><p>Default   : <span class="target" id="index-0-variable:CPACK_PACKAGE_NAME"></span><a class="reference internal" href="../module/CPack.html#variable:CPACK_PACKAGE_NAME" title="CPACK_PACKAGE_NAME"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_PACKAGE_NAME</span></code></a></p></li>
 </ul>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_VERSION">
-<code class="descname">CPACK_NUGET_PACKAGE_VERSION</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_VERSION" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_VERSION</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_VERSION" title="Permalink to this definition">¶</a></dt>
 <dt id="variable:CPACK_NUGET_&lt;compName&gt;_PACKAGE_VERSION">
-<code class="descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_VERSION</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_VERSION" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_VERSION</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_VERSION" title="Permalink to this definition">¶</a></dt>
 <dd><p>The NuGet package version.</p>
 <ul class="simple">
-<li>Mandatory : YES</li>
-<li>Default   : <span class="target" id="index-0-variable:CPACK_PACKAGE_VERSION"></span><a class="reference internal" href="../module/CPack.html#variable:CPACK_PACKAGE_VERSION" title="CPACK_PACKAGE_VERSION"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_PACKAGE_VERSION</span></code></a></li>
+<li><p>Mandatory : YES</p></li>
+<li><p>Default   : <span class="target" id="index-0-variable:CPACK_PACKAGE_VERSION"></span><a class="reference internal" href="../module/CPack.html#variable:CPACK_PACKAGE_VERSION" title="CPACK_PACKAGE_VERSION"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_PACKAGE_VERSION</span></code></a></p></li>
 </ul>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_DESCRIPTION">
-<code class="descname">CPACK_NUGET_PACKAGE_DESCRIPTION</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_DESCRIPTION" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_DESCRIPTION</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_DESCRIPTION" title="Permalink to this definition">¶</a></dt>
 <dt id="variable:CPACK_NUGET_&lt;compName&gt;_PACKAGE_DESCRIPTION">
-<code class="descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_DESCRIPTION</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_DESCRIPTION" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_DESCRIPTION</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_DESCRIPTION" title="Permalink to this definition">¶</a></dt>
 <dd><p>A long description of the package for UI display.</p>
 <ul class="simple">
-<li>Mandatory : YES</li>
-<li><dl class="first docutils">
-<dt>Default   :</dt>
-<dd><ul class="first last">
-<li><span class="target" id="index-0-variable:CPACK_COMPONENT_&lt;compName&gt;_DESCRIPTION"></span><a class="reference internal" href="../module/CPackComponent.html#variable:CPACK_COMPONENT_&lt;compName&gt;_DESCRIPTION" title="CPACK_COMPONENT_&lt;compName&gt;_DESCRIPTION"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_COMPONENT_&lt;compName&gt;_DESCRIPTION</span></code></a>,</li>
-<li><code class="docutils literal notranslate"><span class="pre">CPACK_COMPONENT_GROUP_&lt;groupName&gt;_DESCRIPTION</span></code>,</li>
-<li><span class="target" id="index-0-variable:CPACK_PACKAGE_DESCRIPTION"></span><a class="reference internal" href="../module/CPack.html#variable:CPACK_PACKAGE_DESCRIPTION" title="CPACK_PACKAGE_DESCRIPTION"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_PACKAGE_DESCRIPTION</span></code></a></li>
+<li><p>Mandatory : YES</p></li>
+<li><dl class="simple">
+<dt>Default   :</dt><dd><ul>
+<li><p><span class="target" id="index-0-variable:CPACK_COMPONENT_&lt;compName&gt;_DESCRIPTION"></span><a class="reference internal" href="../module/CPackComponent.html#variable:CPACK_COMPONENT_&lt;compName&gt;_DESCRIPTION" title="CPACK_COMPONENT_&lt;compName&gt;_DESCRIPTION"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_COMPONENT_&lt;compName&gt;_DESCRIPTION</span></code></a>,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CPACK_COMPONENT_GROUP_&lt;groupName&gt;_DESCRIPTION</span></code>,</p></li>
+<li><p><span class="target" id="index-0-variable:CPACK_PACKAGE_DESCRIPTION"></span><a class="reference internal" href="../module/CPack.html#variable:CPACK_PACKAGE_DESCRIPTION" title="CPACK_PACKAGE_DESCRIPTION"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_PACKAGE_DESCRIPTION</span></code></a></p></li>
 </ul>
 </dd>
 </dl>
@@ -131,34 +131,33 @@ a “C” identifier).</p>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_AUTHORS">
-<code class="descname">CPACK_NUGET_PACKAGE_AUTHORS</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_AUTHORS" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_AUTHORS</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_AUTHORS" title="Permalink to this definition">¶</a></dt>
 <dt id="variable:CPACK_NUGET_&lt;compName&gt;_PACKAGE_AUTHORS">
-<code class="descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_AUTHORS</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_AUTHORS" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_AUTHORS</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_AUTHORS" title="Permalink to this definition">¶</a></dt>
 <dd><p>A comma-separated list of packages authors, matching the profile names
 on <a class="reference external" href="http://nuget.org">nuget.org</a>. These are displayed in the NuGet Gallery on
 <a class="reference external" href="http://nuget.org">nuget.org</a> and are used to cross-reference packages by the same
 authors.</p>
 <ul class="simple">
-<li>Mandatory : YES</li>
-<li>Default   : <span class="target" id="index-0-variable:CPACK_PACKAGE_VENDOR"></span><a class="reference internal" href="../module/CPack.html#variable:CPACK_PACKAGE_VENDOR" title="CPACK_PACKAGE_VENDOR"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_PACKAGE_VENDOR</span></code></a></li>
+<li><p>Mandatory : YES</p></li>
+<li><p>Default   : <span class="target" id="index-0-variable:CPACK_PACKAGE_VENDOR"></span><a class="reference internal" href="../module/CPack.html#variable:CPACK_PACKAGE_VENDOR" title="CPACK_PACKAGE_VENDOR"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_PACKAGE_VENDOR</span></code></a></p></li>
 </ul>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_TITLE">
-<code class="descname">CPACK_NUGET_PACKAGE_TITLE</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_TITLE" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_TITLE</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_TITLE" title="Permalink to this definition">¶</a></dt>
 <dt id="variable:CPACK_NUGET_&lt;compName&gt;_PACKAGE_TITLE">
-<code class="descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_TITLE</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_TITLE" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_TITLE</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_TITLE" title="Permalink to this definition">¶</a></dt>
 <dd><p>A human-friendly title of the package, typically used in UI displays
 as on <a class="reference external" href="http://nuget.org">nuget.org</a> and the Package Manager in Visual Studio. If not
 specified, the package ID is used.</p>
 <ul class="simple">
-<li>Mandatory : NO</li>
-<li><dl class="first docutils">
-<dt>Default   :</dt>
-<dd><ul class="first last">
-<li><span class="target" id="index-0-variable:CPACK_COMPONENT_&lt;compName&gt;_DISPLAY_NAME"></span><a class="reference internal" href="../module/CPackComponent.html#variable:CPACK_COMPONENT_&lt;compName&gt;_DISPLAY_NAME" title="CPACK_COMPONENT_&lt;compName&gt;_DISPLAY_NAME"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_COMPONENT_&lt;compName&gt;_DISPLAY_NAME</span></code></a>,</li>
-<li><code class="docutils literal notranslate"><span class="pre">CPACK_COMPONENT_GROUP_&lt;groupName&gt;_DISPLAY_NAME</span></code></li>
+<li><p>Mandatory : NO</p></li>
+<li><dl class="simple">
+<dt>Default   :</dt><dd><ul>
+<li><p><span class="target" id="index-0-variable:CPACK_COMPONENT_&lt;compName&gt;_DISPLAY_NAME"></span><a class="reference internal" href="../module/CPackComponent.html#variable:CPACK_COMPONENT_&lt;compName&gt;_DISPLAY_NAME" title="CPACK_COMPONENT_&lt;compName&gt;_DISPLAY_NAME"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_COMPONENT_&lt;compName&gt;_DISPLAY_NAME</span></code></a>,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CPACK_COMPONENT_GROUP_&lt;groupName&gt;_DISPLAY_NAME</span></code></p></li>
 </ul>
 </dd>
 </dl>
@@ -168,144 +167,144 @@ specified, the package ID is used.</p>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_OWNERS">
-<code class="descname">CPACK_NUGET_PACKAGE_OWNERS</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_OWNERS" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_OWNERS</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_OWNERS" title="Permalink to this definition">¶</a></dt>
 <dt id="variable:CPACK_NUGET_&lt;compName&gt;_PACKAGE_OWNERS">
-<code class="descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_OWNERS</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_OWNERS" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_OWNERS</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_OWNERS" title="Permalink to this definition">¶</a></dt>
 <dd><p>A comma-separated list of the package creators using profile names
 on <a class="reference external" href="http://nuget.org">nuget.org</a>. This is often the same list as in authors,
 and is ignored when uploading the package to <a class="reference external" href="http://nuget.org">nuget.org</a>.</p>
 <ul class="simple">
-<li>Mandatory : NO</li>
-<li>Default   : -</li>
+<li><p>Mandatory : NO</p></li>
+<li><p>Default   : -</p></li>
 </ul>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_HOMEPAGE_URL">
-<code class="descname">CPACK_NUGET_PACKAGE_HOMEPAGE_URL</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_HOMEPAGE_URL" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_HOMEPAGE_URL</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_HOMEPAGE_URL" title="Permalink to this definition">¶</a></dt>
 <dt id="variable:CPACK_NUGET_&lt;compName&gt;_PACKAGE_HOMEPAGE_URL">
-<code class="descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_HOMEPAGE_URL</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_HOMEPAGE_URL" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_HOMEPAGE_URL</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_HOMEPAGE_URL" title="Permalink to this definition">¶</a></dt>
 <dd><p>A URL for the package’s home page, often shown in UI displays as well
 as <a class="reference external" href="http://nuget.org">nuget.org</a>.</p>
 <ul class="simple">
-<li>Mandatory : NO</li>
-<li>Default   : <span class="target" id="index-0-variable:CPACK_PACKAGE_HOMEPAGE_URL"></span><a class="reference internal" href="../module/CPack.html#variable:CPACK_PACKAGE_HOMEPAGE_URL" title="CPACK_PACKAGE_HOMEPAGE_URL"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_PACKAGE_HOMEPAGE_URL</span></code></a></li>
+<li><p>Mandatory : NO</p></li>
+<li><p>Default   : <span class="target" id="index-0-variable:CPACK_PACKAGE_HOMEPAGE_URL"></span><a class="reference internal" href="../module/CPack.html#variable:CPACK_PACKAGE_HOMEPAGE_URL" title="CPACK_PACKAGE_HOMEPAGE_URL"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_PACKAGE_HOMEPAGE_URL</span></code></a></p></li>
 </ul>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_LICENSEURL">
-<code class="descname">CPACK_NUGET_PACKAGE_LICENSEURL</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_LICENSEURL" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_LICENSEURL</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_LICENSEURL" title="Permalink to this definition">¶</a></dt>
 <dt id="variable:CPACK_NUGET_&lt;compName&gt;_PACKAGE_LICENSEURL">
-<code class="descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_LICENSEURL</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_LICENSEURL" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_LICENSEURL</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_LICENSEURL" title="Permalink to this definition">¶</a></dt>
 <dd><p>A URL for the package’s license, often shown in UI displays as well
 as <a class="reference external" href="http://nuget.org">nuget.org</a>.</p>
 <ul class="simple">
-<li>Mandatory : NO</li>
-<li>Default   : -</li>
+<li><p>Mandatory : NO</p></li>
+<li><p>Default   : -</p></li>
 </ul>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_ICONURL">
-<code class="descname">CPACK_NUGET_PACKAGE_ICONURL</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_ICONURL" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_ICONURL</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_ICONURL" title="Permalink to this definition">¶</a></dt>
 <dt id="variable:CPACK_NUGET_&lt;compName&gt;_PACKAGE_ICONURL">
-<code class="descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_ICONURL</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_ICONURL" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_ICONURL</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_ICONURL" title="Permalink to this definition">¶</a></dt>
 <dd><p>A URL for a 64x64 image with transparency background to use as the
 icon for the package in UI display.</p>
 <ul class="simple">
-<li>Mandatory : NO</li>
-<li>Default   : -</li>
+<li><p>Mandatory : NO</p></li>
+<li><p>Default   : -</p></li>
 </ul>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_DESCRIPTION_SUMMARY">
-<code class="descname">CPACK_NUGET_PACKAGE_DESCRIPTION_SUMMARY</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_DESCRIPTION_SUMMARY" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_DESCRIPTION_SUMMARY</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_DESCRIPTION_SUMMARY" title="Permalink to this definition">¶</a></dt>
 <dt id="variable:CPACK_NUGET_&lt;compName&gt;_PACKAGE_DESCRIPTION_SUMMARY">
-<code class="descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_DESCRIPTION_SUMMARY</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_DESCRIPTION_SUMMARY" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_DESCRIPTION_SUMMARY</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_DESCRIPTION_SUMMARY" title="Permalink to this definition">¶</a></dt>
 <dd><p>A short description of the package for UI display. If omitted, a
 truncated version of description is used.</p>
 <ul class="simple">
-<li>Mandatory : NO</li>
-<li>Default   : <span class="target" id="index-0-variable:CPACK_PACKAGE_DESCRIPTION_SUMMARY"></span><a class="reference internal" href="../module/CPack.html#variable:CPACK_PACKAGE_DESCRIPTION_SUMMARY" title="CPACK_PACKAGE_DESCRIPTION_SUMMARY"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_PACKAGE_DESCRIPTION_SUMMARY</span></code></a></li>
+<li><p>Mandatory : NO</p></li>
+<li><p>Default   : <span class="target" id="index-0-variable:CPACK_PACKAGE_DESCRIPTION_SUMMARY"></span><a class="reference internal" href="../module/CPack.html#variable:CPACK_PACKAGE_DESCRIPTION_SUMMARY" title="CPACK_PACKAGE_DESCRIPTION_SUMMARY"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CPACK_PACKAGE_DESCRIPTION_SUMMARY</span></code></a></p></li>
 </ul>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_RELEASE_NOTES">
-<code class="descname">CPACK_NUGET_PACKAGE_RELEASE_NOTES</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_RELEASE_NOTES" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_RELEASE_NOTES</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_RELEASE_NOTES" title="Permalink to this definition">¶</a></dt>
 <dt id="variable:CPACK_NUGET_&lt;compName&gt;_PACKAGE_RELEASE_NOTES">
-<code class="descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_RELEASE_NOTES</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_RELEASE_NOTES" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_RELEASE_NOTES</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_RELEASE_NOTES" title="Permalink to this definition">¶</a></dt>
 <dd><p>A description of the changes made in this release of the package,
 often used in UI like the Updates tab of the Visual Studio Package
 Manager in place of the package description.</p>
 <ul class="simple">
-<li>Mandatory : NO</li>
-<li>Default   : -</li>
+<li><p>Mandatory : NO</p></li>
+<li><p>Default   : -</p></li>
 </ul>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_COPYRIGHT">
-<code class="descname">CPACK_NUGET_PACKAGE_COPYRIGHT</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_COPYRIGHT" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_COPYRIGHT</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_COPYRIGHT" title="Permalink to this definition">¶</a></dt>
 <dt id="variable:CPACK_NUGET_&lt;compName&gt;_PACKAGE_COPYRIGHT">
-<code class="descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_COPYRIGHT</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_COPYRIGHT" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_COPYRIGHT</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_COPYRIGHT" title="Permalink to this definition">¶</a></dt>
 <dd><p>Copyright details for the package.</p>
 <ul class="simple">
-<li>Mandatory : NO</li>
-<li>Default   : -</li>
+<li><p>Mandatory : NO</p></li>
+<li><p>Default   : -</p></li>
 </ul>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_TAGS">
-<code class="descname">CPACK_NUGET_PACKAGE_TAGS</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_TAGS" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_TAGS</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_TAGS" title="Permalink to this definition">¶</a></dt>
 <dt id="variable:CPACK_NUGET_&lt;compName&gt;_PACKAGE_TAGS">
-<code class="descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_TAGS</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_TAGS" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_TAGS</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_TAGS" title="Permalink to this definition">¶</a></dt>
 <dd><p>A space-delimited list of tags and keywords that describe the
 package and aid discoverability of packages through search and
 filtering.</p>
 <ul class="simple">
-<li>Mandatory : NO</li>
-<li>Default   : -</li>
+<li><p>Mandatory : NO</p></li>
+<li><p>Default   : -</p></li>
 </ul>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_DEPENDENCIES">
-<code class="descname">CPACK_NUGET_PACKAGE_DEPENDENCIES</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_DEPENDENCIES" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_DEPENDENCIES</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_DEPENDENCIES" title="Permalink to this definition">¶</a></dt>
 <dt id="variable:CPACK_NUGET_&lt;compName&gt;_PACKAGE_DEPENDENCIES">
-<code class="descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_DEPENDENCIES</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_DEPENDENCIES" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_DEPENDENCIES</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_DEPENDENCIES" title="Permalink to this definition">¶</a></dt>
 <dd><p>A list of package dependencies.</p>
 <ul class="simple">
-<li>Mandatory : NO</li>
-<li>Default   : -</li>
+<li><p>Mandatory : NO</p></li>
+<li><p>Default   : -</p></li>
 </ul>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_DEPENDENCIES_&lt;dependency&gt;_VERSION">
-<code class="descname">CPACK_NUGET_PACKAGE_DEPENDENCIES_&lt;dependency&gt;_VERSION</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_DEPENDENCIES_<dependency>_VERSION" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_DEPENDENCIES_&lt;dependency&gt;_VERSION</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_DEPENDENCIES_<dependency>_VERSION" title="Permalink to this definition">¶</a></dt>
 <dt id="variable:CPACK_NUGET_&lt;compName&gt;_PACKAGE_DEPENDENCIES_&lt;dependency&gt;_VERSION">
-<code class="descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_DEPENDENCIES_&lt;dependency&gt;_VERSION</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_DEPENDENCIES_<dependency>_VERSION" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_&lt;compName&gt;_PACKAGE_DEPENDENCIES_&lt;dependency&gt;_VERSION</code><a class="headerlink" href="#variable:CPACK_NUGET_<compName>_PACKAGE_DEPENDENCIES_<dependency>_VERSION" title="Permalink to this definition">¶</a></dt>
 <dd><p>A <a class="reference external" href="https://docs.microsoft.com/en-us/nuget/reference/package-versioning#version-ranges-and-wildcards">version specification</a> for the particular dependency, where
 <code class="docutils literal notranslate"><span class="pre">&lt;dependency&gt;</span></code> is an item of the dependency list (see above)
 transformed with <code class="docutils literal notranslate"><span class="pre">MAKE_C_IDENTIFIER</span></code> function of <span class="target" id="index-0-command:string"></span><a class="reference internal" href="../command/string.html#command:string" title="string"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">string()</span></code></a>
 command.</p>
 <ul class="simple">
-<li>Mandatory : NO</li>
-<li>Default   : -</li>
+<li><p>Mandatory : NO</p></li>
+<li><p>Default   : -</p></li>
 </ul>
 </dd></dl>
 
 <dl class="variable">
 <dt id="variable:CPACK_NUGET_PACKAGE_DEBUG">
-<code class="descname">CPACK_NUGET_PACKAGE_DEBUG</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_DEBUG" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">CPACK_NUGET_PACKAGE_DEBUG</code><a class="headerlink" href="#variable:CPACK_NUGET_PACKAGE_DEBUG" title="Permalink to this definition">¶</a></dt>
 <dd><p>Enable debug messages while executing CPack NuGet generator.</p>
 <ul class="simple">
-<li>Mandatory : NO</li>
-<li>Default   : OFF</li>
+<li><p>Mandatory : NO</p></li>
+<li><p>Default   : OFF</p></li>
 </ul>
 </dd></dl>
 
@@ -318,7 +317,7 @@ command.</p>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <h3><a href="../index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">CPack NuGet Generator</a><ul>
 <li><a class="reference internal" href="#variables-specific-to-cpack-nuget-generator">Variables specific to CPack NuGet generator</a></li>
@@ -340,13 +339,11 @@ command.</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -375,15 +372,15 @@ command.</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cpack-generators.7.html" >cpack-generators(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

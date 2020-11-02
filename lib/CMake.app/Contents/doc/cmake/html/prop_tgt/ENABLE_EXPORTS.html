@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>ENABLE_EXPORTS &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>ENABLE_EXPORTS &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-properties.7.html" accesskey="U">cmake-properties(7)</a> &#187;</li> 
@@ -62,16 +63,23 @@
 final program.  It is possible for an executable to export symbols to
 be used by loadable modules.  When this property is set to true CMake
 will allow other targets to “link” to the executable with the
-<span class="target" id="index-0-command:target_link_libraries"></span><a class="reference internal" href="../command/target_link_libraries.html#command:target_link_libraries" title="target_link_libraries"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">TARGET_LINK_LIBRARIES()</span></code></a> command.  On all platforms a target-level
+<span class="target" id="index-0-command:target_link_libraries"></span><a class="reference internal" href="../command/target_link_libraries.html#command:target_link_libraries" title="target_link_libraries"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">target_link_libraries()</span></code></a> command.  On all platforms a target-level
 dependency on the executable is created for targets that link to it.
-For DLL platforms an import library will be created for the exported
-symbols and then used for linking.  All Windows-based systems
-including Cygwin are DLL platforms.  For non-DLL platforms that
-require all symbols to be resolved at link time, such as macOS, the
-module will “link” to the executable using a flag like
-<code class="docutils literal notranslate"><span class="pre">-bundle_loader</span></code>.  For other non-DLL platforms the link rule is simply
-ignored since the dynamic loader will automatically bind symbols when
-the module is loaded.</p>
+Handling of the executable on the link lines of the loadable modules
+varies by platform:</p>
+<ul class="simple">
+<li><p>On Windows-based systems (including Cygwin) an “import library” is
+created along with the executable to list the exported symbols.
+Loadable modules link to the import library to get the symbols.</p></li>
+<li><p>On macOS, loadable modules link to the executable itself using the
+<code class="docutils literal notranslate"><span class="pre">-bundle_loader</span></code> flag.</p></li>
+<li><p>On AIX, a linker “import file” is created along with the executable
+to list the exported symbols for import when linking other targets.
+Loadable modules link to the import file to get the symbols.</p></li>
+<li><p>On other platforms, loadable modules are simply linked without
+referencing the executable since the dynamic loader will
+automatically bind symbols when the module is loaded.</p></li>
+</ul>
 <p>This property is initialized by the value of the variable
 <span class="target" id="index-0-variable:CMAKE_ENABLE_EXPORTS"></span><a class="reference internal" href="../variable/CMAKE_ENABLE_EXPORTS.html#variable:CMAKE_ENABLE_EXPORTS" title="CMAKE_ENABLE_EXPORTS"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_ENABLE_EXPORTS</span></code></a> if it is set when a target is created.</p>
 </div>
@@ -96,13 +104,11 @@ the module is loaded.</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -131,15 +137,15 @@ the module is loaded.</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-properties.7.html" >cmake-properties(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>
