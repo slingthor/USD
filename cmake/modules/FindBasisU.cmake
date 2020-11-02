@@ -54,7 +54,7 @@ find_library(BASISU_LIBRARY
 find_path(BASISU_INCLUDE_DIR
     transcoder/basisu.h
 PATH_SUFFIXES
-    basisu/include/
+    basisu/
 HINTS
     "${BASISU_LOCATION}"
     "$ENV{BASISU_LOCATION}"

@@ -101,9 +101,9 @@ static const _FormatDesc FORMAT_DESC[] =
     {GL_RGBA, GL_UNSIGNED_BYTE,
               GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM   }, // BC7UNorm8Vec4srgb
     {GL_RGBA, GL_UNSIGNED_BYTE,
-              GL_COMPRESSED_RGB_S3TC_DXT1_EXT   }, // BC1UNorm8Vec4
+              GL_COMPRESSED_RGBA_S3TC_DXT1_EXT       }, // BC1UNorm8Vec4
     {GL_RGBA, GL_UNSIGNED_BYTE,
-              GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM   }, // BC3UNorm8Vec3
+              GL_COMPRESSED_RGBA_S3TC_DXT5_EXT      }, // BC3UNorm8Vec3
 };
 
 // A few random format validations to make sure the GL table stays
