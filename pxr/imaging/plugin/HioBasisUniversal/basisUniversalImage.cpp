@@ -57,7 +57,12 @@ class HioBasisUniversalImage : public HioImage
 public:
     using Base = HioImage;
 
-    HioBasisUniversalImage() = default;
+    HioBasisUniversalImage()
+    : _subImage(std::numeric_limits<int>::min())
+    , _mipLevel(std::numeric_limits<int>::min())
+    , _sourceColorSpace(HioImage::SourceColorSpace::Auto)
+    , _basisFileContent(nullptr) {}
+
     virtual ~HioBasisUniversalImage() = default;
 
     virtual bool Read(const StorageSpec &storage) override;
@@ -103,11 +108,17 @@ private:
     /// Mipmap level information.
     struct _MipMapLevelInfo
     {
+        _MipMapLevelInfo()
+        : originalWidth(std::numeric_limits<uint32_t>::min())
+        , originalHeight(std::numeric_limits<uint32_t>::min())
+        , totalNumBlocks(std::numeric_limits<uint32_t>::min())
+        , hasAlpha(false) {}
+
         std::shared_ptr<uint8_t> compressedData;
-        uint32_t originalWidth = std::numeric_limits<uint32_t>::min();
-        uint32_t originalHeight = std::numeric_limits<uint32_t>::min();
-        uint32_t totalNumBlocks = std::numeric_limits<uint32_t>::min();
-        bool hasAlpha = false;
+        uint32_t originalWidth;
+        uint32_t originalHeight;
+        uint32_t totalNumBlocks;
+        bool hasAlpha;
     };
 
     using CompressedDataByLevel = std::vector<_MipMapLevelInfo>;
@@ -141,7 +152,13 @@ private:
     public:
         _BasisFile(const std::string &fileName)
         : _decoder(BasisUniversalImageManager::GetInstance().
-                   GetGlobalSelectorCodebok())
+                   GetGlobalSelectorCodebook())
+        , _data(nullptr)
+        , _dataSize(0)
+        , _isValidForReading(false)
+        , _isReadyToUse(false)
+        , _transcoderTexFmt(static_cast<BasisTTFmt>(
+            basist::transcoder_texture_format::cTFRGBA32))
         {
             _Init(fileName);
         }
@@ -177,22 +194,20 @@ private:
         void _Init(const std::string &fileName);
         void _ParseBasisFileContent();
 
-        std::shared_ptr<const char> _data = nullptr;
-        size_t _dataSize = (size_t)0;
         basist::basisu_transcoder _decoder;
-        bool _isValidForReading = false;
-        bool _isReadyToUse = false;
-        BasisTTFmt _transcoderTexFmt = static_cast<BasisTTFmt>(
-            basist::transcoder_texture_format::cTFRGBA32);
+        std::shared_ptr<const char> _data;
+        size_t _dataSize;
+        bool _isValidForReading;
+        bool _isReadyToUse;
+        BasisTTFmt _transcoderTexFmt;
         GPUImages _gpuImages;
     };
 
     std::string _fileName;
-    int _subImage = std::numeric_limits<int>::min();
-    int _mipLevel = std::numeric_limits<int>::min();
-    HioImage::SourceColorSpace _sourceColorSpace =
-        HioImage::SourceColorSpace::Auto;
-    std::shared_ptr<_BasisFile> _basisFileContent = nullptr;
+    int _subImage;
+    int _mipLevel;
+    HioImage::SourceColorSpace _sourceColorSpace;
+    std::shared_ptr<_BasisFile> _basisFileContent;
 };
 
 TF_REGISTRY_FUNCTION(TfType)
@@ -265,10 +280,8 @@ HioBasisUniversalImage::_BasisFile::_ParseBasisFileContent()
         return;
     }
 
-    TF_VERIFY(fileInfo.m_total_images ==
-                    fileInfo.m_image_mipmap_levels.size());
-    TF_VERIFY(fileInfo.m_total_images ==
-              _decoder.get_total_images(_data.get(),
+    TF_VERIFY(fileInfo.m_total_images == fileInfo.m_image_mipmap_levels.size());
+    TF_VERIFY(fileInfo.m_total_images == _decoder.get_total_images(_data.get(),
               (uint32_t)_dataSize));
 
     /// Start decoding the info and the parsing process.

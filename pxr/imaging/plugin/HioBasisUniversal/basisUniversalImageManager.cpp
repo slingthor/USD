@@ -29,13 +29,19 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_INSTANTIATE_SINGLETON(BasisUniversalImageManager);
 
+BasisUniversalImageManager::BasisUniversalImageManager()
+{
+    _globalCodebook.reset(new GlobalSelectorCodebook(
+        basist::g_global_selector_cb_size, basist::g_global_selector_cb));
+}
+
 GlobalSelectorCodebook*
-BasisUniversalImageManager::GetGlobalSelectorCodebok() {
-    if (!basisu_transcoder_initialized) {
+BasisUniversalImageManager::GetGlobalSelectorCodebook() const {
+    static std::once_flag once;
+    std::call_once(once, [](){
         basist::basisu_transcoder_init();
-        basisu_transcoder_initialized = true;
-    }
-    return g_pGlobal_codebook;
+    });
+    return _globalCodebook.get();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

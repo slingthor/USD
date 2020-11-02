@@ -36,18 +36,19 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 using GlobalSelectorCodebook = basist::etc1_global_selector_codebook;
 
-class BasisUniversalImageManager : public TfSingleton<BasisUniversalImageManager> {
+class BasisUniversalImageManager :
+    public TfSingleton<BasisUniversalImageManager> {
 public: 
     static BasisUniversalImageManager& GetInstance() {
         return TfSingleton<BasisUniversalImageManager>::GetInstance();
     }
-    GlobalSelectorCodebook* GetGlobalSelectorCodebok();
+    GlobalSelectorCodebook* GetGlobalSelectorCodebook() const;
     
 private:
     friend class TfSingleton<BasisUniversalImageManager>;
-    BasisUniversalImageManager() = default;
-    GlobalSelectorCodebook* g_pGlobal_codebook = new GlobalSelectorCodebook(basist::g_global_selector_cb_size, basist::g_global_selector_cb);
-    bool basisu_transcoder_initialized = false;
+    BasisUniversalImageManager();
+
+    std::unique_ptr<GlobalSelectorCodebook> _globalCodebook;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
