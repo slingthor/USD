@@ -66,26 +66,18 @@ const _FormatDesc FORMAT_DESC[] =
     {HdFormatInt32Vec4, HgiFormatInt32Vec4}, 
 
     {HdFormatFloat32UInt8, HgiFormatFloat32UInt8},
-
-    {HdFormatBC6FloatVec3, HgiFormatBC6FloatVec3},
-    {HdFormatBC6UFloatVec3, HgiFormatBC6UFloatVec3},
-    {HdFormatBC7UNorm8Vec4, HgiFormatBC7UNorm8Vec4},
-    {HdFormatBC7UNorm8Vec4srgb, HgiFormatBC7UNorm8Vec4srgb},
-    {HdFormatBC1UNorm8Vec4, HgiFormatBC1UNorm8Vec4},
-    {HdFormatBC3UNorm8Vec4, HgiFormatBC3UNorm8Vec4},
 };
 
 // A few random format validations to make sure that the format conversion
 // table stays up-to-date with changes to HdFormat and HgiFormat.
 constexpr bool _CompileTimeValidateFormatTable() {
     return
-        HdFormatCount == 31 &&
+        HdFormatCount == 25 &&
         HdFormatUNorm8 == 0 && HgiFormatUNorm8 == 0 &&
         HdFormatFloat16Vec4 == 11 && HgiFormatFloat16Vec4 == 9 &&
         HdFormatFloat32Vec4 == 15 && HgiFormatFloat32Vec4 == 13 &&
         HdFormatUInt16Vec4 == 19 && HgiFormatUInt16Vec4 == 17 &&
-        HdFormatInt32Vec4 == 23 && HgiFormatInt32Vec4 == 21 &&
-        HdFormatBC3UNorm8Vec4 == 30 && HgiFormatBC3UNorm8Vec4 == 28;
+        HdFormatInt32Vec4 == 23 && HgiFormatInt32Vec4 == 21;
 }
 
 static_assert(_CompileTimeValidateFormatTable(), 

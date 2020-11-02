@@ -419,14 +419,14 @@ HgiMetalConversions::GetPixelFormat(HgiFormat inFormat)
 
     if ((inFormat < 0) || (inFormat >= HgiFormatCount))
     {
-        TF_CODING_ERROR("Unexpected HdFormat %d", inFormat);
+        TF_CODING_ERROR("Unexpected HgiFormat %d", inFormat);
         return MTLPixelFormatRGBA8Unorm;
     }
 
     MTLPixelFormat outFormat = _PIXEL_FORMAT_DESC[inFormat];
     if (outFormat == MTLPixelFormatInvalid)
     {
-        TF_CODING_ERROR("Unsupported HdFormat %d", inFormat);
+        TF_CODING_ERROR("Unsupported HgiFormat %d", inFormat);
         return MTLPixelFormatRGBA8Unorm;
     }
     return outFormat;
@@ -437,14 +437,14 @@ HgiMetalConversions::GetVertexFormat(HgiFormat inFormat)
 {
     if ((inFormat < 0) || (inFormat >= HgiFormatCount))
     {
-        TF_CODING_ERROR("Unexpected HdFormat %d", inFormat);
+        TF_CODING_ERROR("Unexpected HgiFormat %d", inFormat);
         return MTLVertexFormatFloat4;
     }
 
     MTLVertexFormat outFormat = _VERTEX_FORMAT_DESC[inFormat];
     if (outFormat == MTLVertexFormatInvalid)
     {
-        TF_CODING_ERROR("Unsupported HdFormat %d", inFormat);
+        TF_CODING_ERROR("Unsupported HgiFormat %d", inFormat);
         return MTLVertexFormatFloat4;
     }
     return outFormat;
