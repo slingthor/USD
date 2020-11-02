@@ -26,7 +26,7 @@ mtlf
 
 """
 
-import _mtlf
+from . import _mtlf
 from pxr import Tf
 Tf.PrepareModule(_mtlf, locals())
 del _mtlf, Tf

@@ -55,6 +55,9 @@ PXR_NAMESPACE_OPEN_SCOPE
     (bias)                                      \
     (rotation)                                  \
     (translation)                               \
+    (sRGB)                                      \
+    (raw)                                       \
+    ((colorSpaceAuto, "auto"))
 
 #define HDST_LIGHT_TOKENS                       \
     (color)
@@ -66,6 +69,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 #define HDST_MATERIAL_TAG_TOKENS                \
     (defaultMaterialTag)                        \
+    (masked)                                    \
     (additive)                                  \
     (translucent)                               \
     (volume)
@@ -75,6 +79,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 #define HDST_PERF_TOKENS                        \
     (copyBufferGpuToGpu)                        \
+    (copyBufferCpuToGpu)
 
 TF_DECLARE_PUBLIC_TOKENS(HdStGLSLProgramTokens, HDST_API,
                          HDST_GLSL_PROGRAM_TOKENS);

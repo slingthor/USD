@@ -99,24 +99,6 @@ UsdImagingConeAdapter::TrackVariability(UsdPrim const& prim,
     }
 }
 
-// Thread safe.
-//  * Populate dirty bits for the given \p time.
-void 
-UsdImagingConeAdapter::UpdateForTime(UsdPrim const& prim,
-                               SdfPath const& cachePath, 
-                               UsdTimeCode time,
-                               HdDirtyBits requestedBits,
-                               UsdImagingInstancerContext const* 
-                                   instancerContext) const
-{
-    BaseAdapter::UpdateForTime(
-        prim, cachePath, time, requestedBits, instancerContext);
-    UsdImagingValueCache* valueCache = _GetValueCache();
-    if (requestedBits & HdChangeTracker::DirtyTopology) {
-        valueCache->GetTopology(cachePath) = GetMeshTopology();
-    }
-}
-
 HdDirtyBits
 UsdImagingConeAdapter::ProcessPropertyChange(UsdPrim const& prim,
                                              SdfPath const& cachePath,
@@ -135,11 +117,9 @@ UsdImagingConeAdapter::ProcessPropertyChange(UsdPrim const& prim,
 /*virtual*/
 VtValue
 UsdImagingConeAdapter::GetPoints(UsdPrim const& prim,
-                                 SdfPath const& cachePath,
                                  UsdTimeCode time) const
 {
-    TF_UNUSED(cachePath);
-    return GetMeshPoints(prim, time);   
+    return GetMeshPoints(prim, time);
 }
 
 static GfMatrix4d
@@ -189,6 +169,16 @@ UsdImagingConeAdapter::GetMeshTopology()
     return VtValue(HdMeshTopology(UsdImagingGetUnitConeMeshTopology()));
 }
 
+/*virtual*/ 
+VtValue
+UsdImagingConeAdapter::GetTopology(UsdPrim const& prim,
+                                   SdfPath const& cachePath,
+                                   UsdTimeCode time) const
+{
+    TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
+    return GetMeshTopology();
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

@@ -27,7 +27,7 @@
 #include "pxr/base/gf/math.h"
 #include "pxr/base/gf/vec3i.h"
 
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/base/tf/stringUtils.h"
@@ -37,7 +37,9 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-GarchUdimTexture::_MipDescArray GarchUdimTexture::_GetMipLevels(const TfToken& filePath)
+
+GarchUdimTexture::_MipDescArray GarchUdimTexture::_GetMipLevels(const TfToken& filePath,
+                                                                HioImage::SourceColorSpace sourceColorSpace)
 {
     constexpr int maxMipReads = 32;
     _MipDescArray ret {};
@@ -45,7 +47,8 @@ GarchUdimTexture::_MipDescArray GarchUdimTexture::_GetMipLevels(const TfToken& f
     unsigned int prevWidth = std::numeric_limits<unsigned int>::max();
     unsigned int prevHeight = std::numeric_limits<unsigned int>::max();
     for (unsigned int mip = 0; mip < maxMipReads; ++mip) {
-        GarchImageSharedPtr image = GarchImage::OpenForReading(filePath, 0, mip);
+        HioImageSharedPtr image = HioImage::OpenForReading(filePath, 0, mip, 
+                                                           sourceColorSpace);
         if (image == nullptr) {
             break;
         }
@@ -73,26 +76,17 @@ TF_REGISTRY_FUNCTION(TfType)
 
 GarchUdimTexture::GarchUdimTexture(
     TfToken const& imageFilePath,
-    GarchImage::ImageOriginLocation originLocation,
+    HioImage::ImageOriginLocation originLocation,
     std::vector<std::tuple<int, TfToken>>&& tiles,
-    bool const premultiplyAlpha)
-    : GarchTexture(originLocation), _tiles(std::move(tiles)),
-	  _premultiplyAlpha(premultiplyAlpha)
+    bool const premultiplyAlpha,
+    HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: HioImage
+    : GarchTexture(originLocation), _tiles(std::move(tiles)), 
+      _premultiplyAlpha(premultiplyAlpha), _sourceColorSpace(sourceColorSpace)
 {
 }
 
 GarchUdimTexture::~GarchUdimTexture()
 {
-}
-
-GarchUdimTextureRefPtr
-GarchUdimTexture::New(
-    TfToken const& imageFilePath,
-    GarchImage::ImageOriginLocation originLocation,
-    std::vector<std::tuple<int, TfToken>>&& tiles,
-    bool const premultiplyAlpha)
-{
-    return GarchResourceFactory::GetInstance()->NewUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha);
 }
 
 GarchTexture::BindingVector
@@ -141,12 +135,6 @@ GarchUdimTexture::GetTextureInfo(bool forceLoad)
     return ret;
 }
 
-void
-GarchUdimTexture::_OnMemoryRequestedDirty()
-{
-    _loaded = false;
-}
-
 // XXX: This code is duplicated in hdSt/textureObject.cpp, but will hopefully
 // be removed from this file when Storm begins using Hgi for UDIM textures
 namespace {
@@ -161,8 +149,6 @@ template<_ColorSpaceTransform colorSpaceTransform>
 static
 float _ConvertColorSpace(const float in)
 {
-    TRACE_FUNCTION();
-
     float out = in;
     if (colorSpaceTransform == _SRGBToLinear) {
         if (in <= 0.04045) {
@@ -247,6 +233,25 @@ void _PremultiplyAlphaFloat(
 }
 }
 
+template<typename T, uint32_t alpha>
+void
+_ConvertRGBToRGBA(
+    void * const data,
+    const size_t numPixels)
+{
+    TRACE_FUNCTION();
+
+    T * const typedData = reinterpret_cast<T*>(data);
+
+    size_t i = numPixels;
+    while(i--) {
+        typedData[4 * i + 0] = typedData[3 * i + 0];
+        typedData[4 * i + 1] = typedData[3 * i + 1];
+        typedData[4 * i + 2] = typedData[3 * i + 2];
+        typedData[4 * i + 3] = T(alpha);
+    }
+}
+
 void
 GarchUdimTexture::_ReadImage()
 {
@@ -255,213 +260,15 @@ GarchUdimTexture::_ReadImage()
     if (_loaded) {
         return;
     }
-    _loaded = true;
-    _FreeTextureObject();
-    
-    if (_tiles.empty()) {
-        return;
-    }
-    
-    const _MipDescArray firstImageMips = _GetMipLevels(std::get<1>(_tiles[0]));
-    
-    if (firstImageMips.empty()) {
-        return;
-    }
-    
-    _format = firstImageMips[0].image->GetFormat();
-    const GLenum type = firstImageMips[0].image->GetType();
-    unsigned int numChannels;
-    if (_format == GL_RED || _format == GL_LUMINANCE) {
-        numChannels = 1;
-    } else if (_format == GL_RG) {
-        numChannels = 2;
-    } else if (_format == GL_RGB) {
-        numChannels = 3;
-    } else if (_format == GL_RGBA) {
-        numChannels = 4;
-    } else {
-        return;
-    }
-    
-    GLenum internalFormat = GL_RGBA8;
-    unsigned int sizePerElem = 1;
-    if (type == GL_FLOAT) {
-        constexpr GLenum internalFormats[] =
-            { GL_R32F, GL_RG32F, GL_RGB32F, GL_RGBA32F };
-        internalFormat = internalFormats[numChannels - 1];
-        sizePerElem = 4;
-    } else if (type == GL_UNSIGNED_SHORT) {
-        constexpr GLenum internalFormats[] =
-            { GL_R16, GL_RG16, GL_RGB16, GL_RGBA16 };
-        internalFormat = internalFormats[numChannels - 1];
-        sizePerElem = 2;
-    } else if (type == GL_HALF_FLOAT_ARB) {
-        constexpr GLenum internalFormats[] =
-            { GL_R16F, GL_RG16F, GL_RGB16F, GL_RGBA16F };
-        internalFormat = internalFormats[numChannels - 1];
-        sizePerElem = 2;
-    } else if (type == GL_UNSIGNED_BYTE) {
-        constexpr GLenum internalFormats[] =
-            { GL_R8, GL_RG8, GL_RGB8, GL_RGBA8 };
-        constexpr GLenum internalFormatsSRGB[] =
-            { GL_R8, GL_RG8, GL_SRGB8, GL_SRGB8_ALPHA8 };    
-        if (firstImageMips[0].image->IsColorSpaceSRGB()) {
-            internalFormat = internalFormatsSRGB[numChannels - 1];
-        } else {
-            internalFormat = internalFormats[numChannels - 1];
-        }
-        sizePerElem = 1;
-    }
-    
-    const unsigned int maxTileCount =
-    std::get<0>(_tiles.back()) + 1;
-    _depth = static_cast<int>(_tiles.size());
-    const unsigned int numBytesPerPixel = sizePerElem * numChannels;
-    const unsigned int numBytesPerPixelLayer = numBytesPerPixel * _depth;
-    
-    unsigned int targetPixelCount =
-    static_cast<unsigned int>(GetMemoryRequested());
-    const bool loadAllTiles = targetPixelCount == 0;
-    targetPixelCount /= _depth * numBytesPerPixel;
-    
-    std::vector<_TextureSize> mips {};
-    mips.reserve(firstImageMips.size());
-    if (firstImageMips.size() == 1) {
-        unsigned int width = firstImageMips[0].size.width;
-        unsigned int height = firstImageMips[0].size.height;
-        while (true) {
-            mips.emplace_back(width, height);
-            if (width == 1 && height == 1) {
-                break;
-            }
-            width = std::max(1u, width / 2u);
-            height = std::max(1u, height / 2u);
-        }
-        if (!loadAllTiles) {
-            std::reverse(mips.begin(), mips.end());
-        }
-    } else {
-        if (loadAllTiles) {
-            for (_MipDesc const& mip: firstImageMips) {
-                mips.emplace_back(mip.size);
-            }
-        } else {
-            for (auto it = firstImageMips.crbegin();
-                 it != firstImageMips.crend(); ++it) {
-                mips.emplace_back(it->size);
-            }
-        }
-    }
-    
-    unsigned int mipCount = mips.size();
-    if (!loadAllTiles) {
-        mipCount = 0;
-        for (auto const& mip: mips) {
-            const unsigned int currentPixelCount = mip.width * mip.height;
-            if (targetPixelCount <= currentPixelCount) {
-                break;
-            }
-            ++mipCount;
-            targetPixelCount -= currentPixelCount;
-        }
-        
-        if (mipCount == 0) {
-            mips.clear();
-            mips.emplace_back(1, 1);
-            mipCount = 1;
-        } else {
-            mips.resize(mipCount, {0, 0});
-            std::reverse(mips.begin(), mips.end());
-        }
-    }
-    
-    std::vector<std::vector<uint8_t>> mipData;
-    mipData.resize(mipCount);
-    
-    _width = mips[0].width;
-    _height = mips[0].height;
-    
-    // Texture array queries will use a float as the array specifier.
-    std::vector<float> layoutData;
-    layoutData.resize(maxTileCount, 0);
-
-    size_t totalTextureMemory = 0;
-    for (unsigned int mip = 0; mip < mipCount; ++mip) {
-        _TextureSize const& mipSize = mips[mip];
-        const unsigned int currentMipMemory =
-        mipSize.width * mipSize.height * numBytesPerPixelLayer;
-        mipData[mip].resize(currentMipMemory, 0);
-        totalTextureMemory += currentMipMemory;
-    }
-    
-    WorkParallelForN(_tiles.size(), [&](size_t begin, size_t end) {
-        for (size_t tileId = begin; tileId < end; ++tileId) {
-            std::tuple<int, TfToken> const& tile = _tiles[tileId];
-            layoutData[std::get<0>(tile)] = tileId + 1;
-            _MipDescArray images = _GetMipLevels(std::get<1>(tile));
-            if (images.empty()) { continue; }
-            for (unsigned int mip = 0; mip < mipCount; ++mip) {
-                _TextureSize const& mipSize = mips[mip];
-                const unsigned int numBytesPerLayer =
-                mipSize.width * mipSize.height * numBytesPerPixel;
-                GarchImage::StorageSpec spec;
-                spec.width = mipSize.width;
-                spec.height = mipSize.height;
-                spec.format = _format;
-                spec.type = type;
-                spec.flipped = true;
-                spec.data = mipData[mip].data() + (tileId * numBytesPerLayer);
-                const auto it = std::find_if(images.rbegin(), images.rend(),
-                                             [&mipSize](_MipDesc const& i)
-                                             { return mipSize.width <= i.size.width &&
-                                                 mipSize.height <= i.size.height;});
-                (it == images.rend() ? images.front() : *it).image->Read(spec);
-                if (_premultiplyAlpha && (numChannels == 4)) {
-                    const bool isSRGB = (internalFormat == GL_SRGB8_ALPHA8);
-
-                    switch (type) {
-                    case GL_UNSIGNED_BYTE:
-                        if (isSRGB) {
-                            _PremultiplyAlpha<unsigned char, /*isSRGB=*/ true>(
-                                reinterpret_cast<unsigned char *>(spec.data), 
-                                GfVec3i(mipSize.width, mipSize.height, 1));
-                        } else {
-                            _PremultiplyAlpha<unsigned char, /*isSRGB=*/ false>(
-                                reinterpret_cast<unsigned char *>(spec.data), 
-                                GfVec3i(mipSize.width, mipSize.height, 1));   
-                        }
-                        break;
-                    case GL_UNSIGNED_SHORT:
-                        if (isSRGB) {
-                            _PremultiplyAlpha<unsigned short, /*isSRGB=*/ true>(
-                                reinterpret_cast<unsigned short *>(spec.data), 
-                                GfVec3i(mipSize.width, mipSize.height, 1));
-                        } else {
-                            _PremultiplyAlpha<unsigned short, /*isSRGB=*/false>(
-                                reinterpret_cast<unsigned short *>(spec.data), 
-                                GfVec3i(mipSize.width, mipSize.height, 1));
-                        }
-                        break;
-                    case GL_HALF_FLOAT_ARB:
-                        _PremultiplyAlphaFloat<GfHalf>(
-                            reinterpret_cast<GfHalf *>(spec.data), 
-                            GfVec3i(mipSize.width, mipSize.height, 1));
-                        break;  
-                    case GL_FLOAT:
-                        _PremultiplyAlphaFloat<float>(
-                            reinterpret_cast<float *>(spec.data), 
-                            GfVec3i(mipSize.width, mipSize.height, 1));
-                        break;       
-                    }
-                }
-            }
-        }
-    }, 1);
-    
-    _CreateGPUResources(numChannels, type, mips, mipData, layoutData);
-    
-    _SetMemoryUsed(totalTextureMemory + _tiles.size() * sizeof(float));
+    // APPLE METAL: Deprecated
 }
+
+void
+GarchUdimTexture::_OnMemoryRequestedDirty()
+{
+    _loaded = false;
+}
+
 void
 GarchUdimTexture::_ReadTexture()
 {

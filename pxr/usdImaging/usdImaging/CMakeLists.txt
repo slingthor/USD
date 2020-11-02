@@ -31,11 +31,9 @@ pxr_library(usdImaging
         collectionCache
         debugCodes
         delegate
-        drawModeAdapter
         indexProxy
         resolvedAttributeCache
         instancerContext
-        package
         tokens
         valueCache
         basisCurvesAdapter
@@ -82,6 +80,5 @@ pxr_library(usdImaging
 
     RESOURCE_FILES
         plugInfo.json
-        shaders/drawMode.glslfx
 )
 

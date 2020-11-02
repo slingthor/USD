@@ -23,9 +23,10 @@
 //
 
 #include "pxr/imaging/garch/debugCodes.h"
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/utils.h"
 #include "pxr/imaging/garch/vdbTextureData.h"
+#include "pxr/imaging/hf/perfLog.h"
 
 #include "pxr/base/tf/fileUtils.h"
 #include "pxr/base/trace/trace.h"
@@ -55,35 +56,30 @@ GarchVdbTextureData::GarchVdbTextureData(
       _nativeWidth(0), _nativeHeight(0), _nativeDepth(1),
       _resizedWidth(0), _resizedHeight(0), _resizedDepth(1),
       _bytesPerPixel(0),
-      _glInternalFormat(GL_RGB),
-      _glFormat(GL_RGB),
-      _glType(GL_UNSIGNED_BYTE),
+      _numChannels(0),
+      _format(HioFormatUNorm8Vec3),
       _size(0)
 {
 }
 
 GarchVdbTextureData::~GarchVdbTextureData() = default;
 
+const GfBBox3d &
+GarchVdbTextureData::GetBoundingBox() const
+{
+    return _boundingBox;
+}
+ 
 int
 GarchVdbTextureData::NumDimensions() const
 {
     return 3;
 }
 
-GLenum
-GarchVdbTextureData::GLInternalFormat() const {
-    return _glInternalFormat;
-};
-
-GLenum
-GarchVdbTextureData::GLFormat() const {
-    return _glFormat;
-};
-
-GLenum
-GarchVdbTextureData::GLType() const {
-    return _glType;
-};
+HioFormat
+GarchVdbTextureData::GetFormat() const {
+    return _format;
+}
 
 size_t
 GarchVdbTextureData::TargetMemory() const
@@ -224,8 +220,12 @@ public:
         // Allocate dense grid of given size
         : _denseGrid(bbox)
     {
-        TRACE_FUNCTION_SCOPE("GarchVdbTextureData: Copy to dense");
-        openvdb::tools::copyToDense(grid->tree(), _denseGrid);
+        HF_MALLOC_TAG_FUNCTION();
+        {
+            TRACE_FUNCTION_SCOPE("GarchVdbTextureData: Copy to dense");
+            HF_MALLOC_TAG("Copy to dense");
+            openvdb::tools::copyToDense(grid->tree(), _denseGrid);
+        }
     }
 
     const unsigned char * GetData() const override {
@@ -255,9 +255,7 @@ public:
 
     // Get metadata for corresponding OpenGL texture.
     virtual void GetMetadata(int *bytesPerPixel,
-                             GLenum *glInternalFormat,
-                             GLenum *glFormat,
-                             GLenum *glType) const = 0;
+                             HioFormat *hioFormat) const = 0;
 
     // Create a new OpenVDB grid (of the right type) by resampling
     // the old grid. The new grid will have the given transform.
@@ -326,9 +324,7 @@ public:
     }
 
     void GetMetadata(int *bytesPerPixel,
-                     GLenum *glInternalFormat,
-                     GLenum *glFormat,
-                     GLenum *glType) const override;
+                     HioFormat *hioFormat) const override;
     
     _GridHolderBase *GetResampled(const GfMatrix4d &newTransform) override {
         TRACE_FUNCTION();
@@ -356,53 +352,37 @@ private:
 template<>
 void
 _GridHolder<openvdb::FloatGrid>::GetMetadata(int *bytesPerPixel,
-                                             GLenum *glInternalFormat,
-                                             GLenum *glFormat,
-                                             GLenum *glType) const
+                                             HioFormat *hioFormat) const
 {
     *bytesPerPixel = sizeof(float);
-    *glInternalFormat = GL_RED;
-    *glFormat = GL_RED;
-    *glType = GL_FLOAT;
+    *hioFormat = HioFormatFloat32;
 }
 
 template<>
 void
 _GridHolder<openvdb::DoubleGrid>::GetMetadata(int *bytesPerPixel,
-                                              GLenum *glInternalFormat,
-                                              GLenum *glFormat,
-                                              GLenum *glType) const
+                                             HioFormat *hioFormat) const
 {
     *bytesPerPixel = sizeof(double);
-    *glInternalFormat = GL_RED;
-    *glFormat = GL_RED;
-    *glType = GL_DOUBLE;
+    *hioFormat = HioFormatDouble64;
 }
 
 template<>
 void
 _GridHolder<openvdb::Vec3fGrid>::GetMetadata(int *bytesPerPixel,
-                                             GLenum *glInternalFormat,
-                                             GLenum *glFormat,
-                                             GLenum *glType) const
+                                             HioFormat *hioFormat) const
 {
-    *bytesPerPixel = sizeof(float);
-    *glInternalFormat = GL_RED;
-    *glFormat = GL_RED;
-    *glType = GL_FLOAT;
+    *bytesPerPixel = 3 * sizeof(float);
+    *hioFormat = HioFormatFloat32Vec3;
 }
 
 template<>
 void
 _GridHolder<openvdb::Vec3dGrid>::GetMetadata(int *bytesPerPixel,
-                                             GLenum *glInternalFormat,
-                                             GLenum *glFormat,
-                                             GLenum *glType) const
+                                             HioFormat *hioFormat) const
 {
-    *bytesPerPixel = sizeof(double);
-    *glInternalFormat = GL_RED;
-    *glFormat = GL_RED;
-    *glType = GL_DOUBLE;
+    *bytesPerPixel = 3 * sizeof(double);
+    *hioFormat = HioFormatDouble64Vec3;
 }
 
 _GridHolderBase *
@@ -444,6 +424,7 @@ _GridHolderBase::New(const openvdb::GridBase::Ptr &grid)
 _GridHolderBase*
 _LoadGrid(const std::string &filePath, std::string const &gridName)
 {
+    HF_MALLOC_TAG_FUNCTION();
     TRACE_FUNCTION();
 
     openvdb::initialize();
@@ -469,7 +450,12 @@ _LoadGrid(const std::string &filePath, std::string const &gridName)
         return nullptr;
     }
     
-    openvdb::GridBase::Ptr const result = f.readGrid(gridName);
+    openvdb::GridBase::Ptr result;
+
+    {
+        HF_MALLOC_TAG("readGrid");
+        result = f.readGrid(gridName);
+    }
 
     {
         TRACE_FUNCTION_SCOPE("Closing VDB file");
@@ -534,7 +520,7 @@ _ResamplingAdjustment(const int nativeLength, const double scale)
 
 bool
 GarchVdbTextureData::Read(int degradeLevel, bool generateMipmap,
-                        GarchImage::ImageOriginLocation originLocation)
+                        HioImage::ImageOriginLocation originLocation)
 {   
     TRACE_FUNCTION();
 
@@ -555,11 +541,10 @@ GarchVdbTextureData::Read(int degradeLevel, bool generateMipmap,
     // Get grid transform 
     GfMatrix4d gridTransform = gridHolder->GetGridTransform();
     
-    // Get _bytesPerPixel, ...
+    // Get _bytesPerPixel & _format
     gridHolder->GetMetadata(&_bytesPerPixel,
-                            &_glInternalFormat,
-                            &_glFormat,
-                            &_glType);
+                            &_format);
+    _numChannels = HioGetComponentCount(_format);
 
     // Get tree bounding box to compute native dimensions and size
     const openvdb::CoordBBox &nativeTreeBoundingBox =

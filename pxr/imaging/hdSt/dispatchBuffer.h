@@ -42,14 +42,14 @@ using HdStDispatchBufferSharedPtr = std::shared_ptr<class HdStDispatchBuffer>;
 
 /// \class HdStDispatchBuffer
 ///
-/// A VBO of a simple array of GLuint.
+/// A VBO of a simple array of unsigned integers.
 ///
 /// This buffer is used to prepare data on the GPU for indirect dispatch i.e.
-/// to be consumed by glMultiDrawIndirect or glDispatchComputeIndirect. At the
+/// to be consumed by MultiDrawIndirect or DispatchComputeIndirect. At the
 /// same time, interleaved subsets of the array are bound in several different
 /// ways to provide additional data interface to shaders.
 ///
-/// For each binding, we define 'BufferResourceView' on top of the GLuint array.
+/// For each binding, we define 'BufferResourceView' on top of the uint array.
 /// HdBufferArray aggregates those views and HdResourceBinder binds them
 /// with specified binding method and interleaved offset.
 ///
@@ -92,7 +92,7 @@ class HdStDispatchBuffer : public HdBufferArray {
 public:
     /// Constructor. commandNumUints is given in how many integers.
     HDST_API
-    HdStDispatchBuffer(HdStResourceRegistry* _resourceRegistry,
+    HdStDispatchBuffer(HdStResourceRegistry* resourceRegistry,
                        TfToken const &role,
                        int count,
                        unsigned int commandNumUints);
@@ -103,7 +103,7 @@ public:
 
     /// Update entire buffer data
     HDST_API
-    void CopyData(std::vector<GLuint> const &data);
+    void CopyData(std::vector<uint32_t> const &data);
 
     /// Add an interleaved view to this buffer.
     HDST_API
@@ -113,7 +113,7 @@ public:
     /// Returns the dispatch count
     int GetCount() const { return _count; }
 
-    /// Returns the number of GLuints in a single draw command.
+    /// Returns the number of uints in a single draw command.
     unsigned int GetCommandNumUints() const { return _commandNumUints; }
 
     /// Returns a bar which locates all interleaved resources of the entire
@@ -144,9 +144,9 @@ public:
     HdStBufferResourceSharedPtr GetResource() const;
 
     /// Returns the named GPU resource. This method returns the first found
-    /// resource. In HDST_SAFE_MODE it checks all underlying GL buffers
+    /// resource. In HDST_SAFE_MODE it checks all underlying GPU buffers
     /// in _resourceMap and raises a coding error if there are more than
-    /// one GL buffers exist.
+    /// one GPU buffers exist.
     HDST_API
     HdStBufferResourceSharedPtr GetResource(TfToken const& name);
 
@@ -162,7 +162,7 @@ protected:
                                                int stride);
 
 private:
-    class HdStResourceRegistry *_resourceRegistry;
+    HdStResourceRegistry *_resourceRegistry;
     int _count;
     unsigned int _commandNumUints;
     HdStBufferResourceNamedList _resourceList;

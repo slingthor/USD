@@ -61,6 +61,11 @@ static const _FormatDesc FORMAT_DESC[] =
     {GL_RGB,  GL_FLOAT,         GL_RGB32F      }, // Float32Vec3
     {GL_RGBA, GL_FLOAT,         GL_RGBA32F     }, // Float32Vec4
 
+    {GL_RED,  GL_UNSIGNED_SHORT,GL_R16I        }, // UInt16
+    {GL_RG,   GL_UNSIGNED_SHORT,GL_RG16I       }, // UInt16Vec2
+    {GL_RGB,  GL_UNSIGNED_SHORT,GL_RGB16I      }, // UInt16Vec3
+    {GL_RGBA, GL_UNSIGNED_SHORT,GL_RGBA16I     }, // UInt16Vec4
+
     {GL_RED,  GL_INT,           GL_R32I        }, // Int32
     {GL_RG,   GL_INT,           GL_RG32I       }, // Int32Vec2
     {GL_RGB,  GL_INT,           GL_RGB32I      }, // Int32Vec3
@@ -89,7 +94,8 @@ constexpr bool _CompileTimeValidateHgiFormatTable() {
             HgiFormatUNorm8 == 0 &&
             HgiFormatFloat16Vec4 == 9 &&
             HgiFormatFloat32Vec4 == 13 &&
-            HgiFormatUNorm8Vec4srgb == 18) ? true : false;
+            HgiFormatUInt16Vec4 == 17 &&
+            HgiFormatUNorm8Vec4srgb == 22) ? true : false;
 }
 
 static_assert(_CompileTimeValidateHgiFormatTable(), 
@@ -172,9 +178,10 @@ _compareFunctionTable[HgiCompareFunctionCount][2] =
 static uint32_t
 _textureTypeTable[HgiTextureTypeCount][2] =
 {
-    {HgiTextureType1D, GL_TEXTURE_1D},
-    {HgiTextureType2D, GL_TEXTURE_2D},
-    {HgiTextureType3D, GL_TEXTURE_3D}
+    {HgiTextureType1D,      GL_TEXTURE_1D},
+    {HgiTextureType2D,      GL_TEXTURE_2D},
+    {HgiTextureType3D,      GL_TEXTURE_3D},
+    {HgiTextureType2DArray, GL_TEXTURE_2D_ARRAY}
 };
 
 static uint32_t

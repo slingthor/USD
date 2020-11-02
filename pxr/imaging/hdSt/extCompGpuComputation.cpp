@@ -137,8 +137,6 @@ HdStExtCompGpuComputation::Execute(
     HdSt_ResourceBinderMetal const &rbm = static_cast<const HdSt_ResourceBinderMetal&>(binder);
     binder.IntrospectBindings(computeProgram);
 
-    HgiShaderProgramHandle const& hgiProgram = computeProgram->GetProgram();
-
     HdStBufferArrayRangeSharedPtr outputBar =
         std::static_pointer_cast<HdStBufferArrayRange>(outputRange);
     TF_VERIFY(outputBar);
@@ -148,6 +146,7 @@ HdStExtCompGpuComputation::Execute(
     std::vector<int32_t> _uniforms;
     _uniforms.push_back(outputBar->GetElementOffset());
 
+	// APPLE METAL:
     // Generate hash for resource bindings and pipeline.
     // XXX Needs fingerprint hash to avoid collisions
     uint64_t rbHash = 0;
@@ -166,9 +165,8 @@ HdStExtCompGpuComputation::Execute(
             _uniforms.push_back(buffer->GetOffset() / componentSize);
             // Assumes non-SSBO allocator for the stride
             _uniforms.push_back(buffer->GetStride() / componentSize);
-            
-            // FIX THIS UP WITH PROPER COMBINER
-            rbHash += TfHash::Combine(buffer->GetId().Get());
+
+            rbHash = TfHash::Combine(rbHash, buffer->GetId().Get());
         }
     }
 
@@ -194,19 +192,18 @@ HdStExtCompGpuComputation::Execute(
                 //    buffer->GetStride() / buffer->GetComponentSize());
                 // This is correct for the SSBO allocator only
                 _uniforms.push_back(HdGetComponentCount(tupleType.type));
-                
+
                 if (binding.GetType() != HdBinding::SSBO) {
                     TF_RUNTIME_ERROR(
                         "Unsupported binding type %d for ExtComputation",
                         binding.GetType());
                 }
 
-                // FIX THIS UP WITH PROPER COMBINER
-                rbHash += TfHash::Combine(buffer->GetId().Get());
+                rbHash = TfHash::Combine(rbHash, buffer->GetId().Get());
             }
         }
     }
-    
+
     Hgi* hgi = hdStResourceRegistry->GetHgi();
 
     // Prepare uniform buffer for GPU computation
@@ -236,28 +233,20 @@ HdStExtCompGpuComputation::Execute(
         HgiResourceBindingsDesc resourceDesc;
         resourceDesc.debugName = "ExtComputation";
 
-        for (HdExtComputationPrimvarDescriptor const &compPrimvar: _compPrimvars) {
-            TfToken const & name = compPrimvar.sourceComputationOutputName;
+        for (HdExtComputationPrimvarDescriptor const& compPvar: _compPrimvars) {
+            TfToken const & name = compPvar.sourceComputationOutputName;
             HdStBufferResourceSharedPtr const & buffer =
-                    outputBar->GetResource(compPrimvar.name);
+                    outputBar->GetResource(compPvar.name);
 
             HdBinding const &binding = binder.GetBinding(name);
             // These should all be valid as they are required outputs
             if (TF_VERIFY(binding.IsValid()) && TF_VERIFY(buffer->GetId())) {
-                size_t componentSize = HdDataSizeOfType(
-                    HdGetComponentType(buffer->GetTupleType().type));
-
-                uint32_t location = binding.GetLocation();
-
-                // APPLE METAL: Temp until codeGen uses Hgi
-                location = rbm.GetLocation(name);
-                
                 _AppendResourceBindings(
-                    &resourceDesc, buffer->GetId(), location);
+                    &resourceDesc, buffer->GetId(), binding.GetLocation());
             }
         }
 
-        for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
+    for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
             HdStBufferArrayRangeSharedPtr const & inputBar =
                 std::static_pointer_cast<HdStBufferArrayRange>(input);
 
@@ -269,17 +258,11 @@ HdStExtCompGpuComputation::Execute(
                 HdBinding const &binding = binder.GetBinding(name);
                 // These should all be valid as they are required inputs
                 if (TF_VERIFY(binding.IsValid())) {
-                    uint32_t location = binding.GetLocation();
-
-                    // APPLE METAL: Temp until codeGen uses Hgi
-                    location = rbm.GetLocation(name);
-                    
                     _AppendResourceBindings(
-                        &resourceDesc, buffer->GetId(), location);
+                        &resourceDesc, buffer->GetId(), binding.GetLocation());
                 }
             }
         }
-        
         HgiResourceBindingsSharedPtr rb =
             std::make_shared<HgiResourceBindingsHandle>(
                 hgi->CreateResourceBindings(resourceDesc));
@@ -291,7 +274,8 @@ HdStExtCompGpuComputation::Execute(
         resourceBindingsInstance.GetValue();
     HgiResourceBindingsHandle resourceBindings = *resourceBindindsPtr.get();
 
-    HgiComputeCmds* computeCmds = hdStResourceRegistry->GetComputeCmds();
+    HgiComputeCmds* computeCmds = hdStResourceRegistry->GetGlobalComputeCmds();
+
     computeCmds->PushDebugGroup("ExtComputation");
     computeCmds->BindResources(resourceBindings);
     computeCmds->BindPipeline(pipeline);
@@ -303,7 +287,7 @@ HdStExtCompGpuComputation::Execute(
     }
     computeCmds->SetConstantValues(pipeline, slotIndex, uboSize, &_uniforms[0]);
 
-    // dispatch compute kernel
+    // Queue compute work
     computeCmds->Dispatch(GetDispatchCount(), 1);
 
     computeCmds->PopDebugGroup();
@@ -351,7 +335,7 @@ HdStExtCompGpuComputation::CreateGpuComputation(
         std::dynamic_pointer_cast<HdStResourceRegistry>(
                               renderIndex.GetResourceRegistry());
 
-    HdStComputeShaderSharedPtr shader(new HdStComputeShader());
+    HdSt_ComputeShaderSharedPtr shader(new HdSt_ComputeShader());
     shader->SetComputeSource(sourceComp->GetGpuKernelSource());
 
     // Map the computation outputs onto the destination primvar types
@@ -415,7 +399,7 @@ HdSt_GetExtComputationPrimvarsComputations(
     HdBufferSourceSharedPtrVector *sources,
     HdBufferSourceSharedPtrVector *reserveOnlySources,
     HdBufferSourceSharedPtrVector *separateComputationSources,
-    HdComputationSharedPtrVector *computations)
+    HdStComputationSharedPtrVector *computations)
 {
     TF_VERIFY(sources);
     TF_VERIFY(reserveOnlySources);
@@ -471,7 +455,10 @@ HdSt_GetExtComputationPrimvarsComputations(
 
                         separateComputationSources->push_back(
                                                         gpuComputationSource);
-                        computations->push_back(gpuComputation);
+                        // Assume there are no dependencies between ExtComp so
+                        // put all of them in queue zero.
+                        computations->emplace_back(
+                            gpuComputation, HdStComputeQueueZero);
                     }
 
                     // Create a primvar buffer source for the computation

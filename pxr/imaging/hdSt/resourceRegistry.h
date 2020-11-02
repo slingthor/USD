@@ -50,6 +50,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 using HdComputationSharedPtr = std::shared_ptr<class HdComputation>;
 using HdStDispatchBufferSharedPtr = std::shared_ptr<class HdStDispatchBuffer>;
 using HdStGLSLProgramSharedPtr = std::shared_ptr<class HdStGLSLProgram>;
+using HioGlslfxSharedPtr = std::shared_ptr<class HioGlslfx>;
 
 using HdSt_BasisCurvesTopologySharedPtr =
     std::shared_ptr<class HdSt_BasisCurvesTopology>;
@@ -68,8 +69,8 @@ using HdStTextureHandleSharedPtr =
     std::shared_ptr<class HdStTextureHandle>;
 using HdStTextureObjectSharedPtr =
     std::shared_ptr<class HdStTextureObject>;
-using HdStPersistentBufferSharedPtr =
-    std::shared_ptr<class HdStPersistentBuffer>; 
+using HdStBufferResourceSharedPtr = 
+    std::shared_ptr<class HdStBufferResource>;
 using HdStResourceRegistrySharedPtr = 
     std::shared_ptr<class HdStResourceRegistry>;
 using Hd_VertexAdjacencySharedPtr = 
@@ -85,6 +86,30 @@ using HgiComputePipelineSharedPtr =
 
 class HdStTextureIdentifier;
 class HdSamplerParameters;
+
+/// \enum HdStComputeQueue
+///
+/// Determines the 'compute queue' a computation should be added into.
+///
+/// We only perform synchronization between queues, not within one queue.
+/// In OpenGL terms that means we insert memory barriers between computations
+/// of two queues, but not between two computations in the same queue.
+///
+/// A prim determines the role for each queue based on its local knowledge of
+/// compute dependencies. Eg. HdStMesh knows computing normals should wait
+/// until the primvar refinement computation has fnished. It can assign one
+/// queue to primvar refinement and a following queue for normal computations.
+///
+enum HdStComputeQueue {
+    HdStComputeQueueZero=0,
+    HdStComputeQueueOne,
+    HdStComputeQueueTwo,
+    HdStComputeQueueThree,
+    HdStComputeQueueCount};
+
+using HdStComputationSharedPtrVector = 
+    std::vector<std::pair<HdComputationSharedPtr, HdStComputeQueue>>;
+
 
 /// \class HdStResourceRegistry
 ///
@@ -103,6 +128,10 @@ public:
 
     HDST_API
     void InvalidateShaderRegistry() override;
+
+    HDST_API
+    void ReloadResource(TfToken const& resourceType,
+                        std::string const& path) override;
 
     HDST_API
     VtDictionary GetResourceAllocation() const override;
@@ -273,31 +302,36 @@ public:
     /// they are registered.
     HDST_API
     void AddComputation(HdBufferArrayRangeSharedPtr const &range,
-                        HdComputationSharedPtr const &computaion);
+                        HdComputationSharedPtr const &computation,
+                        HdStComputeQueue const queue);
 
     /// ------------------------------------------------------------------------
-    /// Dispatch & persistent buffer API
+    /// Dispatch & buffer API
     /// ------------------------------------------------------------------------
 
     /// Register a buffer allocated with \a count * \a commandNumUints *
-    /// sizeof(GLuint) to be used as an indirect dispatch buffer.
+    /// sizeof(uint32_t) to be used as an indirect dispatch buffer.
     HDST_API
     HdStDispatchBufferSharedPtr RegisterDispatchBuffer(
         TfToken const &role, int count, int commandNumUints);
 
-    /// Register a buffer initialized with \a dataSize bytes of \a data
-    /// to be used as a persistently mapped shader storage buffer.
+    /// Register a misc buffer resource.
+    /// Usually buffers are part of a buffer array (buffer aggregation) and are
+    /// managed via buffer array APIs.
+    /// RegisterBufferResource lets you create a standalone buffer that can
+    /// be used for misc purposes (Eg. GPU frustum cull prim count read back).
     HDST_API
-    HdStPersistentBufferSharedPtr RegisterPersistentBuffer(
-        TfToken const &role, size_t dataSize, void *data);
+    HdStBufferResourceSharedPtr RegisterBufferResource(
+        TfToken const &role, 
+        HdTupleType tupleType);
 
     /// Remove any entries associated with expired dispatch buffers.
     HDST_API
     void GarbageCollectDispatchBuffers();
 
-    /// Remove any entries associated with expired persistently mapped buffers.
+    /// Remove any entries associated with expired misc buffers.
     HDST_API
-    void GarbageCollectPersistentBuffers();
+    void GarbageCollectBufferResources();
 
     /// ------------------------------------------------------------------------
     /// Instance Registries
@@ -387,6 +421,11 @@ public:
     HdInstance<HdStGLSLProgramSharedPtr>
     RegisterGLSLProgram(HdInstance<HdStGLSLProgramSharedPtr>::ID id);
 
+    /// Register a GLSLFX file.
+    HDST_API
+    HdInstance<HioGlslfxSharedPtr>
+    RegisterGLSLFXFile(HdInstance<HioGlslfxSharedPtr>::ID id);
+
     /// Register a texture resource handle.
     HDST_API
     HdInstance<HdStTextureResourceHandleSharedPtr>
@@ -414,14 +453,37 @@ public:
     HdInstance<HgiComputePipelineSharedPtr>
     RegisterComputePipeline(HdInstance<HgiComputePipelineSharedPtr>::ID id);
 
-    /// Returns the global hgi compute command queue for registering computation work
-    HgiComputeCmds* GetComputeCmds();
-    
-    /// Returns the global hgi blit command queue for registering blitting work
-    HgiBlitCmds* GetBlitCmds();
-    
-    /// Submits any queued compute/blit work for GPU execution
-    void SubmitHgiWork();
+    /// Returns the global hgi blit command queue for recording blitting work.
+    /// When using this global cmd instead of creating a new HgiBlitCmds we
+    /// reduce the number of command buffers being created.
+    /// The returned pointer should not be held onto by the client as it is
+    /// only valid until the HgiBlitCmds has been submitted.
+    HDST_API
+    HgiBlitCmds* GetGlobalBlitCmds();
+
+    /// Returns the global hgi compute cmd queue for recording compute work.
+    /// When using this global cmd instead of creating a new HgiComputeCmds we
+    /// reduce the number of command buffers being created.
+    /// The returned pointer should not be held onto by the client as it is
+    /// only valid until the HgiComputeCmds has been submitted.
+    HDST_API
+    HgiComputeCmds* GetGlobalComputeCmds();
+
+    /// Submits blit work queued in global blit cmds for GPU execution.
+    /// We can call this when we want to submit some work to the GPU to ensure
+    /// the GPU isn't starved for work or if we need synchronization (barriers)
+    /// between two Hgi*Cmds objects.
+    /// (Eg. if we need barriers between buffer writes and reads).
+    HDST_API
+    void SubmitBlitWork(HgiSubmitWaitType wait = HgiSubmitWaitTypeNoWait);
+
+    /// Submits compute work queued in global compute cmds for GPU execution.
+    /// We can call this when we want to submit some work to the GPU to ensure
+    /// the GPU isn't starved for work or if we need synchronization (barriers)
+    /// between two Hgi*Cmds objects.
+    /// (Eg. if we need barriers between compute shaders).
+    HDST_API
+    void SubmitComputeWork(HgiSubmitWaitType wait = HgiSubmitWaitTypeNoWait);
 
 public:
     //
@@ -541,8 +603,11 @@ private:
         HdComputationSharedPtr computation;
     };
 
+    // If we need more 'compute queues' we can increase HdStComputeQueueCount.
+    // We could also consider tbb::concurrent_priority_queue if we want this
+    // to be dynamically scalable.
     typedef tbb::concurrent_vector<_PendingComputation> _PendingComputationList;
-    _PendingComputationList  _pendingComputations;
+    _PendingComputationList  _pendingComputations[HdStComputeQueueCount];
 
     // aggregated buffer array
     HdBufferArrayRegistry _nonUniformBufferArrayRegistry;
@@ -563,9 +628,9 @@ private:
         _DispatchBufferRegistry;
     _DispatchBufferRegistry _dispatchBufferRegistry;
 
-    typedef std::vector<HdStPersistentBufferSharedPtr>
-        _PersistentBufferRegistry;
-    _PersistentBufferRegistry _persistentBufferRegistry;
+    typedef std::vector<HdStBufferResourceSharedPtr>
+        _BufferResourceRegistry;
+    _BufferResourceRegistry _bufferResourceRegistry;
 
     // Register mesh topology.
     HdInstanceRegistry<HdSt_MeshTopologySharedPtr>
@@ -609,6 +674,10 @@ private:
     HdInstanceRegistry<HdStGLSLProgramSharedPtr>
         _glslProgramRegistry;
 
+    // glslfx file registry
+    HdInstanceRegistry<HioGlslfxSharedPtr>
+        _glslfxFileRegistry;
+
     // texture resource handle registry
     HdInstanceRegistry<HdStTextureResourceHandleSharedPtr>
         _textureResourceHandleRegistry;
@@ -628,8 +697,8 @@ private:
     HdInstanceRegistry<HgiComputePipelineSharedPtr>
         _computePipelineRegistry;
 
-    HgiComputeCmdsUniquePtr _computeCmds;
     HgiBlitCmdsUniquePtr _blitCmds;
+    HgiComputeCmdsUniquePtr _computeCmds;
 };
 
 

@@ -141,39 +141,39 @@ HdSt_VolumeShader::GetParamsAndBufferSpecsForBBox(
         params->emplace_back(
             HdSt_MaterialParam::ParamTypeFallback,
             _tokens->volumeBBoxInverseTransform,
-            VtValue(GfMatrix4d()));
+            VtValue(GfMatrix4f()));
 
         static const TfToken sourceName(
             _ConcatFallback(_tokens->volumeBBoxInverseTransform));
         specs->emplace_back(
             sourceName,
-            HdTupleType{HdTypeDoubleMat4, 1});
+            HdTupleType{HdTypeFloatMat4, 1});
     }
      
     {
         params->emplace_back(
             HdSt_MaterialParam::ParamTypeFallback,
             _tokens->volumeBBoxLocalMin,
-            VtValue(GfVec3d()));
+            VtValue(GfVec3f()));
 
         static const TfToken sourceName(
             _ConcatFallback(_tokens->volumeBBoxLocalMin));
         specs->emplace_back(
             sourceName,
-            HdTupleType{HdTypeDoubleVec3, 1});
+            HdTupleType{HdTypeFloatVec3, 1});
     }
      
     {
         params->emplace_back(
             HdSt_MaterialParam::ParamTypeFallback,
             _tokens->volumeBBoxLocalMax,
-            VtValue(GfVec3d()));
+            VtValue(GfVec3f()));
 
         static const TfToken sourceName(
             _ConcatFallback(_tokens->volumeBBoxLocalMax));
         specs->emplace_back(
             sourceName,
-            HdTupleType{HdTypeDoubleVec3, 1});
+            HdTupleType{HdTypeFloatVec3, 1});
     }
 }
 
@@ -190,7 +190,7 @@ HdSt_VolumeShader::GetBufferSourcesForBBox(
         sources->push_back(
             std::make_shared<HdVtBufferSource>(
                 sourceName,
-                VtValue(bbox.GetInverseMatrix())));
+                bbox.GetInverseMatrix()));
     }
 
     {
@@ -212,22 +212,22 @@ HdSt_VolumeShader::GetBufferSourcesForBBox(
     }
 }
 
-GfVec3d
+GfVec3f
 HdSt_VolumeShader::GetSafeMin(const GfRange3d &range)
 {
     if (range.IsEmpty()) {
-        return GfVec3d(0.0, 0.0, 0.0);
+        return GfVec3f(0.0, 0.0, 0.0);
     }
-    return range.GetMin();
+    return GfVec3f(range.GetMin());
 }
 
-GfVec3d
+GfVec3f
 HdSt_VolumeShader::GetSafeMax(const GfRange3d &range)
 {
     if (range.IsEmpty()) {
-        return GfVec3d(0.0, 0.0, 0.0);
+        return GfVec3f(0.0, 0.0, 0.0);
     }
-    return range.GetMax();
+    return GfVec3f(range.GetMax());
 }
 
 namespace {

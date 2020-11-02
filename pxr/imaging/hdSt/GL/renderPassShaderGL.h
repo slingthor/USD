@@ -47,19 +47,22 @@ public:
 
 protected:
     HDST_API
-    virtual void BindResources(HdStGLSLProgram const &program,
-                               HdSt_ResourceBinder const &binder,
-                               HdRenderPassState const &state) override;
-    HDST_API
-    virtual void UnbindResources(HdStGLSLProgram const &program,
-                                 HdSt_ResourceBinder const &binder,
-                                 HdRenderPassState const &state) override;
-    
+    void UnbindResources(HdStGLSLProgram const &program,
+                         HdSt_ResourceBinder const &binder,
+                         HdRenderPassState const &state) override;
+    void
+    _BindTexture(HdStGLSLProgram const &program,
+                 const HdRenderPassAovBinding &aov,
+                 const TfToken &bindName,
+                 const HdBinding &binding) override;
+    void
+    _UnbindTexture(const HdBinding &binding) override;
+
 private:
 
     // No copying
-    HdStRenderPassShaderGL(const HdStRenderPassShader &)                     = delete;
-    HdStRenderPassShaderGL &operator =(const HdStRenderPassShader &)         = delete;
+    HdStRenderPassShaderGL(const HdStRenderPassShader &)             = delete;
+    HdStRenderPassShaderGL &operator =(const HdStRenderPassShader &) = delete;
 };
 
 

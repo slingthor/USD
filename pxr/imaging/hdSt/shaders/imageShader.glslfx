@@ -98,10 +98,6 @@ in VertexData
 #if defined(ARCH_GFX_METAL)
 // Still need to use the 'out' semantic as this is picked up by the glslfx parser
 out vec4 colorOut;
-LightingContribution
-integrateLights(vec4 Peye, vec3 Neye, LightingInterfaceProperties props) {
-    return LightingContribution();
-}
 #else
 layout (location = 0) out vec4 colorOut;
 #endif

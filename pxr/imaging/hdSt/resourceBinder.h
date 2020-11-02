@@ -247,18 +247,20 @@ public:
             BindingDeclaration(TfToken const &name,
                          TfToken const &dataType,
                          HdBinding binding)
-            : name(name), dataType(dataType), binding(binding), typeIsAtomic(false) {}
+            : name(name), dataType(dataType), binding(binding), typeIsAtomic(false), writable(false) {}
             
             BindingDeclaration(TfToken const &name,
                                TfToken const &dataType,
                                HdBinding binding,
-                               bool isAtomic)
-            : name(name), dataType(dataType), binding(binding), typeIsAtomic(isAtomic) {}
+                               bool isAtomic,
+                               bool isWritable)
+            : name(name), dataType(dataType), binding(binding), typeIsAtomic(isAtomic), writable(isWritable) {}
             
             TfToken name;
             TfToken dataType;
             HdBinding binding;
             bool typeIsAtomic;
+            bool writable;
         };
 
         // -------------------------------------------------------------------
@@ -406,6 +408,10 @@ public:
         return binding;
     }
 
+    int GetNumReservedUniformBlockLocations() const {
+        return _numReservedUniformBlockLocations;
+    }
+
     int GetNumReservedTextureUnits() const {
         return _numReservedTextureUnits;
     }
@@ -447,6 +453,7 @@ protected:
     };
     typedef std::map<NameAndLevel, HdBinding> _BindingMap;
     mutable _BindingMap _bindingMap;
+    int _numReservedUniformBlockLocations;
     int _numReservedTextureUnits;
 };
 

@@ -87,8 +87,10 @@ protected:
     {
     public:
         /// Constructor.
-        _SimpleBufferArrayRange() :
-            _bufferArray(nullptr), _numElements(0) {
+        _SimpleBufferArrayRange(HdStResourceRegistry* resourceRegistry)
+            : HdStBufferArrayRange(resourceRegistry)
+            , _bufferArray(nullptr)
+            , _numElements(0) {
         }
 
         /// Returns true if this range is valid
@@ -279,9 +281,8 @@ protected:
         HDST_API
         HdBufferSpecVector GetBufferSpecs() const;
         
-        /// APPLE METAL: HGI accessors needed for _SimpleBufferArrayRange::CopyData()
+        /// APPLE METAL: HGI accessors needed for _SimpleBufferArrayRange::ReadData()
         Hgi* GetHgi() { return _resourceRegistry->GetHgi(); }
-        HgiBlitCmds* GetBlitCmds() { return _resourceRegistry->GetBlitCmds(); }
 
     protected:
         HDST_API

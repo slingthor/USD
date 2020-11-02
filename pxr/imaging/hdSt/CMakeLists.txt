@@ -19,6 +19,16 @@ if (OPENSUBDIV_HAS_METAL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
 endif()
 
+set(optionalPublicClasses "")
+set(optionalLibs "")
+set(optionalIncludeDirs "")
+if (PXR_ENABLE_PTEX_SUPPORT)
+    list(APPEND optionalPublicClasses ptexMipmapTextureLoader)
+    list(APPEND optionalLibs ${PTEX_LIBRARY})
+    list(APPEND optionalIncludeDirs ${PTEX_INCLUDE_DIR})
+endif()
+
+
 set(GFX "")
 set(GFXADDITIONAL "")
 set(GFXADDITIONALPUBLIC "")
@@ -27,8 +37,6 @@ if (PXR_ENABLE_GL_SUPPORT)
     list(APPEND GFX     glf
     			        hgiGL)
     list(APPEND GFXADDITIONAL   GL/codeGenGLSL
-                        GL/domeLightComputationsGL
-                        GL/drawTargetTextureResourceGL
                         GL/glslProgramGL
                         GL/indirectDrawBatchGL
                         GL/renderPassShaderGL
@@ -46,8 +54,6 @@ if (PXR_ENABLE_METAL_SUPPORT)
     list(APPEND GFX     mtlf
                         hgiMetal)
     list(APPEND GFXADDITIONAL  Metal/codeGenMSL
-                        Metal/domeLightComputationsMetal
-                        Metal/drawTargetTextureResourceMetal
                         Metal/indirectDrawBatchMetal
                         Metal/metalConversions
                         Metal/glslProgramMetal
@@ -73,17 +79,18 @@ pxr_library(hdSt
         ${GFX}
         ${GLEW_LIBRARY}
         ${OPENSUBDIV_LIBRARIES}
+        ${optionalLibs}
 
     INCLUDE_DIRS
         ${GLEW_INCLUDE_DIR}
         ${OPENSUBDIV_INCLUDE_DIR}
+        ${optionalIncludeDirs}
 
     PUBLIC_CLASSES
         basisCurves
         bufferArrayRange
         bufferResource
         commandBuffer
-        computeShader
         copyComputation
         debugCodes
         dispatchBuffer
@@ -91,8 +98,6 @@ pxr_library(hdSt
         drawItem
         drawItemInstance
         drawTarget
-        drawTargetAttachmentDesc
-        drawTargetAttachmentDescArray
         drawTargetRenderPassState
         dynamicUvTextureObject
         extComputation
@@ -102,10 +107,13 @@ pxr_library(hdSt
         extCompGpuPrimvarBufferSource
         fallbackLightingShader
         field
+        fieldSubtextureIdentifier
         flatNormals
         geometricShader
         glConversions
+        glfTextureCpuData
         glslfxShader
+        glslProgram
         glUtils
         hgiConversions
         imageShaderRenderPass
@@ -118,9 +126,8 @@ pxr_library(hdSt
         mesh
         mixinShader
         package
-        persistentBuffer
         points
-        glslProgram
+        ptexTextureObject
         renderBuffer
         renderDelegate
         renderPass
@@ -138,6 +145,7 @@ pxr_library(hdSt
         surfaceShader
         texture
         textureBinder
+        textureCpuData
         textureHandle
         textureHandleRegistry
         textureIdentifier
@@ -146,24 +154,25 @@ pxr_library(hdSt
         textureResource
         textureResourceHandle
         tokens
+        udimTextureObject
         vboMemoryManager
         vboSimpleMemoryManager
         volume
+        ${optionalPublicClasses}
         ${GFXADDITIONALPUBLIC}
 
     PUBLIC_HEADERS
         api.h
         dynamicUvTextureImplementation.h
-        textureCpuData.h
 
     PRIVATE_CLASSES
         basisCurvesComputations
         basisCurvesShaderKey
         basisCurvesTopology
         codeGen
+        computeShader
         cullingShaderKey
         drawBatch
-        drawTargetTextureResource
         imageShaderShaderKey
         immediateDrawBatch
         indirectDrawBatch
@@ -207,8 +216,7 @@ pxr_library(hdSt
         shaders/meshWire.glslfx
         shaders/points.glslfx
         shaders/pointId.glslfx
-        shaders/ptexTextureGL.glslfx
-        shaders/ptexTextureMetal.glslfx
+        shaders/ptexTexture.glslfx
         shaders/renderPass.glslfx
         shaders/renderPassShader.glslfx
         shaders/simpleLightingShader.glslfx

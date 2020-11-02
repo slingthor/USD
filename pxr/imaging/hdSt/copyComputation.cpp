@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdSt/copyComputation.h"
@@ -84,26 +83,23 @@ HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
         return;
     }
 
-    GLintptr readOffset = srcRange->GetByteOffset(_name) + srcRes->GetOffset();
-    GLintptr writeOffset = dstRange->GetByteOffset(_name) + dstRes->GetOffset();
-    GLsizeiptr copySize = srcResSize;
+    size_t readOffset = srcRange->GetByteOffset(_name) + srcRes->GetOffset();
+    size_t writeOffset = dstRange->GetByteOffset(_name) + dstRes->GetOffset();
+    size_t copySize = srcResSize;
 
     // Unfortunately at the time the copy computation is added, we don't
     // know if the source buffer has 0 length.  So we can get here with
     // a zero sized copy.
-    if (copySize > 0) {
+    if (srcResSize > 0) {
 
         // If the buffer's have 0 size, resources for them would not have
         // be allocated, so the check for resource allocation has been moved
         // until after the copy size check.
 
-        GLint srcId = srcRes->GetId()->GetRawResource();
-        GLint dstId = dstRes->GetId()->GetRawResource();
-
-        if (!TF_VERIFY(srcId)) {
+        if (!TF_VERIFY(srcRes->GetId())) {
             return;
         }
-        if (!TF_VERIFY(dstId)) {
+        if (!TF_VERIFY(dstRes->GetId())) {
             return;
         }
 
@@ -118,7 +114,9 @@ HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
         blitOp.sourceByteOffset = readOffset;
         blitOp.byteSize = copySize;
         blitOp.destinationByteOffset = writeOffset;
-        hdStResourceRegistry->GetBlitCmds()->CopyBufferGpuToGpu(blitOp);
+
+        HgiBlitCmds* blitCmds = hdStResourceRegistry->GetGlobalBlitCmds();
+        blitCmds->CopyBufferGpuToGpu(blitOp);
     }
 
     GLF_POST_PENDING_GL_ERRORS();

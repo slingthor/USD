@@ -27,8 +27,6 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
 
-#include "pxr/imaging/garch/texture.h"
-
 #include "pxr/imaging/hdSt/textureIdentifier.h"
 #include "pxr/imaging/hd/enums.h"
 #include "pxr/imaging/hd/types.h"
@@ -41,16 +39,12 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-#ifdef PXR_PTEX_SUPPORT_ENABLED
-TF_DECLARE_WEAK_AND_REF_PTRS(GarchPtexTexture);
-#endif
-TF_DECLARE_WEAK_AND_REF_PTRS(GarchUdimTexture);
-
 class Hgi;
 using HgiTextureHandle = HgiHandle<class HgiTexture>;
 class HdSt_TextureObjectRegistry;
 struct HgiTextureDesc;
 class HdStTextureCpuData;
+class HdStResourceRegistry;
 
 using HdStTextureObjectSharedPtr = std::shared_ptr<class HdStTextureObject>;
 
@@ -101,7 +95,14 @@ protected:
         const HdStTextureIdentifier &textureId,
         HdSt_TextureObjectRegistry * textureObjectRegistry);
 
+    HDST_API
+    HdStResourceRegistry* _GetResourceRegistry() const;
+
+    HDST_API
     Hgi* _GetHgi() const;
+    
+    HDST_API
+    std::string _GetDebugName(const HdStTextureIdentifier &textureId);
 
     /// Load texture to CPU (thread-safe)
     ///
@@ -160,6 +161,7 @@ protected:
     HdStTextureCpuData * _GetCpuData() const;
 
     void _CreateTexture(const HgiTextureDesc &desc);
+    void _GenerateMipmaps();
     void _DestroyTexture();
 
 private:
@@ -251,108 +253,6 @@ private:
     HgiTextureHandle _gpuTexture;
 };
 
-/// \class HdStPtexTextureObject
-///
-/// A ptex texture - it is using Garch to both load the texture
-/// and allocate the GPU resources (unlike the other texture
-/// types).
-///
-class HdStPtexTextureObject final : public HdStTextureObject
-{
-public:
-    HDST_API
-    HdStPtexTextureObject(
-        const HdStTextureIdentifier &textureId,
-        HdSt_TextureObjectRegistry *textureObjectRegistry);
-
-    HDST_API
-    ~HdStPtexTextureObject() override;
-
-    /// Get the GL texture name for the texels
-    ///
-    /// Only valid after commit phase.
-    ///
-    GarchTextureGPUHandle GetTexelGLTextureName() const { return _texelGLTextureName; }
-
-    /// Get the GL texture name for the layout
-    ///
-    /// Only valid after commit phase.
-    ///
-    GarchTextureGPUHandle GetLayoutGLTextureName() const { return _layoutGLTextureName; }
-
-    HDST_API
-    bool IsValid() const override;
-
-    HDST_API
-    HdTextureType GetTextureType() const override;
-
-protected:
-    HDST_API
-    void _Load() override;
-
-    HDST_API
-    void _Commit() override;
-
-private:
-#ifdef PXR_PTEX_SUPPORT_ENABLED
-    GarchPtexTextureRefPtr _gpuTexture;
-#endif
-
-    GarchTextureGPUHandle _texelGLTextureName;
-    GarchTextureGPUHandle _layoutGLTextureName;
-};
-
-/// \class HdStUdimTextureObject
-///
-/// A udim texture - it is using Glf to both load the texture
-/// and allocate the GPU resources (unlike the other texture
-/// types).
-///
-class HdStUdimTextureObject final : public HdStTextureObject
-{
-public:
-    HDST_API
-    HdStUdimTextureObject(
-        const HdStTextureIdentifier &textureId,
-        HdSt_TextureObjectRegistry *textureObjectRegistry);
-
-    HDST_API
-    ~HdStUdimTextureObject() override;
-
-    /// Get the GL texture name for the texels
-    ///
-    /// Only valid after commit phase.
-    ///
-    GarchTextureGPUHandle GetTexelGLTextureName() const { return _texelGLTextureName; }
-
-    /// Get the GL texture name for the layout
-    ///
-    /// Only valid after commit phase.
-    ///
-    GarchTextureGPUHandle GetLayoutGLTextureName() const { return _layoutGLTextureName; }
-
-    HDST_API
-    bool IsValid() const override;
-
-    HDST_API
-    HdTextureType GetTextureType() const override;
-
-protected:
-    HDST_API
-    void _Load() override;
-
-    HDST_API
-    void _Commit() override;
-
-private:
-    std::vector<std::tuple<int, TfToken>> _tiles;
-
-    GarchUdimTextureRefPtr _gpuTexture;
-
-    GarchTextureGPUHandle _texelGLTextureName;
-    GarchTextureGPUHandle _layoutGLTextureName;
-};
-
 template<HdTextureType textureType>
 struct HdSt_TypedTextureObjectHelper;
 
@@ -373,16 +273,6 @@ struct HdSt_TypedTextureObjectHelper<HdTextureType::Uv> {
 template<>
 struct HdSt_TypedTextureObjectHelper<HdTextureType::Field> {
     using type = HdStFieldTextureObject;
-};
-
-template<>
-struct HdSt_TypedTextureObjectHelper<HdTextureType::Ptex> {
-    using type = HdStPtexTextureObject;
-};
-
-template<>
-struct HdSt_TypedTextureObjectHelper<HdTextureType::Udim> {
-    using type = HdStUdimTextureObject;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

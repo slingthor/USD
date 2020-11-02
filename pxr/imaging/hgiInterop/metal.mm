@@ -160,8 +160,6 @@ HgiInteropMetal::_CreateShaderContext(
     shader.samplerColorLoc = glGetUniformLocation(program, "interopTexture");
     shader.samplerDepthLoc = glGetUniformLocation(program, "depthTexture");
     shader.blitTexSizeUniform = glGetUniformLocation(program, "texSize");
-    shader.blitDepthScaleOffsetUniform =
-        glGetUniformLocation(program, "depthScaleOffset");
 
     shader.vao = 0;
     glGenVertexArrays(1, &shader.vao);
@@ -189,16 +187,7 @@ HgiInteropMetal::_CreateShaderContext(
                               (void*)(offsetof(Vertex, uv)));
     }
     
-    Vertex v[12] = {
-        { {-1, -1}, {0, 0} },
-        { { 1, -1}, {1, 0} },
-        { {-1,  1}, {0, 1} },
-        
-        { {-1, 1}, {0, 1} },
-        { {1, -1}, {1, 0} },
-        { {1,  1}, {1, 1} },
-        
-        // Second set have flipped v coord
+    Vertex v[6] = {
         { {-1, -1}, {0, 1} },
         { { 1, -1}, {1, 1} },
         { {-1,  1}, {0, 0} },
@@ -294,7 +283,6 @@ HgiInteropMetal::HgiInteropMetal(Hgi* hgi)
         // a GL_TEXTURE_RECTANGLE are in pixels,
         // rather than the usual normalised 0..1 range.
         "uniform vec2 texSize;\n"
-        "uniform vec2 depthScaleOffset;\n"
         "\n"
         "void main(void)\n"
         "{\n"
@@ -311,7 +299,7 @@ HgiInteropMetal::HgiInteropMetal(Hgi* hgi)
         "#else\n"
         "    gl_FragColor = texture2DRect(interopTexture, uv.st);\n"
         "#endif\n"
-        "    gl_FragDepth = (depthScaleOffset.y + depth) * depthScaleOffset.x;\n"
+        "    gl_FragDepth = (1.0 + depth) * 0.5;\n"
         "}\n";
 
     GLuint fsColor = _compileShader(fragmentShaderColor, GL_FRAGMENT_SHADER);
@@ -785,8 +773,7 @@ HgiInteropMetal::_RestoreOpenGlState()
 }
 
 void
-HgiInteropMetal::_BlitToOpenGL(GfVec4i const &compRegion,
-                               bool flipY, int shaderIndex)
+HgiInteropMetal::_BlitToOpenGL(GfVec4i const &compRegion, int shaderIndex)
 {
     // Clear GL error state
     _ProcessGLErrors(true);
@@ -849,18 +836,7 @@ HgiInteropMetal::_BlitToOpenGL(GfVec4i const &compRegion,
     // Region of the framebuffer over which to composite.
     glViewport(compRegion[0], compRegion[1], compRegion[2], compRegion[3]);
 
-    if (flipY) {
-        if (shader.blitDepthScaleOffsetUniform != -1) {
-            glUniform2f(shader.blitDepthScaleOffsetUniform, 1.0f, 0.0f);
-        }
-        glDrawArrays(GL_TRIANGLES, 6, 12);
-    }
-    else {
-        if (shader.blitDepthScaleOffsetUniform != -1) {
-            glUniform2f(shader.blitDepthScaleOffsetUniform, 0.5f, 1.0f);
-        }
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-    }
+    glDrawArrays(GL_TRIANGLES, 0, 6);
 
     _RestoreOpenGlState();
     glFlush();
@@ -882,7 +858,7 @@ HgiInteropMetal::CompositeToInterop(
     // XXX We need to flip all renderers (Embree, Prman, ...) for now as we
     // assume they all output gl coords. That may not always be the case if
     // Storm renders with Metal directly.
-    bool flipImage = _hgiMetal->_needsFlip;
+    bool flipImage = true;
 
     HgiMetalTexture *metalColor = static_cast<HgiMetalTexture*>(color.Get());
     HgiMetalTexture *metalDepth = static_cast<HgiMetalTexture*>(depth.Get());
@@ -908,7 +884,7 @@ HgiInteropMetal::CompositeToInterop(
         depthTexture = metalDepth->GetTextureId();
     }
 
-    id<MTLCommandBuffer> commandBuffer = _hgiMetal->GetCommandBuffer();
+    id<MTLCommandBuffer> commandBuffer = _hgiMetal->GetPrimaryCommandBuffer();
     
     id<MTLComputeCommandEncoder> computeEncoder;
     
@@ -983,11 +959,11 @@ HgiInteropMetal::CompositeToInterop(
 
     // We wait until the work is scheduled for execution so that future OpenGL
     // calls are guaranteed to happen after the Metal work encoded above
-    _hgiMetal->CommitCommandBuffer(
+    _hgiMetal->CommitPrimaryCommandBuffer(
         HgiMetal::CommitCommandBuffer_WaitUntilScheduled);
 
     if (glShaderIndex != -1) {
-        _BlitToOpenGL(compRegion, flipImage, glShaderIndex);
+        _BlitToOpenGL(compRegion, glShaderIndex);
 
         _ProcessGLErrors();
     }

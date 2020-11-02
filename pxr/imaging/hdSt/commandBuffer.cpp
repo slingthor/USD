@@ -239,7 +239,7 @@ HdStCommandBuffer::ExecuteDraw(
 
     // Create a new command buffer for each render pass to the current drawable
     if (renderPassDescriptor.colorAttachments[0].loadAction == MTLLoadActionClear) {
-        id <MTLCommandBuffer> commandBuffer = context->GetHgi()->GetCommandBuffer();
+        id <MTLCommandBuffer> commandBuffer = context->GetHgi()->GetPrimaryCommandBuffer();
         int frameNumber = context->GetCurrentFrame();
         [commandBuffer addScheduledHandler:^(id<MTLCommandBuffer> buffer)
          {
@@ -250,22 +250,22 @@ HdStCommandBuffer::ExecuteDraw(
            context->GPUTimerEndTimer(frameNumber);
         }];
 
-        int numAttachments = 1;
-        if (context->GetDrawTarget()) {
-            numAttachments = context->GetDrawTarget()->GetAttachments().size();
-        }
-
         if (context->GetHgi()->BeginMtlf()) {
             renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionLoad;
-            renderPassDescriptor.stencilAttachment.loadAction = MTLLoadActionLoad;
+//            renderPassDescriptor.stencilAttachment.loadAction = MTLLoadActionLoad;
 
-            for (int i = 0; i < numAttachments; i++) {
-                renderPassDescriptor.colorAttachments[i].loadAction = MTLLoadActionLoad;
+            for (int i = 0; i < METAL_MAX_COLOR_ATTACHMENTS; i++) {
+                if (renderPassDescriptor.colorAttachments[i].loadAction == MTLLoadActionClear) {
+                    renderPassDescriptor.colorAttachments[i].loadAction = MTLLoadActionLoad;
+                }
             }
         }
         else {
             mtBatchDrawing = false;
         }
+    }
+    else {
+        context->GetHgi()->BeginMtlf();
     }
 
     uint64_t timeStart = ArchGetTickTime();
@@ -300,7 +300,7 @@ HdStCommandBuffer::ExecuteDraw(
 
 //        NSLog(@"Culled from %lu batches to %lu", _drawBatches.size(), visibleBatches.size());
         
-        unsigned const systemLimit = MAX(3, WorkGetConcurrencyLimit());
+        uint32_t const systemLimit = MAX(3, WorkGetConcurrencyLimit());
         
         // Limit the number of threads used to render with. Save two threads for the system
         // unsigned const maxRenderThreads = MIN(MIN(systemLimit - 2, 6), visibleBatches.size());
@@ -606,8 +606,7 @@ HdStCommandBuffer::FrustumCull(
 {
     HD_TRACE_FUNCTION();
     
-    const bool
-    skipCull = false;
+    const bool skipCull = false;
     
     if (skipCull) {
         return;
@@ -623,11 +622,14 @@ HdStCommandBuffer::FrustumCull(
     // Temp workaround for selection rendertargets being small, and small object
     // culling resulting in object selection not working
     if (renderTargetWidth <= 256 && renderTargetHeight <= 256) {
+        // skip the cull and render everything
+        return;
+
         renderTargetWidth = 2048;
         renderTargetHeight = 2048;
     }
-    dimensions.x = 4.0f / renderTargetWidth;
-    dimensions.y = 4.0f / renderTargetHeight;
+    dimensions.x = 6.0f / renderTargetWidth;
+    dimensions.y = 6.0f / renderTargetHeight;
     
     MtlfMetalContext::GetMetalContext()->PrepareBufferFlush();
     
@@ -678,32 +680,34 @@ HdStCommandBuffer::FrustumCull(
         bvh.BuildBVH(&_drawItemInstances);
     }
 
-    uint64_t timeStart = ArchGetTickTime();
+    if (bvh.populated) {
+        uint64_t timeStart = ArchGetTickTime();
 
 
-    bvh.PerformCulling(simdViewProjMatrix, dimensions);
-    
-    MtlfMetalContext::GetMetalContext()->FlushBuffers();
+        bvh.PerformCulling(simdViewProjMatrix, dimensions);
+        
+        MtlfMetalContext::GetMetalContext()->FlushBuffers();
 
-    uint64_t timeDiff = ArchGetTickTime() - timeStart;
-    
-    static uint64_t fastestTime = 0xffffffffffffffff;
+        uint64_t timeDiff = ArchGetTickTime() - timeStart;
+        
+        static uint64_t fastestTime = 0xffffffffffffffff;
 
-//    fastestTime = std::min(fastestTime, timeDiff);
-//    NSLog(@"HdStCommandBuffer::FrustumCull: %.2fms (%.2fms fastest)",
-//          ArchTicksToNanoseconds(timeDiff) / 1000.0f / 1000.0f,
-//          ArchTicksToNanoseconds(fastestTime) / 1000.0f / 1000.0f);
+    //    fastestTime = std::min(fastestTime, timeDiff);
+    //    NSLog(@"HdStCommandBuffer::FrustumCull: %.2fms (%.2fms fastest)",
+    //          ArchTicksToNanoseconds(timeDiff) / 1000.0f / 1000.0f,
+    //          ArchTicksToNanoseconds(fastestTime) / 1000.0f / 1000.0f);
 
-    if (primCount.load()) {
-        NSLog(@"Scene prims: %lu", primCount.load());
+        if (primCount.load()) {
+            NSLog(@"Scene prims: %lu", primCount.load());
+        }
+        
+        _visibleSize = 0;
+    //    for (auto const& instance : _drawItemInstances) {
+    //        if (instance.IsVisible()) {
+    //            ++_visibleSize;
+    //        }
+    //    }
     }
-    
-    _visibleSize = 0;
-//    for (auto const& instance : _drawItemInstances) {
-//        if (instance.IsVisible()) {
-//            ++_visibleSize;
-//        }
-//    }
 }
 
 void

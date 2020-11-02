@@ -30,6 +30,7 @@
 #include "pxr/imaging/garch/texture.h"
 
 #include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hd/enums.h"
 #include "pxr/imaging/hd/version.h"
@@ -185,9 +186,9 @@ public:
         /// The texture.
         HdStTextureHandleSharedPtr handle;
 
-        /// The path of the corresponding texture prim - used to
-        /// compute the hash for draw batches when not using bindless textures.
-        SdfPath textureSourcePath;
+        /// A hash unique to the corresponding asset; used to
+        /// split draw batches when not using bindless textures.
+        size_t hash;
     };
     using NamedTextureHandleVector = std::vector<NamedTextureHandle>;
 
@@ -243,7 +244,8 @@ public:
 
         HDST_API
         void AddComputation(HdBufferArrayRangeSharedPtr const &range,
-                            HdComputationSharedPtr const &computation);
+                            HdComputationSharedPtr const &computation,
+                            HdStComputeQueue const queue);
 
     private:
         friend class HdStResourceRegistry;

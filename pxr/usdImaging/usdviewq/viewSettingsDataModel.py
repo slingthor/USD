@@ -56,21 +56,38 @@ _HIGHLIGHT_COLORS_DICT = {
 DEFAULT_AMBIENT = 0.2
 DEFAULT_SPECULAR = 0.1
 
+class AbortSettingChange(Exception):
+     pass
+
 
 def visibleViewSetting(f):
     def wrapper(self, *args, **kwargs):
-        f(self, *args, **kwargs)
-        # If f raises an exception, the signal is not emitted.
-        self.signalVisibleSettingChanged.emit()
-        self.signalSettingChanged.emit()
+        try:
+            f(self, *args, **kwargs)
+        except AbortSettingChange:
+            pass # f aborted the setting change, so no signals are emitted.
+        except:
+            raise # f threw some Exception we can't handle, so re-raise it.
+        else:
+            # f was successful; emit signals.
+            self.signalVisibleSettingChanged.emit()
+            self.signalSettingChanged.emit()
+
     return wrapper
 
 
 def invisibleViewSetting(f):
     def wrapper(self, *args, **kwargs):
-        f(self, *args, **kwargs)
-        # If f raises an exception, the signal is not emitted.
-        self.signalSettingChanged.emit()
+        try:
+            f(self, *args, **kwargs)
+        except AbortSettingChange:
+            pass # f aborted the setting change, so no signal is emitted.
+        except:
+             raise # f threw some Exception we can't handle, so re-raise it.
+        else:
+            # f was successful; emit signal.
+            self.signalSettingChanged.emit()
+
     return wrapper
 
 
@@ -84,6 +101,11 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
 
     # emitted when any view setting which may affect the rendered image changes
     signalVisibleSettingChanged = QtCore.Signal()
+
+    # emitted when autoClipping changes value, so that clients can initialize
+    # it efficiently.  This signal will be emitted *before* 
+    # signalVisibleSettingChanged when autoClipping changes.
+    signalAutoComputeClippingPlanesChanged = QtCore.Signal()
 
     # emitted when any aspect of the defaultMaterial changes
     signalDefaultMaterialChanged = QtCore.Signal()
@@ -128,9 +150,17 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
         self._displayRender = self.stateProperty("displayRender", default=False)
         self._displayPrimId = self.stateProperty("displayPrimId", default=False)
         self._enableSceneMaterials = self.stateProperty("enableSceneMaterials", default=True)
+        self._enableSceneLights = self.stateProperty("enableSceneLights", default=True)
         self._cullBackfaces = self.stateProperty("cullBackfaces", default=False)
         self._showInactivePrims = self.stateProperty("showInactivePrims", default=True)
-        self._showAllMasterPrims = self.stateProperty("showAllMasterPrims", default=False)
+
+        showAllMasterPrims = self.stateProperty("showAllMasterPrims", default=False)
+        self._showAllPrototypePrims = self.stateProperty("showAllPrototypePrims", default=False)
+        # XXX: For backwards compatibility, we use the "showAllMasterPrims"
+        # saved state to drive the new "showAllPrototypePrims" state. We
+        # can remove "showAllMasterPrims" in a later release.
+        self._showAllPrototypePrims = showAllMasterPrims
+
         self._showUndefinedPrims = self.stateProperty("showUndefinedPrims", default=False)
         self._showAbstractPrims = self.stateProperty("showAbstractPrims", default=False)
         self._rolloverPrimInfo = self.stateProperty("rolloverPrimInfo", default=False)
@@ -180,9 +210,11 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
         state["displayRender"] = self._displayRender
         state["displayPrimId"] = self._displayPrimId
         state["enableSceneMaterials"] = self._enableSceneMaterials
+        state["enableSceneLights"] = self._enableSceneLights
         state["cullBackfaces"] = self._cullBackfaces
         state["showInactivePrims"] = self._showInactivePrims
-        state["showAllMasterPrims"] = self._showAllMasterPrims
+        state["showAllPrototypePrims"] = self._showAllPrototypePrims
+        state["showAllMasterPrims"] = self._showAllPrototypePrims
         state["showUndefinedPrims"] = self._showUndefinedPrims
         state["showAbstractPrims"] = self._showAbstractPrims
         state["rolloverPrimInfo"] = self._rolloverPrimInfo
@@ -284,8 +316,16 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
 
     @visibleViewSetting
     def _updateFOV(self):
-        if self._freeCamera:
-            self._freeCameraFOV = self.freeCamera.fov
+        raise AbortSettingChange
+        if not self._freeCamera:
+            raise AbortSettingChange
+
+        newFov = self.freeCamera.fov
+        if newFov == self._freeCameraFOV:
+            raise AbortSettingChange
+
+        self._freeCameraFOV = newFov
+
 
     @property
     def freeCameraFOV(self):
@@ -358,6 +398,7 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
     @visibleViewSetting
     def autoComputeClippingPlanes(self, value):
         self._autoComputeClippingPlanes = value
+        self.signalAutoComputeClippingPlanesChanged.emit()
 
     @property
     def showBBoxPlayback(self):
@@ -423,6 +464,15 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
         self._enableSceneMaterials = value
 
     @property
+    def enableSceneLights(self):
+        return self._enableSceneLights
+
+    @enableSceneLights.setter
+    @visibleViewSetting
+    def enableSceneLights(self, value):
+        self._enableSceneLights = value
+
+    @property
     def cullBackfaces(self):
         return self._cullBackfaces
 
@@ -441,13 +491,13 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
         self._showInactivePrims = value
 
     @property
-    def showAllMasterPrims(self):
-        return self._showAllMasterPrims
+    def showAllPrototypePrims(self):
+        return self._showAllPrototypePrims
 
-    @showAllMasterPrims.setter
+    @showAllPrototypePrims.setter
     @invisibleViewSetting
-    def showAllMasterPrims(self, value):
-        self._showAllMasterPrims = value
+    def showAllPrototypePrims(self, value):
+        self._showAllPrototypePrims = value
 
     @property
     def showUndefinedPrims(self):

@@ -45,9 +45,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 // Name shader uses to read AOV, i.e., shader calls
 // HdGet_AOVNAMEReadback().
-static
 TfToken
-_GetReadbackName(const TfToken &aovName)
+HdStRenderPassShader::_GetReadbackName(const TfToken &aovName)
 {
     return TfToken(aovName.GetString() + "Readback");
 }
@@ -115,6 +114,28 @@ HdStRenderPassShader::BindResources(HdStGLSLProgram const &program,
     // set fallback states (should be moved to HdRenderPassState::Bind)
     unsigned int cullStyle = _cullStyle;
     binder.BindUniformui(HdShaderTokens->cullStyle, 1, &cullStyle);
+
+    // Count how many textures we bind for check at the end.
+    size_t numFulfilled = 0;
+
+    // Loop over all AOVs for which a read back was requested.
+    for (const HdRenderPassAovBinding &aovBinding : state.GetAovBindings()) {
+        const TfToken &aovName = aovBinding.aovName;
+        if (_aovReadbackRequests.count(aovName) > 0) {
+            // Bind the texture.
+            TfToken bindName = _GetReadbackName(aovName);
+            _BindTexture(program,
+                         aovBinding,
+                         bindName,
+                         binder.GetBinding(_GetReadbackName(aovName)));
+
+            numFulfilled++;
+        }
+    }
+
+    if (numFulfilled != _aovReadbackRequests.size()) {
+        TF_CODING_ERROR("AOV bindings missing for requested readbacks.");
+    }
 }
 
 
@@ -126,6 +147,14 @@ HdStRenderPassShader::UnbindResources(HdStGLSLProgram const &program,
 {
     TF_FOR_ALL(it, _customBuffers) {
         binder.Unbind(it->second);
+    }
+
+    // Unbind all textures that were requested for AOV read back
+    for (const HdRenderPassAovBinding &aovBinding : state.GetAovBindings()) {
+        const TfToken &aovName = aovBinding.aovName;
+        if (_aovReadbackRequests.count(aovName) > 0) {
+            _UnbindTexture(binder.GetBinding(_GetReadbackName(aovName)));
+        }
     }
 }
 

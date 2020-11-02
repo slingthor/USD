@@ -4,8 +4,8 @@ set(PXR_PACKAGE hio)
 pxr_library(hio
     LIBRARIES
         arch
-        garch
         js
+        plug
         tf
         vt
         trace
@@ -18,14 +18,27 @@ pxr_library(hio
     PUBLIC_CLASSES
         glslfx
         glslfxConfig
+        image
+        imageRegistry
+        types
 
     PRIVATE_CLASSES
         debugCodes
+        dictionary
 
     PUBLIC_HEADERS
         api.h
 
-    CPPFILES
-        dictionary.cpp
+    PRIVATE_HEADERS
+        rankedTypeMap.h
+        stb/stb_image.h
+        stb/stb_image_resize.h
+        stb/stb_image_write.h
 
+    CPPFILES
+        stbImage.cpp
+
+    RESOURCE_FILES
+        plugInfo.json
+    
 )

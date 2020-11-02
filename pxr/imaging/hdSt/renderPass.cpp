@@ -21,8 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
-
 #include "pxr/imaging/hdSt/renderPass.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
@@ -51,9 +49,9 @@
 
 #include "pxr/base/gf/frustum.h"
 
-#include "pxr/imaging/glf/diagnostic.h"
-
+// APPLE METAL:
 #include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/texture.h"
 
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
@@ -70,7 +68,6 @@ _ExecuteDraw(
     HdStRenderPassStateSharedPtr const& stRenderPassState,
     HdStResourceRegistrySharedPtr const& resourceRegistry)
 {
-    cmdBuffer->PrepareDraw(stRenderPassState, resourceRegistry);
     cmdBuffer->ExecuteDraw(stRenderPassState, resourceRegistry);
 }
 
@@ -115,7 +112,6 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
-    GLF_GROUP_FUNCTION();
 
     // Downcast render pass state
     HdStRenderPassStateSharedPtr stRenderPassState =
@@ -134,6 +130,8 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
         GetRenderIndex()->GetResourceRegistry());
     TF_VERIFY(resourceRegistry);
 
+    _cmdBuffer.PrepareDraw(stRenderPassState, resourceRegistry);
+
     // Create graphics work to render into aovs.
     const HgiGraphicsCmdsDesc desc =
         stRenderPassState->MakeGraphicsCmdsDesc(GetRenderIndex());
@@ -150,61 +148,28 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
             collection.GetMaterialTag().GetString();
         gfxCmds->PushDebugGroup(passName.c_str());
         if (!HdStResourceFactory::GetInstance()->IsOpenGL()) {
-            MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-            // Set the render pass descriptor to use for the render encoders
-            MTLRenderPassDescriptor* rpd = context->GetRenderPassDescriptor();
-            MTLPixelFormat colorFormat = MTLPixelFormatInvalid;
-            MTLPixelFormat depthFormat = MTLPixelFormatInvalid;
-            size_t i;
-            bool resolve = !desc.colorResolveTextures.empty();
-            for (i=0; i<desc.colorTextures.size(); i++) {
-                HgiMetalTexture *metalTexture =
-                    static_cast<HgiMetalTexture*>(desc.colorTextures[i].Get());
-                rpd.colorAttachments[i].texture = metalTexture->GetTextureId();
-                colorFormat = rpd.colorAttachments[i].texture.pixelFormat;
+            if (desc.width) {
+                // Set the render pass descriptor for Mtlf to use with the render encoders
+                MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+                MTLRenderPassDescriptor* rpd = context->GetHgi()->renderPassDescriptor;
+                
+                MTLPixelFormat colorFormat = MTLPixelFormatInvalid;
+                MTLPixelFormat depthFormat = MTLPixelFormatInvalid;
+                if (desc.colorTextures.size()) {
+                    colorFormat = rpd.colorAttachments[0].texture.pixelFormat;
+                }
+                if (desc.depthTexture) {
+                    depthFormat = rpd.depthAttachment.texture.pixelFormat;
+                }
+                
+                context->SetRenderPassDescriptor(rpd);
+                context->SetOutputPixelFormats(colorFormat, depthFormat);
+            }
 
-                if (resolve) {
-                    metalTexture =
-                        static_cast<HgiMetalTexture*>(desc.colorResolveTextures[i].Get());
-                    rpd.colorAttachments[i].resolveTexture = metalTexture->GetTextureId();
-                    rpd.colorAttachments[i].storeAction = MTLStoreActionStoreAndMultisampleResolve;
-                }
-                else {
-                    rpd.colorAttachments[i].storeAction = MTLStoreActionStore;
-                }
-            }
-            while (i<8) {
-                rpd.colorAttachments[i].texture = nil;
-                rpd.colorAttachments[i].resolveTexture = nil;
-                i++;
-            }
-            if (desc.depthTexture) {
-                HgiMetalTexture *metalTexture =
-                    static_cast<HgiMetalTexture*>(desc.depthTexture.Get());
-                rpd.depthAttachment.texture = metalTexture->GetTextureId();
-                depthFormat = rpd.depthAttachment.texture.pixelFormat;
-                    
-                if (resolve) {
-                    metalTexture =
-                        static_cast<HgiMetalTexture*>(desc.depthResolveTexture.Get());
-                    rpd.depthAttachment.resolveTexture = metalTexture->GetTextureId();
-                    rpd.depthAttachment.storeAction = MTLStoreActionStoreAndMultisampleResolve;
-                }
-                else {
-                    rpd.depthAttachment.storeAction = MTLStoreActionStore;
-                }
-            }
-            else {
-                rpd.depthAttachment.texture = nil;
-                rpd.depthAttachment.resolveTexture = nil;
-            }
-            context->SetRenderPassDescriptor(rpd);
-            context->SetOutputPixelFormats(colorFormat, depthFormat);
+            GfVec4f const& viewport = renderPassState->GetViewport();
+            gfxCmds->SetViewport(GfVec4i(int(viewport[0]), int(viewport[1]),
+                                         int(viewport[2]), int(viewport[3])));
         }
-
-        GfVec4f const& viewport = renderPassState->GetViewport();
-        gfxCmds->SetViewport(GfVec4i(int(viewport[0]), int(viewport[1]),
-                                     int(viewport[2]), int(viewport[3])));
     }
 
     // Draw
@@ -245,7 +210,6 @@ void
 HdSt_RenderPass::_PrepareDrawItems(TfTokenVector const& renderTags)
 {
     HD_TRACE_FUNCTION();
-    GLF_GROUP_FUNCTION();
 
     HdChangeTracker const &tracker = GetRenderIndex()->GetChangeTracker();
     HdRprimCollection const &collection = GetRprimCollection();
@@ -286,7 +250,6 @@ void
 HdSt_RenderPass::_PrepareCommandBuffer(TfTokenVector const& renderTags)
 {
     HD_TRACE_FUNCTION();
-    GLF_GROUP_FUNCTION();
 
     // -------------------------------------------------------------------
     // SCHEDULE PREPARATION

@@ -86,7 +86,6 @@ HgiMetalBuffer::GetCPUStagingAddress()
     if (_bufferId) {
         return [_bufferId contents];
     }
-    
     return nullptr;
 }
 

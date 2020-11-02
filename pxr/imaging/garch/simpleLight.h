@@ -36,6 +36,12 @@
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/sdf/assetPath.h"
 
+#include "pxr/base/tf/token.h"
+#include "pxr/base/vt/array.h"
+#include "pxr/base/vt/dictionary.h"
+
+#include <string>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 struct GarchSamplerGPUHandle;
@@ -128,6 +134,9 @@ public:
     virtual void SetHasShadow(bool hasShadow);
 
     GARCH_API
+    virtual bool HasIntensity() const;
+    GARCH_API
+    virtual void SetHasIntensity(bool hasIntensity);
     virtual bool IsCameraSpaceLight() const;
     GARCH_API
     virtual void SetIsCameraSpaceLight(bool isCameraSpaceLight);
@@ -141,6 +150,29 @@ public:
     bool IsDomeLight() const;
     GARCH_API
     void SetIsDomeLight(bool isDomeLight);
+    
+    
+    /// \name Post Surface Lighting
+    ///
+    /// Post surface lighting is evaluated after other surface illumination
+    /// and can be used to implement lighting effects beyond those that
+    /// correspond to basic positional lighting, e.g. range base fog, etc.
+    ///
+    /// @{
+
+    GARCH_API
+    TfToken const & GetPostSurfaceIdentifier() const;
+    GARCH_API
+    std::string const & GetPostSurfaceShaderSource() const;
+    GARCH_API
+    VtUCharArray const & GetPostSurfaceShaderParams() const;
+
+    GARCH_API
+    void SetPostSurfaceParams(TfToken const & identifier,
+                              std::string const & shaderSource,
+                              VtUCharArray const & shaderParams);
+
+    /// @}
 
     /// The path to the (unprocessed) environment map texture.
     ///
@@ -169,6 +201,7 @@ private:
     float _spotFalloff;
     GfVec3f _attenuation;
     bool _isCameraSpaceLight;
+    bool _hasIntensity;
 
     bool _hasShadow;
     int _shadowResolution;
@@ -184,6 +217,10 @@ private:
     bool _isDomeLight;
     // path to texture for dome light.
     SdfAssetPath _domeLightTextureFile;
+    
+    TfToken _postSurfaceIdentifier;
+    std::string _postSurfaceShaderSource;
+    VtUCharArray _postSurfaceShaderParams;
 
     SdfPath _id;
 };

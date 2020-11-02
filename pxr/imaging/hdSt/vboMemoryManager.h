@@ -88,8 +88,9 @@ protected:
     class _StripedBufferArrayRange : public HdStBufferArrayRange {
     public:
         /// Constructor.
-        _StripedBufferArrayRange()
-         : _stripedBufferArray(nullptr),
+        _StripedBufferArrayRange(HdStResourceRegistry* resourceRegistry)
+         : HdStBufferArrayRange(resourceRegistry),
+           _stripedBufferArray(nullptr),
            _elementOffset(0),
            _numElements(0),
            _capacity(0)
@@ -234,7 +235,7 @@ protected:
     public:
         /// Constructor.
         HDST_API
-        _StripedBufferArray(HdStResourceRegistry* _resourceRegistry,
+        _StripedBufferArray(HdStResourceRegistry* resourceRegistry,
                             TfToken const &role,
                             HdBufferSpecVector const &bufferSpecs,
                             HdBufferArrayUsageHint usageHint);
@@ -298,9 +299,8 @@ protected:
         HDST_API
         HdBufferSpecVector GetBufferSpecs() const;
         
-        /// APPLE METAL: HGI accessors needed for _StripedBufferArrayRange::CopyData()
+        /// APPLE METAL: HGI accessors needed for _StripedBufferArrayRange::ReadData()
         Hgi* GetHgi() { return _resourceRegistry->GetHgi(); }
-        HgiBlitCmds* GetBlitCmds() { return _resourceRegistry->GetBlitCmds(); }
 
     protected:
         HDST_API

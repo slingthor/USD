@@ -23,10 +23,10 @@
 //
 
 #include "pxr/imaging/hdSt/materialNetwork.h"
-#include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/materialParam.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/subtextureIdentifier.h"
-#include "pxr/imaging/hdSt/drawTarget.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/garch/udimTexture.h"
 #include "pxr/imaging/garch/resourceFactory.h"
@@ -41,6 +41,8 @@
 #include "pxr/usd/sdf/types.h"
 
 #include "pxr/base/tf/envSetting.h"
+#include "pxr/base/tf/hash.h"
+#include "pxr/base/tf/pathUtils.h"
 
 #include <memory>
 
@@ -53,6 +55,7 @@ TF_DEFINE_ENV_SETTING(HDST_USE_TRANSLUCENT_MATERIAL_TAG, false,
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     (opacity)
+    (opacityThreshold)
     (isPtex)
     (st)
     (uv)
@@ -68,6 +71,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (wrapR)
     (minFilter)
     (magFilter)
+    (sourceColorSpace)
 
     (in)
 );
@@ -203,7 +207,7 @@ _GetMaterialTag(
     HdSt_MaterialNode const& terminal)
 {
     // Strongest materialTag opinion is a hardcoded tag in glslfx meta data.
-    // This can be used for additive, translucent or volume materials.
+    // This can be used for masked, additive, translucent or volume materials.
     // See HdMaterialTagTokens.
     VtValue vtMetaTag = TfMapLookupByValue(
         metadata,
@@ -212,6 +216,16 @@ _GetMaterialTag(
 
     if (vtMetaTag.IsHolding<std::string>()) {
         return TfToken(vtMetaTag.UncheckedGet<std::string>());
+    }
+
+    // Next check for authored terminal.opacityThreshold value > 0
+    for (auto const& paramIt : terminal.parameters) {
+        if (paramIt.first != _tokens->opacityThreshold) continue;
+
+        VtValue const& vtOpacityThreshold = paramIt.second;
+        if (vtOpacityThreshold.Get<float>() > 0.0f) {
+            return HdStMaterialTagTokens->masked;
+        }      
     }
 
     bool isTranslucent = false;
@@ -248,8 +262,10 @@ _GetMaterialTag(
 
 static void
 _GetGlslfxForTerminal(
-    HioGlslfxUniquePtr& glslfxOut,
-    TfToken const& nodeTypeId)
+    HioGlslfxSharedPtr& glslfxOut,
+    size_t *glslfxOutHash,
+    TfToken const& nodeTypeId,
+    HdStResourceRegistry *resourceRegistry)
 {
     HD_TRACE_FUNCTION();
 
@@ -263,17 +279,27 @@ _GetGlslfxForTerminal(
         std::string const& glslfxFilePath = sdrNode->GetResolvedImplementationURI();
         if (!glslfxFilePath.empty()) {
 
-            // It is slow to go to disk and load the glslfx file. We don't want
-            // to do this every time the material is dirtied.
-            // XXX We need a way to force reload the same glslfx.
-            if (glslfxOut && glslfxOut->GetFilePath() == glslfxFilePath) {
-                return;
+            // Hash the filepath if it has changed.
+            if (!(*glslfxOutHash) ||
+                (glslfxOut && glslfxOut->GetFilePath() != glslfxFilePath)) {
+                *glslfxOutHash = TfHash()(glslfxFilePath);
             }
 
-            glslfxOut.reset(new HioGlslfx(glslfxFilePath));
+            // Find the glslfx file from the registry
+            HdInstance<HioGlslfxSharedPtr> glslfxInstance = 
+                resourceRegistry->RegisterGLSLFXFile(*glslfxOutHash);
+
+            if (glslfxInstance.IsFirstInstance()) {
+                glslfxOut.reset(new HioGlslfx(glslfxFilePath));
+                glslfxInstance.SetValue(glslfxOut);
+            }
+            glslfxOut = glslfxInstance.GetValue();
+
         } else {
             std::string const& sourceCode = sdrNode->GetSourceCode();
             if (!sourceCode.empty()) {
+                // Do not use the registry for the source code to avoid
+                // the cost of hashing the entire source code.
                 std::istringstream sourceCodeStream(sourceCode);
                 glslfxOut.reset(new HioGlslfx(sourceCodeStream));
             }
@@ -787,23 +813,26 @@ _GetSamplerParameters(
 }
 
 //
-// We need to flip the image for the legacy HwUvTexture_1 shader node and 
-// pre-multiply textures by their alpha if applicable
+// We need to flip the image for the legacy HwUvTexture_1 shader node, 
+// pre-multiply textures by their alpha if applicable, and provide a hint for
+// in what color space the texture is encoded 
 //
 static
 std::unique_ptr<HdStSubtextureIdentifier>
 _GetSubtextureIdentifier(
     const HdTextureType textureType,
     const TfToken &nodeType,
-    const bool premultiplyAlpha)
+    const bool premultiplyAlpha,
+    const TfToken &sourceColorSpace)
 {
     if (textureType == HdTextureType::Uv) {
         const bool flipVertically = (nodeType == _tokens->HwUvTexture_1);
         return std::make_unique<HdStAssetUvSubtextureIdentifier>(flipVertically, 
-            premultiplyAlpha);
+            premultiplyAlpha, sourceColorSpace);
     } 
     if (textureType == HdTextureType::Udim) {
-        return std::make_unique<HdStUdimSubtextureIdentifier>(premultiplyAlpha);
+        return std::make_unique<HdStUdimSubtextureIdentifier>(premultiplyAlpha, 
+            sourceColorSpace);
     }
     if (textureType == HdTextureType::Ptex) {
         return std::make_unique<HdStPtexSubtextureIdentifier>(premultiplyAlpha);
@@ -821,7 +850,8 @@ _MakeMaterialParamsForTexture(
     TfToken const& paramName,
     SdfPathSet* visitedNodes,
     HdSt_MaterialParamVector *params,
-    HdStMaterialNetwork::TextureDescriptorVector *textureDescriptors)
+    HdStMaterialNetwork::TextureDescriptorVector *textureDescriptors,
+    TfToken const& materialTag)
 {
     if (visitedNodes->find(nodePath) != visitedNodes->end()) return;
 
@@ -852,9 +882,11 @@ _MakeMaterialParamsForTexture(
     // Determine if texture should be pre-multiplied on CPU
     // Currently, this will only happen if the texture param is called 
     // "diffuseColor" and if there is another param "opacity" connected to the
-    // same texture node via output "a"
+    // same texture node via output "a", as long as the material tag is not 
+    // "masked"
     bool premultiplyTexture = false;
-    if (paramName == _tokens->diffuseColor) {
+    if (paramName == _tokens->diffuseColor && 
+        materialTag != HdStMaterialTagTokens->masked) {
         auto const& opacityConIt = downstreamNode.inputConnections.find(
             _tokens->opacity);
         if (opacityConIt != downstreamNode.inputConnections.end()) {
@@ -864,6 +896,10 @@ _MakeMaterialParamsForTexture(
         } 
     }
     texParam.isPremultiplied = premultiplyTexture;
+
+    // Get texture's sourceColorSpace hint 
+    const TfToken sourceColorSpace = _ResolveParameter(
+        node, sdrNode, _tokens->sourceColorSpace, HdStTokens->colorSpaceAuto);
 
     // Extract texture file path
     bool useTexturePrimToFindTexture = true;
@@ -913,22 +949,23 @@ _MakeMaterialParamsForTexture(
             } else if (v.IsHolding<std::string>() ||
                        v.IsHolding<SdfAssetPath>()) {
                 const std::string filePath = _ResolveAssetPath(v);
+                const std::string realFilePath = TfRealPath(filePath, true);
 
-                if (GarchIsSupportedUdimTexture(filePath)) {
+                if (GarchIsSupportedUdimTexture(realFilePath)) {
                     texParam.textureType = HdTextureType::Udim;
                 }
                 
                 useTexturePrimToFindTexture = false;
                 textureId = HdStTextureIdentifier(
-                    TfToken(filePath),
+                    TfToken(realFilePath),
                     _GetSubtextureIdentifier(
                         texParam.textureType, 
                         node.nodeTypeId, 
-                        premultiplyTexture));
+                        premultiplyTexture,
+                        sourceColorSpace));
             // If the file attribute is an SdfPath, interpret it as path
             // to a prim holding the texture resource (e.g., a render buffer).
-            } else if (HdStDrawTarget::GetUseStormTextureSystem() &&
-                       v.IsHolding<SdfPath>()) {
+            } else if (v.IsHolding<SdfPath>()) {
                 texturePrimPathForSceneDelegate = v.UncheckedGet<SdfPath>();
             }
         }
@@ -1128,7 +1165,8 @@ _MakeParamsForInputParameter(
     TfToken const& paramName,
     SdfPathSet* visitedNodes,
     HdSt_MaterialParamVector *params,
-    HdStMaterialNetwork::TextureDescriptorVector *textureDescriptors)
+    HdStMaterialNetwork::TextureDescriptorVector *textureDescriptors,
+    TfToken const& materialTag)
 {
     SdrRegistry& shaderReg = SdrRegistry::GetInstance();
 
@@ -1168,7 +1206,8 @@ _MakeParamsForInputParameter(
                             paramName,
                             visitedNodes,
                             params,
-                            textureDescriptors);
+                            textureDescriptors,
+                            materialTag);
                         return;
                     } else if (sdrRole == SdrNodeRole->Primvar) {
                         _MakeMaterialParamsForPrimvarReader(
@@ -1215,7 +1254,8 @@ _GatherMaterialParams(
     HdSt_MaterialNetwork const& network,
     HdSt_MaterialNode const& node,
     HdSt_MaterialParamVector *params,
-    HdStMaterialNetwork::TextureDescriptorVector *textureDescriptors)
+    HdStMaterialNetwork::TextureDescriptorVector *textureDescriptors,
+    TfToken const& materialTag)
 {
     HD_TRACE_FUNCTION();
 
@@ -1245,7 +1285,7 @@ _GatherMaterialParams(
     for (TfToken const& inputName : parameters) {
         _MakeParamsForInputParameter(
             network, node, inputName, &visitedNodes,
-            params, textureDescriptors);
+            params, textureDescriptors, materialTag);
     }
 
     // Set fallback values for the inputs on the terminal
@@ -1273,6 +1313,7 @@ _GatherMaterialParams(
 
 HdStMaterialNetwork::HdStMaterialNetwork()
     : _materialTag(HdStMaterialTagTokens->defaultMaterialTag)
+    , _surfaceGfxHash(0)
 {
 }
 
@@ -1281,7 +1322,8 @@ HdStMaterialNetwork::~HdStMaterialNetwork() = default;
 void
 HdStMaterialNetwork::ProcessMaterialNetwork(
     SdfPath const& materialId,
-    HdMaterialNetworkMap const& hdNetworkMap)
+    HdMaterialNetworkMap const& hdNetworkMap,
+    HdStResourceRegistry *resourceRegistry)
 {
     HD_TRACE_FUNCTION();
 
@@ -1313,7 +1355,8 @@ HdStMaterialNetwork::ProcessMaterialNetwork(
             _GetTerminalNode(materialId, surfaceNetwork)) 
     {
         // Extract the glslfx and metadata for surface/volume.
-        _GetGlslfxForTerminal(_surfaceGfx, surfTerminal->nodeTypeId);
+        _GetGlslfxForTerminal(_surfaceGfx, &_surfaceGfxHash,
+                              surfTerminal->nodeTypeId, resourceRegistry);
         if (_surfaceGfx) {
 
             // If the glslfx file is not valid we skip parsing the network.
@@ -1327,7 +1370,7 @@ HdStMaterialNetwork::ProcessMaterialNetwork(
                 _materialTag = _GetMaterialTag(_materialMetadata, *surfTerminal);
                 _GatherMaterialParams(
                     surfaceNetwork, *surfTerminal,
-                    &_materialParams, &_textureDescriptors);
+                    &_materialParams, &_textureDescriptors, _materialTag);
 
                 // OSL networks have a displacement network in hdNetworkMap
                 // under terminal: HdMaterialTerminalTokens->displacement.
@@ -1375,11 +1418,6 @@ HdStMaterialNetwork::GetTextureDescriptors() const
     return _textureDescriptors;
 }
 
-void
-HdStMaterialNetwork::ClearGlslfx()
-{
-    _surfaceGfx.reset();
-}
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

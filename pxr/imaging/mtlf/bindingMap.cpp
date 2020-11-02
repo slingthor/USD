@@ -46,7 +46,7 @@ MtlfBindingMap::GetSamplerUnit(TfToken const & name)
     MTLFBindingIndex samplerUnit;
     if (!TfMapLookup(_samplerBindings, name, &samplerUnit)) {
         // XXX error check < MAX_TEXTURE_IMAGE_UNITS
-        samplerUnit.index = _samplerBindings.size();
+        samplerUnit.index = _samplerBindingBaseIndex + (int)_samplerBindings.size();
         _samplerBindings[name] = samplerUnit.asInt;
     }
     return samplerUnit.asInt;
@@ -85,7 +85,7 @@ MtlfBindingMap::GetUniformBinding(TfToken const & name)
 {
     MTLFBindingIndex binding;
     if (!TfMapLookup(_uniformBindings, name, &binding)) {
-        binding.index = (int)_uniformBindings.size();
+        binding.index = _uniformBindingBaseIndex + (int)_uniformBindings.size();
         _uniformBindings[name] = binding.asInt;
     }
     return binding.asInt;

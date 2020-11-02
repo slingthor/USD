@@ -51,49 +51,60 @@ public:
     virtual std::unique_ptr<HdStSubtextureIdentifier> Clone() const = 0;
 
     HDST_API
-    virtual ID Hash() const;
-
-    HDST_API
     virtual ~HdStSubtextureIdentifier();
+
+protected:
+    HDST_API
+    friend size_t hash_value(const HdStSubtextureIdentifier &subId);
+
+    virtual ID _Hash() const = 0;
 };
 
+HDST_API
+size_t hash_value(const HdStSubtextureIdentifier &subId);
+
 ///
-/// \class HdStVdbSubtextureIdentifier
+/// \class HdStFieldBaseSubtextureIdentifier
 ///
-/// Identifies the grid in an OpenVDB file by its name.
+/// Base class for information identifying a grid in a volume field
+/// file. Parallels FieldBase in usdVol.
 ///
-class HdStVdbSubtextureIdentifier final : public HdStSubtextureIdentifier
+class HdStFieldBaseSubtextureIdentifier : public HdStSubtextureIdentifier
 {
 public:
-    /// C'tor using name of grid in OpenVDB file
+    /// Get field name.
+    ///
     HDST_API
-    explicit HdStVdbSubtextureIdentifier(TfToken const &gridName);
+    TfToken const &GetFieldName() const { return _fieldName; }
+
+    /// Get field index.
+    ///
+    HDST_API
+    int GetFieldIndex() const { return _fieldIndex; }
 
     HDST_API
-    std::unique_ptr<HdStSubtextureIdentifier> Clone() const override;
+    ~HdStFieldBaseSubtextureIdentifier() override = 0;
+    
+protected:
+    HDST_API
+    HdStFieldBaseSubtextureIdentifier(TfToken const &fieldName, int fieldIndex);
 
     HDST_API
-    ID Hash() const override;
-
-    /// Name of grid in OpenVDB file
-    HDST_API
-    TfToken const &GetGridName() const { return _gridName; }
-
-    HDST_API
-    ~HdStVdbSubtextureIdentifier() override;
+    ID _Hash() const override;
 
 private:
-    TfToken _gridName;
+    TfToken _fieldName;
+    int _fieldIndex;
 };
 
 ///
 /// \class HdStAssetUvSubtextureIdentifier
 ///
-/// Specifies whether a UV texture should be loaded with 
-/// pre-multiplied alpha values and whether it should be loaded flipped 
-/// vertically 
+/// Specifies whether a UV texture should be loaded flipped vertically, whether 
+/// it should be loaded with pre-multiplied alpha values, and the color space 
+/// in which the texture is encoded.
 ///
-/// The latter functionality allows the texture system to support both the
+/// The former functionality allows the texture system to support both the
 /// legacy HwUvTexture_1 (flipVertically = true) and UsdUvTexture
 /// (flipVertically = false) which have opposite conventions for the
 /// vertical orientation.
@@ -102,17 +113,15 @@ class HdStAssetUvSubtextureIdentifier final
                                 : public HdStSubtextureIdentifier
 {
 public:
-    /// C'tor takes bool whether flipping vertically and whether to pre-multiply
-    /// by alpha
+    /// C'tor takes bool whether flipping vertically, whether to pre-multiply
+    /// by alpha, and the texture's source color space
     HDST_API
     explicit HdStAssetUvSubtextureIdentifier(bool flipVertically, 
-                                             bool premultiplyAlpha);
+                                             bool premultiplyAlpha,
+					                         const TfToken& sourceColorSpace);
 
     HDST_API
     std::unique_ptr<HdStSubtextureIdentifier> Clone() const override;
-
-    HDST_API
-    ID Hash() const override;
 
     HDST_API
     bool GetFlipVertically() const { return _flipVertically; }
@@ -121,25 +130,20 @@ public:
     bool GetPremultiplyAlpha() const { return _premultiplyAlpha; }
     
     HDST_API
+    TfToken GetSourceColorSpace() const { return _sourceColorSpace; }
+    
+    HDST_API
     ~HdStAssetUvSubtextureIdentifier() override;
+
+protected:
+    HDST_API
+    ID _Hash() const override;
 
 private:
     bool _flipVertically;
     bool _premultiplyAlpha;
+    TfToken _sourceColorSpace;
 };
-
-template <class HashState>
-void
-TfHashAppend(HashState &h, HdStAssetUvSubtextureIdentifier const &subId) {
-    static size_t vertFlipFalse = TfToken("notVerticallyFlipped").Hash();
-    static size_t vertFlipTrue = TfToken("verticallyFlipped").Hash();
-
-    static size_t premulAlphaFalse = TfToken("noPremultiplyAlpha").Hash();
-    static size_t premulAlphaTrue = TfToken("premultiplyAlpha").Hash();
-
-    h.Append(subId.GetFlipVertically() ? vertFlipTrue : vertFlipFalse);
-    h.Append(subId.GetPremultiplyAlpha() ? premulAlphaTrue :  premulAlphaFalse);
-}
 
 ///
 /// \class HdStDynamicUvSubtextureIdentifier
@@ -181,8 +185,9 @@ public:
     HDST_API
     virtual HdStDynamicUvTextureImplementation *GetTextureImplementation() const;
 
+protected:
     HDST_API
-    ID Hash() const override;
+    ID _Hash() const override;
 };
 
 ///
@@ -203,13 +208,14 @@ public:
     std::unique_ptr<HdStSubtextureIdentifier> Clone() const override;
 
     HDST_API
-    ID Hash() const override;
-
-    HDST_API
     bool GetPremultiplyAlpha() const { return _premultiplyAlpha; }
     
     HDST_API
     ~HdStPtexSubtextureIdentifier() override;
+
+protected:
+    HDST_API
+    ID _Hash() const override;
 
 private:
     bool _premultiplyAlpha;
@@ -219,32 +225,37 @@ private:
 /// \class HdStUdimSubtextureIdentifier
 ///
 /// Specifies whether a Udim texture should be loaded with pre-multiplied alpha
-/// values.
 ///
 class HdStUdimSubtextureIdentifier final
                                 : public HdStSubtextureIdentifier
 {
 public:
-    /// C'tor takes bool whether to pre-multiply by alpha
+    /// C'tor takes bool whether to pre-multiply by alpha and the texture's 
+    /// source color space
     HDST_API
-    explicit HdStUdimSubtextureIdentifier(bool premultiplyAlpha);
+    explicit HdStUdimSubtextureIdentifier(bool premultiplyAlpha,
+                                          const TfToken& sourceColorSpace);
 
     HDST_API
     std::unique_ptr<HdStSubtextureIdentifier> Clone() const override;
 
     HDST_API
-    ID Hash() const override;
+    bool GetPremultiplyAlpha() const { return _premultiplyAlpha; }
 
     HDST_API
-    bool GetPremultiplyAlpha() const { return _premultiplyAlpha; }
+    TfToken GetSourceColorSpace() const { return _sourceColorSpace; }
     
     HDST_API
     ~HdStUdimSubtextureIdentifier() override;
 
+protected:
+    HDST_API
+    ID _Hash() const override;
+
 private:
     bool _premultiplyAlpha;
+    TfToken _sourceColorSpace;
 };
-
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

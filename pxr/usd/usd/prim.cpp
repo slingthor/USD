@@ -482,13 +482,6 @@ UsdPrim::GetPropertyOrder() const
     return order;
 }
 
-void
-UsdPrim::SetPropertyOrder(const TfTokenVector &order) const
-{
-    SetMetadata(SdfFieldKeys->PropertyOrder, order);
-}
-
-
 static void
 _ComposePrimPropertyNames( 
     const PcpPrimIndex& primIndex,
@@ -1082,8 +1075,8 @@ UsdPrim::HasAuthoredPayloads() const
 void
 UsdPrim::Load(UsdLoadPolicy policy) const
 {
-    if (IsInMaster()) {
-        TF_CODING_ERROR("Attempted to load a prim in a master <%s>",
+    if (IsInPrototype()) {
+        TF_CODING_ERROR("Attempted to load a prim in a prototype <%s>",
                         GetPath().GetText());
         return;
     }
@@ -1093,12 +1086,50 @@ UsdPrim::Load(UsdLoadPolicy policy) const
 void
 UsdPrim::Unload() const
 {
-    if (IsInMaster()) {
-        TF_CODING_ERROR("Attempted to unload a prim in a master <%s>",
+    if (IsInPrototype()) {
+        TF_CODING_ERROR("Attempted to unload a prim in a prototype <%s>",
                         GetPath().GetText());
         return;
     }
     _GetStage()->Unload(GetPath());
+}
+
+TfTokenVector 
+UsdPrim::GetChildrenNames() const
+{
+    TfTokenVector names;
+    for (const auto &child : GetChildren()) {
+        names.push_back(child.GetName());
+    }
+    return names;
+}
+
+TfTokenVector 
+UsdPrim::GetAllChildrenNames() const
+{
+    TfTokenVector names;
+    for (const auto &child : GetAllChildren()) {
+        names.push_back(child.GetName());
+    }
+    return names;
+}
+
+TfTokenVector 
+UsdPrim::GetFilteredChildrenNames(const Usd_PrimFlagsPredicate &predicate) const
+{
+    TfTokenVector names;
+    for (const auto &child : GetFilteredChildren(predicate)) {
+        names.push_back(child.GetName());
+    }
+    return names;
+}
+
+TfTokenVector
+UsdPrim::GetChildrenReorder() const
+{
+    TfTokenVector reorder;
+    GetMetadata(SdfFieldKeys->PrimOrder, &reorder);
+    return reorder;
 }
 
 UsdPrim
@@ -1127,24 +1158,48 @@ UsdPrim::IsPseudoRoot() const
     return GetPath() == SdfPath::AbsoluteRootPath();
 }
 
+bool
+UsdPrim::IsPrototypePath(const SdfPath& path)
+{
+    return Usd_InstanceCache::IsPrototypePath(path);
+}
+
+bool
+UsdPrim::IsPathInPrototype(const SdfPath& path)
+{
+    return Usd_InstanceCache::IsPathInPrototype(path);
+}
+
+bool
+UsdPrim::IsMasterPath(const SdfPath& path)
+{
+    return IsPrototypePath(path);
+}
+
+bool
+UsdPrim::IsPathInMaster(const SdfPath& path)
+{
+    return IsPathInPrototype(path);
+}
+
 UsdPrim
 UsdPrim::GetMaster() const
 {
-    Usd_PrimDataConstPtr masterPrimData = 
-        _GetStage()->_GetMasterForInstance(get_pointer(_Prim()));
-    return UsdPrim(masterPrimData, SdfPath());
+    return GetPrototype();
+}
+
+UsdPrim
+UsdPrim::GetPrototype() const
+{
+    Usd_PrimDataConstPtr protoPrimData = 
+        _GetStage()->_GetPrototypeForInstance(get_pointer(_Prim()));
+    return UsdPrim(protoPrimData, SdfPath());
 }
 
 std::vector<UsdPrim>
 UsdPrim::GetInstances() const
 {
-    return _GetStage()->_GetInstancesForMaster(*this);
-}
-
-bool 
-UsdPrim::_PrimPathIsInMaster() const
-{
-    return Usd_InstanceCache::IsPathInMaster(GetPrimPath());
+    return _GetStage()->_GetInstancesForPrototype(*this);
 }
 
 SdfPrimSpecHandleVector 

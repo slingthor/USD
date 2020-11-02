@@ -57,25 +57,11 @@ public:
     HDST_API
     virtual HdSt_CodeGen *NewCodeGen(
         HdStShaderCodeSharedPtrVector const &shaders) const override;
-
-    /// Creates a draw target texture resource for OpenGL
-    HDST_API
-    virtual HdStTextureResourceSharedPtr
-        NewDrawTargetTextureResource() const override;
     
     /// Creates an indirect draw batch for OpenGL
     HDST_API
     virtual HdSt_DrawBatchSharedPtr NewIndirectDrawBatch(
         HdStDrawItemInstance * drawItemInstance) const override;
-      
-    /// Creates a new HdSt_DomeLightComputationGPU computation
-    HDST_API
-    virtual HdSt_DomeLightComputationGPU *NewDomeLightComputationGPU(
-        const TfToken & shaderToken,
-        HdStSimpleLightingShaderPtr const &lightingShader,
-        unsigned int numLevels,
-        unsigned int level,
-        float roughness) const override;
 
     /// Creates a new render pass state for OpenGL
     HDST_API
@@ -116,11 +102,6 @@ public:
         return "compute.glslfx";
     }
     
-    HDST_API
-    virtual const char* const GetPtexTextureShaderFilename() const override {
-        return "ptexTextureGL.glslfx";
-    }
-      
     HDST_API
     virtual HdStGLSLProgram *NewProgram(
         TfToken const &role, HdStResourceRegistry *const registry) const override;

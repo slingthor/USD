@@ -24,7 +24,6 @@
 
 #include "pxr/pxr.h"
 
-#include "pxr/imaging/glf/glew.h"
 #include "pxr/usdImaging/usdImagingGL/unitTestGLDrawing.h"
 
 #include "pxr/base/arch/systemInfo.h"
@@ -171,6 +170,7 @@ My_TestGLDrawing::InitTest()
         if(UsdImagingGLEngine::IsHydraEnabled()) {
             // set same parameter as GlfSimpleLightingContext::SetStateFromOpenGL
             // OpenGL defaults
+            UsdImagingGLEngine::ResourceFactoryGuard guard(_engine->GetResourceFactory());
             _lightingContext = GarchSimpleLightingContext::New();
             if (!IsEnabledSceneLights()) {
 	            GarchSimpleLight light;
@@ -299,6 +299,10 @@ My_TestGLDrawing::DrawTest(bool offscreen)
         }
     }
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
+    if (PresentDisabled()) {
+        _engine->SetEnablePresentation(false);
+    }
+
     if (!GetClipPlanes().empty()) {
         params.clipPlanes = GetClipPlanes();
         for (size_t i=0; i<GetClipPlanes().size(); ++i) {
@@ -383,7 +387,6 @@ void
 My_TestGLDrawing::ShutdownTest()
 {
     std::cout << "My_TestGLDrawing::ShutdownTest()\n";
-    _engine->InvalidateBuffers();
 }
 
 void

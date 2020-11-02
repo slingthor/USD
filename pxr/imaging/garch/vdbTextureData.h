@@ -30,8 +30,8 @@
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/vec3i.h"
 #include "pxr/imaging/garch/api.h"
-#include "pxr/imaging/garch/image.h"
-#include "pxr/imaging/garch/baseTextureData.h"
+#include "pxr/imaging/hio/image.h"
+#include "pxr/imaging/garch/fieldTextureData.h"
 
 #include "pxr/base/gf/bbox3d.h"
 
@@ -43,12 +43,12 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GarchVdbTextureData);
 
 class GarchVdbTextureData_DenseGridHolderBase;
 
-/// \class GlfVdbTextureData
+/// \class GarchVdbTextureData
 ///
 /// Implements GlfBaseTextureData to read grid with given name from
 /// OpenVDB file at given path.
 ///
-class GarchVdbTextureData : public GarchBaseTextureData {
+class GarchVdbTextureData final : public GarchFieldTextureData {
 public:
     GARCH_API
     static GarchVdbTextureDataRefPtr
@@ -56,8 +56,8 @@ public:
         std::string const &gridName,
         size_t targetMemory);
 
-    /// See GarchVdbTexture for details
-    const GfBBox3d &GetBoundingBox() const { return _boundingBox; }
+    GARCH_API
+    const GfBBox3d &GetBoundingBox() const override;
 
     GARCH_API
     int NumDimensions() const override;
@@ -71,29 +71,34 @@ public:
     GARCH_API
     int ResizedDepth(int mipLevel = 0) const override;
 
-    GLenum GLInternalFormat() const override;
-
-    GLenum GLFormat() const override;
-
-    GLenum GLType() const override;
-
+    GARCH_API
+    HioFormat GetFormat() const override;
+    
+    GARCH_API
     size_t TargetMemory() const override;
 
+    GARCH_API
     WrapInfo GetWrapInfo() const override;
 
+    GARCH_API
     size_t ComputeBytesUsed() const override;
 
+    GARCH_API
     size_t ComputeBytesUsedByMip(int mipLevel = 0) const override;
 
+    GARCH_API
     bool Read(int degradeLevel, 
               bool generateMipmap,
-              GarchImage::ImageOriginLocation
-                  originLocation = GarchImage::OriginUpperLeft) override;
+              HioImage::ImageOriginLocation
+                  originLocation = HioImage::OriginUpperLeft) override;
     
+    GARCH_API
     bool HasRawBuffer(int mipLevel = 0) const override;
 
+    GARCH_API
     unsigned char * GetRawBuffer(int mipLevel = 0) const override;
 
+    GARCH_API
     int GetNumMipLevels() const override;
 
 private:
@@ -105,13 +110,14 @@ private:
     const std::string _filePath;
     const std::string _gridName;
 
-    size_t _targetMemory;
+    const size_t _targetMemory;
 
     int _nativeWidth, _nativeHeight, _nativeDepth;
     int _resizedWidth, _resizedHeight, _resizedDepth;
     int _bytesPerPixel;
+    int _numChannels;
 
-    GLenum  _glInternalFormat, _glFormat, _glType;
+    HioFormat _format;
 
     WrapInfo _wrapInfo;
 

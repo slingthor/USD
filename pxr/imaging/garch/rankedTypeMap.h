@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef GARCH_RANKED_TYPE_MAP_H
-#define GARCH_RANKED_TYPE_MAP_H
+#ifndef PXR_IMAGING_GARCH_RANKED_TYPE_MAP_H
+#define PXR_IMAGING_GARCH_RANKED_TYPE_MAP_H
 
 /// \file garch/rankedTypeMap.h
 
@@ -105,7 +105,7 @@ GarchRankedTypeMap::Add(
     std::set<TfType> types;
     PlugRegistry::GetAllDerivedTypes(baseType, &types);
 
-    const std::vector<std::string> restrictions = TfStringSplit(includeList,
+    const std::vector<std::string> restrictions = TfStringSplit(includeList, 
                                                                 ",");
 
     for (auto type: types) {
@@ -182,4 +182,4 @@ GarchRankedTypeMap::Add(
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // GARCH_RANKED_TYPE_MAP_H
+#endif

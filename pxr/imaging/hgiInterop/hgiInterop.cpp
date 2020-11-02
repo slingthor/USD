@@ -57,7 +57,7 @@ void HgiInterop::TransferToApp(
 {
     TfToken const& gfxApi = hgi->GetAPIName();
 
-    if (interopDst==HgiTokens->None) {
+    if (interopDst!=HgiTokens->OpenGL) {
         return;
     }
     

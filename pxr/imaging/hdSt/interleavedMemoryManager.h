@@ -37,15 +37,18 @@
 #include "pxr/imaging/hd/strategyBase.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/version.h"
+#include "pxr/imaging/hgi/buffer.h"
 #include "pxr/base/tf/mallocTag.h"
 #include "pxr/base/tf/token.h"
 
 #include <memory>
 #include <list>
+#include <unordered_map>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdStResourceRegistry;
+struct HgiBufferCpuToGpuOp;
 
 /// \class HdStInterleavedMemoryManager
 ///
@@ -53,15 +56,43 @@ class HdStResourceRegistry;
 ///
 class HdStInterleavedMemoryManager : public HdAggregationStrategy {
 public:
+    /// Copy new data from CPU into staging buffer.
+    /// This reduces the amount of GPU copy commands we emit by first writing
+    /// to the CPU staging area of the buffer and only flushing it to the GPU
+    /// when we write to a non-consecutive area of a buffer.
+    void StageBufferCopy(HgiBufferCpuToGpuOp const& copyOp);
+
+    /// Flush the staging buffer to GPU.
+    /// Copy the new buffer data from staging area to GPU.
+    void Flush() override;
+
+protected:
     class _StripedInterleavedBuffer;
+
+    // BufferFlushListEntry lets use accumulate writes into the same GPU buffer
+    // into CPU staging buffers before flushing to GPU.
+    class _BufferFlushListEntry {
+        public:
+        _BufferFlushListEntry(
+            HgiBufferHandle const& buf, uint64_t start, uint64_t end);
+
+        HgiBufferHandle buffer;
+        uint64_t start;
+        uint64_t end;
+    };
+
+    using _BufferFlushMap = 
+        std::unordered_map<class HgiBuffer*, _BufferFlushListEntry>;
 
     /// specialized buffer array range
     class _StripedInterleavedBufferRange : public HdStBufferArrayRange {
     public:
         /// Constructor.
-        _StripedInterleavedBufferRange() :
-        _stripedBuffer(nullptr), _index(NOT_ALLOCATED), _numElements(1) {
-        }
+        _StripedInterleavedBufferRange(HdStResourceRegistry* resourceRegistry)
+        : HdStBufferArrayRange(resourceRegistry)
+        , _stripedBuffer(nullptr)
+        , _index(NOT_ALLOCATED)
+        , _numElements(1) {}
 
         /// Destructor.
         HDST_API
@@ -199,7 +230,8 @@ public:
     public:
         /// Constructor.
         HDST_API
-        _StripedInterleavedBuffer(HdStResourceRegistry* resourceRegistry,
+        _StripedInterleavedBuffer(HdStInterleavedMemoryManager* mgr,
+                                  HdStResourceRegistry* resourceRegistry,
                                   TfToken const &role,
                                   HdBufferSpecVector const &bufferSpecs,
                                   HdBufferArrayUsageHint usageHint,
@@ -266,9 +298,13 @@ public:
         HDST_API
         HdBufferSpecVector GetBufferSpecs() const;
         
-        /// APPLE METAL: HGI accessors needed for _StripedInterleavedBufferRange::CopyData()
+        HdStInterleavedMemoryManager*
+        GetManager() const {
+            return _manager;
+        }
+
+        /// APPLE METAL: HGI accessor needed for _StripedInterleavedBufferRange::ReadData()
         Hgi* GetHgi() { return _resourceRegistry->GetHgi(); }
-        HgiBlitCmds* GetBlitCmds() { return _resourceRegistry->GetBlitCmds(); }
 
     protected:
         HDST_API
@@ -282,6 +318,7 @@ public:
                                                    int stride);
 
     private:
+        HdStInterleavedMemoryManager* _manager;
         HdStResourceRegistry* const _resourceRegistry;
         bool _needsCompaction;
         int _stride;
@@ -313,6 +350,7 @@ protected:
         VtDictionary &result) const;
     
     HdStResourceRegistry* const _resourceRegistry;
+    _BufferFlushMap _queuedBuffers;
 };
 
 class HdStInterleavedUBOMemoryManager : public HdStInterleavedMemoryManager {

@@ -112,9 +112,6 @@ HgiGLOps::CopyTextureGpuToCpu(HgiTextureGpuToCpuOp const& copyOp)
                 "Copying from compressed GPU texture not supported.");
             return;
         }
-        
-        // Make sure writes are finished before we read from the texture
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
         glGetTextureSubImage(
             srcTexture->GetTextureId(),
@@ -202,9 +199,6 @@ HgiGLOps::CopyTextureCpuToGpu(HgiTextureCpuToGpuOp const& copyOp)
             break;
         }
 
-        // Make sure the copy is finished before reads from texture.
-        glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT);
-
         HGIGL_POST_PENDING_GL_ERRORS();
     };
 }
@@ -214,15 +208,17 @@ HgiGLOps::CopyBufferGpuToGpu(HgiBufferGpuToGpuOp const& copyOp)
 {
     return [copyOp] {
         HgiBufferHandle const& srcBufHandle = copyOp.gpuSourceBuffer;
+        HgiGLBuffer* srcBuffer = static_cast<HgiGLBuffer*>(srcBufHandle.Get());
 
-        if (!TF_VERIFY(srcBufHandle && srcBufHandle->GetRawResource(),
+        if (!TF_VERIFY(srcBuffer && srcBuffer->GetBufferId(),
             "Invalid source buffer handle")) {
             return;
         }
 
         HgiBufferHandle const& dstBufHandle = copyOp.gpuDestinationBuffer;
+        HgiGLBuffer* dstBuffer = static_cast<HgiGLBuffer*>(dstBufHandle.Get());
 
-        if (!TF_VERIFY(dstBufHandle && dstBufHandle->GetRawResource(),
+        if (!TF_VERIFY(dstBuffer && dstBuffer->GetBufferId(),
             "Invalid destination buffer handle")) {
             return;
         }
@@ -232,8 +228,8 @@ HgiGLOps::CopyBufferGpuToGpu(HgiBufferGpuToGpuOp const& copyOp)
             return;
         }
 
-        glCopyNamedBufferSubData(srcBufHandle->GetRawResource(),
-                                 dstBufHandle->GetRawResource(),
+        glCopyNamedBufferSubData(srcBuffer->GetBufferId(),
+                                 dstBuffer->GetBufferId(),
                                  copyOp.sourceByteOffset,
                                  copyOp.destinationByteOffset,
                                  copyOp.byteSize);
@@ -250,8 +246,9 @@ HgiGLOps::CopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp)
         {
             return;
         }
-        
-        HgiBufferHandle const& dstBufHandle = copyOp.gpuDestinationBuffer;
+
+        HgiGLBuffer* glBuffer = static_cast<HgiGLBuffer*>(
+            copyOp.gpuDestinationBuffer.Get());
 
         // Offset into the src buffer
         const char* src = ((const char*) copyOp.cpuSourceBuffer) +
@@ -261,13 +258,41 @@ HgiGLOps::CopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp)
         GLintptr dstOffset = copyOp.destinationByteOffset;
 
         glNamedBufferSubData(
-            dstBufHandle->GetRawResource(),
+            glBuffer->GetBufferId(),
             dstOffset,
             copyOp.byteSize,
             src);
 
-        // Make sure the copy is finished before reads from buffer.
-        glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+        HGIGL_POST_PENDING_GL_ERRORS();
+    };
+}
+
+HgiGLOpsFn 
+HgiGLOps::CopyBufferGpuToCpu(HgiBufferGpuToCpuOp const& copyOp)
+{
+    return [copyOp] {
+        if (copyOp.byteSize == 0 ||
+            !copyOp.cpuDestinationBuffer ||
+            !copyOp.gpuSourceBuffer)
+        {
+            return;
+        }
+
+        HgiGLBuffer* glBuffer = static_cast<HgiGLBuffer*>(
+            copyOp.gpuSourceBuffer.Get());
+
+        // Offset into the dst buffer
+        const char* dst = ((const char*) copyOp.cpuDestinationBuffer) +
+            copyOp.destinationByteOffset;
+
+        // Offset into the src buffer
+        GLintptr srcOffset = copyOp.sourceByteOffset;
+
+        glGetNamedBufferSubData(
+            glBuffer->GetBufferId(),
+            srcOffset,
+            copyOp.byteSize,
+            (void*)dst);
 
         HGIGL_POST_PENDING_GL_ERRORS();
     };
@@ -329,13 +354,19 @@ HgiGLOps::SetConstantValues(
     uint32_t byteSize,
     const void* data)
 {
-    return [pipeline, bindIndex, byteSize, data] {
+    // The data provided could be local stack memory that goes out of scope
+    // before we execute this op. Make a copy to prevent that.
+    uint8_t* dataCopy = new uint8_t[byteSize];
+    memcpy(dataCopy, data, byteSize);
+
+    return [pipeline, bindIndex, byteSize, dataCopy] {
         HgiGLShaderProgram* glProgram =
             static_cast<HgiGLShaderProgram*>(
                 pipeline->GetDescriptor().shaderProgram.Get());
         uint32_t ubo = glProgram->GetUniformBuffer(byteSize);
-        glNamedBufferData(ubo, byteSize, data, GL_STATIC_DRAW);
+        glNamedBufferData(ubo, byteSize, dataCopy, GL_STATIC_DRAW);
         glBindBufferBase(GL_UNIFORM_BUFFER, bindIndex, ubo);
+        delete[] dataCopy;
     };
 }
 
@@ -346,13 +377,19 @@ HgiGLOps::SetConstantValues(
     uint32_t byteSize,
     const void* data)
 {
-    return [pipeline, bindIndex, byteSize, data] {
+    // The data provided could be local stack memory that goes out of scope
+    // before we execute this op. Make a copy to prevent that.
+    uint8_t* dataCopy = new uint8_t[byteSize];
+    memcpy(dataCopy, data, byteSize);
+
+    return [pipeline, bindIndex, byteSize, dataCopy] {
         HgiGLShaderProgram* glProgram =
             static_cast<HgiGLShaderProgram*>(
                 pipeline->GetDescriptor().shaderProgram.Get());
         uint32_t ubo = glProgram->GetUniformBuffer(byteSize);
-        glNamedBufferData(ubo, byteSize, data, GL_STATIC_DRAW);
+        glNamedBufferData(ubo, byteSize, dataCopy, GL_STATIC_DRAW);
         glBindBufferBase(GL_UNIFORM_BUFFER, bindIndex, ubo);
+        delete[] dataCopy;
     };
 }
 
@@ -368,17 +405,64 @@ HgiGLOps::BindVertexBuffers(
 
         // XXX use glBindVertexBuffers to bind all VBs in one go.
         for (size_t i=0; i<vertexBuffers.size(); i++) {
-            HgiBufferHandle const& bufHandle = vertexBuffers[i];
-            HgiBufferDesc const& desc = bufHandle->GetDescriptor();
+            HgiBufferHandle bufHandle = vertexBuffers[i];
+            HgiGLBuffer* buf = static_cast<HgiGLBuffer*>(bufHandle.Get());
+            HgiBufferDesc const& desc = buf->GetDescriptor();
 
             TF_VERIFY(desc.usage & HgiBufferUsageVertex);
 
             glBindVertexBuffer(
                 firstBinding + i,
-                bufHandle->GetRawResource(),
+                buf->GetBufferId(),
                 byteOffsets[i],
                 desc.vertexStride);
         }
+
+        HGIGL_POST_PENDING_GL_ERRORS();
+    };
+}
+
+HgiGLOpsFn
+HgiGLOps::Draw(
+    HgiPrimitiveType primitiveType,
+    uint32_t vertexCount,
+    uint32_t firstVertex,
+    uint32_t instanceCount)
+{
+    return [primitiveType, vertexCount, firstVertex, instanceCount] {
+        TF_VERIFY(instanceCount>0);
+
+        glDrawArraysInstanced(
+            HgiGLConversions::GetPrimitiveType(primitiveType),
+            firstVertex,
+            vertexCount,
+            instanceCount);
+
+        HGIGL_POST_PENDING_GL_ERRORS();
+    };
+}
+
+HgiGLOpsFn
+HgiGLOps::DrawIndirect(
+    HgiPrimitiveType primitiveType,
+    HgiBufferHandle const& drawParameterBuffer,
+    uint32_t drawBufferOffset,
+    uint32_t drawCount,
+    uint32_t stride)
+{
+    return [primitiveType, drawParameterBuffer, drawBufferOffset, drawCount, 
+            stride] {
+
+        HgiGLBuffer* drawBuf =
+            static_cast<HgiGLBuffer*>(drawParameterBuffer.Get());
+
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawBuf->GetBufferId());
+
+        glMultiDrawArraysIndirect(
+            HgiGLConversions::GetPrimitiveType(primitiveType),
+            reinterpret_cast<const void*>(drawBufferOffset),
+            drawCount,
+            stride);
 
         HGIGL_POST_PENDING_GL_ERRORS();
     };
@@ -391,19 +475,19 @@ HgiGLOps::DrawIndexed(
     uint32_t indexCount,
     uint32_t indexBufferByteOffset,
     uint32_t vertexOffset,
-    uint32_t instanceCount,
-    uint32_t firstInstance)
+    uint32_t instanceCount)
 {
     return [primitiveType, indexBuffer, indexCount, indexBufferByteOffset,
-        vertexOffset, instanceCount, firstInstance] {
+            vertexOffset, instanceCount] {
         TF_VERIFY(instanceCount>0);
 
-        HgiBufferDesc const& indexDesc = indexBuffer->GetDescriptor();
+        HgiGLBuffer* indexBuf = static_cast<HgiGLBuffer*>(indexBuffer.Get());
+        HgiBufferDesc const& indexDesc = indexBuf->GetDescriptor();
 
         // We assume 32bit indices: GL_UNSIGNED_INT
         TF_VERIFY(indexDesc.usage & HgiBufferUsageIndex32);
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer->GetRawResource());
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuf->GetBufferId());
 
         glDrawElementsInstancedBaseVertex(
             HgiGLConversions::GetPrimitiveType(primitiveType),
@@ -418,17 +502,46 @@ HgiGLOps::DrawIndexed(
 }
 
 HgiGLOpsFn
+HgiGLOps::DrawIndexedIndirect(
+    HgiPrimitiveType primitiveType,
+    HgiBufferHandle const& indexBuffer,
+    HgiBufferHandle const& drawParameterBuffer,
+    uint32_t drawBufferOffset,
+    uint32_t drawCount,
+    uint32_t stride)
+{
+    return [primitiveType, indexBuffer, drawParameterBuffer, drawBufferOffset,
+            drawCount, stride] {
+
+        HgiGLBuffer* indexBuf = static_cast<HgiGLBuffer*>(indexBuffer.Get());
+        HgiBufferDesc const& indexDesc = indexBuf->GetDescriptor();
+
+        // We assume 32bit indices: GL_UNSIGNED_INT
+        TF_VERIFY(indexDesc.usage & HgiBufferUsageIndex32);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuf->GetBufferId());
+
+        HgiGLBuffer* drawBuf =
+            static_cast<HgiGLBuffer*>(drawParameterBuffer.Get());
+
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawBuf->GetBufferId());
+
+        glMultiDrawElementsIndirect(
+            HgiGLConversions::GetPrimitiveType(primitiveType),
+            GL_UNSIGNED_INT,
+            reinterpret_cast<const void*>(drawBufferOffset),
+            drawCount,
+            stride);
+
+        HGIGL_POST_PENDING_GL_ERRORS();
+    };
+}
+
+HgiGLOpsFn
 HgiGLOps::Dispatch(int dimX, int dimY)
 {
     return [dimX, dimY] {
         glDispatchCompute(dimX, dimY, 1);
-
-        // XXX We assume for now that compute outputs to a SSBO or Texture and
-        // set both barriers. In the future we could try to get the client to
-        // pass in more detailed barrier information or internally try to look
-        // at the resource bindings to make barriers decisions.
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-        glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
 
         HGIGL_POST_PENDING_GL_ERRORS();
     };
@@ -445,6 +558,7 @@ HgiGLOps::BindFramebufferOp(
         uint32_t framebuffer = device->AcquireFramebuffer(desc);
 
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        glEnable(GL_FRAMEBUFFER_SRGB);
 
         bool blendEnabled = false;
 
@@ -452,6 +566,12 @@ HgiGLOps::BindFramebufferOp(
         for (size_t i=0; i<desc.colorAttachmentDescs.size(); i++) {
             HgiAttachmentDesc const& colorAttachment =
                 desc.colorAttachmentDescs[i];
+
+            if (colorAttachment.format == HgiFormatInvalid) {
+                TF_CODING_ERROR(
+                    "Binding framebuffer with invalid format "
+                    "for color attachment %zu.", i);
+            }
 
             if (colorAttachment.loadOp == HgiAttachmentLoadOpClear) {
                 glClearBufferfv(GL_COLOR, i, colorAttachment.clearValue.data());
@@ -480,6 +600,15 @@ HgiGLOps::BindFramebufferOp(
 
         HgiAttachmentDesc const& depthAttachment =
             desc.depthAttachmentDesc;
+
+        if (desc.depthTexture) {
+            if (depthAttachment.format == HgiFormatInvalid) {
+                TF_CODING_ERROR(
+                    "Binding framebuffer with invalid format "
+                    "for depth attachment.");
+            }
+        }
+
         if (desc.depthTexture &&
             depthAttachment.loadOp == HgiAttachmentLoadOpClear) {
             glClearBufferfv(GL_DEPTH, 0, depthAttachment.clearValue.data());
@@ -533,6 +662,7 @@ HgiGLOps::ResolveFramebuffer(
 
         glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolvedFramebuffer);
+        glEnable(GL_FRAMEBUFFER_SRGB);
         glBlitFramebuffer(0, 0, graphicsCmds.width, graphicsCmds.height,
                           0, 0, graphicsCmds.width, graphicsCmds.height,
                           mask,

@@ -478,7 +478,12 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     os_signpost_id_t bvhGenerate = os_signpost_id_generate(cullingLog);
     os_signpost_id_t bvhBake = os_signpost_id_generate(cullingLog);
 
-    populated = true;
+    if (root) {
+        delete root;
+        root = NULL;
+    }
+
+    populated = false;
 
 //    NSLog(@"Building BVH for %zu HdStDrawItemInstance(s), %i", drawables->size(), BVHCounter);
     if (drawables->size() <= 0) {
@@ -503,9 +508,8 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
         return;
     }
 
-    if (root) {
-        delete root;
-    }
+    populated = true;
+
     root = new OctreeNode(0.f, 0.f, 0.f, 0.f, 0.f, 0.f);
     root->ReInit(bbox);
     

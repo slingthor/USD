@@ -59,6 +59,7 @@ endif()
 pxr_library(garch
     LIBRARIES
         arch
+        hio
         js
         plug
         sdf
@@ -79,8 +80,7 @@ pxr_library(garch
         baseTextureData
         contextCaps
         drawTarget
-        image
-        imageRegistry
+        field3DTextureDataBase
         glDebugWindow
         glPlatformDebugContext
         ptexTexture
@@ -106,6 +106,7 @@ pxr_library(garch
 
     PUBLIC_HEADERS
         api.h
+        fieldTextureData.h
         gl.h
         glPlatformContext.h
         ${GARCH_GLPLATFORMCONTEXT}.h
@@ -113,9 +114,6 @@ pxr_library(garch
     PRIVATE_HEADERS
         rankedTypeMap.h
         ${GARCH_GLPLATFORMDEBUGWINDOW}.h
-        stb/stb_image.h
-        stb/stb_image_resize.h
-        stb/stb_image_write.h
 
     PYTHON_CPPFILES
         moduleDeps.cpp
@@ -124,7 +122,6 @@ pxr_library(garch
         ${GARCH_GLPLATFORMCONTEXT}.${GARCH_SOURCE_EXTENSION}
         ${GARCH_GLPLATFORMDEBUGWINDOW}.${GARCH_SOURCE_EXTENSION}
         ${optionalCppFiles}
-        stbImage.cpp
 
     PYMODULE_CPPFILES
         module.cpp

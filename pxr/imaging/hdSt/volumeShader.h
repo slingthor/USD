@@ -125,12 +125,12 @@ public:
     /// GfRange3d encodes empty range by (infinity, -infinity).
     /// Avoid those insane values by returning (0,0).
     ///
-    static GfVec3d GetSafeMin(const GfRange3d &range);
+    static GfVec3f GetSafeMin(const GfRange3d &range);
 
     /// GfRange3d encodes empty range by (infinity, -infinity).
     /// Avoid those insane values by returning (0,0).
     ///
-    static GfVec3d GetSafeMax(const GfRange3d &range);
+    static GfVec3f GetSafeMax(const GfRange3d &range);
 
 private:
 

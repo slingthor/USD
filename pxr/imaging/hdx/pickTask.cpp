@@ -69,7 +69,7 @@ _InitIdRenderPassState(HdRenderIndex *index)
             dynamic_cast<HdStRenderPassState*>(
                 rps.get())) {
         extendedState->SetRenderPassShader(
-            std::make_shared<HdStRenderPassShader>(
+            HdStResourceFactory::GetInstance()->NewRenderPassShader(
                 HdxPackageRenderPassPickingShader()));
     }
 
@@ -151,7 +151,8 @@ HdxPickTask::_Init(GfVec2i const& size)
         attachmentDesc.push_back(
             GarchDrawTarget::AttachmentDesc("neye", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
         attachmentDesc.push_back(
-            GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, GL_DEPTH24_STENCIL8));
+//            GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, GL_DEPTH24_STENCIL8));
+            GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_FLOAT));
         _drawTarget->SetAttachments(attachmentDesc);
         _drawTarget->Bind();
         _drawTarget->Unbind();
@@ -987,7 +988,6 @@ operator==(HdxPickTaskContextParams const& lhs,
         rhsDepthMaskPtr ? *rhsDepthMaskPtr : nullptr;
 
     return lhs.resolution == rhs.resolution
-        && lhs.hitMode == rhs.hitMode
         && lhs.pickTarget == rhs.pickTarget
         && lhs.resolveMode == rhs.resolveMode
         && lhs.doUnpickablesOcclude == rhs.doUnpickablesOcclude
@@ -1017,7 +1017,6 @@ operator<<(std::ostream& out, HdxPickTaskContextParams const& p)
 
     out << "PickTask Context Params: (...) "
         << p.resolution << " "
-        << p.hitMode << " "
         << p.pickTarget << " "
         << p.resolveMode << " "
         << p.doUnpickablesOcclude << " "

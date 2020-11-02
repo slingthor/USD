@@ -63,6 +63,7 @@ public:
     bool IsShowRender() const { return _showRender; }
     bool IsShowProxy() const { return _showProxy; }
     bool ShouldClearOnce() const { return _clearOnce; }
+    bool PresentDisabled() const { return _presentDisabled; }
 
     HdStDrawMode GetDrawMode() const { return _drawMode; }
 
@@ -142,6 +143,7 @@ private:
     bool _showRender;
     bool _showProxy;
     bool _clearOnce;
+    bool _presentDisabled;
 };
 
 

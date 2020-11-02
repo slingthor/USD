@@ -25,7 +25,6 @@
 #define HDST_INDIRECT_DRAW_BATCH_GL_H
 
 #include "pxr/imaging/hdSt/indirectDrawBatch.h"
-#include "pxr/imaging/hdSt/persistentBuffer.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -46,7 +45,10 @@ public:
 protected:
     /// Prepare draw commands and apply view frustum culling for this batch.
     HDST_API
-    virtual void _PrepareDraw(bool gpuCulling, bool freezeCulling) override;
+    virtual void _PrepareDraw(
+                        HdStResourceRegistrySharedPtr const &resourceRegistry,
+                        bool gpuCulling,
+                        bool freezeCulling) override;
 
     /// Executes the drawing commands for this batch.
     HDST_API
@@ -91,13 +93,9 @@ private:
     void _BeginGPUCountVisibleInstances(
 		HdStResourceRegistrySharedPtr const &resourceRegistry);
 
-    // GLsync is not defined in gl.h. It's defined in spec as an opaque pointer:
-    typedef struct __GLsync *GLsync;
-    void _EndGPUCountVisibleInstances(GLsync resultSync, size_t * result);
-    
-    HdStPersistentBufferSharedPtr _resultBuffer;
-
-    GLsync _cullResultSync;
+    void _EndGPUCountVisibleInstances(
+        HdStResourceRegistrySharedPtr const &resourceRegistry,
+        size_t * result);
 };
 
 

@@ -29,11 +29,6 @@
                     }
                 },
                 "Types": {
-                    "UsdImagingDrawModeAdapter" : {
-                        "bases": ["UsdImagingPrimAdapter"],
-                        "isInternal": true,
-                        "primTypeName": "__drawModeAdapter"
-                    },
                     "UsdImagingBasisCurvesAdapter": {
                         "bases": [
                             "UsdImagingGprimAdapter"

@@ -60,8 +60,8 @@ public:
         unsigned int cropBottom = 0,
         unsigned int cropLeft   = 0,
         unsigned int cropRight  = 0,
-        GarchImage::ImageOriginLocation originLocation =
-                           GarchImage::OriginUpperLeft);
+        HioImage::ImageOriginLocation originLocation =
+                           HioImage::OriginUpperLeft);
 
     GARCH_API
     static GarchUVTextureRefPtr New(
@@ -70,8 +70,8 @@ public:
         unsigned int cropBottom = 0,
         unsigned int cropLeft   = 0,
         unsigned int cropRight  = 0,
-        GarchImage::ImageOriginLocation originLocation = 
-                           GarchImage::OriginUpperLeft); 
+        HioImage::ImageOriginLocation originLocation =
+                           HioImage::OriginUpperLeft);
 
     int GetNumDimensions() const override;
     
@@ -117,8 +117,8 @@ protected:
         unsigned int cropBottom,
         unsigned int cropLeft,
         unsigned int cropRight,
-        GarchImage::ImageOriginLocation originLocation =
-            GarchImage::OriginUpperLeft);
+        HioImage::ImageOriginLocation originLocation =
+            HioImage::OriginUpperLeft);
 
     GARCH_API
     virtual ~GarchUVTexture();
@@ -168,7 +168,7 @@ private:
     const unsigned int _cropBottom;
     const unsigned int _cropLeft;
     const unsigned int _cropRight;
-    
+
     std::mutex _readMutex;
 };
 

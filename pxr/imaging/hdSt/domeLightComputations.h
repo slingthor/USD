@@ -28,8 +28,6 @@
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/computation.h"
 
-#include "pxr/imaging/garch/texture.h"
-#include "pxr/imaging/hgi/texture.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -40,10 +38,6 @@ using HdSt_DomeLightComputationGPUSharedPtr =
     std::shared_ptr<class HdSt_DomeLightComputationGPU>;
 using HdStSimpleLightingShaderPtr =
     std::weak_ptr<class HdStSimpleLightingShader>;
-using HdStSimpleLightingShaderSharedPtr =
-    std::shared_ptr<class HdStSimpleLightingShader>;
-using HdStGLSLProgramSharedPtr =
-    std::shared_ptr<class HdStGLSLProgram>;
 
 ////
 //// \class HdSt_DomeLightComputationGPU
@@ -61,16 +55,16 @@ class HdSt_DomeLightComputationGPU : public HdComputation {
 public:
     /// Constructor
     HDST_API
-    static HdSt_DomeLightComputationGPUSharedPtr New(
+    HdSt_DomeLightComputationGPU(
         // Name of computation shader to use, also used as
         // key when setting the GL name on the lighting shader
-        const TfToken & shaderToken, 
+        const TfToken & shaderToken,
         // Lighting shader that remembers the GL texture names
         HdStSimpleLightingShaderPtr const &lightingShader,
         // Number of mip levels.
         unsigned int numLevels = 1,
         // Level to be filled (0 means also to allocate texture)
-        unsigned int level = 0, 
+        unsigned int level = 0,
         float roughness = -1.0);
 
     HDST_API
@@ -85,34 +79,7 @@ public:
     /// since it belongs the same range as src buffer.
     int GetNumOutputElements() const override { return 0; }
 
-protected:
-    
-    /// Constructor
-    HDST_API
-    HdSt_DomeLightComputationGPU(
-        const TfToken & shaderToken, 
-        HdStSimpleLightingShaderPtr const &lightingShader,
-        unsigned int numLevels,
-        unsigned int level , 
-        float roughness);
-    
-    HDST_API
-    bool _GetSrcTextureDimensionsAndGLName(
-        HdStSimpleLightingShaderSharedPtr const &shader,
-        GfVec3i * srcDim,
-        GarchTextureGPUHandle * srcGLTextureName);
-    
-    HDST_API
-    void _FillPixelsByteSize(HgiTextureDesc * const desc);
-
-    HDST_API
-    virtual GarchTextureGPUHandle _GetGlTextureName(
-        const HgiTexture * const hgiTexture) = 0;
-
-    HDST_API
-    virtual void _Execute(HdStGLSLProgramSharedPtr computeProgram) = 0;
-
-protected:
+private:
     const TfToken _shaderToken;
     HdStSimpleLightingShaderPtr const _lightingShader;
     const unsigned int _numLevels;

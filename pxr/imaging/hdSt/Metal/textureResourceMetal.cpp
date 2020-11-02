@@ -29,7 +29,6 @@
 #include "pxr/imaging/hd/perfLog.h"
 
 #include "pxr/imaging/mtlf/mtlDevice.h"
-#include "pxr/imaging/mtlf/ptexTexture.h"
 
 #include "pxr/imaging/garch/texture.h"
 

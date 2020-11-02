@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/hdSt/bufferArrayRange.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hd/bufferSpec.h"
@@ -30,6 +29,11 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+HdStBufferArrayRange::HdStBufferArrayRange(
+    HdStResourceRegistry* resourceRegistry)
+    : _resourceRegistry(resourceRegistry)
+{
+}
 
 HdStBufferArrayRange::~HdStBufferArrayRange() 
 {
@@ -45,6 +49,12 @@ HdStBufferArrayRange::GetBufferSpecs(HdBufferSpecVector *specs) const
     TF_FOR_ALL(it, resources) {
         specs->emplace_back(it->first, it->second->GetTupleType());
     }
+}
+
+HdStResourceRegistry*
+HdStBufferArrayRange::GetResourceRegistry()
+{
+    return _resourceRegistry;
 }
 
 std::ostream &operator <<(std::ostream &out,

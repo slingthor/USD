@@ -89,6 +89,9 @@ public:
     static HgiGLOpsFn CopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp);
 
     HGIGL_API
+    static HgiGLOpsFn CopyBufferGpuToCpu(HgiBufferGpuToCpuOp const& copyOp);
+
+    HGIGL_API
     static HgiGLOpsFn ResolveFramebuffer(
         HgiGLDevice* device,
         HgiGraphicsCmdsDesc const &graphicsCmds);
@@ -130,14 +133,37 @@ public:
         std::vector<uint32_t> const& byteOffsets);
 
     HGIGL_API
+    static HgiGLOpsFn Draw(
+        HgiPrimitiveType primitiveType,
+        uint32_t vertexCount,
+        uint32_t firstVertex,
+        uint32_t instanceCount);
+
+    HGIGL_API
+    static HgiGLOpsFn DrawIndirect(
+        HgiPrimitiveType primitiveType,
+        HgiBufferHandle const& drawParameterBuffer,
+        uint32_t drawBufferOffset,
+        uint32_t drawCount,
+        uint32_t stride);
+
+    HGIGL_API
     static HgiGLOpsFn DrawIndexed(
         HgiPrimitiveType primitiveType,
         HgiBufferHandle const& indexBuffer,
         uint32_t indexCount,
         uint32_t indexBufferByteOffset,
-        uint32_t firstIndex,
         uint32_t vertexOffset,
         uint32_t instanceCount);
+
+    HGIGL_API
+    static HgiGLOpsFn DrawIndexedIndirect(
+        HgiPrimitiveType primitiveType,
+        HgiBufferHandle const& indexBuffer,
+        HgiBufferHandle const& drawParameterBuffer,
+        uint32_t drawBufferOffset,
+        uint32_t drawCount,
+        uint32_t stride);
 
     HGIGL_API
     static HgiGLOpsFn BindFramebufferOp(

@@ -260,7 +260,7 @@ HdSt_SmoothNormalsComputationGPU::Execute(
         computePipelineInstance.GetValue();
     HgiComputePipelineHandle pipeline = *pipelinePtr.get();
 
-    HgiComputeCmds* computeCmds = hdStResourceRegistry->GetComputeCmds();
+    HgiComputeCmds* computeCmds = hdStResourceRegistry->GetGlobalComputeCmds();
     computeCmds->PushDebugGroup("Smooth Normals Cmds");
     computeCmds->BindResources(resourceBindings);
     computeCmds->BindPipeline(pipeline);
@@ -275,6 +275,7 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     // dispatch compute kernel
     computeCmds->Dispatch(numPoints, 1);
 
+    // submit the work
     computeCmds->PopDebugGroup();
 }
 

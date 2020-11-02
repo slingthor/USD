@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
@@ -43,13 +42,18 @@
 #include "pxr/imaging/hgi/graphicsCmdsDesc.h"
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
-#include "pxr/imaging/glf/diagnostic.h"
 
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
 // XXX We do not want to include specific HgiXX backends, but we need to do
 // this temporarily until Storm has transitioned fully to Hgi.
 #include "pxr/imaging/hgiGL/graphicsCmds.h"
 #endif
+
+// APPLE METAL:
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/hgiMetal/hgi.h"
+#include "pxr/imaging/hgiMetal/texture.h"
+
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -59,7 +63,6 @@ _ExecuteDraw(
     HdStRenderPassStateSharedPtr const& stRenderPassState,
     HdStResourceRegistrySharedPtr const& resourceRegistry)
 {
-    drawBatch->PrepareDraw(stRenderPassState, resourceRegistry);
     drawBatch->ExecuteDraw(stRenderPassState, resourceRegistry);
 }
 
@@ -119,7 +122,6 @@ HdSt_ImageShaderRenderPass::_Prepare(TfTokenVector const &renderTags)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
-    GLF_GROUP_FUNCTION();
 
     HdStResourceRegistrySharedPtr const& resourceRegistry = 
         std::dynamic_pointer_cast<HdStResourceRegistry>(
@@ -159,10 +161,11 @@ HdSt_ImageShaderRenderPass::_Execute(
         std::dynamic_pointer_cast<HdStResourceRegistry>(
         GetRenderIndex()->GetResourceRegistry());
     TF_VERIFY(resourceRegistry);
-
+    
 	MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    context->StartFrameForThread();
 	
+    _immediateBatch->PrepareDraw(stRenderPassState, resourceRegistry);
+
     // Create graphics work to render into aovs.
     const HgiGraphicsCmdsDesc desc =
         stRenderPassState->MakeGraphicsCmdsDesc(GetRenderIndex());
@@ -175,6 +178,28 @@ HdSt_ImageShaderRenderPass::_Execute(
 
     if (gfxCmds) {
         gfxCmds->PushDebugGroup(__ARCH_PRETTY_FUNCTION__);
+        
+        // APPLE METAL: Handoff a render descriptor to Mtlf
+        if (!HdStResourceFactory::GetInstance()->IsOpenGL()) {
+            if (desc.width) {
+                // Set the render pass descriptor for Mtlf to use with the render encoders
+                MTLRenderPassDescriptor* rpd = context->GetHgi()->renderPassDescriptor;
+                
+                MTLPixelFormat colorFormat = MTLPixelFormatInvalid;
+                MTLPixelFormat depthFormat = MTLPixelFormatInvalid;
+                if (desc.colorTextures.size()) {
+                    colorFormat = rpd.colorAttachments[0].texture.pixelFormat;
+                }
+                if (desc.depthTexture) {
+                    depthFormat = rpd.depthAttachment.texture.pixelFormat;
+                }
+
+                context->SetRenderPassDescriptor(rpd);
+                context->SetOutputPixelFormats(colorFormat, depthFormat);
+
+                context->GetHgi()->BeginMtlf();
+            }
+        }
     }
 
     // Draw
@@ -203,9 +228,7 @@ HdSt_ImageShaderRenderPass::_Execute(
     }
     
     if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
-        context->CommitCommandBufferForThread(true);
-        
-        context->EndFrameForThread();
+        context->CommitCommandBufferForThread(false);
     }
     
     if (gfxCmds) {

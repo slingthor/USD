@@ -76,11 +76,11 @@ public:
     /// Return a const pointer to draw item
     HdStDrawItem const *GetDrawItem() const { return _drawItem; }
 
-    HdStDrawItemInstance();
     HdStDrawItemInstance(HdStDrawItemInstance const &_item)
     : _batch(_item._batch)
     , _drawItem(_item._drawItem)
     , _batchIndex(_item._batchIndex)
+    , _instanceVisibility(_item._instanceVisibility)
     , _visible(_item._visible)
     {}
 

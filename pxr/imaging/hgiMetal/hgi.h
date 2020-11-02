@@ -51,7 +51,7 @@ public:
     enum CommitCommandBufferWaitType {
         CommitCommandBuffer_NoWait = 0,
         CommitCommandBuffer_WaitUntilScheduled,
-        CommitCommandBuffer_WaitUntilCompleted,
+        CommitCommandBuffer_WaitUntilCompleted
     };
     
     HGIMETAL_API
@@ -75,6 +75,13 @@ public:
 
     HGIMETAL_API
     void DestroyTexture(HgiTextureHandle* texHandle) override;
+
+    HGIMETAL_API
+    HgiTextureViewHandle CreateTextureView(
+        HgiTextureViewDesc const& desc) override;
+
+    HGIMETAL_API
+    void DestroyTextureView(HgiTextureViewHandle* viewHandle) override;
 
     HGIMETAL_API
     HgiSamplerHandle CreateSampler(HgiSamplerDesc const & desc) override;
@@ -144,36 +151,44 @@ public:
     id<MTLDevice> GetPrimaryDevice() const;
 
     HGIMETAL_API
-    id<MTLCommandQueue> GetQueue() const {
-        return _commandQueue;
-    }
+    id<MTLCommandQueue> GetQueue() const;
+
+    // Metal Command buffers are heavy weight, while encoders are lightweight.
+    // But we cannot have more than one active encoder at a time per cmd buf.
+    // (Ideally we would have created on encoder for each HgiCmds)
+    // So for the sake of efficiency, we try to create only one cmd buf and
+    // only use the secondary command buffer when the client code requires it.
+    // For example, the client code may record in a HgiBlitCmds and a
+    // HgiComputeCmds at the same time.
+    HGIMETAL_API
+    id<MTLCommandBuffer> GetPrimaryCommandBuffer(HgiCmds *requester = nullptr,
+                                                 bool flush = true);
+
+    HGIMETAL_API
+    id<MTLCommandBuffer> GetSecondaryCommandBuffer();
+
+    HGIMETAL_API
+    int GetAPIVersion() const;
     
     HGIMETAL_API
-    id<MTLCommandBuffer> GetCommandBuffer(bool flush = true) {
-        if (flush) {
-            _workToFlush = true;
-        }
-        return _commandBuffer;
-    }
+    HgiMetalCapabilities const & GetCapabilities() const;
     
     HGIMETAL_API
-    int GetAPIVersion() const {
-        return _apiVersion;
-    }
-    
-    HGIMETAL_API
-    HgiMetalCapabilities const & GetCapabilities() const {
-        return *_capabilities;
-    }
-    
-    HGIMETAL_API
-    void CommitCommandBuffer(
+    void CommitPrimaryCommandBuffer(
         CommitCommandBufferWaitType waitType = CommitCommandBuffer_NoWait,
         bool forceNewBuffer = false);
 
+    HGIMETAL_API
+    void CommitSecondaryCommandBuffer(
+        id<MTLCommandBuffer> commandBuffer,
+        CommitCommandBufferWaitType waitType);
+
+    HGIMETAL_API
+    void ReleaseSecondaryCommandBuffer(id<MTLCommandBuffer> commandBuffer);
+
 protected:
     HGIMETAL_API
-    bool _SubmitCmds(HgiCmds* cmds) override;
+    bool _SubmitCmds(HgiCmds* cmds, HgiSubmitWaitType wait) override;
 
 private:
     HgiMetal & operator=(const HgiMetal&) = delete;
@@ -191,6 +206,7 @@ private:
     id<MTLCommandQueue> _commandQueue;
     id<MTLCommandBuffer> _commandBuffer;
     id<MTLCaptureScope> _captureScopeFullFrame;
+    HgiCmds* _currentCmds;
 
     std::unique_ptr<HgiMetalCapabilities> _capabilities;
 
@@ -198,17 +214,20 @@ private:
     int _apiVersion;
     bool _useInterop;
     bool _workToFlush;
-    
-    // TEMP for Mtlf handoff
+
+    // APPLE METAL: TEMP for Mtlf handoff
 public:
     
     HGIMETAL_API
     bool BeginMtlf();
     
     class HgiMetalGraphicsCmds* _encoder;
+    MTLRenderPassDescriptor *renderPassDescriptor;
     
     int _sampleCount;
-    bool _needsFlip;
+    
+    HGIMETAL_API
+    void StartFrame(bool capture);
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

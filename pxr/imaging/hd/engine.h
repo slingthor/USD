@@ -71,6 +71,10 @@ public:
     HD_API
     void RemoveTaskContextData(const TfToken &id);
 
+    /// Removes all keys.
+    HD_API
+    void ClearTaskContextData();
+
     /// @}
 
     /// Execute tasks.
@@ -78,8 +82,6 @@ public:
     void Execute(HdRenderIndex *index,
                  HdTaskSharedPtrVector *tasks);
 
-    HD_API
-    void ReloadAllShaders(HdRenderIndex& index);
 
 private:
     /// Context containing token-value pairs, that is passed to each

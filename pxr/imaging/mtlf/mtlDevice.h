@@ -92,7 +92,8 @@ class HgiMetal;
 #define METAL_FEATURESET_FOR_DISPATCHTHREADS MTLFeatureSet_macOS_GPUFamily1_v1
 #endif
 
-class MtlfDrawTarget;
+#define METAL_MAX_COLOR_ATTACHMENTS 8 // Do not change - part of Metal spec.
+
 typedef std::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
 
 /// \class MtlfMetalContext
@@ -212,15 +213,7 @@ public:
     
     MTLF_API
     void SetOutputPixelFormats(MTLPixelFormat pixelFormat, MTLPixelFormat depthFormat);
-    
-    MTLF_API
-    void SetDrawTarget(MtlfDrawTarget *drawTarget);
-    
-    MTLF_API
-    MtlfDrawTarget *GetDrawTarget() const {
-        return drawTarget;
-    }
-    
+
     MTLF_API
     void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, bool _enableMVA);
     
@@ -248,8 +241,11 @@ public:
              int oldStyleUniformSize);
 
     MTLF_API
-    void SetBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name);	//Implementation binds this as a vertex buffer!
-    
+    void SetVertexBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name);	//Implementation binds this as a vertex buffer!
+
+    MTLF_API
+    void SetFragmentBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name);    //Implementation binds this as a vertex buffer!
+
     MTLF_API
     void SetIndexBuffer(id<MTLBuffer> const buffer);
 
@@ -282,19 +278,25 @@ public:
     void SetBlendColor(GfVec4f const &blendColor);
 
     MTLF_API
+    void SetColorWriteMask(MTLColorWriteMask mask);
+    
+    MTLF_API
     void SetDepthWriteEnable(bool depthWriteEnable);
     
     MTLF_API
     void SetDepthComparisonFunction(MTLCompareFunction comparisonFn);
     
     MTLF_API
-    void SetAlphaCoverageEnable(bool alphaCoverageEnable);
+    void SetAlphaCoverageEnable(bool alphaCoverageEnable, bool alphaToOneEnable);
 
     MTLF_API
     void SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor);
     
     MTLF_API
     MTLRenderPassDescriptor* GetRenderPassDescriptor();
+    
+    MTLF_API
+    void DirtyDrawTargets();
     
     MTLF_API
     void SetRenderEncoderState();
@@ -561,12 +563,14 @@ protected:
     struct BlendState {
         bool blendEnable;
         bool alphaCoverageEnable;
+        bool alphaToOneEnable;
         MTLBlendOperation rgbBlendOp;
         MTLBlendOperation alphaBlendOp;
         MTLBlendFactor sourceColorFactor;
         MTLBlendFactor destColorFactor;
         MTLBlendFactor sourceAlphaFactor;
         MTLBlendFactor destAlphaFactor;
+        MTLColorWriteMask writeMask;
         GfVec4f blendColor;
         size_t hashValue;
     } blendState;
@@ -576,8 +580,6 @@ protected:
         MTLCompareFunction depthCompareFunction;
     } depthState;
     
-    MtlfDrawTarget *drawTarget;
-
 private:
     const static uint64_t endOfQueueEventValue = 0xFFFFFFFFFFFFFFFF;
     

@@ -49,15 +49,18 @@
 #include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/iterator.h"
 
+// APPLE METAL:
+#import "pxr/imaging/hgiMetal/buffer.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
 // ---------------------------------------------------------------------------
 
 void
-HdStBufferRelocator::AddRange(GLintptr readOffset,
-                              GLintptr writeOffset,
-                              GLsizeiptr copySize)
+HdStBufferRelocator::AddRange(ptrdiff_t readOffset,
+                              ptrdiff_t writeOffset,
+                              ptrdiff_t copySize)
 {
     _CopyUnit unit(readOffset, writeOffset, copySize);
     if (_queue.empty() || (!_queue.back().Concat(unit))) {
@@ -71,7 +74,7 @@ HdStBufferRelocator::Commit(HgiBlitCmds* blitCmds)
     HgiBufferGpuToGpuOp blitOp;
     blitOp.gpuSourceBuffer = _srcBuffer;
     blitOp.gpuDestinationBuffer = _dstBuffer;
-    
+
     TF_FOR_ALL (it, _queue) {
         blitOp.sourceByteOffset = it->readOffset;
         blitOp.byteSize = it->copySize;

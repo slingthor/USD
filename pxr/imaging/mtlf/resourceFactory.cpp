@@ -30,10 +30,8 @@
 #include "pxr/imaging/mtlf/bindingMap.h"
 #include "pxr/imaging/mtlf/contextCaps.h"
 #include "pxr/imaging/mtlf/drawTarget.h"
-#include "pxr/imaging/mtlf/ptexTexture.h"
 #include "pxr/imaging/mtlf/simpleLightingContext.h"
 #include "pxr/imaging/mtlf/simpleShadowArray.h"
-#include "pxr/imaging/mtlf/udimTexture.h"
 #include "pxr/imaging/mtlf/uniformBlock.h"
 
 #include "pxr/base/tf/diagnostic.h"
@@ -86,7 +84,7 @@ GarchArrayTextureRefPtr MtlfResourceFactory::NewArrayTexture(TfTokenVector const
                                                              unsigned int cropBottom,
                                                              unsigned int cropLeft,
                                                              unsigned int cropRight,
-                                                             GarchImage::ImageOriginLocation originLocation) const
+                                                             HioImage::ImageOriginLocation originLocation) const
 {
     return TfCreateRefPtr(new MtlfArrayTexture(imageFilePaths, arraySize,
                                                cropTop, cropBottom,
@@ -98,25 +96,6 @@ GarchBaseTexture *MtlfResourceFactory::NewBaseTexture() const
 {
     return new MtlfBaseTexture();
 }
-
-#ifdef PXR_PTEX_SUPPORT_ENABLED
-GarchPtexTextureRefPtr MtlfResourceFactory::NewPtexTexture(
-                            const TfToken &imageFilePath,
-                            const bool premultiplyAlpha) const
-{
-    return TfCreateRefPtr(new MtlfPtexTexture(imageFilePath, premultiplyAlpha));
-}
-#endif
-
-GarchUdimTextureRefPtr MtlfResourceFactory::NewUdimTexture(
-                            TfToken const& imageFilePath,
-                            GarchImage::ImageOriginLocation originLocation,
-                            std::vector<std::tuple<int, TfToken>>&& tiles,
-                            bool premultiplyAlpha) const
-{
-    return TfCreateRefPtr(new MtlfUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha));
-}
-
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

@@ -21,17 +21,15 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/garch/textureRegistry.h"
 
 #include "pxr/base/work/loops.h"
 
-
+#include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hdSt/copyComputation.h"
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
 #include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/interleavedMemoryManager.h"
-#include "pxr/imaging/hdSt/persistentBuffer.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/textureResource.h"
@@ -41,12 +39,11 @@
 #include "pxr/imaging/hdSt/textureHandleRegistry.h"
 #include "pxr/imaging/hdSt/textureObjectRegistry.h"
 
+#include "pxr/imaging/hio/glslfx.h"
 #include "pxr/imaging/hgi/hgi.h"
 
-#include "pxr/imaging/hd/engine.h"
-#include "pxr/imaging/hd/tokens.h"
-
 #include "pxr/base/tf/envSetting.h"
+#include "pxr/base/tf/hash.h"
 
 // APPLE METAL: Remove once cast to HgiMetal is gone
 #include "pxr/imaging/hgiMetal/hgi.h"
@@ -115,7 +112,7 @@ HdStResourceRegistry::HdStResourceRegistry(Hgi * const hgi)
     // default aggregation strategy for single buffers (for nested instancer)
     , _singleAggregationStrategy(
         std::make_unique<HdStVBOSimpleMemoryManager>(this))
-    , _textureHandleRegistry(std::make_unique<HdSt_TextureHandleRegistry>(hgi))
+    , _textureHandleRegistry(std::make_unique<HdSt_TextureHandleRegistry>(this))
 {
 }
 
@@ -124,6 +121,25 @@ HdStResourceRegistry::~HdStResourceRegistry() = default;
 void HdStResourceRegistry::InvalidateShaderRegistry()
 {
     _geometricShaderRegistry.Invalidate();
+    _glslfxFileRegistry.Invalidate();
+}
+
+
+void HdStResourceRegistry::ReloadResource(TfToken const& resourceType,
+                                          std::string const& path) 
+{
+    // find the file and invalidate it 
+    if (resourceType == HdResourceTypeTokens->shaderFile) {
+
+        size_t pathHash = TfHash()(path);
+        HdInstance<HioGlslfxSharedPtr> glslfxInstance = 
+                                                RegisterGLSLFXFile(pathHash);
+
+        // Reload the glslfx file.
+        HioGlslfxSharedPtr glslfxSharedPtr = glslfxInstance.GetValue();
+        glslfxSharedPtr.reset(new HioGlslfx(path));
+        glslfxInstance.SetValue(glslfxSharedPtr);
+    }
 }
 
 VtDictionary
@@ -449,23 +465,19 @@ HdStResourceRegistry::AddSource(HdBufferSourceSharedPtr const &source)
 
 void
 HdStResourceRegistry::AddComputation(HdBufferArrayRangeSharedPtr const &range,
-                                   HdComputationSharedPtr const &computation)
+                                   HdComputationSharedPtr const &computation,
+                                   HdStComputeQueue const queue)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    // if the computation is buffer source computation, it will be appended
-    // into pendingBufferSourceComputations, which is executed right after
-    // the first buffer source transfers. Those computations produce
-    // buffer sources as results of computation, so the registry also invokes
-    // another transfers for such buffers. The computation isn't marked
-    // as a buffer source computation will be executed at the end.
-
-    _pendingComputations.emplace_back(range, computation);
+    if (TF_VERIFY(queue < HdStComputeQueueCount)) {
+        _pendingComputations[queue].emplace_back(range, computation);
+    }
 }
 
 /// ------------------------------------------------------------------------
-/// Dispatch & persistent buffer API
+/// Dispatch & misc buffer API
 /// ------------------------------------------------------------------------
 HdStDispatchBufferSharedPtr
 HdStResourceRegistry::RegisterDispatchBuffer(
@@ -480,15 +492,25 @@ HdStResourceRegistry::RegisterDispatchBuffer(
     return result;
 }
 
-HdStPersistentBufferSharedPtr
-HdStResourceRegistry::RegisterPersistentBuffer(
-        TfToken const &role, size_t dataSize, void *data)
+HdStBufferResourceSharedPtr
+HdStResourceRegistry::RegisterBufferResource(
+    TfToken const &role, 
+    HdTupleType tupleType)
 {
-    HdStPersistentBufferSharedPtr const result =
-        std::make_shared<HdStPersistentBuffer>(
-            _hgi, role, dataSize, data);
+    HdStBufferResourceSharedPtr const result =
+        std::make_shared<HdStBufferResource>(
+            role, tupleType, /*offset*/ 0, /*stride*/ 0);
 
-    _persistentBufferRegistry.push_back(result);
+    size_t byteSize = HdDataSizeOfTupleType(tupleType);
+
+    HgiBufferDesc bufDesc;
+    bufDesc.usage= HgiBufferUsageUniform;
+    bufDesc.byteSize= byteSize;
+    HgiBufferHandle newId = _hgi->CreateBuffer(bufDesc);
+
+    result->SetAllocation(newId, byteSize);
+
+    _bufferResourceRegistry.push_back(result);
 
     return result;
 }
@@ -507,16 +529,16 @@ HdStResourceRegistry::GarbageCollectDispatchBuffers()
 }
 
 void
-HdStResourceRegistry::GarbageCollectPersistentBuffers()
+HdStResourceRegistry::GarbageCollectBufferResources()
 {
     HD_TRACE_FUNCTION();
 
-    _persistentBufferRegistry.erase(
+    _bufferResourceRegistry.erase(
         std::remove_if(
-            _persistentBufferRegistry.begin(), _persistentBufferRegistry.end(),
-            std::bind(&HdStPersistentBufferSharedPtr::unique,
+            _bufferResourceRegistry.begin(), _bufferResourceRegistry.end(),
+            std::bind(&HdStBufferResourceSharedPtr::unique,
                       std::placeholders::_1)),
-        _persistentBufferRegistry.end());
+        _bufferResourceRegistry.end());
 }
 
 /// ------------------------------------------------------------------------
@@ -605,6 +627,13 @@ HdStResourceRegistry::RegisterGLSLProgram(
     return _glslProgramRegistry.GetInstance(id);
 }
 
+HdInstance<HioGlslfxSharedPtr>
+HdStResourceRegistry::RegisterGLSLFXFile(
+        HdInstance<HioGlslfxSharedPtr>::ID id)
+{
+    return _glslfxFileRegistry.GetInstance(id);
+}
+
 HdInstance<HdStTextureResourceHandleSharedPtr>
 HdStResourceRegistry::RegisterTextureResourceHandle(
         HdInstance<HdStTextureResourceHandleSharedPtr>::ID id)
@@ -655,41 +684,38 @@ std::ostream &operator <<(
     return out;
 }
 
-HgiComputeCmds*
-HdStResourceRegistry::GetComputeCmds()
-{
-    if (_blitCmds) {
-        _hgi->SubmitCmds(_blitCmds.get());
-        _blitCmds.reset();
-    }
-    if (!_computeCmds) {
-        _computeCmds = _hgi->CreateComputeCmds();
-    }
-    return _computeCmds.get();
-}
-
 HgiBlitCmds*
-HdStResourceRegistry::GetBlitCmds()
+HdStResourceRegistry::GetGlobalBlitCmds()
 {
-    if (_computeCmds) {
-        _hgi->SubmitCmds(_computeCmds.get());
-        _computeCmds.reset();
-    }
     if (!_blitCmds) {
         _blitCmds = _hgi->CreateBlitCmds();
     }
     return _blitCmds.get();
 }
 
-void HdStResourceRegistry::SubmitHgiWork()
+HgiComputeCmds*
+HdStResourceRegistry::GetGlobalComputeCmds()
 {
-    // submit the work queued by the computations
+    if (!_computeCmds) {
+        _computeCmds = _hgi->CreateComputeCmds();
+    }
+    return _computeCmds.get();
+}
+
+void
+HdStResourceRegistry::SubmitBlitWork(HgiSubmitWaitType wait)
+{
     if (_blitCmds) {
-        _hgi->SubmitCmds(_blitCmds.get());
+        _hgi->SubmitCmds(_blitCmds.get(), wait);
         _blitCmds.reset();
     }
+}
+
+void
+HdStResourceRegistry::SubmitComputeWork(HgiSubmitWaitType wait)
+{
     if (_computeCmds) {
-        _hgi->SubmitCmds(_computeCmds.get());
+        _hgi->SubmitCmds(_computeCmds.get(), wait);
         _computeCmds.reset();
     }
 }
@@ -708,6 +734,9 @@ HdStResourceRegistry::_CommitTextures()
     for (HdStShaderCodeSharedPtr const & shaderCode : shaderCodes) {
         shaderCode->AddResourcesFromTextures(ctx);
     }
+
+    // MipMap generation for textures requires us to submit blit work.
+    SubmitBlitWork();
 }
 
 void
@@ -779,29 +808,29 @@ HdStResourceRegistry::_Commit()
         // for each gpu computation, make sure its destination buffer to be
         // allocated.
         //
-        TF_FOR_ALL(compIt, _pendingComputations) {
-            if (compIt->range) {
-                // ask the size of destination buffer of the gpu computation
-                int numElements = compIt->computation->GetNumOutputElements();
-                if (numElements > 0) {
-                    // We call BufferArray->Reallocate() later so that
-                    // the reallocation happens only once per BufferArray.
-                    //
-                    // if the range is already larger than the current one,
-                    // leave it as it is (there is a possibilty that GPU
-                    // computation generates less data than it was).
-                    int currentNumElements = compIt->range->GetNumElements();
-                    if (currentNumElements < numElements) {
-                        compIt->range->Resize(numElements);
-                    }
-                 }
+        for (_PendingComputationList& compVec : _pendingComputations) {
+            for (_PendingComputation &pendingComp : compVec) {
+                HdComputationSharedPtr const &comp = pendingComp.computation;
+                HdBufferArrayRangeSharedPtr &dstRange = pendingComp.range;
+                if (dstRange) {
+                    // ask the size of destination buffer of the gpu computation
+                    int numElements = comp->GetNumOutputElements();
+                    if (numElements > 0) {
+                        // We call BufferArray->Reallocate() later so that
+                        // the reallocation happens only once per BufferArray.
+                        //
+                        // if the range is already larger than the current one,
+                        // leave it as it is (there is a possibilty that GPU
+                        // computation generates less data than it was).
+                        int currentNumElements = dstRange->GetNumElements();
+                        if (currentNumElements < numElements) {
+                            dstRange->Resize(numElements);
+                        }
+                     }
+                }
             }
         }
     }
-
-    // APPLE METAL: Only here to ensure Mtlf flushes it's buffer updates
-//    HgiMetal* hgiMetal = static_cast<HgiMetal*>(_hgi);
-//    hgiMetal->CommitCommandBuffer(HgiMetal::CommitCommandBuffer_NoWait, true);
 
     {
         HD_TRACE_SCOPE("Reallocate buffer arrays");
@@ -817,6 +846,13 @@ HdStResourceRegistry::_Commit()
             _uniformSsboAggregationStrategy.get());
         _singleBufferArrayRegistry.ReallocateAll(
             _singleAggregationStrategy.get());
+        
+        // APPLE METAL: The above creates a set of GPU to GPU copies. However
+        // the next phase may create some CPU to GPU copies to the same memory.
+        // Ideally we wouldn't have requested the GPU copy at all (as it's
+        // redundant) but we did, so we need to ensure these operations are
+        // completed before we issue the CPU to GPU updates.
+        SubmitBlitWork();
     }
 
     {
@@ -824,31 +860,26 @@ HdStResourceRegistry::_Commit()
         // 4. copy phase:
         //
 
-        TF_FOR_ALL(reqIt, _pendingSources) {
+        for (_PendingSource &pendingSource : _pendingSources) {
+            HdBufferArrayRangeSharedPtr &dstRange = pendingSource.range;
             // CPU computation may not have a range. (e.g. adjacency)
-            if (!reqIt->range) continue;
+            if (!dstRange) continue;
 
             // CPU computation may result in an empty buffer source
             // (e.g. GPU quadrangulation table could be empty for quad only
             // mesh)
-            if (reqIt->range->GetNumElements() == 0) continue;
+            if (dstRange->GetNumElements() == 0) continue;
 
-            // Note that for staticArray in interleavedVBO,
-            // it's possible range->GetNumElements() != srcIt->GetNumElements().
-            // (range->GetNumElements() should always be 1, but srcIt
-            //  (vtBufferSource) could have a VtArray with arraySize entries).
-
-            TF_FOR_ALL(srcIt, reqIt->sources) {
-                // execute copy
-                reqIt->range->CopyData(*srcIt);
+            for (auto const& src : pendingSource.sources) {// execute copy
+                dstRange->CopyData(src);
 
                 // also copy any chained buffers
-                _CopyChainedBuffers(*srcIt, reqIt->range);
+                _CopyChainedBuffers(src, dstRange);
             }
 
             if (TfDebug::IsEnabled(HD_BUFFER_ARRAY_RANGE_CLEANED)) {
                 std::stringstream ss;
-                ss << *reqIt->range;
+                ss << *dstRange;
                 TF_DEBUG(HD_BUFFER_ARRAY_RANGE_CLEANED).Msg("CLEAN: %s\n", 
                                                             ss.str().c_str());
             }
@@ -856,10 +887,18 @@ HdStResourceRegistry::_Commit()
     }
 
     {
-        // HD_TRACE_SCOPE("Flush");
+        HD_TRACE_SCOPE("Flush");
         // 5. flush phase:
         //
-        // flush cosolidated buffer updates
+        // flush consolidated / staging buffer updates
+
+        _nonUniformAggregationStrategy->Flush();
+        _nonUniformImmutableAggregationStrategy->Flush();
+        _uniformUboAggregationStrategy->Flush();
+        _uniformSsboAggregationStrategy->Flush();
+        _singleAggregationStrategy->Flush();
+
+        SubmitBlitWork();
     }
 
     {
@@ -870,16 +909,23 @@ HdStResourceRegistry::_Commit()
         // they are registered.
         //   e.g. smooth normals -> quadrangulation.
         //
-        TF_FOR_ALL(it, _pendingComputations) {
-            it->computation->Execute(it->range, this);
+        for (_PendingComputationList& compVec : _pendingComputations) {
+            for (_PendingComputation &pendingComp : compVec) {
+                HdComputationSharedPtr const &comp = pendingComp.computation;
+                HdBufferArrayRangeSharedPtr &dstRange = pendingComp.range;
+                comp->Execute(dstRange, this);
+                HD_PERF_COUNTER_INCR(HdPerfTokens->computationsCommited);
+            }
 
-            HD_PERF_COUNTER_INCR(HdPerfTokens->computationsCommited);
+            // Submit Hgi work between each computation queue to ensure
+            // synchronization (barriers) happens.
+            // Some computations may use BlitCmds (CopyComputation) so we must
+            // submit blit and compute work.
+            SubmitBlitWork();
+            SubmitComputeWork();
         }
     }
 
-    // submit the GPU work queued
-    SubmitHgiWork();
-    
     // release sources
     WorkParallelForEach(_pendingSources.begin(), _pendingSources.end(),
                         [](_PendingSource &ps) {
@@ -889,7 +935,9 @@ HdStResourceRegistry::_Commit()
 
     _pendingSources.clear();
     _numBufferSourcesToResolve = 0;
-    _pendingComputations.clear();
+    for (_PendingComputationList& compVec : _pendingComputations) {
+        compVec.clear();
+    }
 }
 
 void
@@ -900,7 +948,7 @@ HdStResourceRegistry::_GarbageCollect()
     // to other objects which will be subsequently cleaned up.
 
     GarbageCollectDispatchBuffers();
-    GarbageCollectPersistentBuffers();
+    GarbageCollectBufferResources();
 
     {
         size_t count = _meshTopologyRegistry.GarbageCollect();
@@ -946,6 +994,7 @@ HdStResourceRegistry::_GarbageCollect()
     // Cleanup Shader registries
     _geometricShaderRegistry.GarbageCollect();
     _glslProgramRegistry.GarbageCollect();
+    _glslfxFileRegistry.GarbageCollect();
     _textureResourceHandleRegistry.GarbageCollect();
 
     // Cleanup Hgi resources bindings and pipelines
@@ -961,9 +1010,9 @@ HdStResourceRegistry::_GarbageCollect()
     _uniformUboBufferArrayRegistry.GarbageCollect();
     _uniformSsboBufferArrayRegistry.GarbageCollect();
     _singleBufferArrayRegistry.GarbageCollect();
-    
-    // submit the GPU work queued
-    SubmitHgiWork();
+
+    // Garbage collection may reallocate buffers, so we must submit blit work.
+    SubmitBlitWork();
 }
 
 void
@@ -1049,7 +1098,8 @@ HdStResourceRegistry::_UpdateBufferArrayRange(
     for (const auto& spec : migrateSpecs) {
         AddComputation(/*dstRange*/newRange,
                        std::make_shared<HdStCopyComputationGPU>(
-                           /*src=*/curRange, spec.name));
+                           /*src=*/curRange, spec.name),
+                       /*CopyComp queue*/HdStComputeQueueZero);
     }
 
     // Increment version of the underlying bufferArray to notify
@@ -1087,8 +1137,8 @@ HdStResourceRegistry::_TallyResourceAllocation(VtDictionary *result) const
         gpuMemoryUsed += size;
     }
 
-    // persistent buffers
-    for (auto const & buffer: _persistentBufferRegistry) {
+    // misc buffers
+    for (auto const & buffer: _bufferResourceRegistry) {
         if (!TF_VERIFY(buffer)) {
             continue;
         }
@@ -1142,11 +1192,12 @@ HdStResourceRegistry::_TallyResourceAllocation(VtDictionary *result) const
     // Texture registry
     {
         GarchTextureRegistry &textureReg = GarchTextureRegistry::GetInstance();
-        std::vector<VtDictionary> textureInfo = textureReg.GetTextureInfos();
+        std::vector<VtDictionary> textureInfos = textureReg.GetTextureInfos();
         size_t textureMemory = 0;
-        TF_FOR_ALL (textureIt, textureInfo) {
-            VtDictionary &info = (*textureIt);
-            textureMemory += info["memoryUsed"].Get<size_t>();
+        for (VtDictionary const &info :  textureInfos) {
+            if (VtDictionaryIsHolding<size_t>(info, "memoryUsed")) {
+                textureMemory += VtDictionaryGet<size_t>(info, "memoryUsed");
+            }
         }
         (*result)[HdPerfTokens->textureMemory] = VtValue(textureMemory);
     }

@@ -101,15 +101,53 @@ def Python3():
 def GetLocale():
     return sys.stdout.encoding or locale.getdefaultlocale()[1] or "UTF-8"
 
-def GetCommandOutput(command):
-    """Executes the specified command and returns output or None."""
+def GetCommandOutput(command, captureStdErr=True):
+    """Executes the specified command and returns output or None.
+    If command contains pipes (i.e '|'s), creates a subprocess for
+    each pipe in command, returning the output from the last subcommand
+    or None if any of the subcommands result in a CalledProcessError"""
+
+    result = None
+
+    args = shlex.split(command)
+    commands = []
+    cmd_args = []
+    while args:
+        arg = args.pop(0)
+        if arg == '|':
+            commands.append((cmd_args))
+            cmd_args = []
+        else:
+            cmd_args.append(arg)
+    commands.append((cmd_args))
+
+    pipes = []
+    while len(commands) > 1:
+        # We have some pipes
+        command = commands.pop(0)
+        stdin = pipes[-1].stdout if pipes else None
+        try:
+            pipe = subprocess.Popen(command, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE if captureStdErr else None)
+            pipes.append(pipe)
+        except subprocess.CalledProcessError:
+            return None
+
+    # The last command actually returns a result
+    command = commands[0]
     try:
-        return subprocess.check_output(
-            shlex.split(command), 
-            stderr=subprocess.STDOUT).decode(GetLocale(), 'replace').strip()
+        stdin = pipes[-1].stdout if pipes else None
+        result = subprocess.check_output(
+            command,
+            stdin = stdin,
+            stderr=subprocess.STDOUT if captureStdErr else None).decode('utf-8').strip()
     except subprocess.CalledProcessError:
         pass
-    return None
+
+    # clean-up
+    for pipe in pipes:
+        pipe.wait()
+    
+    return result
 
 def GetMacArch():
     macArch = GetCommandOutput('arch').strip()
@@ -120,9 +158,8 @@ def GetMacArch():
     return macArch
 
 def SupportsMacOSUniversalBinaries():
-    # MacOS_SDK = GetCommandOutput('xcrun --show-sdk-version').strip()
-    # return MacOS() and MacOS_SDK >= "10.16"
-    return True
+    MacOS_SDK = GetCommandOutput('/usr/bin/xcodebuild -version').split(' ')[1]
+    return MacOS() and MacOS_SDK >= "10.16"
 
 def GetXcodeDeveloperDirectory():
     """Returns the active developer directory as reported by 'xcode-select -p'.
@@ -131,6 +168,41 @@ def GetXcodeDeveloperDirectory():
         return None
 
     return GetCommandOutput("xcode-select -p")
+
+def CheckCodeSignID():
+    SDKVersion  = GetCommandOutput('xcodebuild -version').strip()[6:10]
+    codeSignIDs = GetCommandOutput('security find-identity -v -p codesigning')
+    if codeSignIDs is None:
+        codeSignIDs = ""
+
+    codeSignID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
+    if codeSignID is not None:
+        # Edge case for ad-hoc codesigning in iOS, which requires setting 
+        # CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY = "" to generate an Xcode project
+        # while "-" is being used by the codesign command line tool
+        if codeSignID == "":
+            codeSignID = "-"
+    elif SDKVersion >= "11.0" and codeSignIDs.find("Apple Development") != -1:
+        codeSignID = "Apple Development"
+    elif codeSignIDs.find("Mac Developer") != -1:
+        codeSignID = "Mac Developer"
+    else:
+        PrintError("Unable to identify code signing identity. " +
+            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
+            "variable to the one you'd like to use. \n" +
+            "If you don't have a code signing identity, you can create one using Xcode:\n" +
+            "https://help.apple.com/xcode/mac/current/#/dev154b28f09 \n")
+        sys.exit(1)
+
+    # Validate that we have a codesign ID that both exists and isn't ambiguous
+    if codeSignIDs.count(codeSignID) != 1 and codeSignID != "-":
+        PrintError("Unable to identify code signing identity. " +
+            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
+            "variable to the one you'd like to use. Options are:\n" + codeSignIDs)
+        sys.exit(1)
+
+    os.environ['CODE_SIGN_ID'] = codeSignID
+    return codeSignID
 
 def GetVisualStudioCompilerAndVersion():
     """Returns a tuple containing the path to the Visual Studio compiler
@@ -400,7 +472,11 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
 
     if IsVisualStudio2019OrGreater():
         generator = generator + " -A x64"
-                
+
+    toolset = context.cmakeToolset
+    if toolset is not None:
+        toolset = '-T "{toolset}"'.format(toolset=toolset)
+
     # On MacOS, enable the use of @rpath for relocatable builds.
     osx_rpath = None
     if targetMacOS or targetIOS:
@@ -436,14 +512,17 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
                 '-DCMAKE_TOOLCHAIN_FILE={usdSrcDir}/cmake/toolchains/ios.toolchain.cmake '
                 .format(usdSrcDir=context.usdSrcDir))
 
-        CODE_SIGN_ID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
-        if CODE_SIGN_ID is None:
-            SDKVersion = GetCommandOutput('xcodebuild -version').strip()[6:10]
+        CODE_SIGN_ID = CheckCodeSignID()
 
-            if SDKVersion >= "11.0":
-                CODE_SIGN_ID="Apple Development"
-            else:
-                CODE_SIGN_ID="iPhone Developer"
+        DEVELOPMENT_TEAM = os.environ.get('XCODE_ATTRIBUTE_DEVELOPMENT_TEAM')
+        if DEVELOPMENT_TEAM is None and not CODE_SIGN_ID == "-":
+            x509subject = GetCommandOutput('security find-certificate -c "{}" -p | openssl x509 -subject | head -1'.format(CODE_SIGN_ID)).strip()
+            # Extract the Organizational Unit (OU field) from the cert
+            DEVELOPMENT_TEAM = [elm for elm in x509subject.split('/') if elm.startswith('OU')][0].split('=')[1]
+
+        # Edge case for iOS
+        if CODE_SIGN_ID == "-":
+            CODE_SIGN_ID = ""
 
         extraArgs.append(
                 '-DIOS_PLATFORM=OS '
@@ -456,7 +535,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
                 '-DPYTHON_LIBRARY=/System/Library/Frameworks/Python.framework/Versions/2.7/lib '
                 '-DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python '.format(
                     codesignid=CODE_SIGN_ID,
-                    developmentTeam=os.environ.get('XCODE_ATTRIBUTE_DEVELOPMENT_TEAM')))
+                    developmentTeam=DEVELOPMENT_TEAM))
 
     # We use -DCMAKE_BUILD_TYPE for single-configuration generators 
     # (Ninja, make), and --config for multi-configuration generators 
@@ -471,6 +550,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
             '-DCMAKE_BUILD_TYPE={config} '
             '{osx_rpath} '
             '{generator} '
+            '{toolset} '
             '{extraArgs} '
             '"{srcDir}"'
             .format(instDir=instDir,
@@ -479,6 +559,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
                     srcDir=srcDir,
                     osx_rpath=(osx_rpath or ""),
                     generator=(generator or ""),
+                    toolset=(toolset or ""),
                     extraArgs=(" ".join(extraArgs) if extraArgs else "")))
 
         Run("cmake --build . --config {config} --target install -- {multiproc}"
@@ -549,12 +630,13 @@ def DownloadFileWithUrllib(url, outputFilename):
     with open(outputFilename, "wb") as outfile:
         outfile.write(r.read())
 
-def DownloadFromCache(srcDir, url, outputFilename):
-
+def GetDownloadCacheFileName(srcDir, url):
     filename = url.split("/")[-1]
+    return srcDir + '/cache/' + filename
 
-    shutil.copy(os.path.abspath(srcDir +'/cache/'+filename), outputFilename)
-
+def DownloadFromCache(srcDir, url, outputFilename):
+    filepath = GetDownloadCacheFileName(srcDir, url)
+    shutil.copy(os.path.abspath(filepath), outputFilename)
 
 def DownloadURL(url, context, force, dontExtract = None):
     """Download and extract the archive file at given URL to the
@@ -575,8 +657,12 @@ def DownloadURL(url, context, force, dontExtract = None):
             PrintInfo("{0} already exists, skipping download"
                       .format(os.path.abspath(filename)))
         else:
-            PrintInfo("Downloading {0} to {1}"
-                      .format(url, os.path.abspath(filename)))
+            if context.downloader == DownloadFromCache:
+                PrintInfo("Copying {0} to {1}"
+                          .format(GetDownloadCacheFileName(context.usdSrcDir, url), os.path.abspath(filename)))
+            else:
+                PrintInfo("Downloading {0} to {1}"
+                          .format(url, os.path.abspath(filename)))
 
             # To work around occasional hiccups with downloading from websites
             # (SSL validation errors, etc.), retry a few times if we don't
@@ -888,7 +974,13 @@ def InstallBoost_Helper(context, force, buildArgs):
         if Windows():
             # toolset parameter for Visual Studio documented here:
             # https://github.com/boostorg/build/blob/develop/src/tools/msvc.jam
-            if IsVisualStudio2019OrGreater():
+            if context.cmakeToolset == "v142":
+                b2_toolset.append("toolset=msvc-14.2")
+            elif context.cmakeToolset == "v141":
+                b2_toolset.append("toolset=msvc-14.1")
+            elif context.cmakeToolset == "v140":
+                b2_toolset.append("toolset=msvc-14.0")
+            elif IsVisualStudio2019OrGreater():
                 b2_toolset = "toolset=msvc-14.2"
             elif IsVisualStudio2017OrGreater():
                 b2_toolset = "toolset=msvc-14.1"
@@ -1323,6 +1415,7 @@ def InstallTIFF(context, force, buildArgs):
         if MacOS() or iOS():
             patchPath = os.path.join(os.path.dirname(scriptFolder), 'patches')
 
+
             devout = open(os.devnull, 'w')
             subprocess.call(['git', 'apply', '--reject', '--whitespace=fix', 
                 patchPath + '/0001-tif_fax3.h-allow-0-length-run-in-DECODE2D.patch'],
@@ -1339,11 +1432,7 @@ def InstallTIFF(context, force, buildArgs):
             subprocess.call(['git', 'apply', '--reject', '--whitespace=fix', 
                 patchPath + '/0001-tif_fax3-more-buffer-overflow-checks-in-Fax3Decode2D.patch'],
                 stdout=devout, stderr=devout)
-
-            PatchFile("CMakeLists.txt",
-                   [("option(ld-version-script \"Enable linker version script\" ON)",
-                     "option(ld-version-script \"Enable linker version script\" OFF)")])
-
+        
         if iOS():
             # Skip contrib to avoid issues with code signing.
             PatchFile("CMakeLists.txt",
@@ -1353,6 +1442,14 @@ def InstallTIFF(context, force, buildArgs):
 
         if context.static_dependencies_macOS:
             extraArgs.append('-DBUILD_SHARED_LIBS=OFF')
+        
+			
+        # The libTIFF CMakeScript says the ld-version-script 
+        # functionality is only for compilers using GNU ld on 
+        # ELF systems or systems which provide an emulation; therefore
+        # skipping it completely on mac and windows.
+        if MacOS() or iOS() or Windows():
+            extraArgs.append("-Dld-version-script=OFF")
         
         RunCMake(context, force, extraArgs)
         return os.getcwd()
@@ -2199,6 +2296,9 @@ def InstallUSD(context, force, buildArgs):
         extraArgs = []
         extraArgs.append('-DPXR_OVERRIDE_PLUGINPATH_NAME=./Resources/usd')
 
+        extraArgs.append('-DPXR_PREFER_SAFETY_OVER_SPEED=' + 
+                         'ON' if context.safetyFirst else 'OFF')
+
         if context.buildPython:
             extraArgs.append('-DPXR_ENABLE_PYTHON_SUPPORT=ON')
             if Python3():
@@ -2498,6 +2598,9 @@ group.add_argument("--force-all", action="store_true",
 group.add_argument("--generator", type=str,
                    help=("CMake generator to use when building libraries with "
                          "cmake"))
+group.add_argument("--toolset", type=str,
+                   help=("CMake toolset to use when building libraries with "
+                         "cmake"))
 
 group = parser.add_argument_group(title="3rd Party Dependency Build Options")
 group.add_argument("--src", type=str,
@@ -2558,6 +2661,15 @@ subgroup.add_argument("--universal", dest="universal", action="store_true",
                       default=False, help="Build universal binaries on MacOS ")
 subgroup.add_argument("--no-universal", dest="universal", action="store_false",
                       help="Do not build universal binaries on MacOS (default)")
+subgroup.add_argument("--prefer-safety-over-speed", dest="safety_first",
+                      action="store_true", default=True, help=
+                      "Enable extra safety checks (which may negatively "
+                      "impact performance) against malformed input files "
+                      "(default)")
+subgroup.add_argument("--prefer-speed-over-safety", dest="safety_first",
+                      action="store_false", help=
+                      "Disable performance-impacting safety checks against "
+                      "malformed input files")
 
 (NO_IMAGING, IMAGING, USD_IMAGING) = (0, 1, 2)
 
@@ -2697,7 +2809,7 @@ class InstallContext:
         # don't support TLS v1.2, which is required for downloading some
         # dependencies.
         
-        if args.use_download_cache and MacOS():
+        if args.use_download_cache and (MacOS() or iOS()):
             self.downloader = DownloadFromCache
             self.downloaderName = "cache"
         elif find_executable("curl"):
@@ -2710,14 +2822,15 @@ class InstallContext:
             self.downloader = DownloadFileWithUrllib
             self.downloaderName = "built-in"
 
-
-        #MacOS only
         self.use_download_cache = args.use_download_cache
+
+        # MacOS Only
         self.make_relocatable = args.make_relocatable
         self.static_dependencies_macOS = args.static_dependencies_macOS
 
-        # CMake generator
+        # CMake generator and toolset
         self.cmakeGenerator = args.generator
+        self.cmakeToolset = args.toolset
 
         # Number of jobs
         self.numJobs = args.jobs
@@ -2741,7 +2854,10 @@ class InstallContext:
         self.buildDebug = args.build_debug;
         self.buildShared = (args.build_type == SHARED_LIBS)
         self.buildMonolithic = (args.build_type == MONOLITHIC_LIB)
+
+        # Build options
         self.buildUniversal = args.universal
+        self.safetyFirst = args.safety_first
 
         # Dependencies that are forced to be built
         self.forceBuildAll = args.force_all
@@ -3017,13 +3133,14 @@ Building with settings:
   3rd-party install directory   {instDir}
   Build directory               {buildDir}
   CMake generator               {cmakeGenerator}
+  CMake toolset                 {cmakeToolset}
   Downloader                    {downloader}
   
-  MacOS:
+  Apple:
     Build universal binaries    {buildUniversalBinaries}
-    Use download cache          {use_download_cache}
     Make relocatable            {make_relocatable}
     Static dependencies         {static_dependencies_macOS}
+    Use download cache          {use_download_cache}
 
   Building                      {buildType}
     Cross Platform              {targetPlatform}
@@ -3074,9 +3191,11 @@ summaryMsg = summaryMsg.format(
     instDir=context.instDir,
     cmakeGenerator=("Default" if not context.cmakeGenerator
                     else context.cmakeGenerator),
+    cmakeToolset=("Default" if not context.cmakeToolset
+                  else context.cmakeToolset),
     downloader=(context.downloaderName),
     buildUniversalBinaries=("On" if context.buildUniversal and SupportsMacOSUniversalBinaries() else "Off"),
-    use_download_cache=("On" if context.use_download_cache and MacOS() else "Off"),
+    use_download_cache=("On" if context.use_download_cache else "Off"),
     make_relocatable=("On" if context.make_relocatable and MacOS() else "Off"),
     static_dependencies_macOS=("On" if context.static_dependencies_macOS and MacOS() else "Off"),
     dependencies=("None" if not dependenciesToBuild else 
@@ -3180,39 +3299,7 @@ if Windows():
     ])
 
 if args.make_relocatable:
-    SDKVersion  = GetCommandOutput('xcodebuild -version').strip()[6:10]
-    codeSignIDs = GetCommandOutput('security find-identity -v -p codesigning')
-    if codeSignIDs is None:
-        codeSignIDs = ""
-
-    codeSignID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
-    if codeSignID is not None:
-        # Edge case for ad-hoc codesigning in iOS, which requires setting 
-        # CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY = "" to generate an Xcode project
-        # while "-" is being used by the codesign command line tool
-        if codeSignID == "":
-            codeSignID = "-"
-    elif SDKVersion >= "11.0" and codeSignIDs.find("Apple Development") != -1:
-        codeSignID = "Apple Development"
-    elif codeSignIDs.find("Mac Developer") != -1:
-        codeSignID = "Mac Developer"
-    else:
-        PrintError("Unable to identify code signing identity. " +
-            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
-            "variable to the one you'd like to use. \n" +
-            "If you don't have a code signing identity, you can create one using Xcode:\n" +
-            "https://help.apple.com/xcode/mac/current/#/dev154b28f09 \n")
-        sys.exit(1)
-
-    # Validate that we have a codesign ID that both exists and isn't ambiguous
-    if codeSignIDs.count(codeSignID) != 1 and codeSignID != "-":
-        PrintError("Unable to identify code signing identity. " +
-            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
-            "variable to the one you'd like to use. Options are:\n" + codeSignIDs)
-        sys.exit(1)
-
-    os.environ['CODE_SIGN_ID'] = codeSignID
-
+    CheckCodeSignID()
     from make_relocatable import make_relocatable
     make_relocatable(context.usdInstDir, context.buildPython, iOS(), verbosity > 1)
 

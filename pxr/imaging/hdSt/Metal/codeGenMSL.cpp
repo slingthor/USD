@@ -39,6 +39,7 @@
 #include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
+#include "pxr/imaging/hdSt/surfaceShader.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hd/binding.h"
@@ -101,6 +102,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((_double, "double"))
     ((_float, "float"))
     ((_int, "int"))
+    ((_bool, "bool"))
     (wrapped_float)
     (wrapped_int)
     (hd_vec2)
@@ -134,6 +136,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (dvec2)
     (dvec3)
     (dvec4)
+    (mat2)
     (mat3)
     (mat4)
     (dmat3)
@@ -186,7 +189,7 @@ std::string
 _GetPtexTextureShaderSource()
 {
     static std::string source =
-        HioGlslfx(HdStPackagePtexTextureShader()).GetSource(
+        HioGlslfx(HdStPackagePtexTextureShader(), TfToken("Metal")).GetSource(
             _tokens->ptexTextureSampler);
     return source;
 }
@@ -452,7 +455,10 @@ _GetFlatType(TfToken const &token)
         return _tokens->_float;
     } else if (token == _tokens->dmat4) {
         return _tokens->_float;
+    } else if (token == _tokens->_bool) {
+        return _tokens->_int;
     }
+
     return token;
 }
 
@@ -534,7 +540,7 @@ static HdSt_CodeGenMSL::TParam& _AddInputPtrParam(
 {
     return _AddInputPtrParam(inputParams,
                         bd.name, bd.dataType, attribute,
-                        bd.binding, arraySize, programScope);
+                        bd.binding, arraySize, programScope, bd.writable);
 }
 
 static void _EmitDeclaration(std::stringstream &str,
@@ -578,7 +584,7 @@ static void _EmitDeclarationMutablePtr(std::stringstream &str,
 
 {
     TfToken ptrName(std::string("*") + name.GetString());
-    str << "device ";
+    str << "device VTXCONST ";
     if (programScope) {
         str << "ProgramScope<st>::";
     }
@@ -1293,7 +1299,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                         << "\n    MSLVsInputs input //[[stage_in]]";
     vsMI_EP_FuncDef     << "vertex MSLVsOutputs vertexEntryPoint("
                         << "\n      uint _vertexID[[vertex_id]]";
-    csFuncDef           << "kernel void computeEntryPoint("
+    csFuncDef           << "kernel void computeEntryPoint(\n"
                         << "    uint _threadPositionInGrid[[thread_position_in_grid]]\n";
 
     if (_buildTarget != kMSL_BuildTarget_MVA_ComputeGS)
@@ -1326,7 +1332,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
             bool usesPackedNormals = (input.name == _tokens->packedSmoothNormals) || (input.name == _tokens->packedFlatNormals);
             
             bool inputIsAtomic = (input.dataType.GetString().find("atomic") != std::string::npos);
-            bool isShaderWritable = (input.usage & HdSt_CodeGenMSL::TParam::Usage::Writable);
+            bool isShaderWritable = (input.usage & (HdSt_CodeGenMSL::TParam::Usage::Mutable | HdSt_CodeGenMSL::TParam::Usage::Writable));
             
             if (input.usage & HdSt_CodeGenMSL::TParam::Uniform) {
                 //This input param is a uniform
@@ -1401,14 +1407,13 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                     vsInputCode << "    scope." << name << " = "
                                 << name << ";\n";
                     
-                vsFuncDef   << "\n    , " << (isPtrParam ? ((inputIsAtomic || isShaderWritable) ? "device " : "device const ") : "")
+                vsFuncDef   << "\n    , device const "
                             << (inProgramScope ? "ProgramScope_Vert::" : "")
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
                 
-                bool isMutable = (input.usage & HdSt_CodeGenMSL::TParam::Mutable);
                 csFuncDef   << "\n    , " << (isPtrParam ? "device " : "")
-                            << ((isMutable || isShaderWritable) ? "" : "const ")
+                            << (isShaderWritable ? "" : "const ")
                             << (inProgramScope ? "ProgramScope_Compute::" : "")
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
@@ -1416,14 +1421,14 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 if(availableInMI_EP) {
                     //The MI entry point needs these too in identical form.
                     vsMI_EP_FuncDefParams << "\n    , "
-                            << (isPtrParam ? ((inputIsAtomic || isShaderWritable) ? "device " : "device const ") : "")
+                            << (isPtrParam ? "device const " : "")
                             << (inProgramScope ? "ProgramScope_Vert::" : "")
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
                 }
                 
                 //MI wrapper code can't use "attrib" attribute specifier.
-                vsMI_FuncDef << "\n    , " << (isPtrParam ? ((inputIsAtomic || isShaderWritable) ? "device " : "device const ") : "")
+                vsMI_FuncDef << "\n    , " << (isPtrParam ? "device const " : "")
                              << (inProgramScope ? "ProgramScope_Vert::" : "")
                              << dataType << (isPtrParam ? "* " : " ")
                              << name;
@@ -1687,6 +1692,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
             
             bool isPtr = false;
             if(name.at(0) == '*') { name = name.substr(1, name.length() - 1); isPtr = true; }
+            bool isWritable = (it->usage & TParam::Usage::Writable);
             
             if(isVPrimVar || isDrawingCoord || isVertexData) {
                 bool isFlat = attribute == "[[flat]]";
@@ -1699,7 +1705,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 gs_GSInputCode << "        scope." << (accessor.empty() ? name : accessor) << " = ";
                 
                 if(prefixScope && isPtr)
-                    gs_GSInputCode << "(const device ProgramScope_Geometry::" << dataType << "*)" << name << ";\n";
+                    gs_GSInputCode << "(const device ProgramScope_Geometry::" << dataType << "*)";
                 else if (it->usage & HdSt_CodeGenMSL::TParam::Uniform)
                     gs_GSInputCode << "vsUniforms->";
                 gs_GSInputCode << name << ";\n";
@@ -1717,7 +1723,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                     isPresentInVS = true;
                 }
                 if(!isPresentInVS) {
-                    cs_EP_FuncDef   << "\n    , " << (isPtr ? "device const " : "")
+                    cs_EP_FuncDef   << "\n    , " << (isPtr ? (isWritable ? "device " : "device const ") : "")
                                     << (prefixScope ? "ProgramScope_Geometry::" : "")
                                     << _GetPackedMSLType(_GetPackedType(it->dataType, true))
                                     << (isPtr ? "* " : " ")
@@ -2239,7 +2245,19 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
             fsInputCode << "    scope." << destPrefix.str() << (accessor.empty() ? name : accessor) << " = " << sourcePrefix.str() << name << ";\n";
         }
     }
-    fsInputCode << "    scope.gl_FragCoord = scope.gl_Position;\n";
+    // How we emulate gl_FragCoord is different based on whether we're
+    // using a pass-through vertex shader due to using compute for GS.
+    // [[position]] is very different, and we we need to standardise it here
+    // by manually doing the division by w to normalise
+    if (_buildTarget != kMSL_BuildTarget_MVA_ComputeGS) {
+        fsInputCode << "    scope.gl_FragCoord = scope.gl_Position;\n";
+    } else {
+        fsInputCode << "    scope.gl_FragCoord.zw = scope.gl_Position.zw;\n";
+        fsInputCode << "    vec2 xy = scope.gl_Position.xy / scope.gl_Position.w;\n";
+        //fsInputCode << "    xy.y *= -1.0;\n";
+        fsInputCode << "    xy += 1.0;\n";
+        fsInputCode << "    scope.gl_FragCoord.xy = xy * 0.5 * vec2(fragExtras->renderTargetWidth, fragExtras->renderTargetHeight);\n";
+    }
     fsTexturingStruct << "};\n\n";
     fsUniformStruct << "};\n\n";
     fsFuncDef << ")\n{\n";
@@ -2562,6 +2580,20 @@ HdSt_CodeGenMSL::Compile(HdStResourceRegistry* const registry)
     _ParseGLSL(_genVS, _mslVSInputParams, _mslVSOutputParams);
     _ParseGLSL(_genFS, _mslPSInputParams, _mslPSOutputParams);
     _ParseGLSL(_genCommon, _mslVSInputParams, _mslVSOutputParams);
+    
+    {
+        // TEMP: Metal compiler doesn't like missing function definitions even in
+        // code that isn't called, so we hack a fix in here until the Storm shader
+        // source/logic is correctly fixed at some future point
+        std::string result = _genFS.str();
+        if (result.find("\nintegrateLights(", 0) == std::string::npos &&
+            result.find("//integrateLights(", 0) != std::string::npos) {
+                _genFS << "LightingContribution\n"
+                          "integrateLights(vec4 Peye, vec3 Neye, LightingInterfaceProperties props){\n"
+                          "  return integrateLightsDefault(Peye, Neye, props);\n"
+                          "}\n";
+        }
+    }
 
     // MSL<->Metal API plumbing
     std::stringstream glueVS, gluePS, glueGS, glueCS;
@@ -2692,6 +2724,7 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "#define vec2 float2\n"
             << "#define vec3 float3\n"
             << "#define vec4 float4\n"
+            << "#define mat2 float2x2\n"
             << "#define mat3 float3x3\n"
             << "#define mat4 float4x4\n"
             << "#define ivec2 int2\n"
@@ -2703,12 +2736,13 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "#define dvec2 float2\n"
             << "#define dvec3 float3\n"
             << "#define dvec4 float4\n"
+            << "#define dmat2 float2x2\n"
             << "#define dmat3 float3x3\n"
             << "#define dmat4 float4x4\n";
     
     // XXX: this macro is still used in GlobalUniform.
     header  << "#define MAT4 mat4\n";
-    
+
     // a trick to tightly pack vec3 into SSBO/UBO.
     header  << _GetPackedTypeDefinitions();
     
@@ -2747,6 +2781,7 @@ HdSt_CodeGenMSL::GetComputeHeader()
 
             << "constexpr sampler texelSampler(address::clamp_to_edge,\n"
             << "                               filter::linear);\n";
+        
     
     // wrapper for type float and int to deal with .x accessors and the like that are valid in GLSL
     header  << "struct wrapped_float {\n"
@@ -2755,7 +2790,9 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "        float r, rr, rrr, rrrr, g, b, a;\n"
             << "    };\n"
             << "    wrapped_float(float _x) { x = _x;}\n"
-            << "    operator float () {\n"
+            << "    wrapped_float(const thread wrapped_float &_x) { x = _x.x;}\n"
+            << "    wrapped_float(const device wrapped_float &_x) { x = _x.x;}\n"
+            << "    operator float () const {\n"
             << "        return x;\n"
             << "    }\n"
             << "};\n";
@@ -2766,7 +2803,9 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "        int r, rr, rrr, rrrr, g, b, a;\n"
             << "    };\n"
             << "    wrapped_int(int _x) { x = _x;}\n"
-            << "    operator int () {\n"
+            << "    wrapped_int(const thread wrapped_int &_x) { x = _x.x;}\n"
+            << "    wrapped_int(const device wrapped_int &_x) { x = _x.x;}\n"
+            << "    operator int () const {\n"
             << "        return x;\n"
             << "    }\n"
             << "};\n";
@@ -2793,7 +2832,8 @@ HdSt_CodeGenMSL::CompileComputeProgram(HdStResourceRegistry* const registry)
     std::stringstream declarations;
     std::stringstream accessors;
     
-    _genCommon  << "class ProgramScope<st> {\n"
+    _genCommon  << "#define VTXCONST\n"
+                << "class ProgramScope<st> {\n"
                 << "public:\n";
 
     uniforms << "// Uniform block\n";
@@ -2951,25 +2991,25 @@ static void _EmitStructAccessor(std::stringstream &str,
             str << _GetUnpackedType(type, false) << " HdGet_" << name
                 << "(int arrayIndex, int localIndex) {\n"
                 << "  return "
-                << _GetPackedTypeAccessor(type, false) << "("
+                << _GetUnpackedType(_GetPackedTypeAccessor(type, false), false) << "("
                 << structMemberName << "[" << index << "]." << name << "[arrayIndex]);\n}\n";
         } else {
             str << _GetUnpackedType(type, false) << " HdGet_" << name
                 << "(int localIndex) {\n"
                 << "  return "
-                << _GetPackedTypeAccessor(type, false) << "("
+                << _GetUnpackedType(_GetPackedTypeAccessor(type, false), false) << "("
                 << structMemberName << "[" << index << "]." << name << ");\n}\n";
         }
     } else {
         if (arraySize > 1) {
             str << _GetUnpackedType(type, false) << " HdGet_" << name
                 << "(int arrayIndex, int localIndex) { return "
-                << _GetPackedTypeAccessor(type, false) << "("
+                << _GetUnpackedType(_GetPackedTypeAccessor(type, false), false) << "("
                 << structMemberName << ptrAccessor << name << "[arrayIndex]);}\n";
         } else {
             str << _GetUnpackedType(type, false) << " HdGet_" << name
                 << "(int localIndex) { return "
-                << _GetPackedTypeAccessor(type, false) << "("
+                << _GetUnpackedType(_GetPackedTypeAccessor(type, false), false) << "("
                 << structMemberName << ptrAccessor << name << ");}\n";
         }
     }
@@ -3104,7 +3144,7 @@ static void _EmitAccessor(std::stringstream &str,
         str << _GetUnpackedType(type, false)
             << " HdGet_" << name << "(int localIndex) {\n"
             << "  int index = " << index << ";\n";
-        str << "  return " << _GetPackedTypeAccessor(type, true) << "("
+        str << "  return " << _GetUnpackedType(_GetPackedTypeAccessor(type, true), false) << "("
             << name << "[index]);\n}\n";
     } else {
         // non-indexed, only makes sense for uniform or vertex.
@@ -3114,7 +3154,7 @@ static void _EmitAccessor(std::stringstream &str,
             emitIndexlessVariant = true;
             str << _GetUnpackedType(type, false)
                 << " HdGet_" << name << "(int localIndex) { return ";
-            str << _GetPackedTypeAccessor(type, true) << "(" << name << ");}\n";
+            str << _GetUnpackedType(_GetPackedTypeAccessor(type, true), false) << "(" << name << ");}\n";
         }
     }
     
@@ -3138,12 +3178,17 @@ static void _EmitTextureAccessors(
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     TfToken const &name = acc.name;
+    
+    char const* textureStr = "texture";
+    if (name == TfToken("depthReadback")) {
+        textureStr = "depth";
+    }
 
     if (!isBindless) {
         // a function returning sampler requires bindless_texture
         if (caps.bindlessTextureEnabled) {
             accessors
-                << "texture" << dim << "d<float>\n"
+                << textureStr << dim << "d<float>\n"
                 << "HdGetSampler_" << name << "() {\n"
                 << "  return textureBind_" << name << ";"
                 << "}\n";
@@ -3185,10 +3230,10 @@ static void _EmitTextureAccessors(
 
     if (hasTextureScaleAndBias) {
         accessors
-            << "  texture" << dim << "d<float> tex = HdGetSampler_" << name << "();\n"
+            << "  " << textureStr << dim << "d<float> tex = HdGetSampler_" << name << "();\n"
             << "  " << _GetUnpackedType(dataType, false)
-            << "  result = is_null_texture(tex) ? 0.0f:"
-            << _GetPackedTypeAccessor(dataType, false)
+            << " result = is_null_texture(tex) ? wrapped_float(0.0f):"
+            << _GetUnpackedType(_GetPackedTypeAccessor(dataType, false), false)
             << "((tex.sample(samplerBind_" << name << ", sampleCoord)\n"
             << "#ifdef HD_HAS_" << name << "_" << HdStTokens->scale << "\n"
             << "    * HdGet_" << name << "_" << HdStTokens->scale << "()\n"
@@ -3199,11 +3244,11 @@ static void _EmitTextureAccessors(
             << ")" << swizzle << ");\n";
     } else {
         accessors
-            << "  texture" << dim << "d<float> tex = HdGetSampler_" << name << "();\n"
+            << "  " << textureStr << dim << "d<float> tex = HdGetSampler_" << name << "();\n"
             << "  " << _GetUnpackedType(dataType, false)
-            << "  result = is_null_texture(tex) ? 0.0f :"
-            << _GetPackedTypeAccessor(dataType, false)
-            << "(HdGetSampler_" << name << "().sample(sampleCoord)"
+            << "  result = is_null_texture(tex) ? wrapped_float(0.0f):"
+            << _GetUnpackedType(_GetPackedTypeAccessor(dataType, false), false)
+            << "(tex.sample(samplerBind_" << name << ", sampleCoord)"
             << swizzle << ");\n";
     }
 
@@ -3225,7 +3270,7 @@ static void _EmitTextureAccessors(
                 << "    return result;\n"
                 << "  } else {\n"
                 << "    return ("
-                << _GetPackedTypeAccessor(dataType, false)
+                << _GetUnpackedType(_GetPackedTypeAccessor(dataType, false), false)
                 << "(materialParams[shaderCoord]."
                 << name
                 << HdSt_ResourceBindingSuffixTokens->fallback << swizzle << ")\n"
@@ -3244,7 +3289,7 @@ static void _EmitTextureAccessors(
                 << "    return result;\n"
                 << "  } else {\n"
                 << "    return "
-                << _GetPackedTypeAccessor(dataType, false)
+                << _GetUnpackedType(_GetPackedTypeAccessor(dataType, false), false)
                 << "(materialParams[shaderCoord]."
                 << name
                 << HdSt_ResourceBindingSuffixTokens->fallback << ");\n"
@@ -3392,7 +3437,7 @@ HdSt_CodeGenMSL::_GenerateCommonDefinitions()
 
         HdBinding::Type bindingType = it->first.GetType();
         if (bindingType != HdBinding::PRIMVAR_REDIRECT) {
-            _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
+            _genDefinitions << "#define HD_HAS_" << it->second.name << " 1\n";
         }
     }
     
@@ -3409,6 +3454,17 @@ HdSt_CodeGenMSL::_GenerateCommonDefinitions()
 void
 HdSt_CodeGenMSL::_GenerateCommonCode()
 {
+    // check if surface shader has masked material tag
+    for (auto const& shader : _shaders) {
+        if (HdStSurfaceShaderSharedPtr surfaceShader =
+            std::dynamic_pointer_cast<HdStSurfaceShader>(shader)) {
+            if (surfaceShader->GetMaterialTag() ==
+                HdStMaterialTagTokens->masked) {
+                _genCommon << "#define HD_MATERIAL_TAG_MASKED 1\n";
+            }
+        }
+    }
+
     _genCommon  << "class ProgramScope<st> {\n"
                 << "public:\n";
 
@@ -3472,10 +3528,15 @@ HdSt_CodeGenMSL::_GenerateCommonCode()
     }
 
     _genCommon  << "#if defined(HD_VERTEX_SHADER)\n"
+                << "#define VTXCONST const\n"
                 << "#if !defined(HD_NUM_clipPlanes)\n"
                 << "#define HD_NUM_clipPlanes 1\n"
                 << "#endif\n"
                 << "float gl_ClipDistance[HD_NUM_clipPlanes];\n"
+                << "#elif defined(HD_GEOMETRY_SHADER)\n"
+                << "#define VTXCONST const\n"
+                << "#else\n"
+                << "#define VTXCONST\n"
                 << "#endif\n";
     
     {
@@ -3525,7 +3586,7 @@ HdSt_CodeGenMSL::_GenerateBindingsCode()
             if (binDecl->binding.GetType() == HdBinding::SSBO)
             {
                 indexStr = "localIndex";
-                if (binDecl->typeIsAtomic)
+                if (binDecl->typeIsAtomic || binDecl->writable)
                 {
                     _EmitDeclarationMutablePtr(_genCommon, *binDecl);
                 }
@@ -5105,7 +5166,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << " HdGet_" << it->second.name << "(int localIndex) {\n"
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return "
-                << _GetPackedTypeAccessor(it->second.dataType, false)
+                << _GetUnpackedType(_GetPackedTypeAccessor(it->second.dataType, false), false)
                 << "(materialParams[shaderCoord]."
                 << it->second.name << HdSt_ResourceBindingSuffixTokens->fallback
                 << swizzle
@@ -5128,13 +5189,20 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             
             isTextureSource = true;
         } else if (bindingType == HdBinding::TEXTURE_2D) {
+            char const* textureStr = "texture";
+            TfToken textureTypeStr = TfToken("texture2d<float>");
+            if (it->second.name == TfToken("depthReadback")) {
+                textureStr = "depth";
+                textureTypeStr = TfToken("depth2d<float>");
+            }
+
             declarations
                 << "sampler samplerBind_" << it->second.name << ";\n"
-                << "texture2d<float> textureBind_" << it->second.name << ";\n";
+                << textureStr << "2d<float> textureBind_" << it->second.name << ";\n";
             
             _AddInputParam(_mslPSInputParams, TfToken("samplerBind_" + it->second.name.GetString()), TfToken("sampler"), TfToken()).usage
                 |= HdSt_CodeGenMSL::TParam::Sampler;
-            _AddInputParam(_mslPSInputParams, TfToken("textureBind_" + it->second.name.GetString()), TfToken("texture2d<float>"), TfToken()).usage
+            _AddInputParam(_mslPSInputParams, TfToken("textureBind_" + it->second.name.GetString()), textureTypeStr, TfToken()).usage
                 |= HdSt_CodeGenMSL::TParam::Texture;
 
             _EmitTextureAccessors(
@@ -5143,82 +5211,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 /* hasTextureTransform = */ false,
                 /* hasTextureScaleAndBias = */ true,
                 /* isBindless = */ false);
-            /*
-            // a function returning sampler requires bindless_texture
-            if (caps.bindlessTextureEnabled) {
-                accessors
-                    << "texture2d<float>\n"
-                    << "HdGetSampler_" << it->second.name << "() {\n"
-                    << "  return textureBind_" << it->second.name << ";"
-                    << "}\n";
-            } else {
-                accessors
-                    << "#define HdGetSampler_" << it->second.name << "()"
-                    << " textureBind_" << it->second.name << "\n";
-            }
-            // vec4 HdGet_name(vec2 coord)
-            accessors
-                << _GetUnpackedType(it->second.dataType, false)
-                << " HdGet_" << it->second.name << "(vec2 coord) {\n"
-                << "  " << _GetUnpackedType(it->second.dataType, false)
-                << " result = is_null_texture(textureBind_" << it->second.name
-                << ") ? 0:"
-                << _GetPackedTypeAccessor(it->second.dataType, false)
-                << "(textureBind_" << it->second.name << ".sample(samplerBind_"
-                << it->second.name << ", coord)"
-                << swizzle << ");\n";
 
-            if (it->second.processTextureFallbackValue) {
-                // Check whether texture is valid (using NAME_valid)
-                //
-                accessors
-                    << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
-                    << "  if (materialParams[shaderCoord]."
-                    << it->second.name
-                    << HdSt_ResourceBindingSuffixTokens->valid
-                    << ") {\n"
-                    << "    return result;\n"
-                    << "  } else {\n"
-                    << "    return "
-                    << _GetPackedTypeAccessor(it->second.dataType, false)
-                    << "(materialParams[shaderCoord]."
-                    << it->second.name
-                    << HdSt_ResourceBindingSuffixTokens->fallback
-                    << swizzle << ");\n"
-                    << "  }\n";
-            } else {
-                accessors
-                    << "  return result;\n";
-            }
-            
-            accessors
-                << "}\n";
-
-            // vec4 HdGet_name(int localIndex)
-            accessors
-                << _GetUnpackedType(it->second.dataType, false)
-                << " HdGet_" << it->second.name
-                << "(int localIndex) { return HdGet_" << it->second.name << "(";
-            if (!it->second.inPrimvars.empty()) {
-                accessors
-                    << "\n"
-                    << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
-                    << "HdGet_" << it->second.inPrimvars[0]
-                    << "(localIndex).xy\n"
-                    << "#else\n"
-                    << "vec2(0.0, 0.0)\n"
-                    << "#endif\n";
-            } else {
-                accessors
-                    << "vec2(0.0, 0.0)";
-            }
-            accessors << "); }\n";
-            // vec4 HdGet_name()
-            accessors
-                << _GetUnpackedType(it->second.dataType, false)
-                << " HdGet_" << it->second.name
-                << "() { return HdGet_" << it->second.name << "(0); }\n";
-             */
             isTextureSource = true;
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_FIELD) {
 
@@ -5384,22 +5377,26 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
         } else if (bindingType == HdBinding::TEXTURE_PTEX_TEXEL) {
             // appending '_layout' for layout is by convention.
             std::string texelBindName("textureBind_" + it->second.name.GetString());
-            std::string layoutBindName("textureBind_" + it->second.name.GetString() + "_layout");
+            std::string samplerBindName("samplerBind_" + it->second.name.GetString());
+            std::string layoutBindName("bufferBind_" + it->second.name.GetString() + "_layout");
             
             declarations
                 << "texture2d_array<float> " << texelBindName << ";\n"
-                << "texture1d<int> " << layoutBindName << ";\n";
+                << "const device ushort * " << layoutBindName << ";\n"
+                << "sampler " << samplerBindName << ";\n";
             
+            _AddInputParam(_mslPSInputParams, TfToken(samplerBindName),
+                           TfToken("sampler"), TfToken(), it->first).usage
+                |= HdSt_CodeGenMSL::TParam::Sampler;
             _AddInputParam(_mslPSInputParams, TfToken(texelBindName),
                            TfToken("texture2d_array<float>"), TfToken(), it->first).usage
                 |= HdSt_CodeGenMSL::TParam::Texture;
-            
+
             HdBinding layoutBinding(HdBinding::TEXTURE_PTEX_LAYOUT,
                 it->first.GetLocation(),
                 it->first.GetTextureUnit());
-            _AddInputParam(_mslPSInputParams, TfToken(layoutBindName),
-                           TfToken("texture1d<int>"), TfToken(), layoutBinding).usage
-                |= HdSt_CodeGenMSL::TParam::Texture;
+            _AddInputPtrParam(_mslPSInputParams, TfToken(layoutBindName),
+                TfToken("ushort"), TfToken(), HdBinding(HdBinding::UNIFORM, 0));
 
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
@@ -5408,6 +5405,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << "(GlopPtexTextureLookup("
                 << texelBindName << ","
                 << layoutBindName << ","
+                << samplerBindName << ","
                 << "GetPatchCoord(localIndex))" << swizzle << ");\n"
                 << "}\n"
                 << _GetUnpackedType(it->second.dataType, false)
@@ -5419,6 +5417,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << "(GlopPtexTextureLookup("
                 << texelBindName<< ","
                 << layoutBindName << ","
+                << samplerBindName << ","
                 << "patchCoord)" << swizzle << ");\n"
                 << "}\n";
             addScalarAccessor = false;
@@ -5461,7 +5460,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                     // Otherwise use default value.
                     << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
                     << "  return "
-                    << _GetPackedTypeAccessor(it->second.dataType, false)
+                    << _GetUnpackedType(_GetPackedTypeAccessor(it->second.dataType, false), false)
                     << "(materialParams[shaderCoord]."
                     << it->second.name << HdSt_ResourceBindingSuffixTokens->fallback
                     << swizzle << ";\n"
@@ -5479,7 +5478,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                     // Otherwise use default value.
                     << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
                     << "  return "
-                    << _GetPackedTypeAccessor(it->second.dataType, false)
+                    << _GetUnpackedType(_GetPackedTypeAccessor(it->second.dataType, false), false)
                     << "(materialParams[shaderCoord]."
                     << it->second.name << HdSt_ResourceBindingSuffixTokens->fallback
                     << swizzle <<  ");\n"
@@ -5494,13 +5493,13 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             }
         } else if (bindingType == HdBinding::TRANSFORM_2D) {
             // Forward declare rotation, scale, and translation
-            accessors
-                << "float HdGet_" << it->second.name << "_"
-                << HdStTokens->rotation  << "();\n"
-                << "vec2 HdGet_" << it->second.name << "_"
-                << HdStTokens->scale  << "();\n"
-                << "vec2 HdGet_" << it->second.name << "_"
-                << HdStTokens->translation  << "();\n";
+//            accessors
+//                << "float HdGet_" << it->second.name << "_"
+//                << HdStTokens->rotation  << "();\n"
+//                << "vec2 HdGet_" << it->second.name << "_"
+//                << HdStTokens->scale  << "();\n"
+//                << "vec2 HdGet_" << it->second.name << "_"
+//                << HdStTokens->translation  << "();\n";
 
             // vec2 HdGet_name(int localIndex)
             accessors
@@ -5609,7 +5608,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 // Otherwise use default value.
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
                 << "  return "
-                << _GetPackedTypeAccessor(it->second.dataType, false)
+                << _GetUnpackedType(_GetPackedTypeAccessor(it->second.dataType, false), false)
                 << "(materialParams[shaderCoord]."
                 << it->second.name << HdSt_ResourceBindingSuffixTokens->fallback
                 <<  ");\n"

@@ -30,6 +30,7 @@
 #include "pxr/imaging/hdSt/bufferArrayRange.h"
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/glConversions.h"
+#include "pxr/imaging/hdSt/hgiConversions.h"
 #include "pxr/imaging/hdSt/fallbackLightingShader.h"
 #include "pxr/imaging/hdSt/renderBuffer.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
@@ -62,7 +63,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 
 HdStRenderPassState::HdStRenderPassState()
-    : HdStRenderPassState(std::make_shared<HdStRenderPassShader>())
+    : HdStRenderPassState(HdStResourceFactory::GetInstance()->NewRenderPassShader())
 {
 }
 
@@ -468,7 +469,8 @@ HdStRenderPassState::MakeGraphicsCmdsDesc(
 
         HgiAttachmentDesc attachmentDesc;
 
-        attachmentDesc.format = hgiTexHandle.Get()->GetDescriptor().format;
+        attachmentDesc.format =
+            HdStHgiConversions::GetHgiFormat(renderBuffer->GetFormat());
 
         // We need to use LoadOpLoad instead of DontCare because we can have
         // multiple render passes that use the same attachments.

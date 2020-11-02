@@ -57,7 +57,9 @@ pxr_library(usdImagingGL
         ${TBB_INCLUDE_DIRS}
 
     PUBLIC_CLASSES
+        drawModeAdapter
         engine
+        package
         renderParams
 
     PUBLIC_HEADERS
@@ -85,6 +87,7 @@ pxr_library(usdImagingGL
 
     RESOURCE_FILES
         plugInfo.json
+        shaders/drawMode.glslfx
 )
 
 if (X11_FOUND OR APPLE)
@@ -93,6 +96,7 @@ if (X11_FOUND OR APPLE)
             hd
             garch
             glf
+            mtlf
             usd
             usdUtils
             usdImaging

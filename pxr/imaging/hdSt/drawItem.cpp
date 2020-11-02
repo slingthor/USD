@@ -68,6 +68,12 @@ _BakeBoundsTransform(GfBBox3f const& bounds)
 {
     GfVec3f const &localMin = bounds.GetRange().GetMin();
     GfVec3f const &localMax = bounds.GetRange().GetMax();
+ 
+    if (localMin[0] == FLT_MAX) {
+        // Short test for a default bounding box - leave unmodified
+        return bounds;
+    }
+    
     GfVec4f worldMin = GfVec4f(localMin[0], localMin[1], localMin[2], 1);
     GfVec4f worldMax = GfVec4f(localMax[0], localMax[1], localMax[2], 1);
     GfMatrix4f const &matrix = bounds.GetMatrix();
@@ -280,9 +286,9 @@ void
 HdStDrawItem::CalculateCullingBounds() const
 {
     if (_instancedCullingBoundsCalculated) {
-        return;
+       return;
     }
-    
+
     HdBufferArrayRangeSharedPtr const & instanceIndexRange = GetInstanceIndexRange();
     if (instanceIndexRange) {
         HdStBufferArrayRangeSharedPtr instanceIndexRangeGL = std::static_pointer_cast<HdStBufferArrayRange>(instanceIndexRange);

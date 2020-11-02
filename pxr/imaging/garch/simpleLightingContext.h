@@ -38,6 +38,9 @@
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/refBase.h"
 #include "pxr/base/tf/weakBase.h"
+#include "pxr/base/tf/token.h"
+
+#include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -57,7 +60,7 @@ public:
     GARCH_API
     void SetLights(GarchSimpleLightVector const & lights);
     GARCH_API
-    GarchSimpleLightVector & GetLights();
+    GarchSimpleLightVector const & GetLights() const;
 
     // returns the effective number of lights taken into account
     // in composable/compatible shader constraints
@@ -72,7 +75,7 @@ public:
     GARCH_API
     void SetShadows(GarchSimpleShadowArrayRefPtr const & shadows);
     GARCH_API
-    GarchSimpleShadowArrayRefPtr const & GetShadows();
+    GarchSimpleShadowArrayRefPtr const & GetShadows() const;
 
     GARCH_API
     void SetMaterial(GarchSimpleMaterial const & material);
@@ -118,11 +121,30 @@ public:
     GARCH_API
     virtual void SetStateFromOpenGL() = 0;
 
+    /// \name Post Surface Lighting
+    ///
+    /// This context can provide additional shader source, currently
+    /// used to implement post surface lighting, along with a hash
+    /// to help de-duplicate use by client shader programs.
+    ///
+    /// @{
+
+    GARCH_API
+    size_t ComputeShaderSourceHash();
+
+    GARCH_API
+    std::string const & ComputeShaderSource(TfToken const &shaderStageKey);
+
+    /// @}
+
 protected:
     GARCH_API
     GarchSimpleLightingContext();
     GARCH_API
     ~GarchSimpleLightingContext();
+
+    void _ComputePostSurfaceShaderState();
+    void _BindPostSurfaceShaderParams(GarchBindingMapPtr const &bindingMap);
 
     GarchSimpleLightVector _lights;
     GarchSimpleShadowArrayRefPtr _shadows;
@@ -142,9 +164,13 @@ protected:
     GarchUniformBlockRefPtr _materialUniformBlock;
     GarchUniformBlockRefPtr _bindlessShadowlUniformBlock;
 
+    class _PostSurfaceShaderState;
+        std::unique_ptr<_PostSurfaceShaderState> _postSurfaceShaderState;
+
     bool _lightingUniformBlockValid;
     bool _shadowUniformBlockValid;
     bool _materialUniformBlockValid;
+    bool _postSurfaceShaderStateValid;
 };
 
 

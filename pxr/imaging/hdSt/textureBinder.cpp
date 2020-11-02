@@ -24,9 +24,11 @@
 #include "pxr/pxr.h"
 
 #include "pxr/imaging/hdSt/textureBinder.h"
+#include "pxr/imaging/hdSt/ptexTextureObject.h"
 #include "pxr/imaging/hdSt/samplerObject.h"
 #include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/textureObject.h"
+#include "pxr/imaging/hdSt/udimTextureObject.h"
 #include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
@@ -125,7 +127,7 @@ public:
                 _Concat(
                     name,
                     HdSt_ResourceBindingSuffixTokens->samplingTransform),
-                VtValue(texture.GetSamplingTransform())));
+                texture.GetSamplingTransform()));
 
         if (useBindlessHandles) {
             sources->push_back(
@@ -157,13 +159,6 @@ public:
             std::make_shared<HdSt_BindlessSamplerBufferSource>(
                 name,
                 sampler.GetTexelsGLTextureHandle()));
-
-        sources->push_back(
-            std::make_shared<HdSt_BindlessSamplerBufferSource>(
-                _Concat(
-                    name,
-                    HdSt_ResourceBindingSuffixTokens->layout),
-                sampler.GetLayoutGLTextureHandle()));
     }
 
     static void Compute(

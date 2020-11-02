@@ -86,7 +86,7 @@ GarchArrayTextureRefPtr GlfResourceFactory::NewArrayTexture(TfTokenVector const 
                                                             unsigned int cropBottom,
                                                             unsigned int cropLeft,
                                                             unsigned int cropRight,
-                                                            GarchImage::ImageOriginLocation originLocation) const
+                                                            HioImage::ImageOriginLocation originLocation) const
 {
     return TfCreateRefPtr(new GlfArrayTexture(imageFilePaths, arraySize,
                                               cropTop, cropBottom,
@@ -97,24 +97,6 @@ GarchArrayTextureRefPtr GlfResourceFactory::NewArrayTexture(TfTokenVector const 
 GarchBaseTexture *GlfResourceFactory::NewBaseTexture() const
 {
     return new GlfBaseTexture();
-}
-
-#ifdef PXR_PTEX_SUPPORT_ENABLED
-GarchPtexTextureRefPtr GlfResourceFactory::NewPtexTexture(
-                            const TfToken &imageFilePath,
-                            const bool premultiplyAlpha) const
-{
-    return TfCreateRefPtr(new GlfPtexTexture(imageFilePath, premultiplyAlpha));
-}
-#endif
-
-GarchUdimTextureRefPtr GlfResourceFactory::NewUdimTexture(
-                            TfToken const& imageFilePath,
-                            GarchImage::ImageOriginLocation originLocation,
-                            std::vector<std::tuple<int, TfToken>>&& tiles,
-                            const bool premultiplyAlpha) const
-{
-    return TfCreateRefPtr(new GlfUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha));
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

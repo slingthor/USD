@@ -28,7 +28,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/api.h"
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/refPtr.h"
 #include "pxr/base/tf/staticTokens.h"
@@ -72,20 +72,21 @@ struct GarchTextureGPUHandle {
         handle = NULL;
     }
 
+    GarchTextureGPUHandle(uint64_t const _handle) {
+        handle = (void*)_handle;
+    }
+    GarchTextureGPUHandle& operator =(uint64_t const _handle) {
+        handle = (void*)_handle;
+        return *this;
+    }
+
     // OpenGL
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GarchTextureGPUHandle(GLuint const _handle) {
         handle = (void*)uint64_t(_handle);
     }
-    GarchTextureGPUHandle(GLuint64 const _handle) {
-        handle = (void*)uint64_t(_handle);
-    }
     GarchTextureGPUHandle& operator =(GLuint const _handle) {
         handle = (void*)uint64_t(_handle);
-        return *this;
-    }
-    GarchTextureGPUHandle& operator =(GLuint64 const _handle) {
-        handle = (void*)_handle;
         return *this;
     }
     operator GLuint() const { return (GLuint)uint64_t(handle); }
@@ -256,7 +257,7 @@ public:
     size_t GetContentsID() const;
 
     GARCH_API
-    GarchImage::ImageOriginLocation GetOriginLocation() const;
+    HioImage::ImageOriginLocation GetOriginLocation() const;
 
     GARCH_API
     bool IsOriginLowerLeft() const;
@@ -266,7 +267,7 @@ protected:
     GarchTexture();
 
     GARCH_API
-    GarchTexture(GarchImage::ImageOriginLocation originLocation);
+    GarchTexture(HioImage::ImageOriginLocation originLocation);
 
     GARCH_API
     void _SetMemoryUsed(size_t size);
@@ -284,30 +285,30 @@ private:
     size_t _memoryUsed;
     size_t _memoryRequested;
     size_t _contentsID;
-    GarchImage::ImageOriginLocation _originLocation;
+    HioImage::ImageOriginLocation _originLocation;
 };
 
 class GarchTextureFactoryBase : public TfType::FactoryBase {
 public:
     virtual GarchTextureRefPtr New(const TfToken& texturePath,
-                                   GarchImage::ImageOriginLocation originLocation) const = 0;
+                                   HioImage::ImageOriginLocation originLocation) const = 0;
     virtual GarchTextureRefPtr New(const TfTokenVector& texturePaths,
-                                   GarchImage::ImageOriginLocation originLocation) const = 0;
+                                   HioImage::ImageOriginLocation originLocation) const = 0;
 };
 
 template <class T>
 class GarchTextureFactory : public GarchTextureFactoryBase {
 public:
     virtual GarchTextureRefPtr New(const TfToken& texturePath,
-                                   GarchImage::ImageOriginLocation originLocation =
-                                                GarchImage::OriginUpperLeft) const
+                                   HioImage::ImageOriginLocation originLocation =
+                                                HioImage::OriginUpperLeft) const
     {
         return T::New(texturePath);
     }
 
     virtual GarchTextureRefPtr New(const TfTokenVector& texturePaths,
-                                   GarchImage::ImageOriginLocation originLocation =
-                                                GarchImage::OriginUpperLeft) const
+                                   HioImage::ImageOriginLocation originLocation =
+                                                HioImage::OriginUpperLeft) const
     {
         return TfNullPtr;
     }

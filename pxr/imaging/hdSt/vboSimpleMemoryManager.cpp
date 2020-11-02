@@ -21,12 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/diagnostic.h"
-
-#include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/resourceFactory.h"
-
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/iterator.h"
@@ -54,6 +48,10 @@
 
 #include <boost/functional/hash.hpp>
 
+// APPLE METAL: needed for triple buffering support
+#include "pxr/imaging/hgiMetal/hgi.h"
+#include "pxr/imaging/hgiMetal/capabilities.h"\
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
@@ -76,7 +74,8 @@ HdStVBOSimpleMemoryManager::CreateBufferArray(
 HdBufferArrayRangeSharedPtr
 HdStVBOSimpleMemoryManager::CreateBufferArrayRange()
 {
-    return std::make_shared<HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange>();
+    return std::make_shared<HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange>
+                (_resourceRegistry);
 }
 
 HdAggregationStrategy::AggregationId
@@ -279,13 +278,18 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::Reallocate(
         return;
     }
 
-    GLF_GROUP_FUNCTION();
-
     int numElements = range->GetNumElements();
 
     // Use blit work to record resource copy commands.
     Hgi* hgi = _resourceRegistry->GetHgi();
-    HgiBlitCmds* blitCmds = _resourceRegistry->GetBlitCmds();
+    HgiBlitCmds* blitCmds = _resourceRegistry->GetGlobalBlitCmds();
+    blitCmds->PushDebugGroup(__ARCH_PRETTY_FUNCTION__);
+
+    // APPLE METAL: Multibuffer support
+    bool hasUnifiedMemory =
+        static_cast<HgiMetal*>(hgi)->GetCapabilities().unifiedMemory;
+    const int bufferCount =
+        hasUnifiedMemory ? HdStBufferResource::MULTIBUFFERING:1;
     
     TF_FOR_ALL (bresIt, GetResources()) {
         HdStBufferResourceSharedPtr const &bres = bresIt->second;
@@ -298,25 +302,16 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::Reallocate(
         // APPLE METAL: Clamp for 0-sized buffers, Metal doesn't support them.
         bufferSize = (bufferSize > 256) ? bufferSize : 256;
         
-        HgiBufferHandle newIds[3];
-        HgiBufferHandle oldIds[3];
+        HgiBufferHandle newIds[HdStBufferResource::MULTIBUFFERING];
+        HgiBufferHandle oldIds[HdStBufferResource::MULTIBUFFERING];
 
         HgiBufferDesc bufDesc;
         bufDesc.byteSize = bufferSize;
         bufDesc.usage = HgiBufferUsageUniform;
 
-        for (int32_t i = 0; i < 3; i++) {
+        for (int32_t i = 0; i < bufferCount; i++) {
             oldIds[i] = bres->GetId(i);
-            
-#if defined(ARCH_OS_MACOS)
-            if (i == 0)
-#else
-            // Triple buffer everything
-            if (true)
-#endif
-            {
-                newIds[i] = hgi->CreateBuffer(bufDesc);
-            }
+            newIds[i] = hgi->CreateBuffer(bufDesc);
         }
 
         // copy the range. There are three cases:
@@ -339,7 +334,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::Reallocate(
         if (copySize > 0) {
             HD_PERF_COUNTER_INCR(HdStPerfTokens->copyBufferGpuToGpu);
 
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < bufferCount; i++) {
                 if (newIds[i]) {
                     HgiBufferGpuToGpuOp blitOp;
                     blitOp.gpuSourceBuffer = oldIds[i];
@@ -351,7 +346,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::Reallocate(
         }
 
         // delete old buffer
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < bufferCount; i++) {
             if (oldIds[i]) {
                 hgi->DestroyBuffer(&oldIds[i]);
             }
@@ -359,6 +354,8 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::Reallocate(
 
         bres->SetAllocations(newIds[0], newIds[1], newIds[2], bufferSize);
     }
+
+    blitCmds->PopDebugGroup();
 
     _capacity = numElements;
     _needsReallocation = false;
@@ -397,7 +394,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::GetResource() const
         TF_FOR_ALL (it, _resourceList) {
             if (it->second->GetId() != id) {
                 TF_CODING_ERROR("GetResource(void) called on"
-                                "HdBufferArray having multiple GL resources");
+                                "HdBufferArray having multiple GPU resources");
             }
         }
     }
@@ -466,9 +463,6 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::CopyData(
                         bufferSource->GetName().GetText());
         return;
     }
-    GLF_GROUP_FUNCTION();
-
-    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     int bytesPerElement = HdDataSizeOfTupleType(VBO->GetTupleType());
     // overrun check. for graceful handling of erroneous assets,
@@ -487,8 +481,9 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::CopyData(
 
     // APPLE METAL: Temp for triple buffering
     VBO->CopyDataIsHappening();
-
-    HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
+    
+    // APPLE METAL: No gl perf counters.
+    //HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
 
     HgiBufferCpuToGpuOp blitOp;
     blitOp.cpuSourceBuffer = bufferSource->GetData();
@@ -498,7 +493,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::CopyData(
     blitOp.byteSize = srcSize;
     blitOp.destinationByteOffset = vboOffset;
 
-    HgiBlitCmds* blitCmds = _bufferArray->GetBlitCmds();
+    HgiBlitCmds* blitCmds = GetResourceRegistry()->GetGlobalBlitCmds();
     blitCmds->CopyBufferCpuToGpu(blitOp);
 }
 

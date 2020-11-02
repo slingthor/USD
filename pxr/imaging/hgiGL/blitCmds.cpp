@@ -88,16 +88,20 @@ HgiGLBlitCmds::CopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp)
 }
 
 void
+HgiGLBlitCmds::CopyBufferGpuToCpu(HgiBufferGpuToCpuOp const& copyOp)
+{
+    _ops.push_back( HgiGLOps::CopyBufferGpuToCpu(copyOp) );
+}
+
+void
 HgiGLBlitCmds::GenerateMipMaps(HgiTextureHandle const& texture)
 {
     _ops.push_back( HgiGLOps::GenerateMipMaps(texture) );
 }
 
 bool
-HgiGLBlitCmds::_Submit(Hgi* hgi)
+HgiGLBlitCmds::_Submit(Hgi* hgi, HgiSubmitWaitType wait)
 {
-    FlushQueuedCopies();
-
     if (_ops.empty()) {
         return false;
     }

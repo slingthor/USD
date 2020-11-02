@@ -44,7 +44,10 @@ public:
 protected:
     /// Prepare draw commands and apply view frustum culling for this batch.
     HDST_API
-    virtual void _PrepareDraw(bool gpuCulling, bool freezeCulling) override;
+    virtual void _PrepareDraw(
+                      HdStResourceRegistrySharedPtr const &resourceRegistry,
+                      bool gpuCulling,
+                      bool freezeCulling) override;
     
     /// Executes the drawing commands for this batch.
     HDST_API
@@ -90,7 +93,7 @@ private:
     
     void _EndGPUCountVisibleInstances(GLsync resultSync, size_t * result);
     
-    HdStPersistentBufferSharedPtr _resultBuffer;
+    HdStBufferResourceSharedPtr _resultBuffer;
 };
 
 

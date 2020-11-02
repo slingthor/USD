@@ -32,6 +32,9 @@
 #include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/garch/texture.h"
 
+#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/texture.h"
+
 #include "pxr/base/gf/vec2i.h"
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/tf/declarePtrs.h"
@@ -103,16 +106,19 @@ public:
         virtual ~MtlfAttachment();
 
         /// Returns the texture object (can be used as any regular GL texture)
-        virtual GarchTextureGPUHandle GetTextureName() override { return _textureName; }
+        virtual GarchTextureGPUHandle GetTextureName() override { return _textureName->GetRawResource(); }
 
+        /// Returns the texture object
+        HgiTextureHandle GetHgiTextureName() { return _textureName; }
+        
         /// Returns the GL texture index multisampled of this attachment
-        GarchTextureGPUHandle GetTextureMSName() const { return _textureNameMS; }
+        HgiTextureHandle GetTextureMSName() const { return _textureNameMS; }
         
         /// Returns the texture object (can be used as any regular GL texture)
-        GarchTextureGPUHandle GetStencilTextureName() const { return _stencilTextureName; }
+        HgiTextureHandle GetStencilTextureName() const { return _stencilTextureName; }
         
         /// Returns the GL texture index multisampled of this attachment
-        GarchTextureGPUHandle GetStencilTextureMSName() const { return _stencilTextureNameMS; }
+        HgiTextureHandle GetStencilTextureMSName() const { return _stencilTextureNameMS; }
 
         /// Returns the GL format of the texture (GL_RGB, GL_DEPTH_COMPONENT...)
         GLenum GetFormat() const { return _format; }
@@ -120,6 +126,8 @@ public:
         /// Returns the GL type of the texture (GL_BYTE, GL_INT, GL_FLOAT...)
         GLenum GetType() const { return _type; }
 
+        MTLPixelFormat GetInternalFormat() const { return _internalFormat; }
+        
         /// Returns the attachment point index in the framebuffer.
         int GetAttach() const { return _attachmentIndex; }
         
@@ -150,11 +158,11 @@ public:
         void _GenTexture();
         void _DeleteTexture();
 
-        id<MTLTexture>   _textureName;
-        id<MTLTexture>   _textureNameMS;
+        HgiTextureHandle _textureName;
+        HgiTextureHandle _textureNameMS;
         
-        id<MTLTexture>   _stencilTextureName;
-        id<MTLTexture>   _stencilTextureNameMS;
+        HgiTextureHandle _stencilTextureName;
+        HgiTextureHandle _stencilTextureNameMS;
 
         GLenum           _format,
                          _type;
@@ -306,14 +314,16 @@ private:
     bool _Validate(std::string * reason = NULL);
 
     void _Resolve();
-
-    MTLRenderPassDescriptor *_mtlRenderPassDescriptor;
     
     int _bindDepth;
 
     GfVec2i _size;
     
     unsigned int _numSamples;
+    
+    MTLRenderPassDescriptor* rpd;
+    std::unique_ptr<HgiGraphicsCmdsDesc> _desc;
+    HgiGraphicsCmdsUniquePtr _gfxCmds;
 };
 
 

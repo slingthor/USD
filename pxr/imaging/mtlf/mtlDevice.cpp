@@ -28,6 +28,7 @@
 
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/capabilities.h"
+#include "pxr/imaging/hgiMetal/graphicsCmds.h"
 #include "pxr/imaging/hgi/texture.h"
 
 #import <simd/simd.h>
@@ -288,12 +289,13 @@ void MtlfMetalContext::Init()
     gpus.dummySampler = [currentDevice newSamplerStateWithDescriptor:samplerDescriptor];
     [samplerDescriptor release];
 
-    windingOrder = MTLWindingClockwise;
-    cullMode = MTLCullModeBack;
+    windingOrder = MTLWindingCounterClockwise;
+    cullMode = MTLCullModeNone;
     fillMode = MTLTriangleFillModeFill;
     
     blendState.blendEnable = false;
     blendState.alphaCoverageEnable = false;
+    blendState.alphaToOneEnable = false;
     blendState.rgbBlendOp = MTLBlendOperationAdd;
     blendState.alphaBlendOp = MTLBlendOperationAdd;
     blendState.sourceColorFactor = MTLBlendFactorSourceAlpha;
@@ -301,11 +303,11 @@ void MtlfMetalContext::Init()
     blendState.sourceAlphaFactor = MTLBlendFactorSourceAlpha;
     blendState.destAlphaFactor = MTLBlendFactorOneMinusSourceAlpha;
     blendState.blendColor = GfVec4f(1.0f);
+    blendState.writeMask = MTLColorWriteMaskAll;
     
     depthState.depthWriteEnable = true;
     depthState.depthCompareFunction = MTLCompareFunctionLessEqual;
     
-    drawTarget = NULL;
     outputPixelFormat = MTLPixelFormatInvalid;
     outputDepthFormat = MTLPixelFormatInvalid;
     
@@ -690,21 +692,29 @@ void MtlfMetalContext::SetAlphaBlendingEnable(bool _blendEnable)
     blendState.blendEnable = _blendEnable;
 }
 
-void MtlfMetalContext::SetBlendOps(MTLBlendOperation _rgbBlendOp, MTLBlendOperation _alphaBlendOp) {
+void MtlfMetalContext::SetBlendOps(MTLBlendOperation _rgbBlendOp, MTLBlendOperation _alphaBlendOp)
+{
     blendState.rgbBlendOp = _rgbBlendOp;
     blendState.alphaBlendOp = _alphaBlendOp;
 }
 
 void MtlfMetalContext::SetBlendFactors(MTLBlendFactor _sourceColorFactor, MTLBlendFactor _destColorFactor,
-                                       MTLBlendFactor _sourceAlphaFactor, MTLBlendFactor _destAlphaFactor) {
+                                       MTLBlendFactor _sourceAlphaFactor, MTLBlendFactor _destAlphaFactor)
+{
     blendState.sourceColorFactor = _sourceColorFactor;
     blendState.destColorFactor = _destColorFactor;
     blendState.sourceAlphaFactor = _sourceAlphaFactor;
     blendState.destAlphaFactor = _destAlphaFactor;
 }
 
-void MtlfMetalContext::SetBlendColor(GfVec4f const &_blendColor) {
-    blendState.blendColor = _blendColor;
+void MtlfMetalContext::SetBlendColor(GfVec4f const &blendColor)
+{
+    blendState.blendColor = blendColor;
+}
+
+void MtlfMetalContext::SetColorWriteMask(MTLColorWriteMask mask)
+{
+    blendState.writeMask = mask;
 }
 
 void MtlfMetalContext::SetDepthWriteEnable(bool depthWriteEnable)
@@ -717,9 +727,10 @@ void MtlfMetalContext::SetDepthComparisonFunction(MTLCompareFunction comparisonF
     depthState.depthCompareFunction = comparisonFn;
 }
 
-void MtlfMetalContext::SetAlphaCoverageEnable(bool _alphaCoverageEnable)
+void MtlfMetalContext::SetAlphaCoverageEnable(bool alphaCoverageEnable, bool alphaToOneEnable)
 {
-    blendState.alphaCoverageEnable = _alphaCoverageEnable;
+    blendState.alphaCoverageEnable = alphaCoverageEnable;
+    blendState.alphaToOneEnable = alphaToOneEnable;
 }
 
 void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, bool _enableMVA)
@@ -887,9 +898,21 @@ void MtlfMetalContext::SetUniformBuffer(
     threadState.boundBuffers.push_back(bufferInfo);
 }
 
-void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name)
+void MtlfMetalContext::SetVertexBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name)
 {
     BufferBinding *bufferInfo = new BufferBinding{index, buffer, name, kMSL_ProgramStage_Vertex, 0, true};
+    threadState.boundBuffers.push_back(bufferInfo);
+
+    if (name == points) {
+        threadState.vertexPositionBuffer = buffer;
+    }
+    
+    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
+}
+
+void MtlfMetalContext::SetFragmentBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name)
+{
+    BufferBinding *bufferInfo = new BufferBinding{index, buffer, name, kMSL_ProgramStage_Fragment, 0, true};
     threadState.boundBuffers.push_back(bufferInfo);
 
     if (name == points) {
@@ -918,12 +941,6 @@ void MtlfMetalContext::SetTexture(int index, id<MTLTexture> const texture, const
     threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_TEXTURE;
 }
 
-void MtlfMetalContext::SetDrawTarget(MtlfDrawTarget *dt)
-{
-    drawTarget = dt;
-    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_DRAW_TARGET;
-}
-
 size_t MtlfMetalContext::HashVertexDescriptor()
 {
     size_t hashVal = 0;
@@ -943,7 +960,7 @@ void MtlfMetalContext::SetRenderPipelineState()
     MetalWorkQueue *wq = threadState.currentWorkQueue;
     
     if (wq->currentEncoderType != MTLENCODERTYPE_RENDER || !wq->encoderInUse || !wq->currentRenderEncoder) {
-        TF_FATAL_CODING_ERROR("Not valid to call SetPipelineState() without an active render encoder");
+        TF_FATAL_CODING_ERROR("Not valid to call SetRenderPipelineState() without an active render encoder");
     }
     
     if (!threadState.enableMVA) {
@@ -956,42 +973,8 @@ void MtlfMetalContext::SetRenderPipelineState()
     if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_DRAW_TARGET) {
         size_t hashVal = 0;
 
-        if (drawTarget) {
-            auto& attachments = drawTarget->GetAttachments();
-            for(auto it : attachments) {
-                MtlfDrawTarget::MtlfAttachment* attachment = ((MtlfDrawTarget::MtlfAttachment*)&(*it.second));
-                MTLPixelFormat depthFormat = [attachment->GetTextureName() pixelFormat];
-
-                if(attachment->GetFormat() == GL_DEPTH_COMPONENT || attachment->GetFormat() == GL_DEPTH_STENCIL) {
-                    boost::hash_combine(hashVal, depthFormat);
-                    if(attachment->GetFormat() == GL_DEPTH_STENCIL) {
-                        boost::hash_combine(hashVal, depthFormat); // again
-                    }
-                }
-                else {
-                    id<MTLTexture> texture = attachment->GetTextureName();
-                    MTLPixelFormat pixelFormat = [texture pixelFormat];
-                    int idx = attachment->GetAttach();
-                    
-                    boost::hash_combine(hashVal, pixelFormat);
-                }
-            }
-        }
-        else {
-//            if (gpus.mtlColorTexture != nil) {
-//                boost::hash_combine(hashVal, gpus.mtlColorTexture.pixelFormat);
-//            }
-//            else {
-                boost::hash_combine(hashVal, outputPixelFormat);
-//            }
-            
-//            if (gpus.mtlDepthTexture != nil) {
-//                boost::hash_combine(hashVal, gpus.mtlDepthTexture.pixelFormat);
-//            }
-//            else {
-                boost::hash_combine(hashVal, outputDepthFormat);
-//            }
-        }
+        boost::hash_combine(hashVal, outputPixelFormat);
+        boost::hash_combine(hashVal, outputDepthFormat);
 
         // Update colour attachments hash
         wq->currentColourAttachmentsHash = hashVal;
@@ -1010,12 +993,14 @@ void MtlfMetalContext::SetRenderPipelineState()
     boost::hash_combine(hashVal, wq->currentColourAttachmentsHash);
     boost::hash_combine(hashVal, blendState.blendEnable);
     boost::hash_combine(hashVal, blendState.alphaCoverageEnable);
+    boost::hash_combine(hashVal, blendState.alphaToOneEnable);
     boost::hash_combine(hashVal, blendState.rgbBlendOp);
     boost::hash_combine(hashVal, blendState.alphaBlendOp);
     boost::hash_combine(hashVal, blendState.sourceColorFactor);
     boost::hash_combine(hashVal, blendState.sourceAlphaFactor);
     boost::hash_combine(hashVal, blendState.destColorFactor);
     boost::hash_combine(hashVal, blendState.destAlphaFactor);
+    boost::hash_combine(hashVal, blendState.writeMask);
     boost::hash_combine(hashVal, sampleCount);
 
     // If this matches the current pipeline state then we should already have the correct pipeline bound
@@ -1077,72 +1062,45 @@ void MtlfMetalContext::SetRenderPipelineState()
     
         if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_DRAW_TARGET) {
             threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_DRAW_TARGET;
-            
-            if (drawTarget) {
-                auto& attachments = drawTarget->GetAttachments();
-                for(auto it : attachments) {
-                    MtlfDrawTarget::MtlfAttachment* attachment = ((MtlfDrawTarget::MtlfAttachment*)&(*it.second));
-                    MTLPixelFormat depthFormat = [attachment->GetTextureName() pixelFormat];
-                    
-                    if(attachment->GetFormat() == GL_DEPTH_COMPONENT || attachment->GetFormat() == GL_DEPTH_STENCIL) {
-                        renderPipelineStateDescriptor.depthAttachmentPixelFormat = depthFormat;
-                        if(attachment->GetFormat() == GL_DEPTH_STENCIL) {
-                            renderPipelineStateDescriptor.stencilAttachmentPixelFormat = depthFormat; //Do not use the stencil pixel format (X32_S8)
-                        }
-                    }
-                    else {
-                        id<MTLTexture> texture = attachment->GetTextureName();
-                        MTLPixelFormat pixelFormat = [texture pixelFormat];
-                        int idx = attachment->GetAttach();
-                        
-                        renderPipelineStateDescriptor.colorAttachments[idx].blendingEnabled = NO;
-                        renderPipelineStateDescriptor.colorAttachments[idx].pixelFormat = pixelFormat;
-                    }
-                }
+
+            if (blendState.alphaCoverageEnable) {
+                renderPipelineStateDescriptor.alphaToCoverageEnabled = YES;
             }
             else {
-                if (blendState.blendEnable) {
-                    renderPipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
-                }
-                else {
-                    renderPipelineStateDescriptor.colorAttachments[0].blendingEnabled = NO;
-                }
-                if (blendState.alphaCoverageEnable) {
-                    renderPipelineStateDescriptor.alphaToCoverageEnabled = YES;
-                }
-                else {
-                    renderPipelineStateDescriptor.alphaToCoverageEnabled = NO;
-                }
-                
-                renderPipelineStateDescriptor.colorAttachments[0].rgbBlendOperation = blendState.rgbBlendOp;
-                renderPipelineStateDescriptor.colorAttachments[0].alphaBlendOperation = blendState.alphaBlendOp;
-
-                renderPipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = blendState.sourceColorFactor;
-                renderPipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = blendState.sourceAlphaFactor;
-                renderPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = blendState.destColorFactor;
-                renderPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = blendState.destAlphaFactor;
-                
-//                if (gpus.mtlMultisampleColorTexture != nil) {
-//                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat =
-//                        gpus.mtlMultisampleColorTexture.pixelFormat;
-//                }
-//                else if (gpus.mtlColorTexture != nil) {
-//                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat =
-//                        gpus.mtlColorTexture.pixelFormat;
-//                }
-//                else {
-                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = outputPixelFormat;
-//                }
-                
-//                if (gpus.mtlDepthTexture != nil) {
-//                    renderPipelineStateDescriptor.depthAttachmentPixelFormat =
-//                        gpus.mtlDepthTexture.pixelFormat;
-//                }
-//                else {
-                    renderPipelineStateDescriptor.depthAttachmentPixelFormat = outputDepthFormat;
-//                    renderPipelineStateDescriptor.stencilAttachmentPixelFormat = outputDepthFormat;
-//                }
+                renderPipelineStateDescriptor.alphaToCoverageEnabled = NO;
             }
+
+            if (blendState.alphaToOneEnable) {
+                renderPipelineStateDescriptor.alphaToOneEnabled = YES;
+            } else {
+                renderPipelineStateDescriptor.alphaToOneEnabled = NO;
+            }
+
+            for (int i = 0; i < METAL_MAX_COLOR_ATTACHMENTS; i++) {
+                if (!wq->currentRenderPassDescriptor.colorAttachments[i].texture) {
+                    break;
+                }
+                
+                if (blendState.blendEnable) {
+                    renderPipelineStateDescriptor.colorAttachments[i].blendingEnabled = YES;
+                }
+                else {
+                    renderPipelineStateDescriptor.colorAttachments[i].blendingEnabled = NO;
+                }
+
+                renderPipelineStateDescriptor.colorAttachments[i].writeMask = blendState.writeMask;
+                renderPipelineStateDescriptor.colorAttachments[i].rgbBlendOperation = blendState.rgbBlendOp;
+                renderPipelineStateDescriptor.colorAttachments[i].alphaBlendOperation = blendState.alphaBlendOp;
+
+                renderPipelineStateDescriptor.colorAttachments[i].sourceRGBBlendFactor = blendState.sourceColorFactor;
+                renderPipelineStateDescriptor.colorAttachments[i].sourceAlphaBlendFactor = blendState.sourceAlphaFactor;
+                renderPipelineStateDescriptor.colorAttachments[i].destinationRGBBlendFactor = blendState.destColorFactor;
+                renderPipelineStateDescriptor.colorAttachments[i].destinationAlphaBlendFactor = blendState.destAlphaFactor;
+                
+                renderPipelineStateDescriptor.colorAttachments[i].pixelFormat = outputPixelFormat;
+            }
+            
+            renderPipelineStateDescriptor.depthAttachmentPixelFormat = outputDepthFormat;
         }
 
         NSError *error = NULL;
@@ -1176,7 +1134,7 @@ void MtlfMetalContext::SetDepthStencilState()
     MetalWorkQueue *wq = threadState.currentWorkQueue;
     
     if (wq->currentEncoderType != MTLENCODERTYPE_RENDER || !wq->encoderInUse || !wq->currentRenderEncoder) {
-        TF_FATAL_CODING_ERROR("Not valid to call SetPipelineState() without an active render encoder");
+        TF_FATAL_CODING_ERROR("Not valid to call SetRenderPipelineState() without an active render encoder");
     }
     
     size_t hashVal = 0;
@@ -1742,9 +1700,14 @@ void MtlfMetalContext::SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPa
         ReleaseEncoder(true);
     }
     
+    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_DRAW_TARGET;
     wq->currentRenderPassDescriptor = renderPassDescriptor;
 }
 
+void MtlfMetalContext::DirtyDrawTargets()
+{
+    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_DRAW_TARGET;
+}
 
 void MtlfMetalContext::ReleaseEncoder(bool endEncoding, MetalWorkQueueType workQueueType)
 {
@@ -1830,7 +1793,16 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
                 TF_FATAL_CODING_ERROR("Can ony pass null renderPassDescriptor if the render encoder is currently active");
             }
             wq->currentRenderEncoder = [wq->commandBuffer renderCommandEncoderWithDescriptor: wq->currentRenderPassDescriptor];
-            //_PatchRenderPassDescriptor();
+            double w = 0.0;
+            double h = 0.0;
+            if (wq->currentRenderPassDescriptor.colorAttachments[0].texture) {
+                w = wq->currentRenderPassDescriptor.colorAttachments[0].texture.width;
+                h = wq->currentRenderPassDescriptor.colorAttachments[0].texture.height;
+            } else if (wq->currentRenderPassDescriptor.depthAttachment) {
+                w = wq->currentRenderPassDescriptor.depthAttachment.texture.width;
+                h = wq->currentRenderPassDescriptor.depthAttachment.texture.height;
+            }
+            [wq->currentRenderEncoder setViewport:(MTLViewport){0, h, w, -h, 0.0, 1.0}];
 
             // Since the encoder is new we'll need to emit all the state again
             threadState.dirtyRenderState = 0xffffffff;

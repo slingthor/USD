@@ -51,26 +51,6 @@ UsdImaging_GetUdimTiles(
     int tileLimit,
     SdfLayerHandle const& layerHandle = SdfLayerHandle());
 
-USDIMAGING_API
-bool
-UsdImaging_UdimTilesExist(
-    std::string const& basePath,
-    int tileLimit,
-    SdfLayerHandle const& layerHandle = SdfLayerHandle());
-
-USDIMAGING_API
-HdTextureResource::ID
-UsdImaging_GetTextureResourceID(UsdPrim const& usdPrim,
-                                  SdfPath const& usdPath,
-                                  UsdTimeCode time,
-                                  size_t salt);
-
-USDIMAGING_API
-HdTextureResourceSharedPtr
-UsdImaging_GetTextureResource(UsdPrim const& usdPrim,
-                                SdfPath const& usdPath,
-                                UsdTimeCode time);
-
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // PXR_USD_IMAGING_USD_IMAGING_TEXTURE_UTILS_H

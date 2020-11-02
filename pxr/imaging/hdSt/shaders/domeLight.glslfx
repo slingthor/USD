@@ -50,11 +50,6 @@
 -- glsl DomeLight.Common
 
 #if defined(ARCH_GFX_METAL)
-struct Uniforms {
-    float roughness;
-    int level;
-    int rowOffset;
-};
 
 class ProgramScope {
 public:
@@ -184,28 +179,19 @@ vec3 ComputeIrradiance(vec3 inPos)
 
 };
 
-constexpr sampler inTexelSampler(address::repeat,
-                                  filter::linear,
-                              mip_filter::linear);
-
 kernel void computeEntryPoint(
     texture2d<float,access::sample> inTexture[[texture(0)]],
     texture2d<float,access::write> outTexture[[texture(1)]],
-    device Uniforms const *uniforms[[buffer(0)]],
+    sampler inSampler[[sampler(0)]],
+    sampler outSampler[[sampler(1)]],
     uint2 gl_GlobalInvocationID[[thread_position_in_grid]])
 {
-    gl_GlobalInvocationID.y += uniforms->rowOffset;
-    if (gl_GlobalInvocationID.x >= outTexture.get_width() || 
-        gl_GlobalInvocationID.y >= outTexture.get_height()) {
-        return;
-    }
-
     ivec2 outCoords = ivec2(gl_GlobalInvocationID.xy);
 
     ProgramScope scope;
     scope.inTexture = inTexture;
     scope._outDims = imageSize(outTexture);
-    scope.inSampler = inTexelSampler;
+    scope.inSampler = inSampler;
     vec2 texCoords = scope.GetTexCoords(outCoords);
     vec3 pos3D = scope.GetWorldPos(texCoords);
     vec4 outColor = vec4(scope.ComputeIrradiance(pos3D), 1.0);
@@ -232,7 +218,13 @@ void main(void)
 
 #if !defined(ARCH_GFX_METAL)
 layout(local_size_x = 32, local_size_y = 32) in;
-uniform float roughness;
+layout(std140, binding=0) uniform Uniform {
+   float roughness;
+};
+#else
+struct Uniforms {
+   float roughness;
+};
 #endif
 
 // Normal Distribution function
@@ -284,28 +276,20 @@ vec3 PrefilterEnvMap(vec3 R, float roughness)
 
 };
 
-constexpr sampler inTexelSampler(address::repeat,
-                                  filter::linear,
-                              mip_filter::linear);
-
 kernel void computeEntryPoint(
     texture2d<float,access::sample> inTexture[[texture(0)]],
     texture2d<float,access::write> outTexture[[texture(1)]],
-    device Uniforms const *uniforms[[buffer(0)]],
+    sampler inSampler[[sampler(0)]],
+    sampler outSampler[[sampler(1)]],
+    device ProgramScope::Uniforms const *uniforms[[buffer(0)]],
     uint2 gl_GlobalInvocationID[[thread_position_in_grid]])
 {
-    gl_GlobalInvocationID.y += uniforms->rowOffset;
-    if (gl_GlobalInvocationID.x >= outTexture.get_width() || 
-        gl_GlobalInvocationID.y >= outTexture.get_height()) {
-        return;
-    }
-
     ivec2 outCoords = ivec2(gl_GlobalInvocationID.xy);
 
     ProgramScope scope;
     scope.inTexture = inTexture;
     scope._outDims = imageSize(outTexture);
-    scope.inSampler = inTexelSampler;
+    scope.inSampler = inSampler;
     vec2 texCoords = scope.GetTexCoords(outCoords);
     vec3 pos3D = scope.GetWorldPos(texCoords);
     vec3 R = normalize(pos3D);
@@ -324,7 +308,7 @@ void main(void)
     vec2 texCoords = GetTexCoords(outCoords);
     vec3 pos3D = GetWorldPos(texCoords);
     vec3 R = normalize(pos3D);
-    vec4 outColor = vec4(PrefilterEnvMap(R, roughness), 1.0);
+    vec4 outColor = vec4(PrefilterEnvMap(R, uniforms->roughness), 1.0);
 
     imageStore(outTexture, outCoords, outColor);
 }
@@ -336,7 +320,6 @@ void main(void)
 
 #if !defined(ARCH_GFX_METAL)
 layout(local_size_x = 32, local_size_y = 32) in;
-uniform int sampleLevel = 0;
 #endif
 
 float Geometry_SchlicksmithGGX(float dotNL, float dotNV, float roughness)
@@ -382,36 +365,23 @@ vec2 ComputeBRDF(float NoV, float roughness)
 
 };
 
-constexpr sampler inTexelSampler(address::clamp_to_edge,
-                                  filter::linear,
-                              mip_filter::linear);
-
 kernel void computeEntryPoint(
     texture2d<float,access::sample> inTexture[[texture(0)]],
     texture2d<float,access::write> outTexture[[texture(1)]],
-    device Uniforms const *uniforms[[buffer(0)]],
+    sampler inSampler[[sampler(0)]],
+    sampler outSampler[[sampler(1)]],
     uint2 gl_GlobalInvocationID[[thread_position_in_grid]])
 {
-    gl_GlobalInvocationID.y += uniforms->rowOffset;
-    if (gl_GlobalInvocationID.x >= outTexture.get_width() || 
-        gl_GlobalInvocationID.y >= outTexture.get_height()) {
-        return;
-    }
-
     ivec2 outCoords = ivec2(gl_GlobalInvocationID.xy);
 
     ProgramScope scope;
     scope.inTexture = inTexture;
     scope._outDims = imageSize(outTexture);
-    scope.inSampler = inTexelSampler;
+    scope.inSampler = inSampler;
     vec2 texCoords = scope.GetTexCoords(outCoords);
     // texCoords.x represents N dot E and texCoords.y represents roughness
     vec4 outColor = vec4(scope.ComputeBRDF(texCoords.x, texCoords.y), 0.0, 1.0);
-#if defined(ARCH_OS_IOS)
-    outTexture.write(outColor, ushort2(outCoords.x, outCoords.y), ushort(uniforms->level));
-#else
-    outTexture.write(outColor, ushort2(outCoords.x, outCoords.y), 0);
-#endif
+    outTexture.write(outColor, ushort2(outCoords.x, outCoords.y));
 }
 
 #else

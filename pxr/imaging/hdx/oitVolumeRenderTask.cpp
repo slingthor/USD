@@ -48,7 +48,7 @@ HdxOitVolumeRenderTask::HdxOitVolumeRenderTask(
                 HdSceneDelegate* delegate, SdfPath const& id)
     : HdxRenderTask(delegate, id)
     , _oitVolumeRenderPassShader(
-        std::make_shared<HdStRenderPassShader>(
+        HdStResourceFactory::GetInstance()->NewRenderPassShader(
             HdxPackageRenderPassOitVolumeShader()))
     , _isOitEnabled(HdxOitBufferAccessor::IsOitEnabled())
 {
@@ -174,6 +174,7 @@ HdxOitVolumeRenderTask::Execute(HdTaskContext* ctx)
     //
     extendedState->SetRenderPassShader(_oitVolumeRenderPassShader);
     renderPassState->SetEnableDepthMask(false);
+    renderPassState->SetColorMaskUseDefault(false);
     renderPassState->SetColorMask(HdRenderPassState::ColorMaskNone);
     HdxRenderTask::Execute(ctx);
 

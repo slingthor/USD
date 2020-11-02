@@ -21,10 +21,9 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
-
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hd/perfLog.h"
 
 #include "pxr/imaging/hf/perfLog.h"
@@ -36,12 +35,13 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
 class Hd_DispatchBufferArrayRange : public HdStBufferArrayRange {
 public:
     /// Constructor.
-    Hd_DispatchBufferArrayRange(HdStDispatchBuffer *buffer) :
-        _buffer(buffer) {
+    Hd_DispatchBufferArrayRange(
+        HdStResourceRegistry* resourceRegistry, HdStDispatchBuffer *buffer)
+        : HdStBufferArrayRange(resourceRegistry)
+        , _buffer(buffer) {
     }
 
     /// Returns true if this range is valid
@@ -179,7 +179,7 @@ HdStDispatchBuffer::HdStDispatchBuffer(
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    size_t stride = commandNumUints * sizeof(GLuint);
+    size_t stride = commandNumUints * sizeof(uint32_t);
     size_t dataSize = count * stride;
     
     // just allocate uninitialized
@@ -197,7 +197,8 @@ HdStDispatchBuffer::HdStDispatchBuffer(
 
     // create a buffer array range, which aggregates all views
     // (will be added by AddBufferResourceView)
-    _bar = HdStBufferArrayRangeSharedPtr(new Hd_DispatchBufferArrayRange(this));
+    _bar = HdStBufferArrayRangeSharedPtr(
+        new Hd_DispatchBufferArrayRange(resourceRegistry, this));
 }
 
 HdStDispatchBuffer::~HdStDispatchBuffer()
@@ -208,13 +209,16 @@ HdStDispatchBuffer::~HdStDispatchBuffer()
 }
 
 void
-HdStDispatchBuffer::CopyData(std::vector<GLuint> const &data)
+HdStDispatchBuffer::CopyData(std::vector<uint32_t> const &data)
 {
-    if (!TF_VERIFY(data.size()*sizeof(GLuint) == static_cast<size_t>(_entireResource->GetSize())))
+    if (!TF_VERIFY(data.size()*sizeof(uint32_t) == static_cast<size_t>(_entireResource->GetSize())))
         return;
 
+    HD_PERF_COUNTER_INCR(HdStPerfTokens->copyBufferCpuToGpu);
+
     // Use blit op to copy over the data.
-    HgiBlitCmds* blitCmds = _resourceRegistry->GetBlitCmds();
+    Hgi* hgi = _resourceRegistry->GetHgi();
+    HgiBlitCmdsUniquePtr blitCmds = hgi->CreateBlitCmds();
     HgiBufferCpuToGpuOp blitOp;
     blitOp.byteSize = _entireResource->GetSize();
     blitOp.cpuSourceBuffer = data.data();
@@ -222,13 +226,14 @@ HdStDispatchBuffer::CopyData(std::vector<GLuint> const &data)
     blitOp.gpuDestinationBuffer = _entireResource->GetId();
     blitOp.destinationByteOffset = 0;
     blitCmds->CopyBufferCpuToGpu(blitOp);
+    hgi->SubmitCmds(blitCmds.get());
 }
 
 void
 HdStDispatchBuffer::AddBufferResourceView(
     TfToken const &name, HdTupleType tupleType, int offset)
 {
-    size_t stride = _commandNumUints * sizeof(GLuint);
+    size_t stride = _commandNumUints * sizeof(uint32_t);
 
     // add a binding view (resource binder iterates and automatically binds)
     HdStBufferResourceSharedPtr view =
@@ -273,7 +278,7 @@ HdStDispatchBuffer::GetResource() const
         TF_FOR_ALL (it, _resourceList) {
             if (it->second->GetId() != id) {
                 TF_CODING_ERROR("GetResource(void) called on"
-                                "HdBufferArray having multiple GL resources");
+                                "HdBufferArray having multiple GPU resources");
             }
         }
     }

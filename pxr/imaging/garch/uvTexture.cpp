@@ -25,7 +25,7 @@
 // 
 
 #include "pxr/imaging/garch/arrayTexture.h"
-#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/uvTexture.h"
 #include "pxr/imaging/garch/uvTextureData.h"
@@ -41,8 +41,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 class Garch_UVTextureFactory : public GarchTextureFactoryBase {
 public:
     virtual GarchTextureRefPtr New(const TfToken& texturePath,
-                                   GarchImage::ImageOriginLocation originLocation =
-                                                GarchImage::OriginUpperLeft) const
+                                   HioImage::ImageOriginLocation originLocation =
+                                                HioImage::OriginUpperLeft) const
     {
         
         return GarchUVTexture::New(texturePath,
@@ -54,8 +54,8 @@ public:
     }
 
     virtual GarchTextureRefPtr New(const TfTokenVector& texturePaths,
-                                   GarchImage::ImageOriginLocation originLocation =
-                                                GarchImage::OriginUpperLeft) const
+                                   HioImage::ImageOriginLocation originLocation =
+                                                HioImage::OriginUpperLeft) const
     {
         return GarchArrayTexture::New(texturePaths,
                                       texturePaths.size(),
@@ -81,7 +81,7 @@ GarchUVTexture::New(
     unsigned int cropBottom,
     unsigned int cropLeft,
     unsigned int cropRight,
-    GarchImage::ImageOriginLocation originLocation)
+    HioImage::ImageOriginLocation originLocation)
 {
     return TfCreateRefPtr(new GarchUVTexture(
             GarchResourceFactory::GetInstance()->NewBaseTexture(),
@@ -97,7 +97,7 @@ GarchUVTexture::New(
     unsigned int cropBottom,
     unsigned int cropLeft,
     unsigned int cropRight,
-    GarchImage::ImageOriginLocation originLocation)
+    HioImage::ImageOriginLocation originLocation)
 {
     return TfCreateRefPtr(new GarchUVTexture(
             GarchResourceFactory::GetInstance()->NewBaseTexture(),
@@ -121,7 +121,7 @@ GarchUVTexture::IsSupportedImageFile(TfToken const &imageFilePath)
 bool 
 GarchUVTexture::IsSupportedImageFile(std::string const &imageFilePath)
 {
-    return GarchImage::IsSupportedImageFile(imageFilePath);
+    return HioImage::IsSupportedImageFile(imageFilePath);
 }
 
 GarchUVTexture::GarchUVTexture(
@@ -131,7 +131,7 @@ GarchUVTexture::GarchUVTexture(
     unsigned int cropBottom,
     unsigned int cropLeft,
     unsigned int cropRight,
-    GarchImage::ImageOriginLocation originLocation)
+    HioImage::ImageOriginLocation originLocation)
     : GarchBaseTexture(originLocation)
     , _baseTexture(baseTexture)
     , _imageFilePath(imageFilePath)

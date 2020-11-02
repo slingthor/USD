@@ -45,23 +45,15 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class Hd_VertexAdjacency;
 
-class HdStBufferRelocator;
 class HdSt_CodeGen;
 class HdStDrawItemInstance;
-class HdSt_FlatNormalsComputationGPU;
 class HdSt_MeshTopology;
 class HdStGLSLProgram;
 class HdStRenderPassState;
 class HdSt_ResourceBinder;
-class HdSt_QuadrangulateComputationGPU;
-class HdSt_SmoothNormalsComputationGPU;
 class HdStSimpleTextureResource;
-class HdStExtCompGpuComputation;
-class HdSt_DomeLightComputation;
 class HdStResourceRegistry;
 
-using HdStBufferArrayRangeSharedPtr = std::shared_ptr<class HdStBufferArrayRange>;
-using HdBufferArraySharedPtr = std::shared_ptr<class HdBufferArray>;
 using HdStTextureResourceSharedPtr = std::shared_ptr<class HdStTextureResource>;
 
 using HdSt_DrawBatchSharedPtr = std::shared_ptr<class HdSt_DrawBatch>;
@@ -69,20 +61,9 @@ using HdSt_GeometricShaderPtr = std::shared_ptr<class HdSt_GeometricShader>;
 using HdStRenderPassShaderSharedPtr =
     std::shared_ptr<class HdStRenderPassShader>;
 using HdStShaderCodeSharedPtr = std::shared_ptr<class HdStShaderCode>;
-using HdSt_DomeLightComputationGPUSharedPtr =
-    std::shared_ptr<class HdSt_DomeLightComputationGPU>;
 using HdStShaderCodeSharedPtrVector = std::vector<HdStShaderCodeSharedPtr>;
 using HdStSimpleLightingShaderPtr =
     std::weak_ptr<class HdStSimpleLightingShader>;
-
-using HdStExtCompGpuComputationResourceSharedPtr =
-    std::shared_ptr<class HdStExtCompGpuComputationResource>;
-using HdExtComputationPrimvarDescriptorVector =
-    std::vector<HdExtComputationPrimvarDescriptor>;
-using HdStDispatchBufferSharedPtr =
-    std::shared_ptr<class HdStDispatchBuffer>;
-using HdStPersistentBufferSharedPtr =
-    std::shared_ptr<class HdStPersistentBuffer>;
 
 class HdStResourceFactoryInterface {
 public:
@@ -103,28 +84,10 @@ public:
     virtual HdSt_CodeGen *NewCodeGen(
         HdStShaderCodeSharedPtrVector const &shaders) const = 0;
     
-    /// Creates a new draw target texture resource
-    HDST_API
-    virtual HdStTextureResourceSharedPtr NewDrawTargetTextureResource() const = 0;
-    
     /// Creates an indirect draw batch
     HDST_API
     virtual HdSt_DrawBatchSharedPtr NewIndirectDrawBatch(
         HdStDrawItemInstance * drawItemInstance) const = 0;
-
-    /// Creates a new HdSt_DomeLightComputationGPU computation
-    HDST_API
-    virtual HdSt_DomeLightComputationGPU *NewDomeLightComputationGPU(
-        // Name of computation shader to use, also used as
-        // key when setting the GL name on the lighting shader
-        const TfToken & shaderToken,
-        // Lighting shader that remembers the GL texture names
-        HdStSimpleLightingShaderPtr const &lightingShader,
-        // Number of mip levels.
-        unsigned int numLevels = 1,
-        // Level to be filled (0 means also to allocate texture)
-        unsigned int level = 0,
-        float roughness = -1.0) const = 0;
 
     /// Creates a new render pass state
     HDST_API
@@ -163,9 +126,6 @@ public:
     HDST_API
     virtual char const *const GetComputeShaderFilename() const = 0;
     
-    HDST_API
-    virtual char const *const GetPtexTextureShaderFilename() const = 0;
-
     /// Creates a graphics API specific program
     HDST_API
     virtual HdStGLSLProgram *NewProgram(

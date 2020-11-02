@@ -60,7 +60,7 @@ UsdImagingLightAdapter::TrackVariability(UsdPrim const& prim,
                                         SdfPath const& cachePath,
                                         HdDirtyBits* timeVaryingBits,
                                         UsdImagingInstancerContext const* 
-                                            instancerContext) const
+                                        instancerContext) const
 {
     // Discover time-varying transforms.
     _IsTransformVarying(prim,
@@ -68,6 +68,14 @@ UsdImagingLightAdapter::TrackVariability(UsdPrim const& prim,
         UsdImagingTokens->usdVaryingXform,
         timeVaryingBits);
 
+    // Discover time-varying visibility.
+    _IsVarying(prim,
+        UsdGeomTokens->visibility,
+        HdLight::DirtyBits::DirtyParams,
+        UsdImagingTokens->usdVaryingVisibility,
+        timeVaryingBits,
+        true);
+    
     // If any of the light attributes is time varying 
     // we will assume all light params are time-varying.
     const std::vector<UsdAttribute> &attrs = prim.GetAttributes();
@@ -85,13 +93,6 @@ UsdImagingLightAdapter::TrackVariability(UsdPrim const& prim,
 
     UsdImagingValueCache* valueCache = _GetValueCache();
 
-    // XXX: The usage of _GetTimeWithOffset here is super-sketch, but avoids
-    // blowing up the inherited visibility cache. This belongs in
-    // UpdateForTime, except that we don't currently call UpdateForTime on
-    // lights...
-    valueCache->GetVisible(cachePath) = GetVisible(prim,
-        _GetTimeWithOffset(0.0));
-
     UsdLuxLight light(prim);
     if (TF_VERIFY(light)) {
         UsdImaging_CollectionCache &collectionCache = _GetCollectionCache();
@@ -101,11 +102,12 @@ UsdImagingLightAdapter::TrackVariability(UsdPrim const& prim,
         // prims with the DirtyCollections flag.
     }
 
-    // XXX Cache primvars for lights.  Note that this does not yet support
-    // animated lights, since we do not call UpdateForTime() for sprims.
+    // XXX Cache primvars for lights.
     {
         // Establish a valueCache entry.
-        valueCache->GetPrimvars(cachePath);
+        HdPrimvarDescriptorVector& vPrimvars = 
+            valueCache->GetPrimvars(cachePath);
+
         // Compile a list of primvars to check.
         std::vector<UsdGeomPrimvar> primvars;
         UsdImaging_InheritedPrimvarStrategy::value_type inheritedPrimvarRecord =
@@ -113,12 +115,12 @@ UsdImagingLightAdapter::TrackVariability(UsdPrim const& prim,
         if (inheritedPrimvarRecord) {
             primvars = inheritedPrimvarRecord->primvars;
         }
+
         UsdGeomPrimvarsAPI primvarsAPI(prim);
         std::vector<UsdGeomPrimvar> local = primvarsAPI.GetPrimvarsWithValues();
         primvars.insert(primvars.end(), local.begin(), local.end());
         for (auto const &pv : primvars) {
-            _ComputeAndMergePrimvar(prim, cachePath, pv, UsdTimeCode(),
-                                    valueCache);
+            _ComputeAndMergePrimvar(prim, pv, UsdTimeCode(), &vPrimvars);
         }
     }
 }
@@ -170,7 +172,17 @@ UsdImagingLightAdapter::MarkVisibilityDirty(UsdPrim const& prim,
                                             SdfPath const& cachePath,
                                             UsdImagingIndexProxy* index)
 {
-    // TBD
+    static const HdDirtyBits paramsDirty = HdLight::DirtyParams;
+    index->MarkSprimDirty(cachePath, paramsDirty);
+}
+
+void
+UsdImagingLightAdapter::MarkLightParamsDirty(UsdPrim const& prim,
+                                             SdfPath const& cachePath,
+                                             UsdImagingIndexProxy* index)
+{
+    static const HdDirtyBits paramsDirty = HdLight::DirtyParams;
+    index->MarkSprimDirty(cachePath, paramsDirty);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
