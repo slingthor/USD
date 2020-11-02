@@ -1496,6 +1496,41 @@ def InstallPNG(context, force, buildArgs):
 PNG = Dependency("PNG", InstallPNG, "include/png.h")
 
 ############################################################
+# BASISU
+BASISU_URL = "https://github.com/BinomialLLC/basis_universal/archive/master.zip"
+
+def DownloadBasisUniversalTexture(context, force, buildArgs):
+    with CurrentWorkingDirectory(DownloadURL(BASISU_URL, context, force)):
+        PatchFile("CmakeLists.txt",
+                [("basisu_tool.cpp", "#basisu_tool.cpp"),
+                 ("add_executable", "add_library"),
+                 ("add_custom_command", "#add_custom_command"),
+                 ("install(TARGETS basisu DESTINATION bin)",
+                  "install(TARGETS basisu DESTINATION lib)")],
+                multiLineMatches=True)
+        RunCMake(context, force, buildArgs)
+
+
+        basisuIncDir = os.path.join("include", "basisu")
+        basisuTranscoderIncDir = os.path.join(basisuIncDir, "transcoder")
+        with CurrentWorkingDirectory(context.instDir):
+            if not os.path.isdir(basisuIncDir):
+                os.makedirs(basisuIncDir)
+                os.makedirs(basisuTranscoderIncDir)
+
+        CopyFiles(context, "*.h", basisuIncDir)
+        CopyFiles(context, 
+            os.path.join("transcoder", "*.inc"), 
+            basisuTranscoderIncDir)
+        CopyFiles(context, 
+            os.path.join("transcoder", "*.h"),
+            basisuTranscoderIncDir)
+    return os.getcwd()
+
+BASISU = Dependency("BASISU", DownloadBasisUniversalTexture, 
+                    "include/basisu/transcoder/basisu.h")
+
+############################################################
 # IlmBase/OpenEXR
 
 # Security vulnerability in future versions:
@@ -2387,6 +2422,11 @@ def InstallUSD(context, force, buildArgs):
             else:
                 extraArgs.append('-DPXR_BUILD_PRMAN_PLUGIN=OFF')                
             
+            if context.buildBasisu:
+                extraArgs.append('-DPXR_BUILD_BASISU_PLUGIN=ON')
+            else:
+                extraArgs.append('-DPXR_BUILD_BASISU_PLUGIN=OFF')
+
             if context.buildOIIO:
                 extraArgs.append('-DPXR_BUILD_OPENIMAGEIO_PLUGIN=ON')
             else:
@@ -2742,6 +2782,12 @@ subgroup.add_argument("--opencoloriocached", dest="build_ocio_cached", action="s
                       help="Build OpenColorIO plugin for USD from cache")
 subgroup.add_argument("--no-opencolorio", dest="build_ocio", action="store_false",
                       help="Do not build OpenColorIO plugin for USD (default)")
+subgroup = group.add_mutually_exclusive_group()
+subgroup.add_argument("--basisu", dest="build_basisu", action="store_true", 
+                      default=False,
+                      help="Build Basis Universal Texture plugin for USD")
+subgroup.add_argument("--no-basisu", dest="build_basisu", action="store_false",
+                      help="Do not build Basis Universal Texture plugin for USD (default)")
 
 group = parser.add_argument_group(title="Alembic Plugin Options")
 subgroup = group.add_mutually_exclusive_group()
@@ -2895,6 +2941,8 @@ class InstallContext:
         self.buildOCIO = args.build_ocio or args.build_ocio_cached
         self.buildOCIOCached = args.build_ocio_cached
 
+        # - Basisu Plugin
+        self.buildBasisu = args.build_basisu
 
         # - Alembic Plugin
         self.buildAlembic = args.build_alembic
@@ -2962,6 +3010,9 @@ if context.buildDraco:
 
 if context.buildMaterialX:
     requiredDependencies += [MATERIALX]
+
+if context.buildBasisu:
+    requiredDependencies += [BASISU]
 
 if context.buildImaging:
     if context.enablePtex:
@@ -3153,6 +3204,7 @@ Building with settings:
       PRMan support:            {buildPrman}
       OpenGL:                   {enableOpenGL}
       Metal:                    {enableMetal}
+      BasisUniversal support:   {buildBasisu}
     UsdImaging                  {buildUsdImaging}
       usdview:                  {buildUsdview}
     Python support              {buildPython}
@@ -3226,7 +3278,8 @@ summaryMsg = summaryMsg.format(
     buildMaterialX=("On" if context.buildMaterialX else "Off"),
     enableHDF5=("On" if context.enableHDF5 else "Off"),
     enableOpenGL=("On" if context.enableOpenGL else "Off"),
-    enableMetal=("On" if iOS() or MacOS() else "Off"))
+    enableMetal=("On" if iOS() or MacOS() else "Off"),
+    buildBasisu=("On" if context.buildBasisu else "Off"))
 
 Print(summaryMsg)
 

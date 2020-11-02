@@ -33,16 +33,16 @@ PXR_NAMESPACE_OPEN_SCOPE
 // A few random format validations to make sure the HioFormat switch stays
 // aligned with the HioFormat table.
 constexpr bool _CompileTimeValidateHioFormatSwitch() {
-    return (HioFormatCount == 44 &&
+    return (HioFormatCount == 46 &&
             HioFormatUNorm8 == 0 &&
             HioFormatFloat32 == 12 &&
             HioFormatUInt32 == 28 &&
-            HioFormatBC6FloatVec3 == 40) ? true : false;
+            HioFormatBC6FloatVec3 == 40 &&
+            HioFormatBC1UNorm8Vec4 == 44) ? true : false;
 }
 
 static_assert(_CompileTimeValidateHioFormatSwitch(),
-              "HioGetNumChannelsFromFormat() and HioGetChannelTypeFromFormat() "
-              "switch in HioTypes out of sync with HioFormat enum");
+              "switchs in HioTypes out of sync with HioFormat enum");
 
 static HioFormat _hioFormats[][4] = {
     { HioFormatUNorm8, HioFormatUNorm8Vec2,
@@ -110,6 +110,8 @@ HioGetHioType(HioFormat format)
         
         case HioFormatBC7UNorm8Vec4:
         case HioFormatBC7UNorm8Vec4srgb:
+        case HioFormatBC1UNorm8Vec4:
+        case HioFormatBC3UNorm8Vec4:
             return HioTypeUnsignedByte;
 
         case HioFormatSNorm8:
@@ -223,6 +225,8 @@ HioGetComponentCount(HioFormat format)
         case HioFormatUNorm8Vec4srgb:
         case HioFormatBC7UNorm8Vec4:
         case HioFormatBC7UNorm8Vec4srgb:
+        case HioFormatBC1UNorm8Vec4:
+        case HioFormatBC3UNorm8Vec4:
             return 4;
         case HioFormatInvalid:
         case HioFormatCount:
@@ -249,6 +253,8 @@ HioGetDataSizeOfType(HioFormat format)
 
         case HioFormatBC7UNorm8Vec4:
         case HioFormatBC7UNorm8Vec4srgb:
+        case HioFormatBC1UNorm8Vec4:
+        case HioFormatBC3UNorm8Vec4:
             return sizeof(unsigned char);
 
         case HioFormatSNorm8:
@@ -410,6 +416,8 @@ HioGetDataSizeOfFormat(HioFormat format,
         case HioFormatBC6UFloatVec3:
         case HioFormatBC7UNorm8Vec4:
         case HioFormatBC7UNorm8Vec4srgb:
+        case HioFormatBC1UNorm8Vec4:
+        case HioFormatBC3UNorm8Vec4:
             if (blockWidth) {
                 *blockWidth = 4;
             }
@@ -434,6 +442,8 @@ HioIsCompressed(HioFormat format)
         case HioFormatBC6UFloatVec3:
         case HioFormatBC7UNorm8Vec4:
         case HioFormatBC7UNorm8Vec4srgb:
+        case HioFormatBC1UNorm8Vec4:
+        case HioFormatBC3UNorm8Vec4:
             return true;
         default:
             return false;

@@ -148,6 +148,7 @@ Hio_StbImage::_GetInfoFromStorageSpec(HioImage::StorageSpec const & storage)
     _height = storage.height;
     _format = storage.format;
     _outputType = HioGetHioType(storage.format);
+    _nchannels = HioGetComponentCount(storage.format);
 }
 
 Hio_StbImage::Hio_StbImage()

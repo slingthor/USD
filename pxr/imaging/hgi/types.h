@@ -105,6 +105,14 @@ enum HgiFormat : int
     // BPTC compressed. 4-component, 4x4 blocks, unsigned byte, sRGB.
     // Representing a float between 0 and 1.
     HgiFormatBC7UNorm8Vec4srgb,
+        
+    // S3TC/DXT compressed. 4-component, 4x4 blocks, unsigned byte
+    // Representing a float between 0 and 1.
+    HgiFormatBC1UNorm8Vec4,
+
+    // S3TC/DXT compressed. 4-component, 4x4 blocks, unsigned byte
+    // Representing a float between 0 and 1.
+    HgiFormatBC3UNorm8Vec4,
 
     // Depth stencil format (Float32 can be used for just depth)
     HgiFormatFloat32UInt8,
