@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>FIXTURES_REQUIRED &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>FIXTURES_REQUIRED &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-properties.7.html" accesskey="U">cmake-properties(7)</a> &#187;</li> 
@@ -57,6 +58,9 @@
             
   <div class="section" id="fixtures-required">
 <span id="prop_test:FIXTURES_REQUIRED"></span><h1>FIXTURES_REQUIRED<a class="headerlink" href="#fixtures-required" title="Permalink to this headline">¶</a></h1>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 3.7.</span></p>
+</div>
 <p>Specifies a list of fixtures the test requires. Fixture names are case
 sensitive and they are not required to have any similarity to test names.</p>
 <p>Fixtures are a way to attach setup and cleanup tasks to a set of tests. If a
@@ -119,25 +123,25 @@ similar to that mentioned above:</p>
 </div>
 <p>Key points from this example:</p>
 <ul class="simple">
-<li>Two fixtures are defined: <code class="docutils literal notranslate"><span class="pre">DB</span></code> and <code class="docutils literal notranslate"><span class="pre">Foo</span></code>. Tests can require a single
+<li><p>Two fixtures are defined: <code class="docutils literal notranslate"><span class="pre">DB</span></code> and <code class="docutils literal notranslate"><span class="pre">Foo</span></code>. Tests can require a single
 fixture as <code class="docutils literal notranslate"><span class="pre">fooOnly</span></code> and <code class="docutils literal notranslate"><span class="pre">dbOnly</span></code> do, or they can depend on multiple
-fixtures like <code class="docutils literal notranslate"><span class="pre">dbWithFoo</span></code> does.</li>
-<li>A <code class="docutils literal notranslate"><span class="pre">DEPENDS</span></code> relationship is set up to ensure <code class="docutils literal notranslate"><span class="pre">setupUsers</span></code> happens after
+fixtures like <code class="docutils literal notranslate"><span class="pre">dbWithFoo</span></code> does.</p></li>
+<li><p>A <code class="docutils literal notranslate"><span class="pre">DEPENDS</span></code> relationship is set up to ensure <code class="docutils literal notranslate"><span class="pre">setupUsers</span></code> happens after
 <code class="docutils literal notranslate"><span class="pre">createDB</span></code>, both of which are setup tests for the <code class="docutils literal notranslate"><span class="pre">DB</span></code> fixture and will
 therefore be executed before the <code class="docutils literal notranslate"><span class="pre">dbOnly</span></code> and <code class="docutils literal notranslate"><span class="pre">dbWithFoo</span></code> tests
-automatically.</li>
-<li>No explicit <code class="docutils literal notranslate"><span class="pre">DEPENDS</span></code> relationships were needed to make the setup tests run
-before or the cleanup tests run after the regular tests.</li>
-<li>The <code class="docutils literal notranslate"><span class="pre">Foo</span></code> fixture has no setup tests defined, only a single cleanup test.</li>
-<li><code class="docutils literal notranslate"><span class="pre">testsDone</span></code> is a cleanup test for both the <code class="docutils literal notranslate"><span class="pre">DB</span></code> and <code class="docutils literal notranslate"><span class="pre">Foo</span></code> fixtures.
+automatically.</p></li>
+<li><p>No explicit <code class="docutils literal notranslate"><span class="pre">DEPENDS</span></code> relationships were needed to make the setup tests run
+before or the cleanup tests run after the regular tests.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">Foo</span></code> fixture has no setup tests defined, only a single cleanup test.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">testsDone</span></code> is a cleanup test for both the <code class="docutils literal notranslate"><span class="pre">DB</span></code> and <code class="docutils literal notranslate"><span class="pre">Foo</span></code> fixtures.
 Therefore, it will only execute once regular tests for both fixtures have
 finished (i.e. after <code class="docutils literal notranslate"><span class="pre">fooOnly</span></code>, <code class="docutils literal notranslate"><span class="pre">dbOnly</span></code> and <code class="docutils literal notranslate"><span class="pre">dbWithFoo</span></code>). No
 <code class="docutils literal notranslate"><span class="pre">DEPENDS</span></code> relationship was specified for <code class="docutils literal notranslate"><span class="pre">testsDone</span></code>, so it is free to
 run before, after or concurrently with other cleanup tests for either
-fixture.</li>
-<li>The setup and cleanup tests never list the fixtures they are for in their own
+fixture.</p></li>
+<li><p>The setup and cleanup tests never list the fixtures they are for in their own
 <code class="docutils literal notranslate"><span class="pre">FIXTURES_REQUIRED</span></code> property, as that would result in a dependency on
-themselves and be considered an error.</li>
+themselves and be considered an error.</p></li>
 </ul>
 </div>
 
@@ -161,13 +165,11 @@ themselves and be considered an error.</li>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -196,15 +198,15 @@ themselves and be considered an error.</li>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-properties.7.html" >cmake-properties(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

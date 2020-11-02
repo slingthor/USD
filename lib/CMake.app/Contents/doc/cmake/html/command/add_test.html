@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>add_test &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>add_test &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-commands.7.html" accesskey="U">cmake-commands(7)</a> &#187;</li> 
@@ -60,35 +61,42 @@
 <p>Add a test to the project to be run by <span class="target" id="index-0-manual:ctest(1)"></span><a class="reference internal" href="../manual/ctest.1.html#manual:ctest(1)" title="ctest(1)"><code class="xref cmake cmake-manual docutils literal notranslate"><span class="pre">ctest(1)</span></code></a>.</p>
 <div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nf">add_test(</span><span class="no">NAME</span><span class="w"> </span><span class="nv">&lt;name&gt;</span><span class="w"> </span><span class="no">COMMAND</span><span class="w"> </span><span class="nv">&lt;command&gt;</span><span class="w"> </span><span class="p">[</span><span class="nv">&lt;arg&gt;...</span><span class="p">]</span><span class="w"></span>
 <span class="w">         </span><span class="p">[</span><span class="no">CONFIGURATIONS</span><span class="w"> </span><span class="nv">&lt;config&gt;...</span><span class="p">]</span><span class="w"></span>
-<span class="w">         </span><span class="p">[</span><span class="no">WORKING_DIRECTORY</span><span class="w"> </span><span class="nv">&lt;dir&gt;</span><span class="p">]</span><span class="nf">)</span><span class="w"></span>
+<span class="w">         </span><span class="p">[</span><span class="no">WORKING_DIRECTORY</span><span class="w"> </span><span class="nv">&lt;dir&gt;</span><span class="p">]</span><span class="w"></span>
+<span class="w">         </span><span class="p">[</span><span class="no">COMMAND_EXPAND_LISTS</span><span class="p">]</span><span class="nf">)</span><span class="w"></span>
 </pre></div>
 </div>
-<p>Adds a test called <code class="docutils literal notranslate"><span class="pre">&lt;name&gt;</span></code>.  The test name may not contain spaces,
-quotes, or other characters special in CMake syntax.  The options are:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">COMMAND</span></code></dt>
-<dd>Specify the test command-line.  If <code class="docutils literal notranslate"><span class="pre">&lt;command&gt;</span></code> specifies an
+<p>Adds a test called <code class="docutils literal notranslate"><span class="pre">&lt;name&gt;</span></code>.  The test name may contain arbitrary
+characters, expressed as a <a class="reference internal" href="../manual/cmake-language.7.html#quoted-argument"><span class="std std-ref">Quoted Argument</span></a> or <a class="reference internal" href="../manual/cmake-language.7.html#bracket-argument"><span class="std std-ref">Bracket Argument</span></a>
+if necessary.  See policy <span class="target" id="index-0-policy:CMP0110"></span><a class="reference internal" href="../policy/CMP0110.html#policy:CMP0110" title="CMP0110"><code class="xref cmake cmake-policy docutils literal notranslate"><span class="pre">CMP0110</span></code></a>.  The options are:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">COMMAND</span></code></dt><dd><p>Specify the test command-line.  If <code class="docutils literal notranslate"><span class="pre">&lt;command&gt;</span></code> specifies an
 executable target (created by <span class="target" id="index-0-command:add_executable"></span><a class="reference internal" href="add_executable.html#command:add_executable" title="add_executable"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">add_executable()</span></code></a>) it will
 automatically be replaced by the location of the executable created
-at build time.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">CONFIGURATIONS</span></code></dt>
-<dd>Restrict execution of the test only to the named configurations.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">WORKING_DIRECTORY</span></code></dt>
-<dd>Set the <span class="target" id="index-0-prop_test:WORKING_DIRECTORY"></span><a class="reference internal" href="../prop_test/WORKING_DIRECTORY.html#prop_test:WORKING_DIRECTORY" title="WORKING_DIRECTORY"><code class="xref cmake cmake-prop_test docutils literal notranslate"><span class="pre">WORKING_DIRECTORY</span></code></a> test property to
+at build time.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">CONFIGURATIONS</span></code></dt><dd><p>Restrict execution of the test only to the named configurations.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">WORKING_DIRECTORY</span></code></dt><dd><p>Set the <span class="target" id="index-0-prop_test:WORKING_DIRECTORY"></span><a class="reference internal" href="../prop_test/WORKING_DIRECTORY.html#prop_test:WORKING_DIRECTORY" title="WORKING_DIRECTORY"><code class="xref cmake cmake-prop_test docutils literal notranslate"><span class="pre">WORKING_DIRECTORY</span></code></a> test property to
 specify the working directory in which to execute the test.
 If not specified the test will be run with the current working
 directory set to the build directory corresponding to the
-current source directory.</dd>
+current source directory.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">COMMAND_EXPAND_LISTS</span></code></dt><dd><p>Lists in <code class="docutils literal notranslate"><span class="pre">COMMAND</span></code> arguments will be expanded, including those
+created with
+<span class="target" id="index-0-manual:cmake-generator-expressions(7)"></span><a class="reference internal" href="../manual/cmake-generator-expressions.7.html#manual:cmake-generator-expressions(7)" title="cmake-generator-expressions(7)"><code class="xref cmake cmake-manual docutils literal notranslate"><span class="pre">generator</span> <span class="pre">expressions</span></code></a>.</p>
+</dd>
 </dl>
 <p>The given test command is expected to exit with code <code class="docutils literal notranslate"><span class="pre">0</span></code> to pass and
 non-zero to fail, or vice-versa if the <span class="target" id="index-0-prop_test:WILL_FAIL"></span><a class="reference internal" href="../prop_test/WILL_FAIL.html#prop_test:WILL_FAIL" title="WILL_FAIL"><code class="xref cmake cmake-prop_test docutils literal notranslate"><span class="pre">WILL_FAIL</span></code></a> test
 property is set.  Any output written to stdout or stderr will be
 captured by <span class="target" id="index-1-manual:ctest(1)"></span><a class="reference internal" href="../manual/ctest.1.html#manual:ctest(1)" title="ctest(1)"><code class="xref cmake cmake-manual docutils literal notranslate"><span class="pre">ctest(1)</span></code></a> but does not affect the pass/fail status
-unless the <span class="target" id="index-0-prop_test:PASS_REGULAR_EXPRESSION"></span><a class="reference internal" href="../prop_test/PASS_REGULAR_EXPRESSION.html#prop_test:PASS_REGULAR_EXPRESSION" title="PASS_REGULAR_EXPRESSION"><code class="xref cmake cmake-prop_test docutils literal notranslate"><span class="pre">PASS_REGULAR_EXPRESSION</span></code></a> or
-<span class="target" id="index-0-prop_test:FAIL_REGULAR_EXPRESSION"></span><a class="reference internal" href="../prop_test/FAIL_REGULAR_EXPRESSION.html#prop_test:FAIL_REGULAR_EXPRESSION" title="FAIL_REGULAR_EXPRESSION"><code class="xref cmake cmake-prop_test docutils literal notranslate"><span class="pre">FAIL_REGULAR_EXPRESSION</span></code></a> test property is used.</p>
+unless the <span class="target" id="index-0-prop_test:PASS_REGULAR_EXPRESSION"></span><a class="reference internal" href="../prop_test/PASS_REGULAR_EXPRESSION.html#prop_test:PASS_REGULAR_EXPRESSION" title="PASS_REGULAR_EXPRESSION"><code class="xref cmake cmake-prop_test docutils literal notranslate"><span class="pre">PASS_REGULAR_EXPRESSION</span></code></a>,
+<span class="target" id="index-0-prop_test:FAIL_REGULAR_EXPRESSION"></span><a class="reference internal" href="../prop_test/FAIL_REGULAR_EXPRESSION.html#prop_test:FAIL_REGULAR_EXPRESSION" title="FAIL_REGULAR_EXPRESSION"><code class="xref cmake cmake-prop_test docutils literal notranslate"><span class="pre">FAIL_REGULAR_EXPRESSION</span></code></a> or
+<span class="target" id="index-0-prop_test:SKIP_REGULAR_EXPRESSION"></span><a class="reference internal" href="../prop_test/SKIP_REGULAR_EXPRESSION.html#prop_test:SKIP_REGULAR_EXPRESSION" title="SKIP_REGULAR_EXPRESSION"><code class="xref cmake cmake-prop_test docutils literal notranslate"><span class="pre">SKIP_REGULAR_EXPRESSION</span></code></a> test property is used.</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">COMMAND</span></code> and <code class="docutils literal notranslate"><span class="pre">WORKING_DIRECTORY</span></code> options may use “generator
 expressions” with the syntax <code class="docutils literal notranslate"><span class="pre">$&lt;...&gt;</span></code>.  See the
-<span class="target" id="index-0-manual:cmake-generator-expressions(7)"></span><a class="reference internal" href="../manual/cmake-generator-expressions.7.html#manual:cmake-generator-expressions(7)" title="cmake-generator-expressions(7)"><code class="xref cmake cmake-manual docutils literal notranslate"><span class="pre">cmake-generator-expressions(7)</span></code></a> manual for available expressions.</p>
+<span class="target" id="index-1-manual:cmake-generator-expressions(7)"></span><a class="reference internal" href="../manual/cmake-generator-expressions.7.html#manual:cmake-generator-expressions(7)" title="cmake-generator-expressions(7)"><code class="xref cmake cmake-manual docutils literal notranslate"><span class="pre">cmake-generator-expressions(7)</span></code></a> manual for available expressions.</p>
 <p>Example usage:</p>
 <div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nf">add_test(</span><span class="no">NAME</span><span class="w"> </span><span class="nb">mytest</span><span class="w"></span>
 <span class="w">         </span><span class="no">COMMAND</span><span class="w"> </span><span class="nb">testDriver</span><span class="w"> </span><span class="p">--</span><span class="nb">config</span><span class="w"> </span><span class="o">$&lt;</span><span class="no">CONFIGURATION</span><span class="o">&gt;</span><span class="w"></span>
@@ -99,8 +107,8 @@ expressions” with the syntax <code class="docutils literal notranslate"><span 
 passing the configuration name and the full path to the executable
 file produced by target <code class="docutils literal notranslate"><span class="pre">myexe</span></code>.</p>
 <div class="admonition note">
-<p class="first admonition-title">Note</p>
-<p class="last">CMake will generate tests only if the <span class="target" id="index-0-command:enable_testing"></span><a class="reference internal" href="enable_testing.html#command:enable_testing" title="enable_testing"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">enable_testing()</span></code></a>
+<p class="admonition-title">Note</p>
+<p>CMake will generate tests only if the <span class="target" id="index-0-command:enable_testing"></span><a class="reference internal" href="enable_testing.html#command:enable_testing" title="enable_testing"><code class="xref cmake cmake-command docutils literal notranslate"><span class="pre">enable_testing()</span></code></a>
 command has been invoked.  The <span class="target" id="index-0-module:CTest"></span><a class="reference internal" href="../module/CTest.html#module:CTest" title="CTest"><code class="xref cmake cmake-module docutils literal notranslate"><span class="pre">CTest</span></code></a> module invokes the
 command automatically unless the <code class="docutils literal notranslate"><span class="pre">BUILD_TESTING</span></code> option is turned
 <code class="docutils literal notranslate"><span class="pre">OFF</span></code>.</p>
@@ -134,13 +142,11 @@ command-line to support target names or generator expressions.</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -169,15 +175,15 @@ command-line to support target names or generator expressions.</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-commands.7.html" >cmake-commands(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

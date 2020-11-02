@@ -1,24 +1,25 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>DOTNET_TARGET_FRAMEWORK_VERSION &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>DOTNET_TARGET_FRAMEWORK_VERSION &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="EchoString" href="EchoString.html" />
-    <link rel="prev" title="DEPLOYMENT_ADDITIONAL_FILES" href="DEPLOYMENT_ADDITIONAL_FILES.html" />
+    <link rel="prev" title="DOTNET_TARGET_FRAMEWORK" href="DOTNET_TARGET_FRAMEWORK.html" />
   
  
 
@@ -33,7 +34,7 @@
           <a href="EchoString.html" title="EchoString"
              accesskey="N">next</a> |</li>
         <li class="right" >
-          <a href="DEPLOYMENT_ADDITIONAL_FILES.html" title="DEPLOYMENT_ADDITIONAL_FILES"
+          <a href="DOTNET_TARGET_FRAMEWORK.html" title="DOTNET_TARGET_FRAMEWORK"
              accesskey="P">previous</a> |</li>
   <li>
     <img src="../_static/cmake-logo-16.png" alt=""
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-properties.7.html" accesskey="U">cmake-properties(7)</a> &#187;</li> 
@@ -57,13 +58,18 @@
             
   <div class="section" id="dotnet-target-framework-version">
 <span id="prop_tgt:DOTNET_TARGET_FRAMEWORK_VERSION"></span><h1>DOTNET_TARGET_FRAMEWORK_VERSION<a class="headerlink" href="#dotnet-target-framework-version" title="Permalink to this headline">¶</a></h1>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 3.12.</span></p>
+</div>
 <p>Specify the .NET target framework version.</p>
-<p>Used to specify the .NET target framework version for C++/CLI.  For
-example: <code class="docutils literal notranslate"><span class="pre">v4.5</span></code>.</p>
+<p>Used to specify the .NET target framework version for C++/CLI and C#.
+For example: <code class="docutils literal notranslate"><span class="pre">v4.5</span></code>.</p>
 <p>This property is only evaluated for <a class="reference internal" href="../manual/cmake-generators.7.html#visual-studio-generators"><span class="std std-ref">Visual Studio Generators</span></a>
 VS 2010 and above.</p>
-<p>Can be initialized for all targets using the variable
-<span class="target" id="index-0-variable:CMAKE_DOTNET_TARGET_FRAMEWORK_VERSION"></span><a class="reference internal" href="../variable/CMAKE_DOTNET_TARGET_FRAMEWORK_VERSION.html#variable:CMAKE_DOTNET_TARGET_FRAMEWORK_VERSION" title="CMAKE_DOTNET_TARGET_FRAMEWORK_VERSION"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_DOTNET_TARGET_FRAMEWORK_VERSION</span></code></a>.</p>
+<p>To initialize this variable for all targets set
+<span class="target" id="index-0-variable:CMAKE_DOTNET_TARGET_FRAMEWORK"></span><a class="reference internal" href="../variable/CMAKE_DOTNET_TARGET_FRAMEWORK.html#variable:CMAKE_DOTNET_TARGET_FRAMEWORK" title="CMAKE_DOTNET_TARGET_FRAMEWORK"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_DOTNET_TARGET_FRAMEWORK</span></code></a> or
+<span class="target" id="index-0-variable:CMAKE_DOTNET_TARGET_FRAMEWORK_VERSION"></span><a class="reference internal" href="../variable/CMAKE_DOTNET_TARGET_FRAMEWORK_VERSION.html#variable:CMAKE_DOTNET_TARGET_FRAMEWORK_VERSION" title="CMAKE_DOTNET_TARGET_FRAMEWORK_VERSION"><code class="xref cmake cmake-variable docutils literal notranslate"><span class="pre">CMAKE_DOTNET_TARGET_FRAMEWORK_VERSION</span></code></a>. If both are set,
+the latter is ignored.</p>
 </div>
 
 
@@ -73,8 +79,8 @@ VS 2010 and above.</p>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
   <h4>Previous topic</h4>
-  <p class="topless"><a href="DEPLOYMENT_ADDITIONAL_FILES.html"
-                        title="previous chapter">DEPLOYMENT_ADDITIONAL_FILES</a></p>
+  <p class="topless"><a href="DOTNET_TARGET_FRAMEWORK.html"
+                        title="previous chapter">DOTNET_TARGET_FRAMEWORK</a></p>
   <h4>Next topic</h4>
   <p class="topless"><a href="EchoString.html"
                         title="next chapter">EchoString</a></p>
@@ -86,13 +92,11 @@ VS 2010 and above.</p>
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -111,7 +115,7 @@ VS 2010 and above.</p>
           <a href="EchoString.html" title="EchoString"
              >next</a> |</li>
         <li class="right" >
-          <a href="DEPLOYMENT_ADDITIONAL_FILES.html" title="DEPLOYMENT_ADDITIONAL_FILES"
+          <a href="DOTNET_TARGET_FRAMEWORK.html" title="DOTNET_TARGET_FRAMEWORK"
              >previous</a> |</li>
   <li>
     <img src="../_static/cmake-logo-16.png" alt=""
@@ -121,15 +125,15 @@ VS 2010 and above.</p>
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-properties.7.html" >cmake-properties(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>

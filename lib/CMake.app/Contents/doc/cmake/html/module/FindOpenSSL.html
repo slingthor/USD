@@ -1,19 +1,20 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>FindOpenSSL &mdash; CMake 3.15.2 Documentation</title>
+    <meta charset="utf-8" />
+  <title>FindOpenSSL &mdash; CMake 3.19.0-rc2 Documentation</title>
 
     <link rel="stylesheet" href="../_static/cmake.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="../_static/documentation_options.js"></script>
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    
     <link rel="shortcut icon" href="../_static/cmake-favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -43,7 +44,7 @@
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" accesskey="U">cmake-modules(7)</a> &#187;</li> 
@@ -66,30 +67,56 @@ components have associated imported targets, as described below.</p>
 <div class="section" id="imported-targets">
 <h2>Imported Targets<a class="headerlink" href="#imported-targets" title="Permalink to this headline">¶</a></h2>
 <p>This module defines the following <span class="target" id="index-0-prop_tgt:IMPORTED"></span><a class="reference internal" href="../prop_tgt/IMPORTED.html#prop_tgt:IMPORTED" title="IMPORTED"><code class="xref cmake cmake-prop_tgt docutils literal notranslate"><span class="pre">IMPORTED</span></code></a> targets:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">OpenSSL::SSL</span></code></dt>
-<dd>The OpenSSL <code class="docutils literal notranslate"><span class="pre">ssl</span></code> library, if found.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">OpenSSL::Crypto</span></code></dt>
-<dd>The OpenSSL <code class="docutils literal notranslate"><span class="pre">crypto</span></code> library, if found.</dd>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">OpenSSL::SSL</span></code></dt><dd><p>The OpenSSL <code class="docutils literal notranslate"><span class="pre">ssl</span></code> library, if found.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OpenSSL::Crypto</span></code></dt><dd><p>The OpenSSL <code class="docutils literal notranslate"><span class="pre">crypto</span></code> library, if found.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OpenSSL::applink</span></code></dt><dd><p>The OpenSSL <code class="docutils literal notranslate"><span class="pre">applink</span></code> components that might be need to be compiled into
+projects under MSVC. This target is available only if found OpenSSL version
+is not less than 0.9.8. By linking this target the above OpenSSL targets can
+be linked even if the project has different MSVC runtime configurations with
+the above OpenSSL targets. This target has no effect on platforms other than
+MSVC.</p>
+</dd>
 </dl>
+<p>NOTE: Due to how <code class="docutils literal notranslate"><span class="pre">INTERFACE_SOURCES</span></code> are consumed by the consuming target,
+unless you certainly know what you are doing, it is always preferred to link
+<code class="docutils literal notranslate"><span class="pre">OpenSSL::applink</span></code> target as <code class="docutils literal notranslate"><span class="pre">PRIVATE</span></code> and to make sure that this target is
+linked at most once for the whole dependency graph of any library or
+executable:</p>
+<div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nf">target_link_libraries(</span><span class="nb">myTarget</span><span class="w"> </span><span class="no">PRIVATE</span><span class="w"> </span><span class="nb">OpenSSL</span><span class="o">::</span><span class="nb">applink</span><span class="nf">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Otherwise you would probably encounter unexpected random problems when building
+and linking, as both the ISO C and the ISO C++ standard claims almost nothing
+about what a link process should be.</p>
 </div>
 <div class="section" id="result-variables">
 <h2>Result Variables<a class="headerlink" href="#result-variables" title="Permalink to this headline">¶</a></h2>
 <p>This module will set the following variables in your project:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">OPENSSL_FOUND</span></code></dt>
-<dd>System has the OpenSSL library. If no components are requested it only
-requires the crypto library.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">OPENSSL_INCLUDE_DIR</span></code></dt>
-<dd>The OpenSSL include directory.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">OPENSSL_CRYPTO_LIBRARY</span></code></dt>
-<dd>The OpenSSL crypto library.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">OPENSSL_SSL_LIBRARY</span></code></dt>
-<dd>The OpenSSL SSL library.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">OPENSSL_LIBRARIES</span></code></dt>
-<dd>All OpenSSL libraries.</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">OPENSSL_VERSION</span></code></dt>
-<dd>This is set to <code class="docutils literal notranslate"><span class="pre">$major.$minor.$revision$patch</span></code> (e.g. <code class="docutils literal notranslate"><span class="pre">0.9.8s</span></code>).</dd>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">OPENSSL_FOUND</span></code></dt><dd><p>System has the OpenSSL library. If no components are requested it only
+requires the crypto library.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OPENSSL_INCLUDE_DIR</span></code></dt><dd><p>The OpenSSL include directory.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OPENSSL_CRYPTO_LIBRARY</span></code></dt><dd><p>The OpenSSL crypto library.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OPENSSL_CRYPTO_LIBRARIES</span></code></dt><dd><p>The OpenSSL crypto library and its dependencies.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OPENSSL_SSL_LIBRARY</span></code></dt><dd><p>The OpenSSL SSL library.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OPENSSL_SSL_LIBRARIES</span></code></dt><dd><p>The OpenSSL SSL library and its dependencies.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OPENSSL_LIBRARIES</span></code></dt><dd><p>All OpenSSL libraries and their dependencies.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OPENSSL_VERSION</span></code></dt><dd><p>This is set to <code class="docutils literal notranslate"><span class="pre">$major.$minor.$revision$patch</span></code> (e.g. <code class="docutils literal notranslate"><span class="pre">0.9.8s</span></code>).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">OPENSSL_APPLINK_SOURCE</span></code></dt><dd><p>The sources in the target <code class="docutils literal notranslate"><span class="pre">OpenSSL::applink</span></code> that is mentioned above. This
+variable shall always be undefined if found openssl version is less than
+0.9.8 or if platform is not MSVC.</p>
+</dd>
 </dl>
 </div>
 <div class="section" id="hints">
@@ -106,7 +133,7 @@ Set <code class="docutils literal notranslate"><span class="pre">OPENSSL_MSVC_ST
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <h3><a href="../index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">FindOpenSSL</a><ul>
 <li><a class="reference internal" href="#optional-components">Optional COMPONENTS</a></li>
@@ -131,13 +158,11 @@ Set <code class="docutils literal notranslate"><span class="pre">OPENSSL_MSVC_ST
     </ul>
    </div>
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -166,15 +191,15 @@ Set <code class="docutils literal notranslate"><span class="pre">OPENSSL_MSVC_ST
     <a href="https://cmake.org/">CMake</a> &#187;
   </li>
   <li>
-    <a href="../index.html">3.15.2 Documentation</a> &#187;
+    <a href="../index.html">3.19.0-rc2 Documentation</a> &#187;
   </li>
 
           <li class="nav-item nav-item-1"><a href="../manual/cmake-modules.7.html" >cmake-modules(7)</a> &#187;</li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-        &#169; Copyright 2000-2019 Kitware, Inc. and Contributors.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.2.
+        &#169; Copyright 2000-2020 Kitware, Inc. and Contributors.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
     </div>
   </body>
 </html>
