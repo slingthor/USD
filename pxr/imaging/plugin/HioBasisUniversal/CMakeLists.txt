@@ -1,5 +1,5 @@
 set(PXR_PREFIX pxr/imaging)
-set(PXR_PACKAGE glfBasisUniversal)
+set(PXR_PACKAGE HioBasisUniversal)
 
 if (NOT ${PXR_BUILD_GPU_SUPPORT})
     message(STATUS
@@ -7,28 +7,23 @@ if (NOT ${PXR_BUILD_GPU_SUPPORT})
     return()
 endif()
 
-set(BASISU_SRC_DIR "${CMAKE_SOURCE_DIR}/third_party/basis_universal")
-file (GLOB basisu_inc_files ${BASISU_SRC_DIR}/*)
-pxr_plugin(glfBasisUniversal
+pxr_plugin(HioBasisUniversal
     LIBRARIES
         ar
         arch
         gf
-        glf
+        hio
         tf
+        ${BASISU_LIBRARY}
 
     INCLUDE_DIRS
-        ${BASISU_SRC_DIR}
-        ${BASISU_SRC_DIR}/transcoder
+        ${BASISU_INCLUDE_DIR}
 
     PUBLIC_CLASSES
         basisUniversalImageManager
 
     CPPFILES
         basisUniversalImage.cpp
-        ${BASISU_SRC_DIR}/transcoder/basisu_transcoder.cpp
-        ${BASISU_SRC_DIR}/transcoder/basisu_transcoder.h
-        ${basisu_inc_files}
 
     RESOURCE_FILES
         plugInfo.json

@@ -1480,17 +1480,36 @@ PNG = Dependency("PNG", InstallPNG, "include/png.h")
 # BASISU
 BASISU_URL = "https://github.com/BinomialLLC/basis_universal/archive/master.zip"
 
-def UploadBasisUniversalTexture(context, force, buildArgs):
-    srcDir = DownloadURL(BASISU_URL, context, force)
-    thirdPartyDir = os.path.join(context.usdSrcDir, "third_party", "basis_universal")
-    if os.path.exists(thirdPartyDir):
-        PrintInfo("Deleting existing {dir}\n".format(dir=thirdPartyDir))
-        shutil.rmtree(thirdPartyDir)
-    PrintInfo("Moving folder {srcDir} to {destDir}\n".format(srcDir=srcDir, destDir=thirdPartyDir))
-    shutil.move(srcDir, thirdPartyDir)
+def DownloadBasisUniversalTexture(context, force, buildArgs):
+    with CurrentWorkingDirectory(DownloadURL(BASISU_URL, context, force)):
+        PatchFile("CmakeLists.txt",
+                [("basisu_tool.cpp", "#basisu_tool.cpp"),
+                 ("add_executable", "add_library"),
+                 ("add_custom_command", "#add_custom_command"),
+                 ("install(TARGETS basisu DESTINATION bin)",
+                  "install(TARGETS basisu DESTINATION lib)")],
+                multiLineMatches=True)
+        RunCMake(context, force, buildArgs)
+
+
+        basisuIncDir = os.path.join("include", "basisu")
+        basisuTranscoderIncDir = os.path.join(basisuIncDir, "transcoder")
+        with CurrentWorkingDirectory(context.instDir):
+            if not os.path.isdir(basisuIncDir):
+                os.makedirs(basisuIncDir)
+                os.makedirs(basisuTranscoderIncDir)
+
+        CopyFiles(context, "*.h", basisuIncDir)
+        CopyFiles(context, 
+            os.path.join("transcoder", "*.inc"), 
+            basisuTranscoderIncDir)
+        CopyFiles(context, 
+            os.path.join("transcoder", "*.h"),
+            basisuTranscoderIncDir)
     return os.getcwd()
 
-BASISU = Dependency("BASISU", UploadBasisUniversalTexture, "")
+BASISU = Dependency("BASISU", DownloadBasisUniversalTexture, 
+                    "include/basisu/transcoder/basisu.h")
 
 ############################################################
 # IlmBase/OpenEXR

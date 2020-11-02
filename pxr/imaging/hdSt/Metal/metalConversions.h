@@ -69,9 +69,6 @@ public:
     static MTLSamplerAddressMode GetWrap(HdWrap wrap);
 
     HDST_API
-    static void GetGlFormat(HdFormat inFormat, GLenum *outFormat, GLenum *outType, GLenum *outInternalFormat);
-
-    HDST_API
     static int GetGLAttribType(HdType type);
 
     /// Return the name of the given type as represented in GLSL.

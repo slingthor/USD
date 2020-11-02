@@ -436,7 +436,27 @@ enum HdFormat
     // Depth-stencil format
     HdFormatFloat32UInt8,
 
+    // BPTC compressed. 3-component, 4x4 blocks, signed floating-point
+    HdFormatBC6FloatVec3,
+
+    // BPTC compressed. 3-component, 4x4 blocks, unsigned floating-point
+    HdFormatBC6UFloatVec3,
+
+    // BPTC compressed. 4-component, 4x4 blocks, unsigned byte.
+    // Representing a float between 0 and 1.
+    HdFormatBC7UNorm8Vec4,
+
+    // BPTC compressed. 4-component, 4x4 blocks, unsigned byte, sRGB.
+    // Representing a float between 0 and 1.
     HdFormatBC7UNorm8Vec4srgb,
+    
+    // S3TC/DXT compressed. 4-component, 4x4 blocks, unsigned byte
+    // Representing a float between 0 and 1.
+    HdFormatBC1UNorm8Vec4,
+
+    // S3TC/DXT compressed. 4-component, 4x4 blocks, unsigned byte
+    // Representing a float between 0 and 1.
+    HdFormatBC3UNorm8Vec4,
 
     HdFormatCount
 };

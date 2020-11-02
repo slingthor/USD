@@ -68,6 +68,13 @@ static const HioFormat FORMAT_DESC[] =
     HioFormatInt32Vec4,     // HdFormatInt32Vec4,
 
     HioFormatFloat32,       // HdFormatFloat32UInt8
+    
+    HioFormatBC6FloatVec3,  // HdFormatBC6FloatVec3
+    HioFormatBC6UFloatVec3, // HdFormatBC6UFloatVec3
+    HioFormatBC7UNorm8Vec4, // HdFormatBC7UNorm8Vec4
+    HioFormatBC7UNorm8Vec4srgb, // HdFormatBC7UNorm8Vec4srgb
+    HioFormatBC1UNorm8Vec4,  // HdFormatBC1UNorm8Vec4
+    HioFormatBC3UNorm8Vec4,  // HdFormatBC3UNorm8Vec4
 };
 static_assert(TfArraySize(FORMAT_DESC) ==
         HdFormatCount, "FORMAT_DESC to HdFormat enum mismatch");

@@ -187,6 +187,7 @@ if (PXR_BUILD_IMAGING)
     endif()
     # --BasisUniversal
     if (PXR_BUILD_BASISU_PLUGIN)
+        find_package(BasisU REQUIRED)
         add_definitions(-DPXR_BUILD_BASISU_PLUGIN)
     endif()
     # --OpenColorIO

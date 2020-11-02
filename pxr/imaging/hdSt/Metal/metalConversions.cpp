@@ -31,51 +31,6 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-struct _FormatDesc {
-    GLenum format;
-    GLenum type;
-    GLenum internalFormat;
-};
-
-static const _FormatDesc FORMAT_DESC[] =
-{
-    // format,  type,          internal format
-    {GL_RED,  GL_UNSIGNED_BYTE, GL_R8},      // HdFormatUNorm8,
-    {GL_RG,   GL_UNSIGNED_BYTE, GL_RG8},     // HdFormatUNorm8Vec2,
-    {GL_RGB,  GL_UNSIGNED_BYTE, GL_RGB8},    // HdFormatUNorm8Vec3,
-    {GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8},   // HdFormatUNorm8Vec4,
-
-    {GL_RED,  GL_BYTE,          GL_R8_SNORM},      // HdFormatSNorm8,
-    {GL_RG,   GL_BYTE,          GL_RG8_SNORM},     // HdFormatSNorm8Vec2,
-    {GL_RGB,  GL_BYTE,          GL_RGB8_SNORM},    // HdFormatSNorm8Vec3,
-    {GL_RGBA, GL_BYTE,          GL_RGBA8_SNORM},   // HdFormatSNorm8Vec4,
-    
-    {GL_RED,  GL_HALF_FLOAT,    GL_R16F},    // HdFormatFloat16,
-    {GL_RG,   GL_HALF_FLOAT,    GL_RG16F},   // HdFormatFloat16Vec2,
-    {GL_RGB,  GL_HALF_FLOAT,    GL_RGB16F},  // HdFormatFloat16Vec3,
-    {GL_RGBA, GL_HALF_FLOAT,    GL_RGBA16F}, // HdFormatFloat16Vec4,
-
-    {GL_RED,  GL_FLOAT,         GL_R32F},    // HdFormatFloat32,
-    {GL_RG,   GL_FLOAT,         GL_RG32F},   // HdFormatFloat32Vec2,
-    {GL_RGB,  GL_FLOAT,         GL_RGB32F},  // HdFormatFloat32Vec3,
-    {GL_RGBA, GL_FLOAT,         GL_RGBA32F}, // HdFormatFloat32Vec4,
-
-    {GL_RED,  GL_UNSIGNED_SHORT,GL_R16I},    // HdFormatUInt16,
-    {GL_RG,   GL_UNSIGNED_SHORT,GL_RG16I},   // HdFormatUInt16Vec2,
-    {GL_RGB,  GL_UNSIGNED_SHORT,GL_RGB16I},  // HdFormatUInt16Vec3,
-    {GL_RGBA, GL_UNSIGNED_SHORT,GL_RGBA16I}, // HdFormatUInt16Vec4,
-
-    {GL_RED,  GL_INT,           GL_R32I},    // HdFormatInt32,
-    {GL_RG,   GL_INT,           GL_RG32I},   // HdFormatInt32Vec2,
-    {GL_RGB,  GL_INT,           GL_RGB32I},  // HdFormatInt32Vec3,
-    {GL_RGBA, GL_INT,           GL_RGBA32I}, // HdFormatInt32Vec4,
-    
-    {GL_DEPTH_STENCIL, GL_FLOAT, GL_DEPTH32F_STENCIL8}, // MTLPixelFormatDepth32Float_Stencil8,
-
-    {GL_RGBA, GL_UNSIGNED_BYTE, GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM}, // HdFormatBC7UNorm8Vec4srgb
-};
-static_assert(TfArraySize(FORMAT_DESC) ==  HdFormatCount, "FORMAT_DESC to HdFormat enum mismatch");
-
 size_t
 HdStMetalConversions::GetComponentSize(int glDataType)
 {
@@ -297,25 +252,6 @@ HdStMetalConversions::GetWrap(HdWrap wrap)
 
     TF_CODING_ERROR("Unexpected HdWrap type %d", wrap);
     return MTLSamplerAddressModeClampToEdge;
-}
-
-void
-HdStMetalConversions::GetGlFormat(HdFormat inFormat, GLenum *outFormat, GLenum *outType, GLenum *outInternalFormat)
-{
-    if ((inFormat < 0) || (inFormat >= HdFormatCount))
-    {
-        TF_CODING_ERROR("Unexpected HdFormat %d", inFormat);
-        *outFormat         = GL_RGBA;
-        *outType           = GL_BYTE;
-        *outInternalFormat = GL_RGBA8;
-        return;
-    }
-
-    const _FormatDesc &desc = FORMAT_DESC[inFormat];
-
-    *outFormat         = desc.format;
-    *outType           = desc.type;
-    *outInternalFormat = desc.internalFormat;
 }
 
 int
