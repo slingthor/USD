@@ -8,10 +8,6 @@ endif()
 
 set(optionalLibs "")
 set(optionalIncludeDirs "")
-if (PXR_ENABLE_PTEX_SUPPORT)
-    list(APPEND optionalLibs ${PTEX_LIBRARY})
-    list(APPEND optionalIncludeDirs ${PTEX_INCLUDE_DIR})
-endif()
 
 if (OPENSUBDIV_HAS_GLSL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_GLSL_COMPUTE)
