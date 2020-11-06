@@ -364,7 +364,7 @@ evaluateIndirectLighting(
 #if defined(ARCH_GFX_METAL)
     vec3 prefilter = textureBind_domeLightPrefilter.sample(
         samplerBind_domeLightPrefilter,
-        coord,
+        Rcoord,
         level(lod)).rgb;
 #else
     vec3 prefilter = textureLod(HdGetSampler_domeLightPrefilter(),
@@ -386,7 +386,7 @@ evaluateIndirectLighting(
 #if defined(ARCH_GFX_METAL)
         vec3 prefilter = textureBind_domeLightPrefilter.sample(
             samplerBind_domeLightPrefilter,
-            coord,
+            Rcoord,
             level(lod)).rgb;
 #else
         vec3 prefilter = textureLod(HdGetSampler_domeLightPrefilter(),
