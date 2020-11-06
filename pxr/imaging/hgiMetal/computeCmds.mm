@@ -98,6 +98,10 @@ HgiMetalComputeCmds::SetConstantValues(
 void
 HgiMetalComputeCmds::Dispatch(int dimX, int dimY)
 {
+    if (!dimX && !dimY) {
+        return;
+    }
+
     uint32_t maxTotalThreads =
         [_pipelineState->GetMetalPipelineState() maxTotalThreadsPerThreadgroup];
     uint32_t exeWidth =
