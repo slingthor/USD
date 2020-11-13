@@ -1,6 +1,5 @@
 .p4*
 .DS_Store
 .AppleDouble
-.vscode
 /build_scripts/make_relocatable.pyc
-lib/python/*
+/lib/python/*
