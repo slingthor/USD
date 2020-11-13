@@ -393,8 +393,13 @@ HdStUdimTextureObject::_DestroyTextures()
 void
 HdStUdimTextureObject::_Load()
 {
-    std::vector<std::tuple<int, TfToken>> tiles =
-        _FindUdimTiles(GetTextureIdentifier().GetFilePath());
+    TfToken filePath = GetTextureIdentifier().GetFilePath();
+    std::vector<std::tuple<int, TfToken>> tiles = _FindUdimTiles(filePath);
+
+    if (tiles.empty()) {
+        return;
+    }
+
     HioImage::SourceColorSpace sourceColorSpace =
         _GetSourceColorSpace(GetTextureIdentifier().GetSubtextureIdentifier());
     const _MipDescArray firstImageMips =
