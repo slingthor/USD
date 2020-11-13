@@ -193,6 +193,7 @@ public:
         MSL_ProgramStage programStage, int offsetWithinResource = 0,
         int uniformBufferSize = 0);
     
+    // typeHint is provided for when the textureId is nil and the type cannot be read from the texture descriptor.
     HDST_API
     void BindTexture(
         const TfToken &name,

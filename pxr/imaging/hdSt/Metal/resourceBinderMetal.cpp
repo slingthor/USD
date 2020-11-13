@@ -345,7 +345,6 @@ public:
                 texture.GetTexelTexture().Get());
             auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
                 sampler.GetTexelsSampler().Get());
-
             auto textureId = metalTexture ? metalTexture->GetTextureId() : nil;
             auto samplerId = metalSampler ? metalSampler->GetSamplerId() : nil;
 

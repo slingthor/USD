@@ -249,6 +249,7 @@ public:
     MTLF_API
     void SetIndexBuffer(id<MTLBuffer> const buffer);
 
+    // typeHint is provided for when the textureId is nil and the type cannot be read from the texture descriptor.
     MTLF_API
     void SetTexture(int index, id<MTLTexture> const texture, const TfToken& name, MSL_ProgramStage stage, MTLTextureType typeHint = MTLTextureType2D);
 
