@@ -250,8 +250,8 @@ public:
     void SetIndexBuffer(id<MTLBuffer> const buffer);
 
     MTLF_API
-    void SetTexture(int index, id<MTLTexture> const texture, const TfToken& name, MSL_ProgramStage stage, bool arrayTexture = false);
-    
+    void SetTexture(int index, id<MTLTexture> const texture, const TfToken& name, MSL_ProgramStage stage, MTLTextureType typeHint = MTLTextureType2D);
+
     MTLF_API
     void SetSampler(int index, id<MTLSamplerState> const sampler, const TfToken& name, MSL_ProgramStage stage);
 
@@ -427,6 +427,8 @@ public:
         id<MTLCommandQueue> commandQueue;
 
         // Dummy black texture for missing textures
+        id<MTLTexture> blackTexture1D;
+        // Dummy black texture for missing textures
         id<MTLTexture> blackTexture2D;
         // Dummy black texture for missing textures
         id<MTLTexture> blackTexture2DArray;
@@ -472,7 +474,7 @@ protected:
         uint8_t          *contents;
     };
     
-    struct TextureBinding { int index; id<MTLTexture> texture; TfToken name; MSL_ProgramStage stage; bool array; };
+    struct TextureBinding { int index; id<MTLTexture> texture; TfToken name; MSL_ProgramStage stage; MTLTextureType typeHint; };
     struct SamplerBinding { int index; id<MTLSamplerState> sampler; TfToken name; MSL_ProgramStage stage; };
     
     struct ThreadState {

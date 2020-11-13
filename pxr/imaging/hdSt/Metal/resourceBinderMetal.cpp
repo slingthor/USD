@@ -346,8 +346,11 @@ public:
             auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
                 sampler.GetTexelsSampler().Get());
 
-            mslProgram.BindTexture(name, metalTexture?metalTexture->GetTextureId():nil);
-            mslProgram.BindSampler(name, metalSampler?metalSampler->GetSamplerId():nil);
+            auto textureId = metalTexture ? metalTexture->GetTextureId() : nil;
+            auto samplerId = metalSampler ? metalSampler->GetSamplerId() : nil;
+
+            mslProgram.BindTexture(name, textureId, MTLTextureType2DArray);
+            mslProgram.BindSampler(name, samplerId);
         }
         
         // Bind the layout
@@ -359,7 +362,7 @@ public:
                 HdSt_ResourceBinder::_Concat(
                     name, HdSt_ResourceBindingSuffixTokens->layout),
                 metalBuffer?metalBuffer->GetBufferId():nil,
-                true);
+                MTLTextureType2DArray);
         }
     }
 
@@ -376,20 +379,23 @@ public:
                 texture.GetTexelTexture().Get());
             auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
                 sampler.GetTexelsSampler().Get());
+            auto textureId = metalTexture ? metalTexture->GetTextureId() : nil;
+            auto samplerId = metalSampler ? metalSampler->GetSamplerId() : nil;
 
-            mslProgram.BindTexture(name, metalTexture?metalTexture->GetTextureId():nil);
-            mslProgram.BindSampler(name, metalSampler?metalSampler->GetSamplerId():nil);
+            mslProgram.BindTexture(name, textureId, MTLTextureType2DArray);
+            mslProgram.BindSampler(name, samplerId);
         }
         
         // Bind the layout
         {
             auto metalTexture = dynamic_cast<HgiMetalTexture const*>(
                 texture.GetLayoutTexture().Get());
+            auto textureId = metalTexture ? metalTexture->GetTextureId() : nil;
 
             mslProgram.BindTexture(
                 HdSt_ResourceBinder::_Concat(
                     name, HdSt_ResourceBindingSuffixTokens->layout),
-                metalTexture?metalTexture->GetTextureId():nil);
+                textureId, MTLTextureType1D);
         }
     }
 };
