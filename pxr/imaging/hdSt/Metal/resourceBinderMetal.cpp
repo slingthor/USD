@@ -362,7 +362,7 @@ public:
                 HdSt_ResourceBinder::_Concat(
                     name, HdSt_ResourceBindingSuffixTokens->layout),
                 metalBuffer?metalBuffer->GetBufferId():nil,
-                MTLTextureType2DArray);
+                true);
         }
     }
 
