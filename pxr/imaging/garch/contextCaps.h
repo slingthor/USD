@@ -82,6 +82,8 @@ public:
     bool shadingLanguage420pack;      // ARB_shading_language_420pack     (4.2)
     bool shaderDrawParametersEnabled; // ARB_shader_draw_parameters       (4.5)
 
+    bool disableBatchDraw; // weither if multi threaded batch drawing is enabled
+    
     // workarounds for driver issues
     bool copyBufferEnabled;
 
