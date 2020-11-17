@@ -417,6 +417,13 @@ HdStDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
     HdStBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRangeGL->GetResource(HdInstancerTokens->instanceIndices);
     
     uint8_t *instanceIndexBuffer = const_cast<uint8_t*>(_GetBufferContents(instanceIndexRes));
+    
+    _numVisible = 0;
+
+    if (!instanceIndexBuffer) {
+        return 0;
+    }
+    
     uint32_t *instanceBuffer = reinterpret_cast<uint32_t*>(instanceIndexBuffer) + instanceOffset;
 
     HdStBufferResourceSharedPtr const & culledInstanceIndexRes = instanceIndexRangeGL->GetResource(HdInstancerTokens->culledInstanceIndices);
@@ -427,7 +434,7 @@ HdStDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
     uint64_t *culledInstanceBuffer64 = reinterpret_cast<uint64_t*>(culledInstanceBuffer);
     
     bool modified = false;
-    _numVisible = 0;
+
     for(i = 0; i < numItems; i++) {
         if (!*instanceVisibility[i])
             continue;
