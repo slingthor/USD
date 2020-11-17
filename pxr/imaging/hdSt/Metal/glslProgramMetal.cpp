@@ -531,7 +531,8 @@ void HdStGLSLProgramMSL::AddCustomBindings(GarchBindingMapRefPtr bindingMap) con
 void
 HdStGLSLProgramMSL::BindTexture(
     const TfToken &name,
-    id<MTLTexture> textureId) const
+    id<MTLTexture> textureId,
+    MTLTextureType typeHint) const
 {
     std::string textureName("textureBind_" + name.GetString());
     TfToken textureNameToken(textureName, TfToken::Immortal);
@@ -546,12 +547,13 @@ HdStGLSLProgramMSL::BindTexture(
     if(!textureBinding) {
         TF_FATAL_CODING_ERROR("Could not bind a texture to the shader?!");
     }
- 
+     
     MtlfMetalContext::GetMetalContext()->SetTexture(
         textureBinding->_index,
         textureId,
         textureNameToken,
-        textureBinding->_stage);
+        textureBinding->_stage,
+        typeHint);
 }
 
 void

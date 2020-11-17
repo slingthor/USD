@@ -268,11 +268,20 @@ void MtlfMetalContext::Init()
     
     uint16_t zero[4] = {};
 
+    blackDesc.textureType = MTLTextureType1D;
+    gpus.blackTexture1D = [currentDevice newTextureWithDescriptor:blackDesc];
+
     blackDesc.textureType = MTLTextureType2D;
     gpus.blackTexture2D = [currentDevice newTextureWithDescriptor:blackDesc];
     
     blackDesc.textureType = MTLTextureType2DArray;
     gpus.blackTexture2DArray = [currentDevice newTextureWithDescriptor:blackDesc];
+
+    [gpus.blackTexture1D replaceRegion:MTLRegionMake1D(0, 1)
+                           mipmapLevel:0
+                             withBytes:&zero
+                           bytesPerRow:sizeof(zero)];\
+
     [gpus.blackTexture2D replaceRegion:MTLRegionMake2D(0, 0, 1, 1)
                            mipmapLevel:0
                              withBytes:&zero
@@ -342,6 +351,7 @@ void MtlfMetalContext::Cleanup()
     CleanupUnusedBuffers(true);
     bufferFreeList.clear();
 
+    [gpus.blackTexture1D release];
     [gpus.blackTexture2D release];
     [gpus.blackTexture2DArray release];
     [gpus.dummySampler release];
@@ -935,9 +945,9 @@ void MtlfMetalContext::SetSampler(int index, id<MTLSamplerState> const sampler, 
     threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_SAMPLER;
 }
 
-void MtlfMetalContext::SetTexture(int index, id<MTLTexture> const texture, const TfToken& name, MSL_ProgramStage stage, bool arrayTexture)
+void MtlfMetalContext::SetTexture(int index, id<MTLTexture> const texture, const TfToken& name, MSL_ProgramStage stage, MTLTextureType typeHint)
 {
-    threadState.textures.push_back({index, texture, name, stage, arrayTexture});
+    threadState.textures.push_back({index, texture, name, stage, typeHint});
     threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_TEXTURE;
 }
 
@@ -1293,10 +1303,12 @@ void MtlfMetalContext::SetRenderEncoderState()
         for(auto texture : threadState.textures) {
             id<MTLTexture> t = texture.texture;
             if (t == nil) {
-                if (texture.array)
-                    t = gpus.blackTexture2DArray;
-                else
+                if (texture.typeHint == MTLTextureType2D)
                     t = gpus.blackTexture2D;
+                else if (texture.typeHint == MTLTextureType2DArray)
+                    t = gpus.blackTexture2DArray;
+                else if (texture.typeHint == MTLTextureType1D)
+                    t = gpus.blackTexture1D;
             }
             if(texture.stage == kMSL_ProgramStage_Vertex) {
                 if(threadState.enableComputeGS) {
