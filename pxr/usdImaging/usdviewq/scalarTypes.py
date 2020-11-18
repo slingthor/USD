@@ -114,10 +114,6 @@ def ToString(v, valueType=None):
     elif isinstance(v, int):
         fn = lambda i: "{:,d}".format(i)
 
-    # pretty print a long
-    elif isinstance(v, long):
-        fn = lambda i: "{:,d}".format(i)
-
     # pretty print a float
     elif isinstance(v, float):
         fn = lambda f: "{:,.6f}".format(f)
