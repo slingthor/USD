@@ -49,6 +49,10 @@ def add_rpath_to_file(args):
     if path_between != ".":
         subprocess.call(['install_name_tool', '-add_rpath', '@loader_path/' + path_between, f],
             stdout=devout, stderr=devout)
+    else:
+        subprocess.call(['install_name_tool', '-add_rpath', '@loader_path', f],
+            stdout=devout, stderr=devout)
+    
 
 
 def remove_rpath(args):
