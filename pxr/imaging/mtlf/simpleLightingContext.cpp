@@ -98,7 +98,7 @@ MtlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
                                                     _shadows->GetShadowMapTexture(),
                                                     _tokens->shadowSampler,
                                                     MSL_ProgramStage(shadowTexture.stage),
-                                                    true);
+                                                    MTLTextureType2DArray);
     MtlfMetalContext::GetMetalContext()->SetSampler(shadowSampler.index,
                                                     _shadows->GetShadowMapDepthSampler(),
                                                     _tokens->shadowSampler,
@@ -108,7 +108,7 @@ MtlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
                                                     _shadows->GetShadowMapTexture(),
                                                     _tokens->shadowCompareSampler,
                                                     MSL_ProgramStage(shadowCompareTexture.stage),
-                                                    true);
+                                                    MTLTextureType2DArray);
     
     MtlfMetalContext::GetMetalContext()->SetSampler(shadowCompareSampler.index,
                                                     _shadows->GetShadowMapCompareSampler(),

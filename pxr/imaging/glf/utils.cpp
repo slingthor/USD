@@ -117,7 +117,7 @@ constexpr bool _CompileTimeValidateHioFormatTable() {
             HioFormatBC1UNorm8Vec4 == 44) ? true : false;
 }
 
-static_assert(_CompileTimeValidateHioFormatTable(),
+static_assert(_CompileTimeValidateHioFormatTable(), 
               "_FormatDesc array in glfUtils out of sync with HioFormat enum");
 
 GLenum

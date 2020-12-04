@@ -27,6 +27,7 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/subtextureIdentifier.h"
 #include "pxr/imaging/hdSt/tokens.h"
+#include "pxr/imaging/hdSt/udimTextureObject.h"
 
 #include "pxr/imaging/garch/udimTexture.h"
 #include "pxr/imaging/garch/resourceFactory.h"
@@ -951,7 +952,7 @@ _MakeMaterialParamsForTexture(
                 const std::string filePath = _ResolveAssetPath(v);
                 const std::string realFilePath = TfRealPath(filePath, true);
 
-                if (GarchIsSupportedUdimTexture(realFilePath)) {
+                if (HdStIsSupportedUdimTexture(realFilePath)) {
                     texParam.textureType = HdTextureType::Udim;
                 }
                 

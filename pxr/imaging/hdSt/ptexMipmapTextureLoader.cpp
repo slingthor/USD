@@ -1068,7 +1068,7 @@ HdStPtexMipmapTextureLoader::generateBuffers()
     int numPages = (int)_pages.size();
 
     // populate the texels
-    int pageStride = _bpp * _pageWidth * _pageHeight;
+    size_t pageStride = _bpp * _pageWidth * _pageHeight;
 
     _texelBuffer = new unsigned char[pageStride * numPages];
     _memoryUsage = pageStride * numPages;

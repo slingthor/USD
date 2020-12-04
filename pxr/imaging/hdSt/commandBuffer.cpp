@@ -235,7 +235,9 @@ HdStCommandBuffer::ExecuteDraw(
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     MTLRenderPassDescriptor *renderPassDescriptor = context->GetRenderPassDescriptor();
     
-    bool mtBatchDrawing = true;
+    
+    bool mtBatchDrawing = !GarchResourceFactory::GetInstance()->
+    GetContextCaps().disableBatchDraw;
 
     // Create a new command buffer for each render pass to the current drawable
     if (renderPassDescriptor.colorAttachments[0].loadAction == MTLLoadActionClear) {

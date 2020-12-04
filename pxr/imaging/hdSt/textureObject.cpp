@@ -305,7 +305,7 @@ _GetWrapParameter(const bool hasWrapMode, const GLenum wrapMode)
         case GL_CLAMP_TO_BORDER: return HdWrapBlack;
         case GL_MIRRORED_REPEAT: return HdWrapMirror;
         //
-        // For GlfImage legacy plugins that still use the GL_CLAMP
+        // For HioImage legacy plugins that still use the GL_CLAMP
         // (obsoleted in OpenGL 3.0).
         //
         // Note that some graphics drivers produce results for GL_CLAMP
