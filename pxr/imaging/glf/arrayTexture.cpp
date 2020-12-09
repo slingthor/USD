@@ -24,7 +24,7 @@
 /// \file ArrayTexture.cpp
 // 
 
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/garch/glApi.h"
 
 #include "pxr/imaging/garch/uvTextureData.h"
 
@@ -125,8 +125,8 @@ GlfArrayTexture::_CreateTextures(
         texDataVec[0]->ResizedHeight(),                 /* height         */
         _arraySize,                                     /* depth          */
         0,                                              /* border         */
-        GlfGetGLFormat(texDataVec[0]->GetFormat()),  /* format         */
-        GlfGetGLType(texDataVec[0]->GetFormat()),    /* type           */
+        GlfGetGLFormat(texDataVec[0]->GetFormat()),     /* format         */
+        GlfGetGLType(texDataVec[0]->GetFormat()),       /* type           */
         NULL);                                          /* data           */
     
     int memUsed = 0;
@@ -143,8 +143,8 @@ GlfArrayTexture::_CreateTextures(
                 texData->ResizedWidth(),                 /* width          */
                 texData->ResizedHeight(),                /* height         */
                 1,                                       /* depth          */
-                GlfGetGLFormat(texData->GetFormat()), /* format         */
-                GlfGetGLType(texData->GetFormat()),   /* type           */
+                GlfGetGLFormat(texData->GetFormat()),    /* format         */
+                GlfGetGLType(texData->GetFormat()),      /* type           */
                 texData->GetRawBuffer());                /* data           */
             
             memUsed += texData->ComputeBytesUsed();

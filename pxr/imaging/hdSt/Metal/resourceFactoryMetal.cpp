@@ -51,9 +51,10 @@ HdStResourceFactoryMetal::~HdStResourceFactoryMetal()
 
 HdSt_CodeGen *HdStResourceFactoryMetal::NewCodeGen(
     HdSt_GeometricShaderPtr const &geometricShader,
-    HdStShaderCodeSharedPtrVector const &shaders) const
+    HdStShaderCodeSharedPtrVector const &shaders,
+    TfToken const &materialTag) const
 {
-    return new HdSt_CodeGenMSL(geometricShader, shaders);
+    return new HdSt_CodeGenMSL(geometricShader, shaders, materialTag);
 }
 
 HdSt_CodeGen *HdStResourceFactoryMetal::NewCodeGen(

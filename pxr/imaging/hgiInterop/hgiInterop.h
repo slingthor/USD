@@ -43,6 +43,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 class Hgi;
 class HgiInteropMetal;
 class HgiInteropOpenGL;
+class HgiInteropVulkan;
+
 
 /// \class HgiInterop
 ///
@@ -98,6 +100,8 @@ private:
 
 #if defined(HGIINTEROP_METAL_TO_GL_ENABLED)
     std::unique_ptr<HgiInteropMetal> _metalToOpenGL;
+#elif defined(PXR_VULKAN_SUPPORT_ENABLED)
+    std::unique_ptr<HgiInteropVulkan> _vulkanToOpenGL;
 #elif defined(HGIINTEROP_GL_TO_GL_ENABLED)
     std::unique_ptr<HgiInteropOpenGL> _openGLToOpenGL;
 #endif

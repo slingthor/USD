@@ -46,7 +46,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchTextureHandle);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchTexture);
 
-class GarchRankedTypeMap;
+class HioRankedTypeMap;
 class GarchTextureFactoryBase;
 
 /// \class GarchTextureRegistry
@@ -148,7 +148,7 @@ public:
 private:
 
     // Map of file extensions to texture types.
-    std::unique_ptr<GarchRankedTypeMap> _typeMap;
+    std::unique_ptr<HioRankedTypeMap> _typeMap;
 
     // registry for shared textures
     TextureRegistryMap _textureRegistry;

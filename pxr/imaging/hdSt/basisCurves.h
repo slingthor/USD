@@ -73,8 +73,8 @@ public:
     HF_MALLOC_TAG_NEW("new HdStBasisCurves");
 
     HDST_API
-    HdStBasisCurves(SdfPath const& id,
-                    SdfPath const& instancerId = SdfPath());
+    HdStBasisCurves(SdfPath const& id);
+
     HDST_API
     virtual ~HdStBasisCurves();
 
@@ -139,7 +139,7 @@ private:
     bool _SupportsUserNormals(HdStDrawItem* drawItem);
     
     const TfToken& _GetMaterialTag(const HdRenderIndex &renderIndex) const;
-
+    
     void _UpdateDrawItem(HdSceneDelegate *sceneDelegate,
                          HdStDrawItem *drawItem,
                          HdDirtyBits *dirtyBits,
@@ -158,6 +158,7 @@ private:
     HdTopology::ID _topologyId;
     HdDirtyBits _customDirtyBitsInUse;
     int _refineLevel;  // XXX: could be moved into HdBasisCurveTopology.
+    bool _displayOpacity;
 };
 
 

@@ -265,9 +265,6 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
     int attach = a->GetAttach();
     HgiAttachmentDesc attachmentDesc;
 
-    _desc->width = tid->GetDescriptor().dimensions[0];
-    _desc->height = tid->GetDescriptor().dimensions[1];
-
     if (a->GetFormat()==GL_DEPTH_COMPONENT || a->GetFormat()==GL_DEPTH_STENCIL) {
         
         if (HasMSAA()) {

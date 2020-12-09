@@ -38,7 +38,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 namespace {
 
 // Per TextureCtx user data.
-struct RtxGlfImagePluginUserData {
+struct RtxHioImagePluginUserData {
     HioImageSharedPtr image;
 
     std::mutex mipLevelsMutex;
@@ -47,14 +47,14 @@ struct RtxGlfImagePluginUserData {
 
 /// A Renderman Rtx texture plugin that uses HioImage to read files,
 /// allowing support for additional file types beyond .tex.
-class RtxGlfImagePlugin : public RtxPlugin {
+class RtxHioImagePlugin : public RtxPlugin {
 public:
-    RtxGlfImagePlugin(RixContext* rixCtx, const char* pluginName);
-    ~RtxGlfImagePlugin() override;
+    RtxHioImagePlugin(RixContext* rixCtx, const char* pluginName);
+    ~RtxHioImagePlugin() override;
 
-    // Convenience to get the user data as a RtxGlfImagePluginUserData*.
-    RtxGlfImagePluginUserData* data(TextureCtx& tCtx) {
-        return static_cast<RtxGlfImagePluginUserData*>(tCtx.userData);
+    // Convenience to get the user data as a RtxHioImagePluginUserData*.
+    RtxHioImagePluginUserData* data(TextureCtx& tCtx) {
+        return static_cast<RtxHioImagePluginUserData*>(tCtx.userData);
     }
 
     // RtxPlugin overrides
@@ -66,12 +66,12 @@ private:
     RixMessages* m_msgHandler;
 };
 
-RtxGlfImagePlugin::RtxGlfImagePlugin(RixContext *rixCtx, const char *pluginName) :
+RtxHioImagePlugin::RtxHioImagePlugin(RixContext *rixCtx, const char *pluginName) :
     m_msgHandler((RixMessages *)rixCtx->GetRixInterface(k_RixMessages))
 {
 }
 
-RtxGlfImagePlugin::~RtxGlfImagePlugin()
+RtxHioImagePlugin::~RtxHioImagePlugin()
 {
     // Do nothing
 }
@@ -87,7 +87,7 @@ _ConvertWrapMode(HioAddressMode hioWrapMode, RixMessages *msgs,
         return true;
     case HioAddressModeMirrorRepeat:
         msgs->ErrorAlways(
-            "RtxGlfImagePlugin: "
+            "RtxHioImagePlugin: "
             "Texture %s has unsupported HioAddressModeMirrorRepeat; using "
             "k_Periodic instead.",
             filename.c_str());
@@ -98,7 +98,7 @@ _ConvertWrapMode(HioAddressMode hioWrapMode, RixMessages *msgs,
         return true;
     case HioAddressModeClampToBorderColor:
         msgs->ErrorAlways(
-            "RtxGlfImagePlugin: "
+            "RtxHioImagePlugin: "
             "Texture %s has unsupported HioAddressModeClampToBorderColor; using "
             "k_Black instead.",
             filename.c_str());
@@ -131,7 +131,7 @@ _ConvertSRGBtoLinear(T *dest, unsigned nPixels,
 }
 
 int
-RtxGlfImagePlugin::Open(TextureCtx& tCtx)
+RtxHioImagePlugin::Open(TextureCtx& tCtx)
 {
     tCtx.userData = nullptr;
 
@@ -152,7 +152,7 @@ RtxGlfImagePlugin::Open(TextureCtx& tCtx)
     HioImageSharedPtr image = HioImage::OpenForReading(filename);
     if (!image) {
         m_msgHandler->ErrorAlways(
-            "RtxGlfImagePlugin %p: "
+            "RtxHioImagePlugin %p: "
             "failed to open '%s'\n", this, filename.c_str());
         return 1;
     }
@@ -178,7 +178,7 @@ RtxGlfImagePlugin::Open(TextureCtx& tCtx)
         break;
     default:
         m_msgHandler->ErrorAlways(
-            "RtxGlfImagePlugin %p: "
+            "RtxHioImagePlugin %p: "
             "unsupported data type for %s\n", this, filename.c_str());
         return 1;
     }
@@ -214,7 +214,7 @@ RtxGlfImagePlugin::Open(TextureCtx& tCtx)
 
     // Allocate storage for this context.  Renderman will
     // request as tiles, which we will service from this buffer.
-    RtxGlfImagePluginUserData* data = new RtxGlfImagePluginUserData();
+    RtxHioImagePluginUserData* data = new RtxHioImagePluginUserData();
     tCtx.userData = data;
     data->image = image;
 
@@ -222,9 +222,9 @@ RtxGlfImagePlugin::Open(TextureCtx& tCtx)
 }
 
 int
-RtxGlfImagePlugin::Fill(TextureCtx& tCtx, FillRequest& fillReq)
+RtxHioImagePlugin::Fill(TextureCtx& tCtx, FillRequest& fillReq)
 {
-    RtxGlfImagePluginUserData* data = this->data(tCtx);
+    RtxHioImagePluginUserData* data = this->data(tCtx);
     assert(nullptr != data);
 
     // Find (or create) appropriate MIP level.
@@ -250,7 +250,7 @@ RtxGlfImagePlugin::Fill(TextureCtx& tCtx, FillRequest& fillReq)
             if (tCtx.dataType != TextureCtx::k_Byte &&
                 tCtx.dataType != TextureCtx::k_Float) {
                 m_msgHandler->ErrorAlways(
-                    "RtxGlfImagePlugin %p: unsupported data type\n", this);
+                    "RtxHioImagePlugin %p: unsupported data type\n", this);
                 return 1;
             }
 
@@ -323,9 +323,9 @@ RtxGlfImagePlugin::Fill(TextureCtx& tCtx, FillRequest& fillReq)
 }
 
 int
-RtxGlfImagePlugin::Close(TextureCtx& tCtx)
+RtxHioImagePlugin::Close(TextureCtx& tCtx)
 {
-    RtxGlfImagePluginUserData* data = this->data(tCtx);
+    RtxHioImagePluginUserData* data = this->data(tCtx);
     if (nullptr != data) {
         for (HioImage::StorageSpec &cachedLevel: data->mipLevels) {
             delete [] (char*) cachedLevel.data;
@@ -339,5 +339,5 @@ RtxGlfImagePlugin::Close(TextureCtx& tCtx)
 
 RTXPLUGINCREATE
 {
-    return new RtxGlfImagePlugin(rixCtx, pluginName);
+    return new RtxHioImagePlugin(rixCtx, pluginName);
 }

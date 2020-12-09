@@ -27,17 +27,6 @@
 #include "pxr/pxr.h"
 #include "pxr/base/arch/defines.h"
 
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-#include <GL/glew.h>
-#else // PXR_OPENGL_SUPPORT_ENABLED
-// MTL_FIXME: These GL constants shouldn't be referenced by Hydra.
-//            Create a Hydra enum to represent instead
-#define GL_UNSIGNED_INT_2_10_10_10_REV  0x8368
-#define GL_INT_2_10_10_10_REV           0x8D9F
-#define GL_PRIMITIVES_GENERATED         0x8C87
-#define GL_TIME_ELAPSED                 0x88BF
-#endif // PXR_OPENGL_SUPPORT_ENABLED
-
 #import <Metal/Metal.h>
 
 #include "pxr/imaging/mtlf/api.h"

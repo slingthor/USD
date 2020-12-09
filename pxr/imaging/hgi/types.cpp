@@ -25,6 +25,8 @@
 #include "pxr/imaging/hgi/types.h"
 #include "pxr/base/tf/diagnostic.h"
 
+#include <algorithm>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 size_t
@@ -64,6 +66,8 @@ HgiGetComponentCount(const HgiFormat f)
     case HgiFormatBC7UNorm8Vec4:
     case HgiFormatBC7UNorm8Vec4srgb:
     case HgiFormatUNorm8Vec4srgb:
+    case HgiFormatBC1UNorm8Vec4:
+    case HgiFormatBC3UNorm8Vec4:
         return 4;
     case HgiFormatCount:
     case HgiFormatInvalid:
@@ -130,6 +134,8 @@ HgiGetDataSizeOfFormat(
     case HgiFormatBC6UFloatVec3:
     case HgiFormatBC7UNorm8Vec4:
     case HgiFormatBC7UNorm8Vec4srgb:
+    case HgiFormatBC1UNorm8Vec4:
+    case HgiFormatBC3UNorm8Vec4:
         if (blockWidth) {
             *blockWidth = 4;
         }
@@ -154,10 +160,27 @@ HgiIsCompressed(const HgiFormat f)
     case HgiFormatBC6UFloatVec3:
     case HgiFormatBC7UNorm8Vec4:
     case HgiFormatBC7UNorm8Vec4srgb:
+    case HgiFormatBC1UNorm8Vec4:
+    case HgiFormatBC3UNorm8Vec4:
         return true;
     default:
         return false;
     }
+}
+
+size_t
+HgiGetDataSize(
+    const HgiFormat format,
+    const GfVec3i &dimensions)
+{
+    size_t blockWidth, blockHeight;
+    const size_t bpt =
+        HgiGetDataSizeOfFormat(format, &blockWidth, &blockHeight);
+    return
+        ((dimensions[0] + blockWidth  - 1) / blockWidth ) *
+        ((dimensions[1] + blockHeight - 1) / blockHeight) *
+        std::max(1, dimensions[2]) *
+        bpt;
 }
 
 uint16_t
@@ -192,18 +215,12 @@ HgiGetMipInfos(
 
     std::vector<HgiMipInfo> result;
     result.reserve(numMips);
-    
-    size_t blockWidth, blockHeight;
-    const size_t bpt =
-        HgiGetDataSizeOfFormat(format, &blockWidth, &blockHeight);
+
     size_t byteOffset = 0;
     GfVec3i size = dimensions;
 
     for (uint16_t mipLevel = 0; mipLevel < numMips; mipLevel++) {
-        const size_t byteSize = 
-            ((size[0] + blockWidth  - 1) / blockWidth ) *
-            ((size[1] + blockHeight - 1) / blockHeight) *
-            size[2] * bpt;
+        const size_t byteSize = HgiGetDataSize(format, size);
 
         result.push_back({ byteOffset, size, byteSize });
 

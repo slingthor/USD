@@ -21,7 +21,7 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/garch/glApi.h"
 #include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdSt/drawItem.h"
@@ -134,13 +134,11 @@ HdStRenderPassStateGL::Bind()
         glDisable(GL_BLEND);
     }
 
-    if (!_alphaToCoverageUseDefault) {
-        if (_alphaToCoverageEnabled) {
-            glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-            glEnable(GL_SAMPLE_ALPHA_TO_ONE);
-        } else {
-            glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-        }
+    if (_alphaToCoverageEnabled) {
+        glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+        glEnable(GL_SAMPLE_ALPHA_TO_ONE);
+    } else {
+        glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
     }
     glEnable(GL_PROGRAM_POINT_SIZE);
     GLint glMaxClipPlanes;

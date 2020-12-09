@@ -80,7 +80,6 @@ else()
             sdf
             ${Boost_PYTHON_LIBRARY}
             ${OPENGL_gl_LIBRARY}
-            ${OPENGL_glu_LIBRARY}
             ${GLEW_LIBRARY}
             ${X11_LIBRARIES}
             ${optionalLibs}
@@ -132,5 +131,8 @@ else()
             plugInfo.json
             shaders/pcfShader.glslfx
             shaders/simpleLighting.glslfx
+
+        DOXYGEN_FILES
+            overview.dox
     )
 endif()

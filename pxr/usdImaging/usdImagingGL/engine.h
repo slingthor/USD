@@ -52,11 +52,9 @@
 
 #include "pxr/imaging/hdx/selectionTracker.h"
 #include "pxr/imaging/hdx/renderSetupTask.h"
-#include "pxr/imaging/hdx/pickTask.h"
 
 #include "pxr/imaging/hgi/hgi.h"
 
-#include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/garch/simpleLightingContext.h"
 #include "pxr/imaging/garch/simpleMaterial.h"

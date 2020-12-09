@@ -24,12 +24,12 @@
 // info.cpp
 //
 
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/garch/glApi.h"
 
 #include "pxr/imaging/glf/info.h"
 #include "pxr/imaging/glf/glContext.h"
 
-#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/glApi.h"
 
 #include "pxr/base/tf/stringUtils.h"
 
@@ -87,14 +87,14 @@ GlfHasExtensions(string const & queryExtensions)
 bool
 GlfHasLegacyGraphics()
 {
-    GlfGlewInit();
+    GarchGLApiLoad();
 
-    // if glew says we don't support OpenGL 2.0,
+    // if GL loader says we don't support OpenGL 2.0,
     // then we must have very limited graphics.  In
     // common usage, this should only be true for NX
     // clients.
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    return !GLEW_VERSION_2_0;
+    return !GARCH_GLAPI_HAS(VERSION_2_0);
 #else
     return true;
 #endif

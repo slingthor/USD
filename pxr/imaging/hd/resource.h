@@ -31,7 +31,7 @@
 #include "pxr/imaging/hd/api.h"
 #include "pxr/imaging/hd/version.h"
 
-#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/glApi.h"
 
 #if defined(PXR_METAL_SUPPORT_ENABLED)
 #include "pxr/imaging/mtlf/mtlDevice.h"

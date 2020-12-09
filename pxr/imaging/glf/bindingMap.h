@@ -28,7 +28,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/glf/api.h"
-#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/glApi.h"
 #include "pxr/imaging/garch/bindingMap.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/token.h"

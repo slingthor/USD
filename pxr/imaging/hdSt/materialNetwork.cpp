@@ -29,6 +29,12 @@
 #include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/udimTextureObject.h"
 
+#ifdef PXR_MATERIALX_SUPPORT_ENABLED
+#include "pxr/imaging/hdSt/materialXFilter.h"
+#endif
+
+#include "pxr/imaging/hd/material.h"
+
 #include "pxr/imaging/garch/udimTexture.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
@@ -48,10 +54,6 @@
 #include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-TF_DEFINE_ENV_SETTING(HDST_USE_TRANSLUCENT_MATERIAL_TAG, false,
-                      "Use translucent material tag instead of additive for"
-                      "translucent materials with no given material tag.");
 
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
@@ -205,7 +207,7 @@ _ConvertLegacyHdMaterialNetwork(
 static TfToken
 _GetMaterialTag(
     VtDictionary const& metadata,
-    HdSt_MaterialNode const& terminal)
+    HdMaterialNode2 const& terminal)
 {
     // Strongest materialTag opinion is a hardcoded tag in glslfx meta data.
     // This can be used for masked, additive, translucent or volume materials.
@@ -247,12 +249,7 @@ _GetMaterialTag(
     }
 
     if (isTranslucent) {
-        // Default to our cheapest blending: unsorted additive unless env var
-        // is set
-        const bool useTranslucentMaterialTag =
-            TfGetEnvSetting(HDST_USE_TRANSLUCENT_MATERIAL_TAG);
-        return useTranslucentMaterialTag ? HdStMaterialTagTokens->translucent : 
-                                           HdStMaterialTagTokens->additive;
+        return HdStMaterialTagTokens->translucent;
     }
 
     // An empty materialTag on the HdRprimCollection level means: 'ignore all
@@ -308,21 +305,18 @@ _GetGlslfxForTerminal(
     }
 }
 
-static HdSt_MaterialNode const*
+static HdMaterialNode2 const*
 _GetTerminalNode(
     SdfPath const& id,
-    HdSt_MaterialNetwork const& network)
+    HdMaterialNetwork2 const& network,
+    TfToken const & terminalName)
 {
-    if (network.terminals.size() != 1) {
-        if (network.terminals.size() > 1) {
-            TF_WARN("Unsupported number of terminals [%d] in material [%s]",
-                    (int)network.terminals.size(), id.GetText());
-        }
+    // Get the Surface or Volume Terminal
+    auto const& terminalConnIt = network.terminals.find(terminalName);
+    if (terminalConnIt == network.terminals.end()) {
         return nullptr;
     }
-
-    auto const& terminalConnIt = network.terminals.begin();
-    HdSt_MaterialConnection const& connection = terminalConnIt->second;
+    HdMaterialConnection2 const& connection = terminalConnIt->second;
     SdfPath const& terminalPath = connection.upstreamNode;
     auto const& terminalIt = network.nodes.find(terminalPath);
     return &terminalIt->second;
@@ -336,16 +330,15 @@ _GetTerminalNode(
 //
 static VtValue
 _GetNodeFallbackValue(
-    HdSt_MaterialNode const& node,
+    HdMaterialNode2 const& node,
     TfToken const& outputName)
 {
     SdrRegistry &shaderReg = SdrRegistry::GetInstance();
 
     // Find the corresponding Sdr node.
     SdrShaderNodeConstPtr const sdrNode = 
-        shaderReg.GetShaderNodeByIdentifierAndType(
-            node.nodeTypeId,
-            HioGlslfxTokens->glslfx);
+        shaderReg.GetShaderNodeByIdentifierAndType(node.nodeTypeId,
+                                                   HioGlslfxTokens->glslfx);
     if (!sdrNode) {
         return VtValue();
     }
@@ -385,8 +378,8 @@ _GetNodeFallbackValue(
 
 static VtValue
 _GetParamFallbackValue(
-    HdSt_MaterialNetwork const& network,
-    HdSt_MaterialNode const& node,
+    HdMaterialNetwork2 const& network,
+    HdMaterialNode2 const& node,
     TfToken const& paramName)
 {
     // The 'fallback value' will be the value of the material param if nothing
@@ -400,9 +393,9 @@ _GetParamFallbackValue(
 
     if (connIt != node.inputConnections.end()) {
         if (!connIt->second.empty()) {
-            HdSt_MaterialConnection const& con = connIt->second.front();
+            HdMaterialConnection2 const& con = connIt->second.front();
             auto const& pnIt = network.nodes.find(con.upstreamNode);
-            HdSt_MaterialNode const& upstreamNode = pnIt->second;
+            HdMaterialNode2 const& upstreamNode = pnIt->second;
         
             const VtValue fallbackValue =
                 _GetNodeFallbackValue(upstreamNode, con.upstreamOutputName);
@@ -455,7 +448,7 @@ _GetParamFallbackValue(
 static TfToken
 _GetPrimvarNameAttributeValue(
     SdrShaderNodeConstPtr const& sdrNode,
-    HdSt_MaterialNode const& node,
+    HdMaterialNode2 const& node,
     TfToken const& propName)
 {
     VtValue vtName;
@@ -512,8 +505,8 @@ _MakeMaterialParamsForAdditionalPrimvar(
 
 static void
 _MakeMaterialParamsForPrimvarReader(
-    HdSt_MaterialNetwork const& network,
-    HdSt_MaterialNode const& node,
+    HdMaterialNetwork2 const& network,
+    HdMaterialNode2 const& node,
     SdfPath const& nodePath,
     TfToken const& paramName,
     SdfPathSet* visitedNodes,
@@ -544,8 +537,8 @@ _MakeMaterialParamsForPrimvarReader(
 
 static void
 _MakeMaterialParamsForTransform2d(
-    HdSt_MaterialNetwork const& network,
-    HdSt_MaterialNode const& node,
+    HdMaterialNetwork2 const& network,
+    HdMaterialNode2 const& node,
     SdfPath const& nodePath,
     TfToken const& paramName,
     SdfPathSet* visitedNodes,
@@ -565,11 +558,11 @@ _MakeMaterialParamsForTransform2d(
     auto inIt = node.inputConnections.find(_tokens->in);
     if (inIt != node.inputConnections.end()) {
         if (!inIt->second.empty()) {
-            HdSt_MaterialConnection const& con = inIt->second.front();
+            HdMaterialConnection2 const& con = inIt->second.front();
             SdfPath const& upstreamNodePath = con.upstreamNode;
             
             auto const& pnIt = network.nodes.find(upstreamNodePath);
-            HdSt_MaterialNode const& primvarNode = pnIt->second;
+            HdMaterialNode2 const& primvarNode = pnIt->second;
             SdrShaderNodeConstPtr primvarSdr = 
                 shaderReg.GetShaderNodeByIdentifierAndType(
                     primvarNode.nodeTypeId, HioGlslfxTokens->glslfx);
@@ -664,7 +657,7 @@ _ResolveAssetPath(VtValue const& value)
 template<typename T>
 static auto
 _ResolveParameter(
-    HdSt_MaterialNode const& node,
+    HdMaterialNode2 const& node,
     SdrShaderNodeConstPtr const &sdrNode,
     TfToken const &name,
     T const &defaultValue) -> T
@@ -695,7 +688,7 @@ _ResolveParameter(
 static HdWrap
 _ResolveWrapSamplerParameter(
     SdfPath const &nodePath,
-    HdSt_MaterialNode const& node,
+    HdMaterialNode2 const& node,
     SdrShaderNodeConstPtr const &sdrNode,
     TfToken const &name)
 {
@@ -734,7 +727,7 @@ _ResolveWrapSamplerParameter(
 static HdMinFilter
 _ResolveMinSamplerParameter(
     SdfPath const &nodePath,
-    HdSt_MaterialNode const& node,
+    HdMaterialNode2 const& node,
     SdrShaderNodeConstPtr const &sdrNode)
 {
     // Using linearMipmapLinear as fallback value.
@@ -779,7 +772,7 @@ _ResolveMinSamplerParameter(
 static HdMagFilter
 _ResolveMagSamplerParameter(
     SdfPath const &nodePath,
-    HdSt_MaterialNode const& node,
+    HdMaterialNode2 const& node,
     SdrShaderNodeConstPtr const &sdrNode)
 {
     const TfToken value = _ResolveParameter(
@@ -798,7 +791,7 @@ _ResolveMagSamplerParameter(
 static HdSamplerParameters
 _GetSamplerParameters(
     SdfPath const &nodePath,
-    HdSt_MaterialNode const& node,
+    HdMaterialNode2 const& node,
     SdrShaderNodeConstPtr const &sdrNode)
 {
     return { _ResolveWrapSamplerParameter(
@@ -843,9 +836,9 @@ _GetSubtextureIdentifier(
 
 static void
 _MakeMaterialParamsForTexture(
-    HdSt_MaterialNetwork const& network,
-    HdSt_MaterialNode const& node,
-    HdSt_MaterialNode const& downstreamNode, // needed to determine def value
+    HdMaterialNetwork2 const& network,
+    HdMaterialNode2 const& node,
+    HdMaterialNode2 const& downstreamNode, // needed to determine def value
     SdfPath const& nodePath,
     TfToken const& outputName,
     TfToken const& paramName,
@@ -891,7 +884,7 @@ _MakeMaterialParamsForTexture(
         auto const& opacityConIt = downstreamNode.inputConnections.find(
             _tokens->opacity);
         if (opacityConIt != downstreamNode.inputConnections.end()) {
-            HdSt_MaterialConnection const& con = opacityConIt->second.front();
+            HdMaterialConnection2 const& con = opacityConIt->second.front();
             premultiplyTexture = ((nodePath == con.upstreamNode) && 
                                   (con.upstreamOutputName == _tokens->a));
         } 
@@ -988,11 +981,11 @@ _MakeMaterialParamsForTexture(
 
     if (stIt != node.inputConnections.end()) {
         if (!stIt->second.empty()) {
-            HdSt_MaterialConnection const& con = stIt->second.front();
+            HdMaterialConnection2 const& con = stIt->second.front();
             SdfPath const& upstreamNodePath = con.upstreamNode;
             
             auto const& upIt = network.nodes.find(upstreamNodePath);
-            HdSt_MaterialNode const& upstreamNode = upIt->second;
+            HdMaterialNode2 const& upstreamNode = upIt->second;
 
             SdrShaderNodeConstPtr upstreamSdr = 
                 shaderReg.GetShaderNodeByIdentifierAndType(
@@ -1114,8 +1107,8 @@ _MakeMaterialParamsForTexture(
 
 static void
 _MakeMaterialParamsForFieldReader(
-    HdSt_MaterialNetwork const& network,
-    HdSt_MaterialNode const& node,
+    HdMaterialNetwork2 const& network,
+    HdMaterialNode2 const& node,
     SdfPath const& nodePath,
     TfToken const& paramName,
     SdfPathSet* visitedNodes,
@@ -1161,8 +1154,8 @@ _MakeMaterialParamsForFieldReader(
 
 static void
 _MakeParamsForInputParameter(
-    HdSt_MaterialNetwork const& network,
-    HdSt_MaterialNode const& node,
+    HdMaterialNetwork2 const& network,
+    HdMaterialNode2 const& node,
     TfToken const& paramName,
     SdfPathSet* visitedNodes,
     HdSt_MaterialParamVector *params,
@@ -1177,20 +1170,20 @@ _MakeParamsForInputParameter(
 
     if (conIt != node.inputConnections.end()) {
 
-        std::vector<HdSt_MaterialConnection> const& cons = conIt->second;
+        std::vector<HdMaterialConnection2> const& cons = conIt->second;
         if (!cons.empty()) {
 
             // Find the node that is connected to this input
-            HdSt_MaterialConnection const& con = cons.front();
+            HdMaterialConnection2 const& con = cons.front();
             auto const& upIt = network.nodes.find(con.upstreamNode);
 
             if (upIt != network.nodes.end()) {
 
                 SdfPath const& upstreamPath = upIt->first;
                 TfToken const& upstreamOutputName = con.upstreamOutputName;
-                HdSt_MaterialNode const& upstreamNode = upIt->second;
+                HdMaterialNode2 const& upstreamNode = upIt->second;
 
-                SdrShaderNodeConstPtr upstreamSdr =
+                SdrShaderNodeConstPtr upstreamSdr = 
                     shaderReg.GetShaderNodeByIdentifierAndType(
                         upstreamNode.nodeTypeId,
                         HioGlslfxTokens->glslfx);
@@ -1252,8 +1245,8 @@ _MakeParamsForInputParameter(
 
 static void
 _GatherMaterialParams(
-    HdSt_MaterialNetwork const& network,
-    HdSt_MaterialNode const& node,
+    HdMaterialNetwork2 const& network,
+    HdMaterialNode2 const& node,
     HdSt_MaterialParamVector *params,
     HdStMaterialNetwork::TextureDescriptorVector *textureDescriptors,
     TfToken const& materialTag)
@@ -1335,26 +1328,24 @@ HdStMaterialNetwork::ProcessMaterialNetwork(
     _textureDescriptors.clear();
     _materialTag = HdStMaterialTagTokens->defaultMaterialTag;
 
-    HdSt_MaterialNetwork surfaceNetwork;
+    HdMaterialNetwork2 surfaceNetwork;
 
     // The fragment source comes from the 'surface' network or the
     // 'volume' network.
-    _ConvertLegacyHdMaterialNetwork(
-        hdNetworkMap,
-        HdMaterialTerminalTokens->surface,
-        &surfaceNetwork);
+    bool isVolume = false;
+    HdMaterialNetwork2ConvertFromHdMaterialNetworkMap(hdNetworkMap,
+                                                      &surfaceNetwork,
+                                                      &isVolume);
+    const TfToken &terminalName = (isVolume) ? HdMaterialTerminalTokens->volume 
+                                            : HdMaterialTerminalTokens->surface;
 
-    bool isVolume = surfaceNetwork.terminals.empty();
-    if (isVolume) {
-        _ConvertLegacyHdMaterialNetwork(
-            hdNetworkMap,
-            HdMaterialTerminalTokens->volume,
-            &surfaceNetwork);
-    }
+#ifdef PXR_MATERIALX_SUPPORT_ENABLED
+    HdSt_ApplyMaterialXFilter(&surfaceNetwork);
+#endif
 
-    if (HdSt_MaterialNode const* surfTerminal = 
-            _GetTerminalNode(materialId, surfaceNetwork)) 
-    {
+    if (HdMaterialNode2 const* surfTerminal = 
+            _GetTerminalNode(materialId, surfaceNetwork, terminalName)) {
+
         // Extract the glslfx and metadata for surface/volume.
         _GetGlslfxForTerminal(_surfaceGfx, &_surfaceGfxHash,
                               surfTerminal->nodeTypeId, resourceRegistry);
@@ -1363,15 +1354,15 @@ HdStMaterialNetwork::ProcessMaterialNetwork(
             // If the glslfx file is not valid we skip parsing the network.
             // This produces no fragmentSource which means Storm's material
             // will use the fallback shader.
-
             if (_surfaceGfx->IsValid()) {
-                _fragmentSource = isVolume ? _surfaceGfx->GetVolumeSource() : 
-                    _surfaceGfx->GetSurfaceSource();
+                
+                _fragmentSource = isVolume ? _surfaceGfx->GetVolumeSource() 
+                                           : _surfaceGfx->GetSurfaceSource();
                 _materialMetadata = _surfaceGfx->GetMetadata();
                 _materialTag = _GetMaterialTag(_materialMetadata, *surfTerminal);
-                _GatherMaterialParams(
-                    surfaceNetwork, *surfTerminal,
-                    &_materialParams, &_textureDescriptors, _materialTag);
+                _GatherMaterialParams(surfaceNetwork, *surfTerminal,
+                                      &_materialParams, &_textureDescriptors, 
+                                      _materialTag);
 
                 // OSL networks have a displacement network in hdNetworkMap
                 // under terminal: HdMaterialTerminalTokens->displacement.

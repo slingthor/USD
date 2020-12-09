@@ -30,6 +30,7 @@
 #include "pxr/usd/sdf/fileIO_Common.h"
 #include "pxr/usd/sdf/layer.h"
 #include "pxr/usd/ar/asset.h"
+#include "pxr/usd/ar/resolvedPath.h"
 #include "pxr/usd/ar/resolver.h"
 
 #include "pxr/base/trace/trace.h"
@@ -56,8 +57,8 @@ TF_DEFINE_ENV_SETTING(
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-// Our interface to the YACC menva parser for parsing to SdfData.
-extern bool Sdf_ParseMenva(
+// Our interface to the YACC layer parser for parsing to SdfData.
+extern bool Sdf_ParseLayer(
     const string& context, 
     const std::shared_ptr<PXR_NS::ArAsset>& asset,
     const string& token,
@@ -66,8 +67,8 @@ extern bool Sdf_ParseMenva(
     PXR_NS::SdfDataRefPtr data,
     PXR_NS::SdfLayerHints *hints);
 
-extern bool Sdf_ParseMenvaFromString(
-    const std::string & menvaString,
+extern bool Sdf_ParseLayerFromString(
+    const std::string & layerString,
     const string& token,
     const string& version,
     PXR_NS::SdfDataRefPtr data,
@@ -139,7 +140,8 @@ SdfTextFileFormat::CanRead(const string& filePath) const
 {
     TRACE_FUNCTION();
 
-    std::shared_ptr<ArAsset> asset = ArGetResolver().OpenAsset(filePath);
+    std::shared_ptr<ArAsset> asset = ArGetResolver().OpenAsset(
+        ArResolvedPath(filePath));
     return asset && _CanReadImpl(asset, GetFileCookie());
 }
 
@@ -151,7 +153,8 @@ SdfTextFileFormat::Read(
 {
     TRACE_FUNCTION();
 
-    std::shared_ptr<ArAsset> asset = ArGetResolver().OpenAsset(resolvedPath);
+    std::shared_ptr<ArAsset> asset = ArGetResolver().OpenAsset(
+        ArResolvedPath(resolvedPath));
     if (!asset) {
         return false;
     }
@@ -176,7 +179,7 @@ SdfTextFileFormat::Read(
 
     SdfLayerHints hints;
     SdfAbstractDataRefPtr data = InitData(layer->GetFileFormatArguments());
-    if (!Sdf_ParseMenva(
+    if (!Sdf_ParseLayer(
             resolvedPath, asset, GetFormatId(), GetVersionString(), 
             metadataOnly, TfDynamic_cast<SdfDataRefPtr>(data), &hints)) {
         return false;
@@ -208,13 +211,15 @@ struct Sdf_IsLayerMetadataField : public Sdf_IsMetadataField
 #define _WriteLayerOffset  Sdf_FileIOUtility::WriteLayerOffset
 
 static bool
-_WriteLayerToMenva(
+_WriteLayer(
     const SdfLayer* l,
     std::ostream& out,
     const string& cookie,
     const string& versionString,
-    const string& comment)
+    const string& commentOverride)
 {
+    TRACE_FUNCTION();
+
     _Write(out, 0, "%s %s\n", cookie.c_str(), versionString.c_str());
 
     // Grab the pseudo-root, which is where all layer-specific
@@ -229,12 +234,14 @@ _WriteLayerToMenva(
     // Partition this layer's fields so that all fields to write out are
     // in the range [fields.begin(), metadataFieldsEnd).
     TfTokenVector fields = pseudoRoot->ListFields();
-    TfTokenVector::iterator metadataFieldsEnd = 
-        std::partition(fields.begin(), fields.end(), Sdf_IsLayerMetadataField());
+    TfTokenVector::iterator metadataFieldsEnd = std::partition(
+        fields.begin(), fields.end(), Sdf_IsLayerMetadataField());
 
     // Write comment at the top of the metadata section for readability.
-    if (!comment.empty())
-    {
+    const std::string comment = commentOverride.empty() ?
+        l->GetComment() : commentOverride;
+
+    if (!comment.empty()) {
         _WriteQuotedString(header, 1, comment);
         _Write(header, 0, "\n");
     }
@@ -298,10 +305,9 @@ _WriteLayerToMenva(
     }
         
     // Root prims
-    TF_FOR_ALL(i, l->GetRootPrims())
-    {
+    for (const SdfPrimSpecHandle& rootPrim : l->GetRootPrims()) {
         _Write(out, 0,"\n");
-        (*i)->WriteToStream(out, 0);
+        Sdf_WritePrim(rootPrim.GetSpec(), out, 0);
     }
 
     _Write(out, 0,"\n");
@@ -324,7 +330,9 @@ SdfTextFileFormat::WriteToFile(
         return false;
     }
 
-    bool ok = Write(layer, wrapper.GetStream(), comment);
+    const bool ok = _WriteLayer(
+        &layer, wrapper.GetStream(), GetFileCookie(), GetVersionString(), 
+        comment);
 
     if (ok && !wrapper.Commit(&reason)) {
         TF_RUNTIME_ERROR(reason);
@@ -341,11 +349,9 @@ SdfTextFileFormat::ReadFromString(
 {
     SdfLayerHints hints;
     SdfAbstractDataRefPtr data = InitData(layer->GetFileFormatArguments());
-    if (!Sdf_ParseMenvaFromString(str, 
-                                  GetFormatId(),
-                                  GetVersionString(),
-                                  TfDynamic_cast<SdfDataRefPtr>(data),
-                                  &hints)) {
+    if (!Sdf_ParseLayerFromString(
+            str, GetFormatId(), GetVersionString(),
+            TfDynamic_cast<SdfDataRefPtr>(data), &hints)) {
         return false;
     }
 
@@ -360,37 +366,13 @@ SdfTextFileFormat::WriteToString(
     const std::string& comment) const
 {
     std::stringstream ostr;
-    if (!Write(layer, ostr, comment)) {
+    if (!_WriteLayer(
+            &layer, ostr, GetFileCookie(), GetVersionString(), comment)) {
         return false;
     }
 
     *str = ostr.str();
     return true;
-}
-
-bool
-SdfTextFileFormat::WriteToStream(
-    const SdfLayer& layer,
-    std::ostream& ostr) const
-{
-    return Write(layer, ostr);
-}
-
-bool
-SdfTextFileFormat::Write(
-    const SdfLayer& layer,
-    std::ostream& ostr,
-    const string& commentOverride) const
-{
-    TRACE_FUNCTION();
-
-    string comment = commentOverride.empty() ?
-        layer.GetComment() : commentOverride;
-
-    return _WriteLayerToMenva(&layer, ostr, GetFileCookie(),
-                              GetVersionString(), comment);
-
-    return false;
 }
 
 bool 

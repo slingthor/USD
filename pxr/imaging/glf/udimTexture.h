@@ -27,7 +27,7 @@
 /// \file Glf/udimTexture.h
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/garch/api.h"
+#include "pxr/imaging/glf/api.h"
 
 #include "pxr/imaging/garch/udimTexture.h"
 
@@ -43,7 +43,7 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GlfUdimTexture);
 class GlfUdimTexture : public GarchUdimTexture {
 public:
     GLF_API
-    virtual ~GlfUdimTexture();
+    ~GlfUdimTexture() override;
 
 protected:
     GLF_API
@@ -52,7 +52,7 @@ protected:
         HioImage::ImageOriginLocation originLocation,
         std::vector<std::tuple<int, TfToken>>&& tiles,
         bool const premultiplyAlpha,
-        HioImage::SourceColorSpace sourceColorSpace); // APPLE METAL: HioImage
+        HioImage::SourceColorSpace sourceColorSpace);
 
     friend class GlfResourceFactory;
 

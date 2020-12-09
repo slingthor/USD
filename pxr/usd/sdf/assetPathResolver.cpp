@@ -92,7 +92,11 @@ Sdf_ResolvePath(
     ArAssetInfo* assetInfo)
 {
     TRACE_FUNCTION();
+#if AR_VERSION == 1
     return ArGetResolver().ResolveWithAssetInfo(layerPath, assetInfo);
+#else
+    return ArGetResolver().Resolve(layerPath, assetInfo);
+#endif
 }
 
 bool
@@ -112,6 +116,7 @@ Sdf_ComputeFilePath(
 
     string resolvedPath = Sdf_ResolvePath(layerPath, assetInfo);  
     if (resolvedPath.empty()) {
+#if AR_VERSION == 1
         // If we can't resolve layerPath, it means no layer currently
         // exists at that location. Compute the local path to figure
         // out where this layer would go if we were to create a new
@@ -126,6 +131,14 @@ Sdf_ComputeFilePath(
         if (!resolver.IsSearchPath(layerPath)) {
             resolvedPath = resolver.ComputeLocalPath(layerPath);
         }
+#else
+        // If we can't resolve layerPath, it means no layer currently
+        // exists at that location. Use ResolveForNewAsset to figure
+        // out where this layer would go if we were to create a new
+        // one. 
+        ArResolver& resolver = ArGetResolver();
+        resolvedPath = resolver.ResolveForNewAsset(layerPath, assetInfo);
+#endif
     }
 
     return resolvedPath;

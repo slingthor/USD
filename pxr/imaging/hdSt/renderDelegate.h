@@ -129,16 +129,14 @@ public:
 
     HDST_API
     virtual HdInstancer *CreateInstancer(HdSceneDelegate *delegate,
-                                         SdfPath const& id,
-                                         SdfPath const& instancerId) override;
+                                         SdfPath const& id) override;
 
     HDST_API
     virtual void DestroyInstancer(HdInstancer *instancer) override;
 
     HDST_API
     virtual HdRprim *CreateRprim(TfToken const& typeId,
-                                 SdfPath const& rprimId,
-                                 SdfPath const& instancerId) override;
+                                 SdfPath const& rprimId) override;
     HDST_API
     virtual void DestroyRprim(HdRprim *rPrim) override;
 
@@ -205,6 +203,8 @@ protected:
     Hgi *_hgi;
     
 private:
+    void _ApplyTextureSettings();
+
     static const TfTokenVector SUPPORTED_RPRIM_TYPES;
     static const TfTokenVector SUPPORTED_SPRIM_TYPES;
 

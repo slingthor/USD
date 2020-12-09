@@ -27,7 +27,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hdSt/resourceBinder.h"
-#include "pxr/imaging/hdSt/computeShader.h"
+#include "pxr/imaging/hdSt/extCompComputeShader.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 
 #include "pxr/imaging/hd/bufferSource.h"
@@ -80,7 +80,7 @@ public:
     /// will cache and de-duplicate its compute shader instance with.
     HdStExtCompGpuComputationResource(
         HdBufferSpecVector const &outputBufferSpecs,
-        HdSt_ComputeShaderSharedPtr const &kernel,
+        HdSt_ExtCompComputeShaderSharedPtr const &kernel,
         HdBufferArrayRangeSharedPtrVector const &inputs,
         HdStResourceRegistrySharedPtr const &registry
     );
@@ -116,7 +116,7 @@ public:
 
 private:
     HdBufferSpecVector                    _outputBufferSpecs;
-    HdSt_ComputeShaderSharedPtr            _kernel;
+    HdSt_ExtCompComputeShaderSharedPtr    _kernel;
     HdStResourceRegistrySharedPtr         _registry;
     
     size_t                                _shaderSourceHash;

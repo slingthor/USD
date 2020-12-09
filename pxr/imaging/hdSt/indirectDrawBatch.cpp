@@ -21,7 +21,7 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/garch/glApi.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
@@ -67,6 +67,7 @@ HdSt_IndirectDrawBatch::HdSt_IndirectDrawBatch(
     : HdSt_DrawBatch(drawItemInstance)
     , _drawCommandBufferDirty(false)
     , _bufferArraysHash(0)
+    , _barElementOffsetsHash(0)
     , _numVisibleItems(0)
     , _numTotalVertices(0)
     , _numTotalElements(0)
@@ -99,7 +100,8 @@ HdSt_IndirectDrawBatch::_Init(HdStDrawItemInstance * drawItemInstance)
     // remember buffer arrays version for dispatch buffer updating
     HdStDrawItem const* drawItem = drawItemInstance->GetDrawItem();
     _bufferArraysHash = drawItem->GetBufferArraysHash();
-    
+    // _barElementOffsetsHash is updated during _CompileBatch
+
     // determine gpu culling program by the first drawitem
     _useDrawArrays  = !drawItem->GetTopologyRange();
     _useInstancing = static_cast<bool>(drawItem->GetInstanceIndexRange());
@@ -115,6 +117,10 @@ HdSt_IndirectDrawBatch::_Init(HdStDrawItemInstance * drawItemInstance)
         _cullingProgram->Initialize(
             _useDrawArrays, _useGpuInstanceCulling, _bufferArraysHash);
     }
+
+    TF_DEBUG(HDST_DRAW_BATCH).Msg(
+        "   Resetting dispatch buffer.\n");
+    _dispatchBuffer.reset();
 }
 
 HdSt_IndirectDrawBatch::_CullingProgram &
@@ -300,6 +306,9 @@ HdSt_IndirectDrawBatch::_CompileBatch(
     for (size_t item = 0; item < numDrawItemInstances; ++item) {
         HdStDrawItemInstance const * instance = _drawItemInstances[item];
         HdStDrawItem const * drawItem = _drawItemInstances[item]->GetDrawItem();
+
+        _barElementOffsetsHash = TfHash::Combine(_barElementOffsetsHash,
+                                            drawItem->GetElementOffsetsHash());
 
         //
         // index buffer data
@@ -798,48 +807,73 @@ HdSt_IndirectDrawBatch::_CompileBatch(
     }
 }
 
-bool
+HdSt_DrawBatch::ValidationResult
 HdSt_IndirectDrawBatch::Validate(bool deepValidation)
 {
-    if (!TF_VERIFY(!_drawItemInstances.empty())) return false;
+    if (!TF_VERIFY(!_drawItemInstances.empty())) {
+        return ValidationResult::RebuildAllBatches;
+    }
+
+    TF_DEBUG(HDST_DRAW_BATCH).Msg(
+        "Validating indirect draw batch %p (deep validation = %d)...\n",
+        (void*)(this), deepValidation);
 
     // check the hash to see they've been reallocated/migrated or not.
     // note that we just need to compare the hash of the first item,
     // since drawitems are aggregated and ensure that they are sharing
     // same buffer arrays.
-
     HdStDrawItem const* batchItem = _drawItemInstances.front()->GetDrawItem();
-
-    size_t bufferArraysHash = batchItem->GetBufferArraysHash();
+    size_t const bufferArraysHash = batchItem->GetBufferArraysHash();
 
     if (_bufferArraysHash != bufferArraysHash) {
         _bufferArraysHash = bufferArraysHash;
-        _dispatchBuffer.reset();
-        return false;
+        TF_DEBUG(HDST_DRAW_BATCH).Msg(
+            "   Buffer arrays hash changed. Need to rebuild batch.\n");
+        return ValidationResult::RebuildBatch;
     }
 
-    // Deep validation is needed when a drawItem changes its buffer spec,
-    // surface shader or geometric shader.
+    // Deep validation is flagged explicitly when a drawItem has changes to
+    // its BARs (e.g. buffer spec, aggregation, element offsets) or when its 
+    // surface shader or geometric shader changes.
     if (deepValidation) {
+        HD_TRACE_SCOPE("Indirect draw batch deep validation");
         // look through all draw items to be still compatible
 
         size_t numDrawItemInstances = _drawItemInstances.size();
+        size_t barElementOffsetsHash = 0;
+
         for (size_t item = 0; item < numDrawItemInstances; ++item) {
             HdStDrawItem const * drawItem
                 = _drawItemInstances[item]->GetDrawItem();
 
             if (!TF_VERIFY(drawItem->GetGeometricShader())) {
-                return false;
+                return ValidationResult::RebuildAllBatches;
             }
 
             if (!_IsAggregated(batchItem, drawItem)) {
-                return false;
+                 TF_DEBUG(HDST_DRAW_BATCH).Msg(
+                    "   Deep validation: Found draw item that fails aggregation"
+                    " test. Need to rebuild all batches.\n");
+                return ValidationResult::RebuildAllBatches;
             }
+
+            barElementOffsetsHash = TfHash::Combine(barElementOffsetsHash,
+                drawItem->GetElementOffsetsHash());
+        }
+
+        if (_barElementOffsetsHash != barElementOffsetsHash) {
+             TF_DEBUG(HDST_DRAW_BATCH).Msg(
+                "   Deep validation: Element offsets hash mismatch."
+                "   Rebuilding batch (even though only the dispatch buffer"
+                "   needs to be updated)\n.");
+            return ValidationResult::RebuildBatch;
         }
 
     }
 
-    return true;
+    TF_DEBUG(HDST_DRAW_BATCH).Msg(
+        "   Validation passed. No need to rebuild batch.\n");
+    return ValidationResult::ValidBatch;
 }
 
 void
@@ -1273,38 +1307,28 @@ HdSt_IndirectDrawBatch::_GPUFrustumInstanceCulling(
         HdBinding binding = binder.GetBinding(HdStIndirectDrawTokens->ulocCullParams);
         int bindLoc = binding.GetLocation();
 
-        //
-        // Reset culling pass
-        //
-
         // GfxCmds has no attachment since it is a vertex only shader.
         HgiGraphicsCmdsDesc gfxDesc;
-        HgiGraphicsCmdsUniquePtr resetGfxCmds= hgi->CreateGraphicsCmds(gfxDesc);
-        resetGfxCmds->PushDebugGroup("GPU frustum culling reset pass");
-        resetGfxCmds->BindPipeline(psoHandle);
-        resetGfxCmds->SetConstantValues(
+        HgiGraphicsCmdsUniquePtr cullGfxCmds = hgi->CreateGraphicsCmds(gfxDesc);
+        cullGfxCmds->PushDebugGroup("GPU frustum instance culling");
+        cullGfxCmds->BindPipeline(psoHandle);
+
+        // Reset Pass
+        cullGfxCmds->SetConstantValues(
             psoHandle, HgiShaderStageVertex, 
             bindLoc, sizeof(Uniforms), &cullParams);
 
-        resetGfxCmds->DrawIndirect(
+        cullGfxCmds->DrawIndirect(
             cullCommandBuffer->GetId(),
             cullCommandBuffer->GetOffset(),
             _dispatchBufferCullInput->GetCount(),
             cullCommandBuffer->GetStride());
 
-        // Since we do two shader passes that read/write to the SSBO
-        // (reset then cull) we need synchronization inbetween via SubmitCmds.
-        resetGfxCmds->PopDebugGroup();
-        hgi->SubmitCmds(resetGfxCmds.get());
+        // Make sure the reset-pass memory writes
+        // are visible to the culling shader pass.
+        cullGfxCmds->MemoryBarrier(HgiMemoryBarrierAll);
 
-        //
         // Perform Culling
-        //
-
-        HgiGraphicsCmdsUniquePtr cullGfxCmds = hgi->CreateGraphicsCmds(gfxDesc);
-        cullGfxCmds->PushDebugGroup("GPU frustum instance culling");
-        cullGfxCmds->BindPipeline(psoHandle);
-
         cullParams.resetPass = 0;
         cullGfxCmds->SetConstantValues(
             psoHandle, HgiShaderStageVertex,
@@ -1315,6 +1339,10 @@ HdSt_IndirectDrawBatch::_GPUFrustumInstanceCulling(
             cullCommandBuffer->GetOffset(),
             _dispatchBufferCullInput->GetCount(),
             cullCommandBuffer->GetStride());
+
+        // Make sure culling memory writes are
+        // visible to execute draw.
+        cullGfxCmds->MemoryBarrier(HgiMemoryBarrierAll);
 
         cullGfxCmds->PopDebugGroup();
         hgi->SubmitCmds(cullGfxCmds.get());
@@ -1424,6 +1452,10 @@ HdSt_IndirectDrawBatch::_GPUFrustumNonInstanceCulling(
         bindLoc, sizeof(Uniforms), &cullParams);
 
     cullGfxCmds->Draw(_dispatchBufferCullInput->GetCount(), 0, 1);
+
+    // Make sure culling memory writes are visible to execute draw.
+    cullGfxCmds->MemoryBarrier(HgiMemoryBarrierAll);
+
     cullGfxCmds->PopDebugGroup();
     hgi->SubmitCmds(cullGfxCmds.get());
     // XXX Remove the unbinding since it uses raw gl calls.

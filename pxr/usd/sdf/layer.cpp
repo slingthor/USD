@@ -352,7 +352,7 @@ SdfLayer::CreateNew(
         "SdfLayer::CreateNew('%s', '%s')\n",
         identifier.c_str(), TfStringify(args).c_str());
 
-    return _CreateNew(TfNullPtr, identifier, ArAssetInfo(), args);
+    return _CreateNew(TfNullPtr, identifier, args);
 }
 
 SdfLayerRefPtr
@@ -366,14 +366,13 @@ SdfLayer::CreateNew(
         fileFormat->GetFormatId().GetText(), 
         identifier.c_str(), TfStringify(args).c_str());
 
-    return _CreateNew(fileFormat, identifier, ArAssetInfo(), args);
+    return _CreateNew(fileFormat, identifier, args);
 }
 
 SdfLayerRefPtr
 SdfLayer::_CreateNew(
     SdfFileFormatConstPtr fileFormat,
     const string& identifier,
-    const ArAssetInfo& assetInfo,
     const FileFormatArguments &args)
 {
     if (Sdf_IsAnonLayerIdentifier(identifier)) {
@@ -398,11 +397,16 @@ SdfLayer::_CreateNew(
     const string absIdentifier = 
         isRelativePath ? TfAbsPath(identifier) : identifier;
 
+#if AR_VERSION == 1
     // Direct newly created layers to a local path.
     const string localPath = resolver.ComputeLocalPath(absIdentifier);
+#else
+    // Resolve the identifier to the path where new assets should go.
+    const string localPath = resolver.ResolveForNewAsset(absIdentifier);
+#endif
     if (localPath.empty()) {
         TF_CODING_ERROR(
-            "Failed to compute local path for new layer with "
+            "Failed to compute path for new layer with "
             "identifier '%s'", absIdentifier.c_str());
         return TfNullPtr;
     }
@@ -441,7 +445,7 @@ SdfLayer::_CreateNew(
         }
 
         layer = _CreateNewWithFormat(
-            fileFormat, absIdentifier, localPath, assetInfo, args);
+            fileFormat, absIdentifier, localPath, ArAssetInfo(), args);
 
         if (!TF_VERIFY(layer)) {
             return TfNullPtr;
@@ -978,7 +982,7 @@ SdfLayer::ReloadLayers(
 bool 
 SdfLayer::Import(const string &layerPath)
 {
-    string filePath = Sdf_ComputeFilePath(layerPath);
+    string filePath = Sdf_ResolvePath(layerPath);
     if (filePath.empty())
         return false;
 

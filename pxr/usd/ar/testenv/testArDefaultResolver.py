@@ -32,6 +32,11 @@ import shutil
 class TestArDefaultResolver(unittest.TestCase):
 
     def assertPathsEqual(self, path1, path2):
+        # XXX: Explicit conversion to str to accommodate change in
+        # return type to Ar.ResolvedPath in Ar 2.0.
+        path1 = str(path1)
+        path2 = str(path2)
+
         # Flip backslashes to forward slashes and make sure path case doesn't
         # cause test failures to accommodate platform differences. We don't use
         # os.path.normpath since that might fix up other differences we'd want
@@ -79,7 +84,9 @@ class TestArDefaultResolver(unittest.TestCase):
         with open(testFilePath, 'w') as ofp:
             print('Garbage', file=ofp)
         
-        resolvedPath = Ar.GetResolver().Resolve(testFileName)
+        # XXX: Explicit conversion to str to accommodate change in
+        # return type to Ar.ResolvedPath in Ar 2.0.
+        resolvedPath = str(Ar.GetResolver().Resolve(testFileName))
 
         # The resolved path should be absolute.
         self.assertTrue(os.path.isabs(resolvedPath))
@@ -181,6 +188,62 @@ class TestArDefaultResolver(unittest.TestCase):
         self.assertEqual(eval(repr(context)), context)
 
         self.assertNotEqual(emptyContext, context)
+
+    @unittest.skipIf(not hasattr(Ar.Resolver, "ResolveForNewAsset"),
+                     "No ResolveForNewAsset API")
+    def test_ResolveForNewAsset(self):
+        resolver  = Ar.GetResolver()
+
+        # ResolveForNewAsset returns the path a new asset would be written
+        # to for a given asset path. ArDefaultResolver assumes all asset paths
+        # are filesystem paths, so this is just the absolute path of the
+        # input.
+        self.assertPathsEqual(
+            resolver.ResolveForNewAsset('/test/path/1/newfile'),
+            os.path.abspath('/test/path/1/newfile'))
+
+        self.assertPathsEqual(
+            resolver.ResolveForNewAsset('test/path/1/newfile'),
+            os.path.abspath('test/path/1/newfile'))
+
+        # This should work even if a file happens to already exist at the
+        # computed path.
+        testDir = os.path.abspath('ResolveForNewAsset')
+        if os.path.isdir(testDir):
+            shutil.rmtree(testDir)
+        os.makedirs(testDir)
+
+        testFileName = 'test_ResolveForNewAsset.txt'
+        testFileAbsPath = os.path.join(testDir, testFileName)
+        with open(testFileAbsPath, 'w') as ofp:
+            print('Garbage', file=ofp)
+
+        self.assertPathsEqual(
+            resolver.ResolveForNewAsset(testFileAbsPath),
+            testFileAbsPath)
+
+        self.assertPathsEqual(
+            resolver.ResolveForNewAsset(
+                'ResolveForNewAsset/test_ResolveForNewAsset.txt'),
+            testFileAbsPath)
+
+    @unittest.skipIf(not hasattr(Ar.Resolver, "CreateContextFromString"),
+                     "No CreateContextFromString(s) API")
+    def test_CreateContextFromString(self):
+        resolver = Ar.GetResolver()
+
+        def _TestWithPaths(searchPaths):
+            self.assertEqual(
+                resolver.CreateContextFromString(os.pathsep.join(searchPaths)),
+                Ar.ResolverContext(Ar.DefaultResolverContext(searchPaths)))
+            self.assertEqual(
+                resolver.CreateContextFromStrings(
+                    [("", os.pathsep.join(searchPaths))]),
+                Ar.ResolverContext(Ar.DefaultResolverContext(searchPaths)))
+
+        _TestWithPaths([])
+        _TestWithPaths(["/a"])
+        _TestWithPaths(["/a", "/b"])
 
 if __name__ == '__main__':
     unittest.main()

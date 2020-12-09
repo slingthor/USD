@@ -19,10 +19,12 @@ endif()
 if (PXR_ENABLE_METAL_SUPPORT AND PXR_ENABLE_GL_SUPPORT)
     add_compile_options(-x objective-c++)
     FIND_LIBRARY(COREVIDEO_LIBRARY CoreVideo)
+    list(APPEND optionalLibraries garch)
     list(APPEND optionalLibraries ${COREVIDEO_LIBRARY} hgiMetal)
     list(APPEND optionalCppFiles metal.mm)
     list(APPEND optionalPrivateHeaders metal.h)
 elseif(PXR_ENABLE_GL_SUPPORT)
+    list(APPEND optionalLibraries garch)
     list(APPEND optionalLibraries hgiGL)
     list(APPEND optionalCppFiles opengl.cpp)
     list(APPEND optionalPrivateHeaders opengl.h)
@@ -33,9 +35,6 @@ pxr_library(hgiInterop
         gf
         tf
         hgi
-        ${GLEW_LIBRARY}
-        ${OPENGL_gl_LIBRARY}
-        ${OPENGL_glu_LIBRARY}
         ${optionalLibraries}
 
     PUBLIC_HEADERS

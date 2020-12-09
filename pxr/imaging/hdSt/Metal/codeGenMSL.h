@@ -108,7 +108,8 @@ public:
     /// Constructor.
     HD_API
     HdSt_CodeGenMSL(HdSt_GeometricShaderPtr const &geometricShader,
-                    HdStShaderCodeSharedPtrVector const &shaders);
+                    HdStShaderCodeSharedPtrVector const &shaders,
+                    TfToken const &materialTag);
 
     /// Constructor for non-geometric use cases.
     /// Don't call compile when constructed this way.
@@ -205,6 +206,7 @@ private:
     HdSt_ResourceBinder::MetaData _metaData;
     HdSt_GeometricShaderPtr _geometricShader;
     HdStShaderCodeSharedPtrVector _shaders;
+    TfToken _materialTag;
 
     // source buckets
     std::stringstream _genDefinitions, _genOSDDefinitions, _genCommon, _genVS, _genTCS, _genTES;

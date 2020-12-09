@@ -354,18 +354,15 @@ public:
     HD_API
     virtual SdfPath GetMaterialId(SdfPath const& rprimId) override;
 
+    HD_API
+    virtual SdfPath GetInstancerId(SdfPath const& primId) override;
+
     HD_API 
     virtual VtValue GetMaterialResource(SdfPath const &materialId) override;
 
     HD_API
     virtual VtValue GetCameraParamValue(SdfPath const &cameraId, 
                                         TfToken const &paramName) override;
-    HD_API
-    virtual HdTextureResource::ID GetTextureResourceID(
-        SdfPath const& textureId) override;
-    HD_API
-    virtual HdTextureResourceSharedPtr GetTextureResource(
-        SdfPath const& textureId) override;
 
     HD_API
     virtual HdRenderBufferDescriptor GetRenderBufferDescriptor(
@@ -502,6 +499,7 @@ private:
 
     typedef std::map<SdfPath, SdfPath> SdfPathMap;
     SdfPathMap _materialBindings;
+    SdfPathMap _instancerBindings;
 
     bool _hasInstancePrimvars;
     int _refineLevel;

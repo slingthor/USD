@@ -22,7 +22,8 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/pxr.h"
-#include "pxr/imaging/glf/glew.h"
+
+#include "pxr/imaging/garch/glApi.h"
 
 #include "pxr/usdImaging/usdImagingGL/unitTestGLDrawing.h"
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
@@ -114,7 +115,7 @@ void
 UsdImagingGL_UnitTestWindow::OnInitializeGL()
 {
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    GlfGlewInit();
+    GarchGLApiLoad();
     GlfRegisterDefaultDebugOutputMessageCallback();
     GlfContextCaps::InitInstance();
 #endif

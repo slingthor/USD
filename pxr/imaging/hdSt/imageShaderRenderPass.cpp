@@ -181,7 +181,7 @@ HdSt_ImageShaderRenderPass::_Execute(
         
         // APPLE METAL: Handoff a render descriptor to Mtlf
         if (!HdStResourceFactory::GetInstance()->IsOpenGL()) {
-            if (desc.width) {
+            if (desc.colorTextures.size() || desc.depthTexture) {
                 // Set the render pass descriptor for Mtlf to use with the render encoders
                 MTLRenderPassDescriptor* rpd = context->GetHgi()->renderPassDescriptor;
                 

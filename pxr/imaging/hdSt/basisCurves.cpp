@@ -35,6 +35,7 @@
 #include "pxr/imaging/hdSt/material.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/rprimUtils.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/base/arch/hash.h"
 
@@ -52,17 +53,15 @@
 #include "pxr/imaging/hd/vtBufferSource.h"
 #include "pxr/base/vt/value.h"
 
-#include <iostream>
-
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdStBasisCurves::HdStBasisCurves(SdfPath const& id,
-                 SdfPath const& instancerId)
-    : HdBasisCurves(id, instancerId)
+HdStBasisCurves::HdStBasisCurves(SdfPath const& id)
+    : HdBasisCurves(id)
     , _topology()
     , _topologyId(0)
     , _customDirtyBitsInUse(0)
     , _refineLevel(0)
+    , _displayOpacity(false)
 {
     /*NOTHING*/
 }
@@ -78,11 +77,11 @@ HdStBasisCurves::Sync(HdSceneDelegate *delegate,
 {
     TF_UNUSED(renderParam);
 
+    bool updateMaterialTag = false;
     if (*dirtyBits & HdChangeTracker::DirtyMaterialId) {
         _SetMaterialId(delegate->GetRenderIndex().GetChangeTracker(),
                        delegate->GetMaterialId(GetId()));
-
-        _sharedData.materialTag = _GetMaterialTag(delegate->GetRenderIndex());
+        updateMaterialTag = true;
     }
 
     // Check if either the material or geometric shaders need updating for
@@ -101,7 +100,13 @@ HdStBasisCurves::Sync(HdSceneDelegate *delegate,
         updateGeometricShader = true;
     }
 
+    bool displayOpacity = _displayOpacity;
     _UpdateRepr(delegate, reprToken, dirtyBits);
+
+    if (updateMaterialTag || 
+        (GetMaterialId().IsEmpty() && displayOpacity != _displayOpacity)) { 
+        _sharedData.materialTag = _GetMaterialTag(delegate->GetRenderIndex());
+    }
 
     if (updateMaterialShader || updateGeometricShader) {
         _UpdateShadersForAllReprs(delegate,
@@ -129,7 +134,8 @@ HdStBasisCurves::_GetMaterialTag(const HdRenderIndex &renderIndex) const
     }
 
     // A material may have been unbound, we should clear the old tag
-    return HdMaterialTagTokens->defaultMaterialTag;
+    return _displayOpacity ? HdStMaterialTagTokens->masked :
+                             HdMaterialTagTokens->defaultMaterialTag;
 }
 
 void
@@ -147,11 +153,23 @@ HdStBasisCurves::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
     _UpdateVisibility(sceneDelegate, dirtyBits);
 
     /* MATERIAL SHADER (may affect subsequent primvar population) */
-    if ((*dirtyBits & (HdChangeTracker::DirtyInstancer |
-                       HdChangeTracker::NewRepr)) ||
+    if ((*dirtyBits & HdChangeTracker::NewRepr) ||
         HdChangeTracker::IsAnyPrimvarDirty(*dirtyBits, id)) {
         drawItem->SetMaterialShader(HdStGetMaterialShader(this, sceneDelegate));
     }
+
+    // Reset value of _displayOpacity
+    if (HdChangeTracker::IsAnyPrimvarDirty(*dirtyBits, id)) {
+        _displayOpacity = false;
+    }
+
+    /* INSTANCE PRIMVARS */
+    _UpdateInstancer(sceneDelegate, dirtyBits);
+    HdStUpdateInstancerData(sceneDelegate->GetRenderIndex(),
+            this, drawItem, &_sharedData, *dirtyBits);
+    _displayOpacity = _displayOpacity ||
+            HdStIsInstancePrimvarExistentAndValid(
+            sceneDelegate->GetRenderIndex(), this, HdTokens->displayOpacity);
 
     /* CONSTANT PRIMVARS, TRANSFORM, EXTENT AND PRIMID */
     if (HdStShouldPopulateConstantPrimvars(dirtyBits, id)) {
@@ -161,16 +179,10 @@ HdStBasisCurves::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
 
         HdStPopulateConstantPrimvars(this, &_sharedData, sceneDelegate,
             drawItem, dirtyBits, constantPrimvars);
-    }
 
-    /* INSTANCE PRIMVARS */
-    if (!GetInstancerId().IsEmpty()) {
-        HdStInstancer *instancer = static_cast<HdStInstancer*>(
-            sceneDelegate->GetRenderIndex().GetInstancer(GetInstancerId()));
-        if (TF_VERIFY(instancer)) {
-            instancer->PopulateDrawItem(this, drawItem,
-                                        &_sharedData, *dirtyBits);
-        }
+        _displayOpacity = _displayOpacity ||
+            HdStIsPrimvarExistentAndValid(this, sceneDelegate, 
+            constantPrimvars, HdTokens->displayOpacity);
     }
 
     /* TOPOLOGY */
@@ -206,18 +218,22 @@ HdStBasisCurves::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
     TF_VERIFY(drawItem->GetConstantPrimvarRange());
 }
 
-static const char* HdSt_PrimTypeToString(HdSt_GeometricShader::PrimitiveType type){
-    if (type == HdSt_GeometricShader::PrimitiveType::PRIM_BASIS_CURVES_LINES){
+static const char*
+HdSt_PrimTypeToString(HdSt_GeometricShader::PrimitiveType type) {
+    switch (type)
+    {
+    case HdSt_GeometricShader::PrimitiveType::PRIM_POINTS:
+        return "points";
+    case HdSt_GeometricShader::PrimitiveType::PRIM_BASIS_CURVES_LINES:
         return "lines";
-    }
-    if (type == HdSt_GeometricShader::PrimitiveType::PRIM_BASIS_CURVES_LINEAR_PATCHES){
+    case HdSt_GeometricShader::PrimitiveType::PRIM_BASIS_CURVES_LINEAR_PATCHES:
         return "patches[linear]";
-    }
-    if (type == HdSt_GeometricShader::PrimitiveType::PRIM_BASIS_CURVES_CUBIC_PATCHES){
+    case HdSt_GeometricShader::PrimitiveType::PRIM_BASIS_CURVES_CUBIC_PATCHES:
         return "patches[cubic]";
+    default:
+        TF_WARN("Unknown type");
+        return "unknown";
     }
-    TF_WARN("Unknown type");
-    return "unknown";
 }
 
 void
@@ -326,10 +342,18 @@ HdStBasisCurves::_UpdateDrawItemGeometricShader(
 
     TF_VERIFY(geomShader);
 
-    drawItem->SetGeometricShader(geomShader);
+    if (geomShader != drawItem->GetGeometricShader())
+    {
+        drawItem->SetGeometricShader(geomShader);
 
-    // The batches need to be validated and rebuilt if necessary.
-    renderIndex.GetChangeTracker().MarkBatchesDirty();
+        // If the gometric shader changes, we need to do a deep validation of
+        // batches, so they can be rebuilt if necessary.
+        renderIndex.GetChangeTracker().MarkBatchesDirty();
+
+        TF_DEBUG(HD_RPRIM_UPDATED).Msg(
+            "%s: Marking all batches dirty to trigger deep validation because"
+            " the geometric shader was updated.\n", GetId().GetText());
+    }
 }
 
 HdDirtyBits
@@ -417,8 +441,9 @@ HdStBasisCurves::_UpdateRepr(HdSceneDelegate *sceneDelegate,
                    HdChangeTracker::NewRepr);
 
     if (TfDebug::IsEnabled(HD_RPRIM_UPDATED)) {
-        std::cout << "HdStBasisCurves::_UpdateRepr " << GetId()
-                  << " Repr = " << reprToken << "\n";
+        TfDebug::Helper().Msg(
+            "HdStBasisCurves::_UpdateRepr for %s : Repr = %s\n",
+            GetId().GetText(), reprToken.GetText());
         HdChangeTracker::DumpDirtyBits(*dirtyBits);
     }
 
@@ -588,10 +613,15 @@ HdStBasisCurves::_PopulateTopology(HdSceneDelegate *sceneDelegate,
 
             HdBufferSpec::GetBufferSpecs(sources, &bufferSpecs);
 
+            // Set up the usage hints to mark topology as varying if
+            // there is a previously set range.
+            HdBufferArrayUsageHint usageHint;
+            usageHint.bits.sizeVarying = drawItem->GetTopologyRange()? 1 : 0;
+
             // allocate new range
             HdBufferArrayRangeSharedPtr range
                 = resourceRegistry->AllocateNonUniformBufferArrayRange(
-                    HdTokens->topology, bufferSpecs, HdBufferArrayUsageHint());
+                    HdTokens->topology, bufferSpecs, usageHint);
 
             // add sources to update queue
             resourceRegistry->AddSources(range, std::move(sources));
@@ -722,6 +752,10 @@ HdStBasisCurves::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
             } else {
                 sources.push_back(HdBufferSourceSharedPtr(
                         new HdVtBufferSource(primvar.name, value)));
+
+                if (primvar.name == HdTokens->displayOpacity) {
+                    _displayOpacity = true;
+                }
             }
         }
     }
@@ -814,6 +848,10 @@ HdStBasisCurves::_PopulateElementPrimvars(HdSceneDelegate *sceneDelegate,
         if (!value.IsEmpty()) {
             sources.push_back(HdBufferSourceSharedPtr(
                               new HdVtBufferSource(primvar.name, value)));
+                              
+            if (primvar.name == HdTokens->displayOpacity) {
+                _displayOpacity = true;
+            }
         }
     }
 
@@ -928,11 +966,8 @@ HdStBasisCurves::GetInitialDirtyBitsMask() const
         | HdChangeTracker::DirtyVisibility 
         | HdChangeTracker::DirtyWidths
         | HdChangeTracker::DirtyComputationPrimvarDesc
+        | HdChangeTracker::DirtyInstancer
         ;
-
-    if (!GetInstancerId().IsEmpty()) {
-        mask |= HdChangeTracker::DirtyInstancer;
-    }
 
     return mask;
 }

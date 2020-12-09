@@ -21,7 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/garch/glApi.h"
+
 #include "pxr/usdImaging/usdImagingGL/engine.h"
 
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
@@ -48,6 +49,7 @@
 
 #include "pxr/imaging/hd/rendererPlugin.h"
 #include "pxr/imaging/hd/rendererPluginRegistry.h"
+#include "pxr/imaging/hdx/pickTask.h"
 #include "pxr/imaging/hdx/taskController.h"
 #include "pxr/imaging/hdx/tokens.h"
 
@@ -103,8 +105,8 @@ void _InitGL()
 
     std::call_once(initFlag, []{
 
-        // Initialize Glew library for GL Extensions if needed
-        GlfGlewInit();
+        // Initialize GL library for GL Extensions if needed
+        GarchGLApiLoad();
 
         // Initialize if needed and switch to shared GL context.
         GlfSharedGLContextScopeHolder sharedContext;

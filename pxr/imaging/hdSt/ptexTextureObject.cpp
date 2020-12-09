@@ -132,9 +132,11 @@ HdStPtexTextureObject::_DestroyTextures()
 {
     if (Hgi * hgi = _GetHgi()) {
         if (_texelTexture) {
+            _SubtractFromTotalTextureMemory(_texelTexture);
             hgi->DestroyTexture(&_texelTexture);
         }
         if (_layoutBuffer) {
+            _AdjustTotalTextureMemory(-_layoutBuffer->GetByteSizeOfResource());
             hgi->DestroyBuffer(&_layoutBuffer);
         }
     }
@@ -325,6 +327,7 @@ HdStPtexTextureObject::_Commit()
         texDesc.initialData = _texelData.get();
         texDesc.pixelsByteSize = _numBytesPerPixel;
         _texelTexture = hgi->CreateTexture(texDesc);
+        _AddToTotalTextureMemory(_texelTexture);
     }
     
     // Layout GPU texture buffer creation
@@ -346,6 +349,7 @@ HdStPtexTextureObject::_Commit()
         bufDesc.byteSize = _numFaces * 6 * sizeof(uint16_t);
         bufDesc.initialData = _layoutData.get();
         _layoutBuffer = hgi->CreateBuffer(bufDesc);
+        _AdjustTotalTextureMemory(_layoutBuffer->GetByteSizeOfResource());
     }
     
     // Free CPU data

@@ -28,7 +28,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/api.h"
-#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/glApi.h"
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/hashmap.h"
 #include "pxr/base/tf/refBase.h"

@@ -21,7 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/garch/glApi.h"
+
 #include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
@@ -74,6 +75,7 @@ HdStRenderPassState::HdStRenderPassState(
     , _fallbackLightingShader(std::make_shared<HdSt_FallbackLightingShader>())
     , _clipPlanesBufferSize(0)
     , _alphaThresholdCurrent(0)
+    , _resolveMultiSampleAov(true)
 {
     _lightingShader = _fallbackLightingShader;
 }
@@ -271,6 +273,18 @@ HdStRenderPassState::Prepare(
 }
 
 void
+HdStRenderPassState::SetResolveAovMultiSample(bool state)
+{
+    _resolveMultiSampleAov = state;
+}
+
+bool
+HdStRenderPassState::GetResolveAovMultiSample() const
+{
+    return _resolveMultiSampleAov;
+}
+
+void
 HdStRenderPassState::SetLightingShader(HdStLightingShaderSharedPtr const &lightingShader)
 {
     if (lightingShader) {
@@ -330,6 +344,24 @@ void
 HdStRenderPassState::Unbind()
 {
     /*NOTHING*/
+}
+
+void
+HdStRenderPassState::SetCameraFramingState(GfMatrix4d const &worldToViewMatrix,
+                                           GfMatrix4d const &projectionMatrix,
+                                           GfVec4d const &viewport,
+                                           ClipPlanesVector const & clipPlanes)
+{
+    if (_camera) {
+        // If a camera handle was set, reset it.
+        _camera = nullptr;
+    }
+
+    _worldToViewMatrix = worldToViewMatrix;
+    _projectionMatrix = projectionMatrix;
+    _viewport = GfVec4f((float)viewport[0], (float)viewport[1],
+                        (float)viewport[2], (float)viewport[3]);
+    _clipPlanes = clipPlanes;
 }
 
 size_t
@@ -424,6 +456,7 @@ HdStRenderPassState::MakeGraphicsCmdsDesc(
 
     static const size_t maxColorTex = 8;
     const bool useMultiSample = GetUseAovMultiSample();
+    const bool resolveMultiSample = GetResolveAovMultiSample();
 
     HgiGraphicsCmdsDesc desc;
 
@@ -455,7 +488,7 @@ HdStRenderPassState::MakeGraphicsCmdsDesc(
 
         // Get resolve texture target.
         HgiTextureHandle hgiResolveHandle;
-        if (multiSampled) {
+        if (multiSampled && resolveMultiSample) {
             VtValue resolveRes = renderBuffer->GetResource(/*ms*/false);
             if (!TF_VERIFY(resolveRes.IsHolding<HgiTextureHandle>())) {
                 continue;
@@ -463,14 +496,10 @@ HdStRenderPassState::MakeGraphicsCmdsDesc(
             hgiResolveHandle = resolveRes.UncheckedGet<HgiTextureHandle>();
         }
 
-        // Assume AOVs have the same dimensions so pick size of any.
-        desc.width = renderBuffer->GetWidth();
-        desc.height = renderBuffer->GetHeight();
-
         HgiAttachmentDesc attachmentDesc;
 
-        attachmentDesc.format =
-            HdStHgiConversions::GetHgiFormat(renderBuffer->GetFormat());
+        attachmentDesc.format = hgiTexHandle->GetDescriptor().format;
+        attachmentDesc.usage = hgiTexHandle->GetDescriptor().usage;
 
         // We need to use LoadOpLoad instead of DontCare because we can have
         // multiple render passes that use the same attachments.
@@ -484,7 +513,7 @@ HdStRenderPassState::MakeGraphicsCmdsDesc(
 
         // Don't store multisample images. Only store the resolved versions.
         // This saves a bunch of bandwith (especially on tiled gpu's).
-        attachmentDesc.storeOp = multiSampled ?
+        attachmentDesc.storeOp = (multiSampled && resolveMultiSample) ?
             HgiAttachmentStoreOpDontCare :
             HgiAttachmentStoreOpStore;
 

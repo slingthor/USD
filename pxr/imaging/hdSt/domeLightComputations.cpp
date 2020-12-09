@@ -21,7 +21,7 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/garch/glApi.h"
 #include "pxr/imaging/hdSt/domeLightComputations.h"
 #include "pxr/imaging/hdSt/hgiConversions.h"
 #include "pxr/imaging/hdSt/simpleLightingShader.h"
@@ -204,7 +204,7 @@ HdSt_DomeLightComputationGPU::Execute(
     texBind0.stageUsage = HgiShaderStageCompute;
     texBind0.textures.push_back(srcTextureName);
     texBind0.samplers.push_back(srcSamplerName);
-    texBind0.resourceType = HgiBindResourceTypeSamplerImage;
+    texBind0.resourceType = HgiBindResourceTypeCombinedSamplerImage;
     resourceDesc.textures.push_back(std::move(texBind0));
 
     HgiTextureBindDesc texBind1;

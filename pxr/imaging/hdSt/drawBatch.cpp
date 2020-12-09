@@ -23,6 +23,7 @@
 //
 #include "pxr/imaging/hdSt/codeGen.h"
 #include "pxr/imaging/hdSt/commandBuffer.h"
+#include "pxr/imaging/hdSt/debugCodes.h"
 #include "pxr/imaging/hdSt/drawBatch.h"
 #include "pxr/imaging/hdSt/geometricShader.h"
 #include "pxr/imaging/hdSt/glslfxShader.h"
@@ -194,9 +195,14 @@ HdSt_DrawBatch::Rebuild()
             return false;
         }
         if (!Append(item)) {
+            TF_DEBUG(HDST_DRAW_BATCH).Msg("   Rebuild failed for batch %p\n",
+            (void*)(this));
             return false;
         }
     }
+
+    TF_DEBUG(HDST_DRAW_BATCH).Msg("   Rebuild success for batch %p\n",
+        (void*)(this));
 
     return true;
 }
@@ -306,7 +312,7 @@ HdSt_DrawBatch::_DrawingProgram::CompileShader(
 
     std::unique_ptr<HdSt_CodeGen> codeGen(
         HdStResourceFactory::GetInstance()->NewCodeGen(
-            _geometricShader, shaders));
+            _geometricShader, shaders, drawItem->GetMaterialTag()));
 
     // let resourcebinder resolve bindings and populate metadata
     // which is owned by codegen.

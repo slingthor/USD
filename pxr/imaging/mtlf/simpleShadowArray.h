@@ -70,7 +70,7 @@ protected:
     MTLF_API
     MtlfSimpleShadowArray();
     MTLF_API
-    virtual ~MtlfSimpleShadowArray();
+    ~MtlfSimpleShadowArray() override;
 
     friend class MtlfResourceFactory;
     

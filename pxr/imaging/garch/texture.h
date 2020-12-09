@@ -35,7 +35,7 @@
 #include "pxr/base/tf/weakPtr.h"
 #include "pxr/base/vt/dictionary.h"
 
-#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/glApi.h"
 
 #if defined(ARCH_OS_WINDOWS)
 typedef uint64_t GLuint64;

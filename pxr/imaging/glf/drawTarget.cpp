@@ -24,14 +24,14 @@
 // glf/drawTarget.cpp
 //
 
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/garch/glApi.h"
 
 #include "pxr/imaging/glf/drawTarget.h"
 #include "pxr/imaging/glf/glContext.h"
 #include "pxr/imaging/glf/diagnostic.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/glf/utils.h"
 
-#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/utils.h"
 
 #include "pxr/imaging/hf/perfLog.h"
@@ -73,7 +73,7 @@ GlfDrawTarget::GlfDrawTarget( GfVec2i const & size, bool requestMSAA /* =false *
     _size(size),
     _numSamples(1)
 {
-    GlfGlewInit();
+    GarchGLApiLoad();
 
     // If MSAA has been requested and it is enabled then we will create
     // msaa buffers
@@ -102,7 +102,7 @@ GlfDrawTarget::GlfDrawTarget( GarchDrawTargetPtr const & drawtarget ) :
     _numSamples(drawtarget->GetNumSamples()),
     _owningContext()
 {
-    GlfGlewInit();
+    GarchGLApiLoad();
 
     _GenFrameBuffer();
 
@@ -625,9 +625,9 @@ GlfDrawTarget::WriteToFile(std::string const & name,
     HioImage::StorageSpec storage;
     storage.width = _size[0];
     storage.height = _size[1];
-    storage.format = GarchGetHioFormat(a->GetFormat(),
-                                          a->GetType(),
-                                          /* isSRGB */ isSRGB);
+    storage.format = GarchGetHioFormat(a->GetFormat(), 
+                                     a->GetType(),
+                                     /* isSRGB */ isSRGB);
     storage.flipped = true;
     storage.data = buf.get();
 

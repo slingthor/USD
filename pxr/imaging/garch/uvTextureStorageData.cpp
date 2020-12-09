@@ -81,7 +81,7 @@ unsigned char * GarchUVTextureStorageData::GetRawBuffer(int mipLevel) const
 
 bool GarchUVTextureStorageData::Read(int degradeLevel,
                                      bool generateMipmap,
-                                     HioImage::ImageOriginLocation originLocation)
+                                   HioImage::ImageOriginLocation originLocation)
 {
     _targetMemory = _size;
     std::vector<float> storageArray;

@@ -114,11 +114,21 @@ that depend on GL, including:
 
 ##### Metal
 
-To build USD with Metal enabled requires macOS Mojave (10.14) or newer.
+Building USD with Metal enabled requires macOS Mojave (10.14) or newer.
 Support for Metal can optionally be disabled by specifying the cmake flag
 ```PXR_ENABLE_METAL_SUPPORT=FALSE```.  This will skip components and libraries
 that depend on Metal, including:
 - Hydra imaging
+
+##### Vulkan
+
+Building USD with Vulkan enabled requires the Vulkan SDK and glslang to
+be installed. The VULKAN_SDK environment variable must point to the
+location of the SDK. The glslang compiler headers must be locatable during
+the build process.
+
+Support for Vulkan can optionally be enabled by specifying the cmake flag
+```PXR_ENABLE_VULKAN_SUPPORT=TRUE```.
 
 ##### OSL (OpenShadingLanguage)
 
@@ -307,6 +317,20 @@ of the environment variable using the following CMake option:
 
 By doing this, USD will check the ```CUSTOM_USD_PLUGINPATHS``` environment variable for paths, instead of the default
 ```PXR_PLUGINPATH_NAME``` one.
+
+The values specified in ```PXR_PLUGINPATH_NAME``` or ```PXR_INSTALL_LOCATION```
+have the following characteristics:
+
+- Values may contain any number of paths.
+
+- Paths ending with slash ('/') have 'plugInfo.json' appended automatically.
+
+- '*' may be used anywhere to match any character except slash.
+
+- '**' may be used anywhere to match any character including slash.
+
+- Paths follow Unix '$PATH'-like conventions; when duplicate definitions exist
+  in the path, the first one found is used.
 
 ##### Shared library prefix
 

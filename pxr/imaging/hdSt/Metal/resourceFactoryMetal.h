@@ -51,7 +51,8 @@ public:
     HDST_API
     virtual HdSt_CodeGen *NewCodeGen(
         HdSt_GeometricShaderPtr const &geometricShader,
-        HdStShaderCodeSharedPtrVector const &shaders) const override;
+        HdStShaderCodeSharedPtrVector const &shaders,
+        TfToken const &materialTag) const override;
     
     HDST_API
     virtual HdSt_CodeGen *NewCodeGen(

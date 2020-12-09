@@ -21,7 +21,7 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/garch/glApi.h"
 
 #include "pxr/imaging/hdSt/textureObject.h"
 
@@ -98,6 +98,33 @@ HdStTextureObject::_GetHgi() const
     TF_VERIFY(hgi);
 
     return hgi;
+}
+
+void
+HdStTextureObject::_AdjustTotalTextureMemory(
+    const int64_t memDiff)
+{
+    if (TF_VERIFY(_textureObjectRegistry)) {
+        _textureObjectRegistry->AdjustTotalTextureMemory(memDiff);
+    }
+}
+
+void
+HdStTextureObject::_AddToTotalTextureMemory(
+    const HgiTextureHandle &texture)
+{
+    if (texture) {
+        _AdjustTotalTextureMemory(texture->GetByteSizeOfResource());
+    }
+}
+
+void
+HdStTextureObject::_SubtractFromTotalTextureMemory(
+    const HgiTextureHandle &texture)
+{
+    if (texture) {
+        _AdjustTotalTextureMemory(-texture->GetByteSizeOfResource());
+    }
 }
 
 std::string
@@ -265,6 +292,7 @@ HdStUvTextureObject::_CreateTexture(const HgiTextureDesc &desc)
     _DestroyTexture();
  
     _gpuTexture = hgi->CreateTexture(desc);
+    _AddToTotalTextureMemory(_gpuTexture);
 }
 
 void
@@ -287,6 +315,7 @@ void
 HdStUvTextureObject::_DestroyTexture()
 {
     if (Hgi * hgi = _GetHgi()) {
+        _SubtractFromTotalTextureMemory(_gpuTexture);
         hgi->DestroyTexture(&_gpuTexture);
     }
 }
@@ -391,7 +420,7 @@ HdStAssetUvTextureObject::_Load()
         std::make_unique<HdStGlfTextureCpuData>(
             textureData,
             _GetDebugName(GetTextureIdentifier()),
-            /* generateMips = */ true,
+            /* useOrGenerateMips = */ true,
             _GetPremultiplyAlpha(
                 GetTextureIdentifier().GetSubtextureIdentifier(), 
                 GetTextureType())));
@@ -517,6 +546,7 @@ HdStFieldTextureObject::HdStFieldTextureObject(
 HdStFieldTextureObject::~HdStFieldTextureObject()
 {
     if (Hgi * hgi = _GetHgi()) {
+        _SubtractFromTotalTextureMemory(_gpuTexture);
         hgi->DestroyTexture(&_gpuTexture);
     }
 }
@@ -567,11 +597,13 @@ HdStFieldTextureObject::_Commit()
     }
         
     // Free previously allocated texture
+    _SubtractFromTotalTextureMemory(_gpuTexture);
     hgi->DestroyTexture(&_gpuTexture);
 
     // Upload to GPU only if we have valid CPU data
     if (_cpuData && _cpuData->IsValid()) {
         _gpuTexture = hgi->CreateTexture(_cpuData->GetTextureDesc());
+        _AddToTotalTextureMemory(_gpuTexture);
     }
 
     // Free CPU memory after transfer to GPU

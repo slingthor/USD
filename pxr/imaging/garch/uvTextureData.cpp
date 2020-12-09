@@ -44,7 +44,7 @@ GarchUVTextureData::New(
     unsigned int cropBottom,
     unsigned int cropLeft,
     unsigned int cropRight,
-    HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: HioImage
+    HioImage::SourceColorSpace sourceColorSpace)
 {
     GarchUVTextureData::Params params;
     params.targetMemory = targetMemory;
@@ -57,7 +57,7 @@ GarchUVTextureData::New(
 
 GarchUVTextureDataRefPtr
 GarchUVTextureData::New(std::string const &filePath, Params const &params,
-                        HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: HioImage
+                      HioImage::SourceColorSpace sourceColorSpace)
 {
     return TfCreateRefPtr(new GarchUVTextureData(filePath, params,
 												 sourceColorSpace));
@@ -69,7 +69,7 @@ GarchUVTextureData::~GarchUVTextureData()
 
 GarchUVTextureData::GarchUVTextureData(std::string const &filePath,
                                    Params const &params, 
-                                   HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: HioImage
+                                   HioImage::SourceColorSpace sourceColorSpace)
   : _filePath(filePath),
     _params(params),
     _targetMemory(0),
@@ -99,7 +99,7 @@ GarchUVTextureData_ComputeMemory(HioImageSharedPtr const &img,
     const double scale = generateMipmap ? 4.0 / 3 : 1.0;
 
     if (HioIsCompressed(img->GetFormat())) {
-         return scale * HioGetDataSize(img->GetFormat(),
+        return scale * HioGetDataSize(img->GetFormat(), 
                             GfVec3i(img->GetWidth(), img->GetHeight(), 1));
     }
 
@@ -291,7 +291,7 @@ _IsValidCrop(HioImageSharedPtr image,
 
 bool
 GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
-                         HioImage::ImageOriginLocation originLocation)
+                       HioImage::ImageOriginLocation originLocation)
 {   
     TRACE_FUNCTION();
 

@@ -136,6 +136,14 @@ HgiMetalComputeCmds::PopDebugGroup()
 {
 }
 
+void
+HgiMetalComputeCmds::MemoryBarrier(HgiMemoryBarrier barrier)
+{
+    TF_VERIFY(barrier==HgiMemoryBarrierAll, "Unknown barrier");
+    // Do nothing. All resource writes performed in a given kernel function
+    // are visible in the next kernel function.
+}
+
 bool
 HgiMetalComputeCmds::_Submit(Hgi* hgi, HgiSubmitWaitType wait)
 {
@@ -165,8 +173,8 @@ HgiMetalComputeCmds::_Submit(Hgi* hgi, HgiSubmitWaitType wait)
     
     if (_secondaryCommandBuffer) {
         _hgi->ReleaseSecondaryCommandBuffer(_commandBuffer);
-        _commandBuffer = nil;
     }
+    _commandBuffer = nil;
 
     return submittedWork;
 }

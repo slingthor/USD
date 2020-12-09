@@ -22,6 +22,7 @@
 // language governing permissions and limitations under the Apache License.
 //
 
+#include "pxr/imaging/garch/glApi.h"
 #include "pxr/pxr.h"
 #include "pxr/usdImaging/usdAppUtils/frameRecorder.h"
 
@@ -29,6 +30,7 @@
 
 #include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/garch/simpleMaterial.h"
+#include "pxr/imaging/hio/image.h"
 #include "pxr/usd/usd/stage.h"
 #include "pxr/usd/usdGeom/bboxCache.h"
 #include "pxr/usd/usdGeom/metrics.h"
@@ -58,7 +60,7 @@ UsdAppUtilsFrameRecorder::UsdAppUtilsFrameRecorder() :
     _imagingEngine.reset(new UsdImagingGLEngine(_driver));
     
 	// Apple Metal: Don't initialise GL
-//  GlfGlewInit();
+//  GarchGLApiLoad();
 }
 
 UsdAppUtilsFrameRecorder::~UsdAppUtilsFrameRecorder()

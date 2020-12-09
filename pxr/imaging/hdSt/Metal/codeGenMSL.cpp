@@ -22,11 +22,11 @@
 // language governing permissions and limitations under the Apache License.
 //
 
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/garch/glApi.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/glApi.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hio/glslfx.h"
@@ -160,7 +160,8 @@ HdSt_CodeGenMSL::TParam::Usage operator|=(HdSt_CodeGenMSL::TParam::Usage &lhs,
 }
 
 HdSt_CodeGenMSL::HdSt_CodeGenMSL(HdSt_GeometricShaderPtr const &geometricShader,
-                             HdStShaderCodeSharedPtrVector const &shaders)
+                                 HdStShaderCodeSharedPtrVector const &shaders,
+                                 TfToken const &materialTag)
     : _geometricShader(geometricShader), _shaders(shaders)
 {
     TF_VERIFY(geometricShader);
@@ -3454,15 +3455,8 @@ HdSt_CodeGenMSL::_GenerateCommonDefinitions()
 void
 HdSt_CodeGenMSL::_GenerateCommonCode()
 {
-    // check if surface shader has masked material tag
-    for (auto const& shader : _shaders) {
-        if (HdStSurfaceShaderSharedPtr surfaceShader =
-            std::dynamic_pointer_cast<HdStSurfaceShader>(shader)) {
-            if (surfaceShader->GetMaterialTag() ==
-                HdStMaterialTagTokens->masked) {
-                _genCommon << "#define HD_MATERIAL_TAG_MASKED 1\n";
-            }
-        }
+    if (_materialTag == HdStMaterialTagTokens->masked) {
+        _genFS << "#define HD_MATERIAL_TAG_MASKED 1\n";
     }
 
     _genCommon  << "class ProgramScope<st> {\n"

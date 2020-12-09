@@ -28,6 +28,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+namespace internal { namespace GLApi { bool  GarchGLApiLoad(); } }
 
 bool GlfGlewInit()
 {
@@ -41,6 +42,7 @@ bool GlfGlewInit()
         glewExperimental = true;
 #endif // ARCH_OS_MACOS
         result = glewInit() == GLEW_OK;
+        result &= internal::GLApi::GarchGLApiLoad();
 #else
         result = true;
 #endif // ARCH_GFX_OPENGL

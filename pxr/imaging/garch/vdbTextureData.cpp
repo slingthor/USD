@@ -23,10 +23,10 @@
 //
 
 #include "pxr/imaging/garch/debugCodes.h"
-#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/utils.h"
 #include "pxr/imaging/garch/vdbTextureData.h"
 #include "pxr/imaging/hf/perfLog.h"
+#include "pxr/imaging/hio/image.h"
 
 #include "pxr/base/tf/fileUtils.h"
 #include "pxr/base/trace/trace.h"
@@ -255,7 +255,7 @@ public:
 
     // Get metadata for corresponding OpenGL texture.
     virtual void GetMetadata(int *bytesPerPixel,
-                             HioFormat *hioFormat) const = 0;
+                             HioFormat *format) const = 0;
 
     // Create a new OpenVDB grid (of the right type) by resampling
     // the old grid. The new grid will have the given transform.
@@ -324,7 +324,7 @@ public:
     }
 
     void GetMetadata(int *bytesPerPixel,
-                     HioFormat *hioFormat) const override;
+                     HioFormat *format) const override;
     
     _GridHolderBase *GetResampled(const GfMatrix4d &newTransform) override {
         TRACE_FUNCTION();
@@ -352,37 +352,37 @@ private:
 template<>
 void
 _GridHolder<openvdb::FloatGrid>::GetMetadata(int *bytesPerPixel,
-                                             HioFormat *hioFormat) const
+                                             HioFormat *format) const
 {
     *bytesPerPixel = sizeof(float);
-    *hioFormat = HioFormatFloat32;
+    *format = HioFormatFloat32;
 }
 
 template<>
 void
 _GridHolder<openvdb::DoubleGrid>::GetMetadata(int *bytesPerPixel,
-                                             HioFormat *hioFormat) const
+                                             HioFormat *format) const
 {
     *bytesPerPixel = sizeof(double);
-    *hioFormat = HioFormatDouble64;
+    *format = HioFormatDouble64;
 }
 
 template<>
 void
 _GridHolder<openvdb::Vec3fGrid>::GetMetadata(int *bytesPerPixel,
-                                             HioFormat *hioFormat) const
+                                             HioFormat *format) const
 {
     *bytesPerPixel = 3 * sizeof(float);
-    *hioFormat = HioFormatFloat32Vec3;
+    *format = HioFormatFloat32Vec3;
 }
 
 template<>
 void
 _GridHolder<openvdb::Vec3dGrid>::GetMetadata(int *bytesPerPixel,
-                                             HioFormat *hioFormat) const
+                                             HioFormat *format) const
 {
     *bytesPerPixel = 3 * sizeof(double);
-    *hioFormat = HioFormatDouble64Vec3;
+    *format = HioFormatDouble64Vec3;
 }
 
 _GridHolderBase *

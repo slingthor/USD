@@ -41,7 +41,7 @@
 #include "pxr/base/tf/refBase.h"
 #include "pxr/base/tf/weakBase.h"
 
-#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/glApi.h"
 
 #include <map>
 #include <set>

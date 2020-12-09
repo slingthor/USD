@@ -86,6 +86,7 @@ public:
 
 protected:
     size_t _GetBufferArraysHash() const override;
+    size_t _GetElementOffsetsHash() const override;
 
 private:
     HdSt_GeometricShaderSharedPtr _geometricShader;

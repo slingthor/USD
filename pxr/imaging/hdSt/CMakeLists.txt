@@ -19,9 +19,12 @@ if (OPENSUBDIV_HAS_METAL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
 endif()
 
-set(optionalPublicClasses "")
+set(optionalPrivateClasses "")
 set(optionalLibs "")
 set(optionalIncludeDirs "")
+if (${PXR_BUILD_MATERIALX_PLUGIN})
+    list(APPEND optionalPrivateClasses materialXFilter)
+endif()
 if (PXR_ENABLE_PTEX_SUPPORT)
     list(APPEND optionalPublicClasses ptexMipmapTextureLoader)
     list(APPEND optionalLibs ${PTEX_LIBRARY})
@@ -77,12 +80,10 @@ pxr_library(hdSt
         tf
         trace
         ${GFX}
-        ${GLEW_LIBRARY}
         ${OPENSUBDIV_LIBRARIES}
         ${optionalLibs}
 
     INCLUDE_DIRS
-        ${GLEW_INCLUDE_DIR}
         ${OPENSUBDIV_INCLUDE_DIR}
         ${optionalIncludeDirs}
 
@@ -170,9 +171,9 @@ pxr_library(hdSt
         basisCurvesShaderKey
         basisCurvesTopology
         codeGen
-        computeShader
         cullingShaderKey
         drawBatch
+        extCompComputeShader
         imageShaderShaderKey
         immediateDrawBatch
         indirectDrawBatch
@@ -188,12 +189,12 @@ pxr_library(hdSt
         subdivision
         subdivision3
         triangulate
-        unitTestDelegate
         unitTestGLDrawing
         unitTestHelper
         volumeShader
         volumeShaderKey
         ${GFXADDITIONAL}
+	${optionalPrivateClasses}
 
     RESOURCE_FILES
         plugInfo.json
@@ -223,6 +224,9 @@ pxr_library(hdSt
         shaders/terminals.glslfx
         shaders/visibility.glslfx
         shaders/volume.glslfx
+
+    DOXYGEN_FILES
+        overview.dox
 )
 
 if (X11_FOUND OR APPLE)

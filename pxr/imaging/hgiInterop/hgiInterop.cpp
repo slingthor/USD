@@ -33,6 +33,9 @@
 
 #if defined(HGIINTEROP_METAL_TO_GL_ENABLED)
     #include "pxr/imaging/hgiInterop/metal.h"
+#elif defined(PXR_VULKAN_SUPPORT_ENABLED)
+    #include "pxr/imaging/hgiVulkan/hgi.h"
+    #include "pxr/imaging/hgiInterop/vulkan.h"
 #elif defined(HGIINTEROP_GL_TO_GL_ENABLED)
     #include "pxr/imaging/hgiGL/hgi.h"
     #include "pxr/imaging/hgiInterop/opengl.h"
@@ -75,6 +78,16 @@ void HgiInterop::TransferToApp(
         } else {
             TF_CODING_ERROR("Unsupported Hgi backed: %s", gfxApi.GetText());
         }
+	}
+#elif defined(PXR_VULKAN_SUPPORT_ENABLED)
+    if (gfxApi==HgiTokens->Vulkan && interopDst==HgiTokens->OpenGL) {
+        // Transfer Vulkan textures to OpenGL application
+        if (!_vulkanToOpenGL) {
+            _vulkanToOpenGL.reset(new HgiInteropVulkan(hgi));
+        }
+        _vulkanToOpenGL->CompositeToInterop(color, depth, compRegion);
+    } else {
+        TF_CODING_ERROR("Unsupported Hgi backed: %s", gfxApi.GetText());
     }
 #elif defined(HGIINTEROP_GL_TO_GL_ENABLED)
     if (gfxApi==HgiTokens->OpenGL && interopDst==HgiTokens->OpenGL) {

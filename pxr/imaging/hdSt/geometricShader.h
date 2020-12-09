@@ -31,7 +31,7 @@
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/usd/sdf/path.h"
-#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/glApi.h"
 #include "pxr/imaging/hio/glslfx.h"
 
 #include <memory>
@@ -122,24 +122,24 @@ public:
                        float lineWidth = 0);
 
     HDST_API
-    virtual ~HdSt_GeometricShader();
+    ~HdSt_GeometricShader() override;
 
     // HdShader overrides
     HDST_API
-    virtual ID ComputeHash() const override;
+    ID ComputeHash() const override;
     HDST_API
-    virtual std::string GetSource(TfToken const &shaderStageKey) const override;
+    std::string GetSource(TfToken const &shaderStageKey) const override;
     HDST_API
-    virtual void BindResources(HdStGLSLProgram const &program,
+    void BindResources(HdStGLSLProgram const &program,
                                HdSt_ResourceBinder const &binder,
                                HdRenderPassState const &state) override;
     
     HDST_API
-    virtual void UnbindResources(HdStGLSLProgram const &program,
+    void UnbindResources(HdStGLSLProgram const &program,
                                  HdSt_ResourceBinder const &binder,
                                  HdRenderPassState const &state) override;
     HDST_API
-    virtual void AddBindings(HdBindingRequestVector *customBindings) override;
+    void AddBindings(HdBindingRequestVector *customBindings) override;
 
     std::vector<std::string> GetSourceKeys(TfToken const &shaderStageKey) const {
         return _glslfx->GetSourceKeys(shaderStageKey);

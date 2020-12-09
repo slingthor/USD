@@ -28,7 +28,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/glf/api.h"
-#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/glApi.h"
 #include "pxr/imaging/garch/simpleShadowArray.h"
 
 #include <vector>
@@ -38,7 +38,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class GlfSimpleShadowArray : public GarchSimpleShadowArray {
 public:
-
     // Disallow copies
     GlfSimpleShadowArray(const GlfSimpleShadowArray&) = delete;
     GlfSimpleShadowArray& operator=(const GlfSimpleShadowArray&) = delete;
@@ -64,7 +63,7 @@ protected:
     GLF_API
     GlfSimpleShadowArray();
     GLF_API
-    virtual ~GlfSimpleShadowArray();
+    ~GlfSimpleShadowArray() override;
 
     friend class GlfResourceFactory;
 

@@ -81,6 +81,7 @@ pxr_library(garch
         contextCaps
         drawTarget
         field3DTextureDataBase
+	    glApi
         glDebugWindow
         glPlatformDebugContext
         ptexTexture
@@ -109,10 +110,10 @@ pxr_library(garch
         fieldTextureData.h
         gl.h
         glPlatformContext.h
+        khrplatform.h
         ${GARCH_GLPLATFORMCONTEXT}.h
 
     PRIVATE_HEADERS
-        rankedTypeMap.h
         ${GARCH_GLPLATFORMDEBUGWINDOW}.h
 
     PYTHON_CPPFILES

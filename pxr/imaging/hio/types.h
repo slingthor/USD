@@ -27,6 +27,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hio/api.h"
 #include <stdlib.h>
+#include <cinttypes>
 
 PXR_NAMESPACE_OPEN_SCOPE
 

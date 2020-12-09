@@ -21,7 +21,7 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/garch/glApi.h"
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/GL/renderDelegateGL.h"
@@ -98,15 +98,7 @@ void HdStRenderDelegateGL::PrepareRender(
     if (params.applyRenderState) {
         glDisable(GL_BLEND);
     }
-    
-    // note: to get benefit of alpha-to-coverage, the target framebuffer
-    // has to be a MSAA buffer.
-    if (params.enableIdRender) {
-        glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-    } else if (params.enableSampleAlphaToCoverage) {
-        glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-    }
-    
+        
     // for points width
     glEnable(GL_PROGRAM_POINT_SIZE);
     

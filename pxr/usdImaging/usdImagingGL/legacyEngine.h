@@ -35,7 +35,7 @@
 #include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/garch/simpleMaterial.h"
 
-#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/glApi.h"
 #include "pxr/imaging/cameraUtil/conformWindow.h"
 
 #include "pxr/usd/usdGeom/gprim.h"
@@ -52,6 +52,8 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DECLARE_WEAK_PTRS(UsdImagingGLLegacyEngine);
+
+TF_DECLARE_WEAK_AND_REF_PTRS(GlfDrawTarget);
 
 class UsdImagingGLLegacyEngine : public TfWeakBase 
 {

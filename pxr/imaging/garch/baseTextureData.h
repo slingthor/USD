@@ -28,7 +28,7 @@
 #include "pxr/imaging/garch/api.h"
 #include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/utils.h"
-#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/glApi.h"
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/refPtr.h"
 #include "pxr/base/tf/weakPtr.h"
@@ -82,7 +82,7 @@ public:
 
     virtual bool Read(int degradeLevel, 
                       bool generateMipmap, 
-                      HioImage::ImageOriginLocation originLocation =
+                      HioImage::ImageOriginLocation originLocation = 
                                                  HioImage::OriginUpperLeft) = 0;
     
     virtual bool HasRawBuffer(int mipLevel = 0) const = 0;

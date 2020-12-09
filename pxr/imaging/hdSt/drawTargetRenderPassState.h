@@ -46,7 +46,8 @@ using HdRenderPassAovBindingVector =
 /// to major changes.  It is likely this functionality will be absorbed into
 /// the base class.
 ///
-class HdStDrawTargetRenderPassState final {
+class HdStDrawTargetRenderPassState final
+{
 public:
     HDST_API
     HdStDrawTargetRenderPassState();

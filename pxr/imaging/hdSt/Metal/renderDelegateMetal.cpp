@@ -197,12 +197,6 @@ void HdStRenderDelegateMetal::PrepareRender(
         }
         context->SetAlphaBlendingEnable(false);
     }
-    
-    if (params.enableIdRender) {
-        context->SetAlphaCoverageEnable(false, false);
-    } else if (params.enableSampleAlphaToCoverage) {
-        context->SetAlphaCoverageEnable(true, false);
-    }
 }
 
 void HdStRenderDelegateMetal::FinalizeRender()

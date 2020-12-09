@@ -138,8 +138,8 @@ MtlfDebugEnumToString(GLenum debugEnum)
 
 static void _MtlfPushDebugGroup(char const * message)
 {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED) && defined(GL_KHR_debug)
-    if (GLEW_KHR_debug) {
+#if defined(GL_KHR_debug)
+    if (GARCH_GLAPI_HAS(KHR_debug)) {
         glPushDebugGroup(GL_DEBUG_SOURCE_THIRD_PARTY, 0, -1, message);
     }
 #endif
@@ -147,8 +147,8 @@ static void _MtlfPushDebugGroup(char const * message)
 
 static void _MtlfPopDebugGroup()
 {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED) && defined(GL_KHR_debug)
-    if (GLEW_KHR_debug) {
+#if defined(GL_KHR_debug)
+    if (GARCH_GLAPI_HAS(KHR_debug)) {
         glPopDebugGroup();
     }
 #endif

@@ -67,8 +67,8 @@ public:
         unsigned int cropBottom = 0,
         unsigned int cropLeft   = 0,
         unsigned int cropRight  = 0,
-        HioImage::ImageOriginLocation originLocation =
-                           HioImage::OriginUpperLeft);
+        HioImage::ImageOriginLocation originLocation = 
+                           HioImage::OriginUpperLeft); 
 
     GLF_API
     static GlfArrayTextureRefPtr New(
@@ -78,7 +78,7 @@ public:
         unsigned int cropBottom = 0,
         unsigned int cropLeft   = 0,
         unsigned int cropRight  = 0,
-        HioImage::ImageOriginLocation originLocation =
+        HioImage::ImageOriginLocation originLocation = 
                            HioImage::OriginUpperLeft);
 
     GLF_API
@@ -98,7 +98,7 @@ protected:
         unsigned int cropBottom,
         unsigned int cropLeft,
         unsigned int cropRight,
-        HioImage::ImageOriginLocation originLocation =
+        HioImage::ImageOriginLocation originLocation = 
                            HioImage::OriginUpperLeft);
 
     friend class GlfResourceFactory;

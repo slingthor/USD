@@ -382,9 +382,11 @@ HdStUdimTextureObject::_DestroyTextures()
 {
     if (Hgi * hgi = _GetHgi()) {
         if (_texelTexture) {
+            _SubtractFromTotalTextureMemory(_texelTexture);
             hgi->DestroyTexture(&_texelTexture);
         }
         if (_layoutTexture) {
+            _SubtractFromTotalTextureMemory(_layoutTexture);
             hgi->DestroyTexture(&_layoutTexture);
         }
     }
@@ -627,6 +629,7 @@ HdStUdimTextureObject::_Commit()
         texDesc.initialData = _textureData.data();
         texDesc.pixelsByteSize = _textureData.size();
         _texelTexture = hgi->CreateTexture(texDesc);
+        _AddToTotalTextureMemory(_texelTexture);
     }
     
     // Layout GPU texture creation
@@ -639,6 +642,7 @@ HdStUdimTextureObject::_Commit()
         texDesc.initialData = _layoutData.data();
         texDesc.pixelsByteSize = _layoutData.size() * sizeof(float);
         _layoutTexture = hgi->CreateTexture(texDesc);
+        _AddToTotalTextureMemory(_layoutTexture);
     }
 
     // Free CPU memory after transfer to GPU

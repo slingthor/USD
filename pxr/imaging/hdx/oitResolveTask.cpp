@@ -21,7 +21,7 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/garch/glApi.h"
 
 #if defined(PXR_METAL_SUPPORT_ENABLED)
 #include "pxr/imaging/mtlf/mtlDevice.h"
@@ -311,6 +311,10 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
     if (ctx->erase(HdxTokens->oitRequestFlag) == 0) {
         return;
     }
+
+    // Explicitly erase clear flag so that it can be re-used by subsequent
+    // OIT render and resolve tasks.
+    ctx->erase(HdxTokens->oitClearedFlag);
 
     if (!TF_VERIFY(_renderPassState)) return;
     if (!TF_VERIFY(_renderPassShader)) return;

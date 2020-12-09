@@ -110,11 +110,6 @@ HgiMetalBlitCmds::CopyTextureGpuToCpu(
 
     HgiTextureDesc const& texDesc = srcTexture->GetDescriptor();
 
-    if (!TF_VERIFY(texDesc.layerCount > copyOp.sourceTexelOffset[2],
-        "Trying to copy an invalid texture layer/slice")) {
-        return;
-    }
-
     MTLPixelFormat metalFormat = MTLPixelFormatInvalid;
 
     if (texDesc.usage & HgiTextureUsageBitsColorTarget) {
@@ -204,7 +199,6 @@ HgiMetalBlitCmds::CopyTextureCpuToGpu(
 
     GfVec3i const& offsets = copyOp.destinationTexelOffset;
     int depthOffset = isTexArray ? 0 : offsets[2];
-
     if (texDesc.type == HgiTextureType1D) {
         [dstTexture->GetTextureId()
             replaceRegion:MTLRegionMake1D(offsets[0], width)
@@ -359,6 +353,18 @@ HgiMetalBlitCmds::CopyBufferGpuToCpu(HgiBufferGpuToCpuOp const& copyOp)
 }
 
 void
+HgiMetalBlitCmds::CopyTextureToBuffer(HgiTextureToBufferOp const& copyOp)
+{
+    TF_CODING_ERROR("Missing Implementation");
+}
+
+void
+HgiMetalBlitCmds::CopyBufferToTexture(HgiBufferToTextureOp const& copyOp)
+{
+    TF_CODING_ERROR("Missing Implementation");
+}
+
+void
 HgiMetalBlitCmds::GenerateMipMaps(HgiTextureHandle const& texture)
 {
     HgiMetalTexture* metalTex = static_cast<HgiMetalTexture*>(texture.Get());
@@ -367,6 +373,13 @@ HgiMetalBlitCmds::GenerateMipMaps(HgiTextureHandle const& texture)
         
         [_blitEncoder generateMipmapsForTexture:metalTex->GetTextureId()];
     }
+}
+
+void
+HgiMetalBlitCmds::MemoryBarrier(HgiMemoryBarrier barrier)
+{
+    TF_VERIFY(barrier==HgiMemoryBarrierAll, "Unknown barrier");
+    // Do nothing. All blit encoder work will be visible to next encoder.
 }
 
 bool

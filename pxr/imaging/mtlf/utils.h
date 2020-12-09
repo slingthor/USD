@@ -27,7 +27,7 @@
 /// \file mtlf/utils.h
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/glApi.h"
 
 #include <string>
 

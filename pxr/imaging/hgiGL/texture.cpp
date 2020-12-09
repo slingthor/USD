@@ -21,7 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include <GL/glew.h>
+#include "pxr/imaging/garch/glApi.h"
+
 #include "pxr/imaging/hgiGL/diagnostic.h"
 #include "pxr/imaging/hgiGL/conversions.h"
 #include "pxr/imaging/hgiGL/texture.h"
@@ -64,6 +65,7 @@ _GlTextureSubImageND(
     const GLint level,
     const GfVec3i &offsets,
     const GfVec3i &dimensions,
+    const uint32_t layerCount,
     const GLenum format,
     const GLenum type,
     const void * pixels)
@@ -99,7 +101,7 @@ _GlTextureSubImageND(
         glTextureSubImage3D(texture,
                             level,
                             offsets[0], offsets[1], offsets[2],
-                            dimensions[0], dimensions[1], dimensions[2],
+                            dimensions[0], dimensions[1], layerCount,
                             format,
                             type,
                             pixels);
@@ -283,6 +285,7 @@ HgiGLTexture::HgiGLTexture(HgiTextureDesc const & desc)
                         mip,
                         /*offsets*/GfVec3i(0),
                         mipInfo.dimensions,
+                        desc.layerCount,
                         glFormat,
                         glPixelType,
                         initialData + mipInfo.byteOffset);
@@ -399,14 +402,7 @@ HgiGLTexture::~HgiGLTexture()
 size_t
 HgiGLTexture::GetByteSizeOfResource() const
 {
-    GfVec3i const& s = _descriptor.dimensions;
-    size_t blockWidth, blockHeight;
-    const size_t bytesPerBlock =
-        HgiGetDataSizeOfFormat(_descriptor.format, &blockWidth, &blockHeight);
-    return
-        ((s[0] + blockWidth  - 1) / blockWidth) *
-        ((s[1] + blockHeight - 1) / blockHeight) *
-        std::max(s[2], 1) * bytesPerBlock;
+    return _GetByteSizeOfResource(_descriptor);
 }
 
 uint64_t

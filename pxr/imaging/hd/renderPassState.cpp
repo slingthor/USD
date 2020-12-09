@@ -28,6 +28,7 @@
 #include "pxr/imaging/hd/debugCodes.h"
 #include "pxr/imaging/hd/tokens.h"
 
+#include "pxr/base/gf/camera.h"
 #include "pxr/base/gf/frustum.h"
 #include "pxr/base/tf/stringUtils.h"
 
@@ -75,18 +76,14 @@ HdRenderPassState::HdRenderPassState()
     , _blendAlphaDstFactor(HdBlendFactorZero)
     , _blendConstantColor(0.0f, 0.0f, 0.0f, 0.0f)
     , _blendEnabled(false)
-    , _alphaToCoverageUseDefault(true)
-    , _alphaToCoverageEnabled(true)
+    , _alphaToCoverageEnabled(false)
     , _colorMaskUseDefault(true)
     , _colorMask(HdRenderPassState::ColorMaskRGBA)
     , _useMultiSampleAov(true)
 {
 }
 
-HdRenderPassState::~HdRenderPassState()
-{
-    /*NOTHING*/
-}
+HdRenderPassState::~HdRenderPassState() = default;
 
 /* virtual */
 void
@@ -110,24 +107,6 @@ HdRenderPassState::Unbind()
 }
 
 void
-HdRenderPassState::SetCameraFramingState(GfMatrix4d const &worldToViewMatrix,
-                                         GfMatrix4d const &projectionMatrix,
-                                         GfVec4d const &viewport,
-                                         ClipPlanesVector const & clipPlanes)
-{
-    if (_camera) {
-        // If a camera handle was set, reset it.
-        _camera = nullptr;
-    }
-
-    _worldToViewMatrix = worldToViewMatrix;
-    _projectionMatrix = projectionMatrix;
-    _viewport = GfVec4f((float)viewport[0], (float)viewport[1],
-                        (float)viewport[2], (float)viewport[3]);
-    _clipPlanes = clipPlanes;
-}
-
-void
 HdRenderPassState::SetCameraAndViewport(HdCamera const *camera,
                                         GfVec4d const &viewport)
 {
@@ -139,12 +118,13 @@ HdRenderPassState::SetCameraAndViewport(HdCamera const *camera,
                         (float)viewport[2], (float)viewport[3]);
 }
 
-GfMatrix4d const&
+GfMatrix4d
 HdRenderPassState::GetWorldToViewMatrix() const
 {
     if (!_camera) {
         return _worldToViewMatrix;
     }
+
     return _camera->GetViewMatrix();
 }
 
@@ -155,14 +135,13 @@ HdRenderPassState::GetProjectionMatrix() const
         return _projectionMatrix;
     }
 
-    // Adjust the camera frustum based on the window policy.
-    GfMatrix4d projection = _camera->GetProjectionMatrix(); 
-    CameraUtilConformWindowPolicy const& policy =
-        _camera->GetWindowPolicy();
-    projection = CameraUtilConformedWindow(projection, policy,
-        _viewport[3] != 0.0 ? _viewport[2] / _viewport[3] : 1.0);
+    CameraUtilConformWindowPolicy const policy = _camera->GetWindowPolicy();
+    const double aspect =
+        (_viewport[3] != 0.0 ? _viewport[2] / _viewport[3] : 1.0);
 
-    return projection;
+    // Adjust the camera frustum based on the window policy.
+    return CameraUtilConformedWindow(
+        _camera->GetProjectionMatrix(), policy, aspect);
 }
 
 HdRenderPassState::ClipPlanesVector const &
@@ -359,12 +338,6 @@ void
 HdRenderPassState::SetBlendEnabled(bool enabled)
 {
     _blendEnabled = enabled;
-}
-
-void
-HdRenderPassState::SetAlphaToCoverageUseDefault(bool useDefault)
-{
-    _alphaToCoverageUseDefault = useDefault;
 }
 
 void

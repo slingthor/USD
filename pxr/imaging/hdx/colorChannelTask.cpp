@@ -46,8 +46,8 @@ TF_DEFINE_PRIVATE_TOKENS(
 HdxColorChannelTask::HdxColorChannelTask(
     HdSceneDelegate* delegate, 
     SdfPath const& id)
-    : HdxTask(id)
-    , _channel(HdxColorChannelTokens->color)
+  : HdxTask(id)
+  , _channel(HdxColorChannelTokens->color)
 {
 }
 
@@ -67,7 +67,8 @@ HdxColorChannelTask::_Sync(HdSceneDelegate* delegate,
     HF_MALLOC_TAG_FUNCTION();
 
     if (!_compositor) {
-        _compositor.reset(new HdxFullscreenShader(_GetHgi(), "ColorChannel"));
+        _compositor = std::make_unique<HdxFullscreenShader>(
+            _GetHgi(), "ColorChannel");
     }
 
     if ((*dirtyBits) & HdChangeTracker::DirtyParams) {
@@ -83,7 +84,7 @@ HdxColorChannelTask::_Sync(HdSceneDelegate* delegate,
 
 void
 HdxColorChannelTask::Prepare(HdTaskContext* ctx,
-                                HdRenderIndex* renderIndex)
+                             HdRenderIndex* renderIndex)
 {
 }
 
@@ -95,12 +96,32 @@ HdxColorChannelTask::Execute(HdTaskContext* ctx)
 
     HgiTextureHandle aovTexture;
     _GetTaskContextData(ctx, HdAovTokens->color, &aovTexture);
-
+    
+    HgiShaderFunctionDesc fragDesc;
+    fragDesc.debugName = _tokens->colorChannelFrag.GetString();
+    fragDesc.shaderStage = HgiShaderStageFragment;
+    HgiShaderFunctionAddConstantParam(
+        &fragDesc, "screenSize", "vec2");
+    HgiShaderFunctionAddStageInput(
+        &fragDesc, "hd_Position", "vec4", "position");
+    HgiShaderFunctionAddStageInput(
+        &fragDesc, "uvOut", "vec2");
+    HgiShaderFunctionAddTexture(
+        &fragDesc, "colorIn");
+    HgiShaderFunctionAddStageOutput(
+        &fragDesc, "hd_FragColor", "vec4", "color");
+    
+    HgiShaderFunctionAddConstantParam(
+        &fragDesc, "channel", "int");
+    
     _compositor->SetProgram(
         HdxPackageColorChannelShader(), 
-        _tokens->colorChannelFrag);
-
-    _CreateParameterBuffer();
+        _tokens->colorChannelFrag,
+        fragDesc);
+    const auto &aovDesc = aovTexture->GetDescriptor();
+    _CreateParameterBuffer(
+        static_cast<float>(aovDesc.dimensions[0]),
+        static_cast<float>(aovDesc.dimensions[1]));
     _compositor->BindBuffer(_parameterBuffer, 0);
 
     _compositor->BindTextures(
@@ -111,7 +132,8 @@ HdxColorChannelTask::Execute(HdTaskContext* ctx)
 }
 
 void
-HdxColorChannelTask::_CreateParameterBuffer()
+HdxColorChannelTask::_CreateParameterBuffer(
+    float screenSizeX, float screenSizeY)
 {
     _ParameterBuffer pb;
 
@@ -125,6 +147,8 @@ HdxColorChannelTask::_CreateParameterBuffer()
         ++i;
     }
     pb.channel = i;
+    pb.screenSize[0] = screenSizeX;
+    pb.screenSize[1] = screenSizeY;
 
     // All data is still the same, no need to update the storage buffer
     if (_parameterBuffer && pb == _parameterData) {

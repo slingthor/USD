@@ -24,7 +24,7 @@
 // utils.cpp
 //
 
-#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/glApi.h"
 #include "pxr/imaging/garch/utils.h"
 
 #include "pxr/base/tf/diagnostic.h"
@@ -189,6 +189,10 @@ GarchGetHioFormat(GLenum glFormat, GLenum glType, bool isSRGB)
             return HioFormatBC7UNorm8Vec4;
         case GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM:
             return HioFormatBC7UNorm8Vec4srgb;
+        case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
+            return HioFormatBC1UNorm8Vec4;
+        case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
+            return HioFormatBC3UNorm8Vec4;
         default:
             TF_CODING_ERROR("Unsupported type");
             return HioFormatUNorm8Vec3;

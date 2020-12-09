@@ -23,7 +23,7 @@
 //
 /// \file garch/udimTexture.cpp
 
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/garch/glApi.h"
 
 #include "pxr/imaging/glf/udimTexture.h"
 
@@ -35,6 +35,7 @@
 #include "pxr/imaging/glf/glContext.h"
 
 #include "pxr/imaging/glf/utils.h"
+
 #include "pxr/base/tf/stringUtils.h"
 
 #include "pxr/base/trace/trace.h"
@@ -52,7 +53,7 @@ GlfUdimTexture::GlfUdimTexture(
     HioImage::ImageOriginLocation originLocation,
     std::vector<std::tuple<int, TfToken>>&& tiles,
     bool const premultiplyAlpha,
-    HioImage::SourceColorSpace sourceColorSpace) // APPLE METAL: HioImage
+    HioImage::SourceColorSpace sourceColorSpace)
     : GarchUdimTexture(imageFilePath, originLocation, std::move(tiles), 
       premultiplyAlpha, sourceColorSpace)
 {
@@ -119,6 +120,8 @@ GlfUdimTexture::_CreateGPUResources(unsigned int numChannels,
             internalFormat = internalFormats[numChannels - 1];
         }
         sizePerElem = 1;
+    } else {
+        TF_CODING_ERROR("Unexpected GL type %d\n", type);
     }
 
     const unsigned int maxTileCount =

@@ -23,7 +23,7 @@
 //
 /// \file simpleLightingContext.cpp
 
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/garch/glApi.h"
 
 #include "pxr/imaging/garch/bindingMap.h"
 #include "pxr/imaging/garch/resourceFactory.h"

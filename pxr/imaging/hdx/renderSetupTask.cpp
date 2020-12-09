@@ -173,12 +173,13 @@ HdxRenderSetupTask::SyncParams(HdSceneDelegate* delegate,
             params.blendAlphaSrcFactor, params.blendAlphaDstFactor);
     renderPassState->SetBlendConstantColor(params.blendConstantColor);
     
+    if (HdStRenderPassState * const hdStRenderPassState =
+                dynamic_cast<HdStRenderPassState*>(renderPassState.get())) {
+        hdStRenderPassState->SetResolveAovMultiSample(
+            params.resolveAovMultiSample);
+    }
+
     // alpha to coverage
-    // XXX:  Long-term Alpha to Coverage will be a render style on the
-    // task.  However, as there isn't a fallback we current force it
-    // enabled, unless a client chooses to manage the setting itself (aka usdImaging).
-    renderPassState->SetAlphaToCoverageUseDefault(
-        delegate->IsEnabled(HdxOptionTokens->taskSetAlphaToCoverage));
     renderPassState->SetAlphaToCoverageEnabled(
         params.enableAlphaToCoverage &&
         !TfDebug::IsEnabled(HDX_DISABLE_ALPHA_TO_COVERAGE));

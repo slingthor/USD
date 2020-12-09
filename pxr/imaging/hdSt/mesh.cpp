@@ -65,7 +65,6 @@
 
 #include "pxr/base/vt/value.h"
 
-#include <iostream>
 #include <limits>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -87,9 +86,8 @@ namespace {
     constexpr HdStComputeQueue _RefineNormalsCompQueue = HdStComputeQueueThree;
 }
 
-HdStMesh::HdStMesh(SdfPath const& id,
-                   SdfPath const& instancerId)
-    : HdMesh(id, instancerId)
+HdStMesh::HdStMesh(SdfPath const& id)
+    : HdMesh(id)
     , _topology()
     , _vertexAdjacency()
     , _topologyId(0)
@@ -104,6 +102,7 @@ HdStMesh::HdStMesh(SdfPath const& id,
     , _limitNormals(false)
     , _sceneNormals(false)
     , _hasVaryingTopology(false)
+    , _displayOpacity(false)
 {
     /*NOTHING*/
 }
@@ -121,11 +120,11 @@ HdStMesh::Sync(HdSceneDelegate *delegate,
 {
     TF_UNUSED(renderParam);
 
+    bool updateMaterialTag = false;
     if (*dirtyBits & HdChangeTracker::DirtyMaterialId) {
         _SetMaterialId(delegate->GetRenderIndex().GetChangeTracker(),
                        delegate->GetMaterialId(GetId()));
-
-        _sharedData.materialTag = _GetMaterialTag(delegate->GetRenderIndex());
+        updateMaterialTag = true;
     }
 
     // Check if either the material or geometric shaders need updating for
@@ -146,7 +145,13 @@ HdStMesh::Sync(HdSceneDelegate *delegate,
         updateGeometricShader = true;
     }
 
+    bool displayOpacity = _displayOpacity;
     _UpdateRepr(delegate, reprToken, dirtyBits);
+
+    if (updateMaterialTag || 
+        (GetMaterialId().IsEmpty() && displayOpacity != _displayOpacity)) { 
+        _sharedData.materialTag = _GetMaterialTag(delegate->GetRenderIndex());
+    }
 
     if (updateMaterialShader || updateGeometricShader) {
         _UpdateShadersForAllReprs(delegate,
@@ -752,6 +757,8 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
                 _sceneNormalsInterpolation =
                     isVarying ? HdInterpolationVarying : HdInterpolationVertex;
                 _sceneNormals = true;
+            } else if (source->GetName() == HdTokens->displayOpacity) {
+                _displayOpacity = true;
             }
 
             // Special handling of points primvar.
@@ -1095,6 +1102,8 @@ HdStMesh::_PopulateFaceVaryingPrimvars(HdSceneDelegate *sceneDelegate,
             if (source->GetName() == HdTokens->normals) {
                 _sceneNormalsInterpolation = HdInterpolationFaceVarying;
                 _sceneNormals = true;
+            } else if (source->GetName() == HdTokens->displayOpacity) {
+                _displayOpacity = true;
             }
 
             // FaceVarying primvar requires quadrangulation or triangulation,
@@ -1200,6 +1209,8 @@ HdStMesh::_PopulateElementPrimvars(HdSceneDelegate *sceneDelegate,
             if (source->GetName() == HdTokens->normals) {
                 _sceneNormalsInterpolation = HdInterpolationUniform;
                 _sceneNormals = true;
+            } else if (source->GetName() == HdTokens->displayOpacity) {
+                _displayOpacity = true;
             }
             sources.push_back(source);
         }
@@ -1363,7 +1374,8 @@ HdStMesh::_GetMaterialTag(const HdRenderIndex &renderIndex) const
     }
 
     // A material may have been unbound, we should clear the old tag
-    return HdMaterialTagTokens->defaultMaterialTag;
+    return _displayOpacity ? HdStMaterialTagTokens->masked :
+                             HdMaterialTagTokens->defaultMaterialTag;
 }
 
 static std::string
@@ -1450,8 +1462,7 @@ HdStMesh::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
     _UpdateVisibility(sceneDelegate, dirtyBits);
 
     /* MATERIAL SHADER (may affect subsequent primvar population) */
-    if ((*dirtyBits & (HdChangeTracker::DirtyInstancer |
-                       HdChangeTracker::NewRepr)) ||
+    if ((*dirtyBits & HdChangeTracker::NewRepr) ||
         HdChangeTracker::IsAnyPrimvarDirty(*dirtyBits, id)) {
         drawItem->SetMaterialShader(_GetMaterialShader(this, sceneDelegate));
     }
@@ -1501,6 +1512,19 @@ HdStMesh::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
         _PopulateAdjacency(resourceRegistry);
     }
 
+    // Reset value of _displayOpacity
+    if (HdChangeTracker::IsAnyPrimvarDirty(*dirtyBits, id)) {
+        _displayOpacity = false;
+    }
+
+    /* INSTANCE PRIMVARS */
+    _UpdateInstancer(sceneDelegate, dirtyBits);
+    HdStUpdateInstancerData(sceneDelegate->GetRenderIndex(),
+            this, drawItem, &_sharedData, *dirtyBits);
+    _displayOpacity = _displayOpacity ||
+            HdStIsInstancePrimvarExistentAndValid(
+            sceneDelegate->GetRenderIndex(), this, HdTokens->displayOpacity);
+
     /* CONSTANT PRIMVARS, TRANSFORM, EXTENT AND PRIMID */
     if (HdStShouldPopulateConstantPrimvars(dirtyBits, id)) {
         HdPrimvarDescriptorVector constantPrimvars =
@@ -1517,16 +1541,11 @@ HdStMesh::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
                 _sceneNormals = true;
             }
         }
-    }
 
-    /* INSTANCE PRIMVARS */
-    if (!GetInstancerId().IsEmpty()) {
-        HdStInstancer *instancer = static_cast<HdStInstancer*>(
-            sceneDelegate->GetRenderIndex().GetInstancer(GetInstancerId()));
-        if (TF_VERIFY(instancer)) {
-            instancer->PopulateDrawItem(this, drawItem,
-                                        &_sharedData, *dirtyBits);
-        }
+        // Also want to check existence of displayOpacity primvar
+        _displayOpacity = _displayOpacity ||
+            HdStIsPrimvarExistentAndValid(this, sceneDelegate, 
+            constantPrimvars, HdTokens->displayOpacity);
     }
 
     /* VERTEX PRIMVARS */
@@ -1694,6 +1713,10 @@ HdStMesh::_UpdateDrawItemGeometricShader(HdSceneDelegate *sceneDelegate,
         // If the gometric shader changes, we need to do a deep validation of
         // batches, so they can be rebuilt if necessary.
         renderIndex.GetChangeTracker().MarkBatchesDirty();
+
+        TF_DEBUG(HD_RPRIM_UPDATED).Msg(
+            "%s: Marking all batches dirty to trigger deep validation because"
+            " the geometric shader was updated.\n", GetId().GetText());
     }
 }
 
@@ -1844,8 +1867,9 @@ HdStMesh::_UpdateRepr(HdSceneDelegate *sceneDelegate,
     }
 
     if (TfDebug::IsEnabled(HD_RPRIM_UPDATED)) {
-        std::cout << "HdStMesh::GetRepr " << GetId()
-                  << " Repr = " << reprToken << "\n";
+        TfDebug::Helper().Msg(
+            "HdStMesh::_UpdateRepr for %s : Repr = %s\n",
+            GetId().GetText(), reprToken.GetText());
         HdChangeTracker::DumpDirtyBits(*dirtyBits);
     }
 
@@ -1944,11 +1968,8 @@ HdStMesh::GetInitialDirtyBitsMask() const
         | HdChangeTracker::DirtyTopology
         | HdChangeTracker::DirtyTransform
         | HdChangeTracker::DirtyVisibility
+        | HdChangeTracker::DirtyInstancer;
         ;
-
-    if (!GetInstancerId().IsEmpty()) {
-        mask |= HdChangeTracker::DirtyInstancer;
-    }
 
     return mask;
 }
