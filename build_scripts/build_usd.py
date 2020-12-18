@@ -1254,7 +1254,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             lipoCommandsRelease = CreateUniversalBinaries(context, libNames, x86Dir, armDir)
 
             x86Files = glob.glob(os.getcwd() + "/build/*intel64*_debug/libtbb*.*")
-            armFiles = glob.glob(os.getcwd() + "/build/*arm64*_debug/libtbb*.*")
+            armFiles = glob.glob(os.getcwd() + "/build/*arm64e*_debug/libtbb*.*")
             libNames = [os.path.basename(x) for x in x86Files]
             x86Dir = os.path.dirname(x86Files[0])
             armDir = os.path.dirname(armFiles[0])
