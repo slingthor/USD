@@ -50,11 +50,6 @@ TF_DEFINE_ENV_SETTING(GLF_ENABLE_COPY_BUFFER, true,
                       "Use GL copy buffer data");
 TF_DEFINE_ENV_SETTING(GLF_ENABLE_SHADER_DRAW_PARAMETERS, true,
                       "Use GL shader draw params if available (OpenGL 4.5+)");
-
-TF_DEFINE_ENV_SETTING(GLF_DISABLE_BATCH_DRAW, false,
-                      "Disable multithreaded batch drawing");
-
-
 TF_DEFINE_ENV_SETTING(GLF_GLSL_VERSION, 0,
                       "GLSL version");
 
@@ -137,7 +132,7 @@ GlfContextCaps::_LoadCaps()
     hasSubDataCopy               = glBufferSubData != NULL;
     hasDispatchCompute           = glDispatchCompute != NULL;
     hasMipLevelTextureWrite      = true;
-    disableBatchDraw              = false;
+    disableBatchDraw             = false;
 
     GLint glMaxClipPlanes;
     glGetIntegerv(GL_MAX_CLIP_PLANES, &glMaxClipPlanes);
@@ -257,10 +252,6 @@ GlfContextCaps::_LoadCaps()
     }
     if (!TfGetEnvSetting(GLF_ENABLE_SHADER_DRAW_PARAMETERS)) {
         shaderDrawParametersEnabled = false;
-    }
-    
-    if (TfGetEnvSetting(GLF_DISABLE_BATCH_DRAW)) {
-        disableBatchDraw = true;
     }
 
     // For debugging and unit testing

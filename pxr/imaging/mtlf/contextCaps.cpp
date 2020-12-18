@@ -32,6 +32,9 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+TF_DEFINE_ENV_SETTING(MTLF_DISABLE_BATCH_DRAW, false,
+                      "Disable multithreaded batch drawing");
+
 // Initialize members to ensure a sane starting state.
 MtlfContextCaps::MtlfContextCaps()
 {
@@ -86,6 +89,10 @@ MtlfContextCaps::_LoadCaps()
 #else
     hasMipLevelTextureWrite      = false;
 #endif
+    disableBatchDraw             = false;
+    if(TfGetEnvSetting(MTLF_DISABLE_BATCH_DRAW)) {
+        disableBatchDraw = true;
+    }
 }
 
 
