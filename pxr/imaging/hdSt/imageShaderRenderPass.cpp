@@ -183,7 +183,7 @@ HdSt_ImageShaderRenderPass::_Execute(
         if (!HdStResourceFactory::GetInstance()->IsOpenGL()) {
             if (desc.colorTextures.size() || desc.depthTexture) {
                 // Set the render pass descriptor for Mtlf to use with the render encoders
-                MTLRenderPassDescriptor* rpd = context->GetHgi()->renderPassDescriptor;
+                MTLRenderPassDescriptor* rpd = context->GetHgi()->_renderPassDescriptor;
                 
                 MTLPixelFormat colorFormat = MTLPixelFormatInvalid;
                 MTLPixelFormat depthFormat = MTLPixelFormatInvalid;
