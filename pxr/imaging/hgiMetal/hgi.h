@@ -221,8 +221,8 @@ public:
     HGIMETAL_API
     bool BeginMtlf();
     
-    class HgiMetalGraphicsCmds* _encoder;
-    MTLRenderPassDescriptor *renderPassDescriptor;
+    class HgiMetalGraphicsCmds *_encoder;
+    MTLRenderPassDescriptor *_renderPassDescriptor;
     
     int _sampleCount;
     

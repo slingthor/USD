@@ -151,7 +151,7 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
             if (desc.width) {
                 // Set the render pass descriptor for Mtlf to use with the render encoders
                 MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-                MTLRenderPassDescriptor* rpd = context->GetHgi()->renderPassDescriptor;
+                MTLRenderPassDescriptor* rpd = context->GetHgi()->_renderPassDescriptor;
                 
                 MTLPixelFormat colorFormat = MTLPixelFormatInvalid;
                 MTLPixelFormat depthFormat = MTLPixelFormatInvalid;
