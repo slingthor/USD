@@ -812,7 +812,7 @@ def InstallZlib(context, force, buildArgs):
 
         if iOS():
             # Replace test executables with static libraries to avoid issues with code signing.
-            PatchFile("CMakeLists.txt", 
+            PatchFile("CMakeLists.txt",
                 [("add_executable(example test/example.c)", "add_library(example STATIC test/example.c)"),
                  ("add_executable(minigzip test/minigzip.c)", "add_library(minigzip STATIC test/minigzip.c)")])
 
@@ -1041,7 +1041,7 @@ def InstallBoost_Helper(context, force, buildArgs):
 
         b2 = "b2" if Windows() else "./b2"
 
-        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+        if MacOS():
             newLines = [
                 'using clang-darwin : x86_64\n',
                 ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
@@ -1049,7 +1049,7 @@ def InstallBoost_Helper(context, force, buildArgs):
                 ': <compileflags>"-target x86_64-apple-macos10.15 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target x86_64-apple-macos10.15 -isysroot {SDK_PATH}" address-model=64 architecture=x86_64\n'
                     .format(SDK_PATH=sdkPath),
                 ';\n\n'
-                'using clang-darwin : arm64\n',
+                'using clang-darwin : arm64e\n',
                 ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
                     .format(XCODE_ROOT=xcodeRoot),
                 ': <compileflags>"-target arm64e-apple-macos10.15 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target arm64e-apple-macos10.15 -isysroot {SDK_PATH}" address-model=64 architecture=arm64e\n'
@@ -1063,12 +1063,15 @@ def InstallBoost_Helper(context, force, buildArgs):
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
             b2_toolset = "toolset=clang-darwin-x86_64"
             b2_settings[0] = '--prefix="{instDir}/_tmp/x86_64"'.format(instDir=context.instDir)
+        else:
+            b2_toolset = "toolset=clang-darwin-{0}".format(GetMacArch())
+
         b2CmdPrimary = '{b2} {toolset} {options} install'.format(
             b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
         Run(b2CmdPrimary)
 
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
-            b2_toolset = "toolset=clang-darwin-arm64"
+            b2_toolset = "toolset=clang-darwin-arm64e"
             b2_settings[0] = '--prefix="{instDir}/_tmp/arm64e"'.format(instDir=context.instDir)
                 
             b2CmdSecondary = '{b2} {toolset} {options} install'.format(
@@ -1210,8 +1213,8 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
                       "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/MacOSX.*' 2>/dev/null | head -1)"),
                      ("-m64",
                       "-m64 -arch x86_64"),
-                    ("ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64))",
-                     "ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64 arm64e))")],
+                     ("ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64))",
+                      "ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64 arm64e))")],
                     True)
 
         archPrimary = GetMacArch()
@@ -1220,7 +1223,8 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             archPrimary = "intel64"
             archSecondary = "arm64e"
         else:
-            archSecondary = "arm64e"
+            archPrimary = "arm64e"
+            archSecondary = "intel64"
 
         if context.static_dependencies_macOS:
             buildArgs.append('extra_inc=big_iron.inc ')
