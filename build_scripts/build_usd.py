@@ -826,7 +826,7 @@ ZLIB = Dependency("zlib", InstallZlib, "include/zlib.h")
 # boost
 
 if MacOS() or iOS():
-    BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.70.0/boost_1_70_0.tar.gz"
+    BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.70.0/boost_1_70_0.tar.bz2"
     BOOST_VERSION_FILE = "include/boost/version.hpp"
 elif Linux():
     if Python3():
