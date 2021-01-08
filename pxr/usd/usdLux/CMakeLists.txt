@@ -5,6 +5,7 @@ pxr_library(usdLux
     LIBRARIES
         tf
         vt
+        ndr
         sdf
         usd
         usdGeom
@@ -18,17 +19,24 @@ pxr_library(usdLux
         domeLight
         geometryLight
         light
-        listAPI
-        shapingAPI
-        shadowAPI
         lightFilter
         lightPortal
+        listAPI
+        pluginLight
+        pluginLightFilter
+        portalLight
         rectLight
+        shadowAPI
+        shapingAPI
         sphereLight
         tokens
 
     PUBLIC_HEADERS
         api.h
+
+    PRIVATE_CLASSES
+        discoveryPlugin
+        lightDefParser
 
     PYTHON_CPPFILES
         moduleDeps.cpp
@@ -39,14 +47,17 @@ pxr_library(usdLux
         wrapDiskLight.cpp
         wrapDistantLight.cpp
         wrapDomeLight.cpp
-        wrapLightPortal.cpp
         wrapGeometryLight.cpp
         wrapLight.cpp
-        wrapListAPI.cpp
-        wrapShapingAPI.cpp
-        wrapShadowAPI.cpp
         wrapLightFilter.cpp
+        wrapLightPortal.cpp
+        wrapListAPI.cpp
+        wrapPluginLight.cpp
+        wrapPluginLightFilter.cpp
+        wrapPortalLight.cpp
         wrapRectLight.cpp
+        wrapShadowAPI.cpp
+        wrapShapingAPI.cpp
         wrapSphereLight.cpp
         wrapTokens.cpp
 

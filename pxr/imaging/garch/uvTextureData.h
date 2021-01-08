@@ -162,6 +162,12 @@ private:
         std::vector<HioImageSharedPtr> images;
     };
 
+    // Given a HioImage it will return the number of mip levels that
+    // are actually valid to be loaded to the GPU. For instance, it will
+    // drop textures with non valid OpenGL pyramids.
+    std::vector<HioImageSharedPtr> _GetAllValidMipLevels(
+        const HioImageSharedPtr image) const;
+
     // Reads an image using HioImage. If possible and requested, it will
     // load a down-sampled version (when mipmapped .tex file) of the image.
     // If targetMemory is > 0, it will iterate through the down-sampled version
@@ -169,21 +175,11 @@ private:
     // Otherwise, it will use the given degradeLevel.
     // When estimating the required GPU memory, it will take into account that
     // the GPU might generate MipMaps.
-    _DegradedImageInput _ReadDegradedImageInput(bool generateMipmap,
-                                                size_t targetMemory,
-                                                size_t degradeLevel);
-
-    // Helper to read degraded image chains, given a starting mip and an 
-    // ending mip it will fill the image chain.
-    _DegradedImageInput _GetDegradedImageInputChain(double scaleX, 
-                                                    double scaleY, 
-                                                    int startMip, 
-                                                    int lastMip);
-
-    // Given a HioImage it will return the number of mip levels that
-    // are actually valid to be loaded to the GPU. For instance, it will
-    // drop textures with non valid OpenGL pyramids.
-    int _GetNumMipLevelsValid(const HioImageSharedPtr image) const;
+    std::vector<HioImageSharedPtr> _ReadDegradedImageInput(
+        const HioImageSharedPtr &fullImage,
+        bool generateMipmap,
+        size_t targetMemory,
+        size_t degradeLevel);
 
     GarchUVTextureData(std::string const &filePath, Params const &params, 
                      HioImage::SourceColorSpace sourceColorSpace);

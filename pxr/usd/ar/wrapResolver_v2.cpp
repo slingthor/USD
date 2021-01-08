@@ -39,36 +39,6 @@ using namespace boost::python;
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-static ArResolvedPath
-_Resolve(ArResolver& resolver, const std::string& assetPath)
-{
-    return resolver.Resolve(assetPath);
-}
-
-static tuple
-_ResolveWithAssetInfo(ArResolver& resolver, const std::string& assetPath)
-{
-    ArAssetInfo assetInfo;
-    const ArResolvedPath resolvedPath = resolver.Resolve(assetPath, &assetInfo);
-    return boost::python::make_tuple(resolvedPath, assetInfo);
-}
-
-static ArResolvedPath
-_ResolveForNewAsset(ArResolver& resolver, const std::string& assetPath)
-{
-    return resolver.ResolveForNewAsset(assetPath);
-}
-
-static tuple
-_ResolveForNewAssetWithAssetInfo(
-    ArResolver& resolver, const std::string& assetPath)
-{
-    ArAssetInfo assetInfo;
-    const ArResolvedPath resolvedPath =
-        resolver.ResolveForNewAsset(assetPath, &assetInfo);
-    return boost::python::make_tuple(resolvedPath, assetInfo);
-}
-
 void
 wrapResolver()
 {
@@ -79,6 +49,9 @@ wrapResolver()
         .def("ConfigureResolverForAsset", &This::ConfigureResolverForAsset)
 
         .def("CreateDefaultContext", &This::CreateDefaultContext)
+        .def("CreateDefaultContextForAsset", 
+             &This::CreateDefaultContextForAsset,
+             args("assetPath"))
 
         .def("CreateContextFromString", 
              (ArResolverContext (This::*)(const std::string&))
@@ -94,25 +67,32 @@ wrapResolver()
         .def("CreateContextFromStrings", &This::CreateContextFromStrings,
              args("contextStrs"))
 
-        .def("CreateDefaultContextForAsset", 
-             &This::CreateDefaultContextForAsset)
         .def("GetCurrentContext", &This::GetCurrentContext)
 
         .def("IsRelativePath", &This::IsRelativePath)
         .def("AnchorRelativePath", &This::AnchorRelativePath)
 
-        .def("Resolve", &_Resolve,
+        .def("IsContextDependentPath", &This::IsContextDependentPath,
+             args("assetPath"))
+
+        .def("CreateIdentifier", &This::CreateIdentifier,
+             (args("assetPath"), 
+              args("anchorAssetPath") = ArResolvedPath()))
+        .def("CreateIdentifierForNewAsset", &This::CreateIdentifierForNewAsset,
+             (args("assetPath"), 
+              args("anchorAssetPath") = ArResolvedPath()))
+
+        .def("Resolve", &This::Resolve,
              (args("assetPath")))
-        .def("ResolveWithAssetInfo", &_ResolveWithAssetInfo,
+        .def("ResolveForNewAsset", &This::ResolveForNewAsset,
              (args("assetPath")))
 
-        .def("ResolveForNewAsset", &_ResolveForNewAsset,
-             (args("assetPath")))
-        .def("ResolveForNewAssetWithAssetInfo", 
-             &_ResolveForNewAssetWithAssetInfo,
-             (args("assetPath")))
-
-        .def("GetExtension", &This::GetExtension)
+        .def("GetAssetInfo", &This::GetAssetInfo,
+             (args("assetPath"), args("resolvedPath")))
+        .def("GetModificationTimestamp", &This::GetModificationTimestamp,
+             (args("assetPath"), args("resolvedPath")))
+        .def("GetExtension", &This::GetExtension,
+             args("assetPath"))
         .def("RefreshContext", &This::RefreshContext)
         ;
 

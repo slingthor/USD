@@ -213,7 +213,7 @@ struct Sdf_IsLayerMetadataField : public Sdf_IsMetadataField
 static bool
 _WriteLayer(
     const SdfLayer* l,
-    std::ostream& out,
+    Sdf_TextOutput& out,
     const string& cookie,
     const string& versionString,
     const string& commentOverride)
@@ -229,7 +229,7 @@ _WriteLayer(
     // Accumulate header metadata in a stringstream buffer,
     // as an easy way to check later if we have any layer
     // metadata to write at all.
-    std::ostringstream header;
+    Sdf_StringOutput header;
 
     // Partition this layer's fields so that all fields to write out are
     // in the range [fields.begin(), metadataFieldsEnd).
@@ -286,7 +286,7 @@ _WriteLayer(
     } // end for each field
 
     // Write header if not empty.
-    string headerStr = header.str();
+    string headerStr = header.GetString();
     if (!headerStr.empty()) {
         _Write(out, 0, "(\n");
         _Write(out, 0, "%s", headerStr.c_str());
@@ -322,6 +322,7 @@ SdfTextFileFormat::WriteToFile(
     const std::string& comment,
     const FileFormatArguments& args) const
 {
+#if AR_VERSION == 1
     // open file
     string reason;
     TfAtomicOfstreamWrapper wrapper(filePath);
@@ -330,15 +331,35 @@ SdfTextFileFormat::WriteToFile(
         return false;
     }
 
+    Sdf_TextOutput out(wrapper.GetStream());
+
     const bool ok = _WriteLayer(
-        &layer, wrapper.GetStream(), GetFileCookie(), GetVersionString(), 
-        comment);
+        &layer, out, GetFileCookie(), GetVersionString(), comment);
 
     if (ok && !wrapper.Commit(&reason)) {
         TF_RUNTIME_ERROR(reason);
         return false;
     }
+#else
+    std::shared_ptr<ArWritableAsset> asset = 
+        ArGetResolver().OpenAssetForWrite(
+            ArResolvedPath(filePath), ArResolver::WriteMode::Replace);
+    if (!asset) {
+        TF_RUNTIME_ERROR(
+            "Unable to open %s for write", filePath.c_str());
+        return false;
+    }
 
+    Sdf_TextOutput out(std::move(asset));
+
+    const bool ok = _WriteLayer(
+        &layer, out, GetFileCookie(), GetVersionString(), comment);
+
+    if (ok && !out.Close()) {
+        TF_RUNTIME_ERROR("Could not close %s", filePath.c_str());
+        return false;
+    }
+#endif
     return ok;
 }
 
@@ -365,13 +386,14 @@ SdfTextFileFormat::WriteToString(
     std::string* str,
     const std::string& comment) const
 {
-    std::stringstream ostr;
+    Sdf_StringOutput out;
+
     if (!_WriteLayer(
-            &layer, ostr, GetFileCookie(), GetVersionString(), comment)) {
+            &layer, out, GetFileCookie(), GetVersionString(), comment)) {
         return false;
     }
 
-    *str = ostr.str();
+    *str = out.GetString();
     return true;
 }
 

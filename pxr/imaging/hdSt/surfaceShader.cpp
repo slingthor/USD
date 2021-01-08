@@ -26,9 +26,8 @@
 #include "pxr/imaging/hdSt/surfaceShader.h"
 #include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
-#include "pxr/imaging/hdSt/textureResource.h"
-#include "pxr/imaging/hdSt/textureResourceHandle.h"
 #include "pxr/imaging/hdSt/textureBinder.h"
+#include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/materialParam.h"
 
 #include "pxr/imaging/hd/binding.h"
@@ -72,7 +71,6 @@ HdStSurfaceShader::HdStSurfaceShader()
  , _isValidComputedHash(false)
  , _computedTextureSourceHash(0)
  , _isValidComputedTextureSourceHash(false)
- , _textureDescriptors()
  , _materialTag()
 {
 }
@@ -137,12 +135,6 @@ HdStSurfaceShader::GetShaderData() const
 {
     return _paramArray;
 }
-/*virtual*/
-HdStShaderCode::TextureDescriptorVector
-HdStSurfaceShader::GetTextures() const
-{
-    return _textureDescriptors;
-}
 
 HdStShaderCode::NamedTextureHandleVector const &
 HdStSurfaceShader::GetNamedTextureHandles() const
@@ -156,10 +148,6 @@ HdStSurfaceShader::BindResources(HdStGLSLProgram const &program,
 								 HdSt_ResourceBinder const &binder,
                                  HdRenderPassState const &state)
 {
-    // Old texture system.
-    program.BindResources(this, binder);
-
-    // New texture system.
     binder.BindShaderResources(this, program);
 }
 /*virtual*/
@@ -168,10 +156,6 @@ HdStSurfaceShader::UnbindResources(HdStGLSLProgram const &program,
                                    HdSt_ResourceBinder const &binder,
                                    HdRenderPassState const &state)
 {
-    // Old texture system.
-    program.UnbindResources(this, binder);
-
-    // New texture system.
     binder.UnbindShaderResources(this, program);
 }
 
@@ -231,13 +215,6 @@ HdStSurfaceShader::_ComputeTextureSourceHash() const
 
     size_t hash = 0;
 
-    // Old texture system
-    for (const HdStShaderCode::TextureDescriptor &desc : _textureDescriptors) {
-        boost::hash_combine(hash, desc.name);
-        boost::hash_combine(hash, desc.textureSourcePath);
-    }
-
-    // New texture system
     for (const HdStShaderCode::NamedTextureHandle &namedHandle :
              _namedTextureHandles) {
 
@@ -269,13 +246,6 @@ HdStSurfaceShader::SetParams(const HdSt_MaterialParamVector &params)
     _params = params;
     _primvarNames = _CollectPrimvarNames(_params);
     _isValidComputedHash = false;
-}
-
-void
-HdStSurfaceShader::SetTextureDescriptors(const TextureDescriptorVector &texDesc)
-{
-    _textureDescriptors = texDesc;
-    _isValidComputedTextureSourceHash = false;
 }
 
 void

@@ -19,16 +19,25 @@ if (OPENSUBDIV_HAS_METAL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
 endif()
 
-set(optionalPrivateClasses "")
 set(optionalLibs "")
 set(optionalIncludeDirs "")
-if (${PXR_BUILD_MATERIALX_PLUGIN})
-    list(APPEND optionalPrivateClasses materialXFilter)
+set(optionalPublicClasses "")
+set(optionalPrivateClasses "")
+if (${PXR_ENABLE_MATERIALX_IMAGING_SUPPORT})
+    add_definitions(-DPXR_MATERIALX_STDLIB_DIR="${MATERIALX_STDLIB_DIR}")
+    add_definitions(-DPXR_MATERIALX_RESOURCE_DIR="${MATERIALX_RESOURCE_DIR}")
+
+    list(APPEND optionalLibs ${MATERIALX_LIBRARIES})
+    list(APPEND optionalIncludeDirs ${MATERIALX_INCLUDE_DIRS})
+    list(APPEND optionalPrivateClasses
+         materialXFilter
+         materialXShaderGen
+    )
 endif()
 if (PXR_ENABLE_PTEX_SUPPORT)
-    list(APPEND optionalPublicClasses ptexMipmapTextureLoader)
     list(APPEND optionalLibs ${PTEX_LIBRARY})
     list(APPEND optionalIncludeDirs ${PTEX_INCLUDE_DIR})
+    list(APPEND optionalPublicClasses ptexMipmapTextureLoader)
 endif()
 
 
@@ -44,8 +53,7 @@ if (PXR_ENABLE_GL_SUPPORT)
                         GL/indirectDrawBatchGL
                         GL/renderPassShaderGL
                         GL/renderPassStateGL
-                        GL/resourceBinderGL
-                        GL/textureResourceGL)
+                        GL/resourceBinderGL)
 
     list(APPEND GFXADDITIONALPUBLIC
                         GL/renderDelegateGL
@@ -62,8 +70,7 @@ if (PXR_ENABLE_METAL_SUPPORT)
                         Metal/glslProgramMetal
                         Metal/renderPassShaderMetal
                         Metal/renderPassStateMetal
-                        Metal/resourceBinderMetal
-                        Metal/textureResourceMetal)
+                        Metal/resourceBinderMetal)
 
     list(APPEND GFXADDITIONALPUBLIC
                         Metal/renderDelegateMetal
@@ -152,8 +159,6 @@ pxr_library(hdSt
         textureIdentifier
         textureObject
         textureObjectRegistry
-        textureResource
-        textureResourceHandle
         tokens
         udimTextureObject
         vboMemoryManager
@@ -167,6 +172,7 @@ pxr_library(hdSt
         dynamicUvTextureImplementation.h
 
     PRIVATE_CLASSES
+        assetUvTextureCpuData
         basisCurvesComputations
         basisCurvesShaderKey
         basisCurvesTopology
@@ -177,7 +183,6 @@ pxr_library(hdSt
         imageShaderShaderKey
         immediateDrawBatch
         indirectDrawBatch
-        materialBufferSourceAndTextureHelper
         materialParam
         meshShaderKey
         meshTopology 
@@ -188,6 +193,7 @@ pxr_library(hdSt
         shaderKey
         subdivision
         subdivision3
+        textureUtils
         triangulate
         unitTestGLDrawing
         unitTestHelper
@@ -213,6 +219,7 @@ pxr_library(hdSt
         shaders/lighting.glslfx
         shaders/lightingIntegrationShader.glslfx
         shaders/mesh.glslfx
+        shaders/meshFaceCull.glslfx
         shaders/meshNormal.glslfx
         shaders/meshWire.glslfx
         shaders/points.glslfx

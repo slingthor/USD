@@ -86,29 +86,6 @@ HdSt_ResourceBinder *HdStResourceFactoryGL::NewResourceBinder() const
     return new HdSt_ResourceBinderGL();
 }
 
-HdStSimpleTextureResource *
-HdStResourceFactoryGL::NewSimpleTextureResource(
-    GarchTextureHandleRefPtr const &textureHandle,
-    HdTextureType textureType,
-    size_t memoryRequest) const
-{
-    return new HdStSimpleTextureResourceGL(
-        textureHandle, textureType, memoryRequest);
-}
-
-HdStSimpleTextureResource *
-HdStResourceFactoryGL::NewSimpleTextureResource(
-    GarchTextureHandleRefPtr const &textureHandle,
-    HdTextureType textureType,
-    HdWrap wrapS, HdWrap wrapT, HdWrap wrapR,
-    HdMinFilter minFilter, HdMagFilter magFilter,
-    size_t memoryRequest) const
-{
-    return new HdStSimpleTextureResourceGL(
-        textureHandle, textureType, wrapS, wrapT, wrapR, minFilter, magFilter,
-        memoryRequest);
-}
-
 HdStGLSLProgram *HdStResourceFactoryGL::NewProgram(
     TfToken const &role, HdStResourceRegistry *const registry) const
 {

@@ -28,10 +28,11 @@
 #include "pxr/imaging/hdSt/debugCodes.h"
 #include "pxr/imaging/hdSt/shaderKey.h"
 #include "pxr/imaging/hdSt/resourceBinder.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 
 #include "pxr/imaging/hd/binding.h"
-#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
+#include "pxr/imaging/hd/renderPassState.h"
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/imaging/hio/glslfx.h"
@@ -41,12 +42,19 @@
 #include <iostream>
 #include <string>
 
+#if defined(PXR_METAL_SUPPORT_ENABLED)
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#endif
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
 HdSt_GeometricShader::HdSt_GeometricShader(std::string const &glslfxString,
                                        PrimitiveType primType,
                                        HdCullStyle cullStyle,
+                                       bool useHardwareFaceCulling,
+                                       bool hasMirroredTransform,
+                                       bool doubleSided,
                                        HdPolygonMode polygonMode,
                                        bool cullingPass,
                                        SdfPath const &debugId,
@@ -54,6 +62,9 @@ HdSt_GeometricShader::HdSt_GeometricShader(std::string const &glslfxString,
     : HdStShaderCode()
     , _primType(primType)
     , _cullStyle(cullStyle)
+    , _useHardwareFaceCulling(useHardwareFaceCulling)
+    , _hasMirroredTransform(hasMirroredTransform)
+    , _doubleSided(doubleSided)
     , _polygonMode(polygonMode)
     , _lineWidth(lineWidth)
     , _frustumCullingPass(cullingPass)
@@ -107,25 +118,178 @@ HdSt_GeometricShader::BindResources(HdStGLSLProgram const &program,
                                     HdSt_ResourceBinder const &binder,
                                     HdRenderPassState const &state)
 {
-    if (_cullStyle != HdCullStyleDontCare) {
-        unsigned int cullStyle = _cullStyle;
-        binder.BindUniformui(HdShaderTokens->cullStyle, 1, &cullStyle);
-    } else {
-        // don't care -- use renderPass's fallback
-    }
+    const bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
-//    if (GetPrimitiveMode() == GL_PATCHES) {
-//        glPatchParameteri(GL_PATCH_VERTICES, GetPrimitiveIndexSize());
-//    }
-//
-//    if (_polygonMode == HdPolygonModeLine) {
-//        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-//        if (_lineWidth > 0) {
-//            glLineWidth(_lineWidth);
+    if (isOpenGL) {
+        if (_useHardwareFaceCulling) {
+            switch (_cullStyle) {
+                case HdCullStyleFront:
+                    glEnable(GL_CULL_FACE);
+                    if (_hasMirroredTransform) {
+                        glCullFace(GL_BACK);
+                    } else {
+                        glCullFace(GL_FRONT);
+                    }
+                    break;
+                case HdCullStyleFrontUnlessDoubleSided:
+                    if (!_doubleSided) {
+                        glEnable(GL_CULL_FACE);
+                        if (_hasMirroredTransform) {
+                            glCullFace(GL_BACK);
+                        } else {
+                            glCullFace(GL_FRONT);
+                        }
+                    }
+                    break;
+                case HdCullStyleBack:
+                    glEnable(GL_CULL_FACE);
+                    if (_hasMirroredTransform) {
+                        glCullFace(GL_FRONT);
+                    } else {
+                        glCullFace(GL_BACK);
+                    }
+                    break;
+                case HdCullStyleBackUnlessDoubleSided:
+                    if (!_doubleSided) {
+                        glEnable(GL_CULL_FACE);
+                        if (_hasMirroredTransform) {
+                            glCullFace(GL_FRONT);
+                        } else {
+                            glCullFace(GL_BACK);
+                        }
+                    }
+                    break;
+                case HdCullStyleNothing:
+                    glDisable(GL_CULL_FACE);
+                    break;
+                case HdCullStyleDontCare:
+                default:
+                    // Fallback to the renderPass opinion, but account for
+                    // combinations of parameters that require extra handling
+                    HdCullStyle cullstyle = state.GetCullStyle();
+                    if (_doubleSided &&
+                       (cullstyle == HdCullStyleBackUnlessDoubleSided ||
+                        cullstyle == HdCullStyleFrontUnlessDoubleSided)) {
+                        glDisable(GL_CULL_FACE);
+                    } else if (_hasMirroredTransform &&
+                        (cullstyle == HdCullStyleBack ||
+                         cullstyle == HdCullStyleBackUnlessDoubleSided)) {
+                        glEnable(GL_CULL_FACE);
+                        glCullFace(GL_FRONT);
+                    } else if (_hasMirroredTransform &&
+                        (cullstyle == HdCullStyleFront ||
+                         cullstyle == HdCullStyleFrontUnlessDoubleSided)) {
+                        glEnable(GL_CULL_FACE);
+                        glCullFace(GL_BACK);
+                    }
+                    break;
+            }
+        } else {
+            // Use fragment shader culling via discard.
+            glDisable(GL_CULL_FACE);
+
+            if (_cullStyle != HdCullStyleDontCare) {
+                unsigned int cullStyle = _cullStyle;
+                binder.BindUniformui(HdShaderTokens->cullStyle, 1, &cullStyle);
+            } else {
+                // don't care -- use renderPass's fallback
+            }
+        }
+        if (GetPrimitiveMode() == GL_PATCHES) {
+            glPatchParameteri(GL_PATCH_VERTICES, GetPrimitiveIndexSize());
+        }
+
+        if (_polygonMode == HdPolygonModeLine) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            if (_lineWidth > 0) {
+                glLineWidth(_lineWidth);
+            }
+        }
+    }
+#endif
+#if defined(PXR_METAL_SUPPORT_ENABLED)
+    if (!isOpenGL) {
+        MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+        if (_useHardwareFaceCulling) {
+            switch (_cullStyle) {
+                case HdCullStyleFront:
+                    
+                    if (_hasMirroredTransform) {
+                        context->SetCullMode(MTLCullModeBack);
+                    } else {
+                        context->SetCullMode(MTLCullModeFront);
+                    }
+                    break;
+                case HdCullStyleFrontUnlessDoubleSided:
+                    if (!_doubleSided) {
+                        if (_hasMirroredTransform) {
+                            context->SetCullMode(MTLCullModeBack);
+                        } else {
+                            context->SetCullMode(MTLCullModeFront);
+                        }
+                    }
+                    break;
+                case HdCullStyleBack:
+                    if (_hasMirroredTransform) {
+                        context->SetCullMode(MTLCullModeFront);
+                    } else {
+                        context->SetCullMode(MTLCullModeBack);
+                    }
+                    break;
+                case HdCullStyleBackUnlessDoubleSided:
+                    if (!_doubleSided) {
+                        if (_hasMirroredTransform) {
+                            context->SetCullMode(MTLCullModeFront);
+                        } else {
+                            context->SetCullMode(MTLCullModeBack);
+                        }
+                    }
+                    break;
+                case HdCullStyleNothing:
+                    context->SetCullMode(MTLCullModeNone);
+                    break;
+                case HdCullStyleDontCare:
+                default:
+                    // Fallback to the renderPass opinion, but account for
+                    // combinations of parameters that require extra handling
+                    HdCullStyle cullstyle = state.GetCullStyle();
+                    if (_doubleSided &&
+                       (cullstyle == HdCullStyleBackUnlessDoubleSided ||
+                        cullstyle == HdCullStyleFrontUnlessDoubleSided)) {
+                        context->SetCullMode(MTLCullModeNone);
+                    } else if (_hasMirroredTransform &&
+                        (cullstyle == HdCullStyleBack ||
+                         cullstyle == HdCullStyleBackUnlessDoubleSided)) {
+                        context->SetCullMode(MTLCullModeFront);
+                    } else if (_hasMirroredTransform &&
+                        (cullstyle == HdCullStyleFront ||
+                         cullstyle == HdCullStyleFrontUnlessDoubleSided)) {
+                        context->SetCullMode(MTLCullModeBack);
+                    }
+                    break;
+            }
+        } else {
+            // Use fragment shader culling via discard.
+            context->SetCullMode(MTLCullModeNone);
+
+            if (_cullStyle != HdCullStyleDontCare) {
+                unsigned int cullStyle = _cullStyle;
+                binder.BindUniformui(HdShaderTokens->cullStyle, 1, &cullStyle);
+            } else {
+                // don't care -- use renderPass's fallback
+            }
+        }
+//        if (GetPrimitiveMode() == GL_PATCHES) {
+//            glPatchParameteri(GL_PATCH_VERTICES, GetPrimitiveIndexSize());
 //        }
-//    }
-#else
-//    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+
+        if (_polygonMode == HdPolygonModeLine) {
+            context->SetPolygonFillMode(MTLTriangleFillModeLines);
+//            if (_lineWidth > 0) {
+//                glLineWidth(_lineWidth);
+//            }
+        }
+    }
 #endif
 }
 
@@ -134,12 +298,59 @@ HdSt_GeometricShader::UnbindResources(HdStGLSLProgram const &program,
                                       HdSt_ResourceBinder const &binder,
                                       HdRenderPassState const &state)
 {
+    const bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
-//    if (_polygonMode == HdPolygonModeLine) {
-//        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-//    }
-#else
-//    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+    if (isOpenGL) {
+        if (_polygonMode == HdPolygonModeLine) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
+
+        // Restore renderPass culling opinions
+        HdCullStyle cullstyle = state.GetCullStyle();
+        switch (cullstyle) {
+            case HdCullStyleFront:
+            case HdCullStyleFrontUnlessDoubleSided:
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_FRONT);
+                break;
+            case HdCullStyleBack:
+            case HdCullStyleBackUnlessDoubleSided:
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_BACK);
+                break;
+            case HdCullStyleNothing:
+            case HdCullStyleDontCare:
+            default:
+                glDisable(GL_CULL_FACE);
+                break;
+        }
+    }
+#endif
+#if defined(PXR_METAL_SUPPORT_ENABLED)
+    if (!isOpenGL) {
+        MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+        if (_polygonMode == HdPolygonModeLine) {
+            context->SetPolygonFillMode(MTLTriangleFillModeFill);
+        }
+
+        // Restore renderPass culling opinions
+        HdCullStyle cullstyle = state.GetCullStyle();
+        switch (cullstyle) {
+            case HdCullStyleFront:
+            case HdCullStyleFrontUnlessDoubleSided:
+                context->SetCullMode(MTLCullModeFront);
+                break;
+            case HdCullStyleBack:
+            case HdCullStyleBackUnlessDoubleSided:
+                context->SetCullMode(MTLCullModeBack);
+                break;
+            case HdCullStyleNothing:
+            case HdCullStyleDontCare:
+            default:
+                context->SetCullMode(MTLCullModeNone);
+                break;
+        }
+    }
 #endif
 }
 
@@ -267,6 +478,9 @@ HdSt_GeometricShader::GetNumPrimitiveVertsForGeometryShader() const
                     shaderKey.GetGlslfxString(),
                     shaderKey.GetPrimitiveType(),
                     shaderKey.GetCullStyle(),
+                    shaderKey.UseHardwareFaceCulling(),
+                    shaderKey.HasMirroredTransform(),
+                    shaderKey.IsDoubleSided(),
                     shaderKey.GetPolygonMode(),
                     shaderKey.IsFrustumCullingPass(),
                     /*debugId=*/SdfPath(),

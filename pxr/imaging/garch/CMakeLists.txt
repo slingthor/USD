@@ -46,11 +46,6 @@ endif()
 
 set (optionalPublicClasses "")
 set (optionalCppFiles "")
-if (PXR_ENABLE_PTEX_SUPPORT)
-    list(APPEND optionalPublicClasses ptexMipmapTextureLoader)
-    list(APPEND optionalLibs ${PTEX_LIBRARY})
-    list(APPEND optionalIncludeDirs ${PTEX_INCLUDE_DIR})
-endif()
 if (PXR_ENABLE_OPENVDB_SUPPORT)
     list(APPEND optionalPublicClasses vdbTextureData)
     list(APPEND optionalLibs ${OPENEXR_Half_LIBRARY} ${OPENVDB_LIBRARY})
@@ -84,7 +79,6 @@ pxr_library(garch
 	    glApi
         glDebugWindow
         glPlatformDebugContext
-        ptexTexture
         resourceFactory
         texture
         textureHandle
@@ -93,7 +87,6 @@ pxr_library(garch
         simpleLightingContext
         simpleMaterial
         simpleShadowArray
-        udimTexture
         uniformBlock
         utils
         uvTexture

@@ -70,7 +70,8 @@ ivec2 _outDims;
 vec2 GetTexCoords(ivec2 outCoords)
 {
     ivec2 outDims = _outDims;
-    vec2 texCoords = vec2(outCoords.x, outCoords.y) / vec2(outDims.x, outDims.y);
+    // apply a (0.5, 0.5) offset to use pixel centers and not pixel corners
+    vec2 texCoords = vec2(outCoords.x + 0.5, outCoords.y + 0.5) / vec2(outDims.x, outDims.y);
     return texCoords;
 }
 

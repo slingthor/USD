@@ -27,11 +27,18 @@
 /// \file mtlf/utils.h
 
 #include "pxr/pxr.h"
+#include "pxr/imaging/mtlf/api.h"
 #include "pxr/imaging/garch/glApi.h"
+#include "pxr/imaging/hio/image.h"
+#include "pxr/imaging/hio/types.h"
 
 #include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+/// Returns the GL format for a given HioFormat.
+MTLF_API
+int MtlfGetGLFormat(HioFormat format);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

@@ -58,7 +58,7 @@ HdStSamplerObject::_GetHgi() const
         return nullptr;
     }
 
-    HdStResourceRegistry * const registry = 
+    HdStResourceRegistry * const registry =
         _samplerObjectRegistry->GetResourceRegistry();
     if (!TF_VERIFY(registry)) {
         return nullptr;
@@ -106,7 +106,7 @@ _GenSampler(HdSt_SamplerObjectRegistry * const samplerObjectRegistry,
         return HgiSamplerHandle();
     }
 
-    HdStResourceRegistry * const registry = 
+    HdStResourceRegistry * const registry =
         samplerObjectRegistry->GetResourceRegistry();
     if (!TF_VERIFY(registry)) {
         return HgiSamplerHandle();
@@ -151,7 +151,7 @@ _GenGLTextureSamplerHandle(HgiTextureHandle const &textureHandle,
     if (sampler == nullptr) {
         return 0;
     }
-    
+
     HgiGLSampler * const glSampler = dynamic_cast<HgiGLSampler*>(sampler);
     if (glSampler == nullptr) {
         TF_CODING_ERROR("Only OpenGL samplers supported");
@@ -166,33 +166,9 @@ _GenGLTextureSamplerHandle(HgiTextureHandle const &textureHandle,
     const GLuint64EXT result =
         glGetTextureSamplerHandleARB(textureName, samplerName);
 
-    glMakeTextureHandleResidentARB(result);
-
-    GLF_POST_PENDING_GL_ERRORS();
-
-    return result;
-#else
-    TF_CODING_ERROR("OpenGL not enabled");
-    return 0;
-#endif
-}
-
-// Get texture handle for bindless textures.
-static
-GLuint64EXT
-_GenGlTextureHandle(const GLuint textureName,
-                    const bool createGLTextureHandle)
-{
-    if (!createGLTextureHandle) {
-        return 0;
+    if (!glIsTextureHandleResidentARB(result)) {
+        glMakeTextureHandleResidentARB(result);
     }
-
-    if (textureName == 0) {
-        return 0;
-    }
-#if defined(___PXR_OPENGL_SUPPORT_ENABLED)
-    const GLuint64EXT result = glGetTextureHandleARB(textureName);
-    glMakeTextureHandleResidentARB(result);
 
     GLF_POST_PENDING_GL_ERRORS();
 
@@ -216,8 +192,20 @@ _GenGlTextureHandle(HgiTextureHandle const &texture,
     if (!texture) {
         return 0;
     }
+#if defined(___PXR_OPENGL_SUPPORT_ENABLED)
+    const GLuint textureName = texture->GetRawResource();
+    const GLuint64EXT result = glGetTextureHandleARB(textureName);
+    if (!glIsTextureHandleResidentARB(result)) {
+        glMakeTextureHandleResidentARB(result);
+    }
 
-    return _GenGlTextureHandle(texture->GetRawResource(), true);
+    GLF_POST_PENDING_GL_ERRORS();
+
+    return result;
+#else
+    TF_CODING_ERROR("OpenGL not enabled");
+    return 0;
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -361,10 +349,14 @@ HdStPtexSamplerObject::HdStPtexSamplerObject(
           PTEX_SAMPLER_PARAMETERS,
           ptexTexture.IsValid()))
   , _texelsGLTextureHandle(
-      _GenGlTextureHandle(
+      _GenGLTextureSamplerHandle(
           ptexTexture.GetTexelTexture(),
+          _texelsSampler,
           createBindlessHandle && ptexTexture.IsValid()))
-  , _layoutBuffer(ptexTexture.GetLayoutBuffer())
+  , _layoutGLTextureHandle(
+      _GenGlTextureHandle(
+          ptexTexture.GetLayoutTexture(),
+          createBindlessHandle && ptexTexture.IsValid()))
 {
 }
 
@@ -420,5 +412,5 @@ HdStUdimSamplerObject::~HdStUdimSamplerObject()
         hgi->DestroySampler(&_texelsSampler);
     }
 }
-   
+
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -615,45 +615,6 @@ HdStGLSLProgramMSL::BindBuffer(
     }
 }
 
-void HdStGLSLProgramMSL::BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
-{
-    // XXX: there's an issue where other shaders try to use textures.
-    std::string textureName;
-    std::string samplerName;
-
-    TF_FOR_ALL(it, surfaceShader->GetTextureDescriptors()) {
-        //When more types are added to the switch below, don't forget to update the mask too.
-        textureName = "textureBind_" + it->name.GetString();
-        TfToken textureNameToken(textureName, TfToken::Immortal);
-
-        MSL_ShaderBinding const* const textureBinding = MSL_FindBinding(
-            _bindingMap, textureNameToken, kMSL_BindingType_Texture, 0xFFFFFFFF,
-            0);
-        if(!textureBinding)
-        {
-            TF_FATAL_CODING_ERROR("Could not bind a texture to the shader?!");
-        }
-
-        HdBinding::Type type = textureBinding->_binding.GetType();
-        HdStTextureResourceSharedPtr const & textureResource =
-            it->handle->GetTextureResource();
-        
-        if (type == HdBinding::TEXTURE_UDIM_LAYOUT ||
-            type == HdBinding::TEXTURE_PTEX_LAYOUT) {
-            BindTexture(it->name, textureResource->GetLayoutTextureId());
-        }
-        else {
-            BindTexture(it->name, textureResource->GetTexelsTextureId());
-            BindSampler(it->name, textureResource->GetTexelsSamplerId());
-        }
-    }
-}
-
-void HdStGLSLProgramMSL::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
-{
-    // Nothing
-}
-
 void HdStGLSLProgramMSL::SetProgram(char const* const label) {
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();

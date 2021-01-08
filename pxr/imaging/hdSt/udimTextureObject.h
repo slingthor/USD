@@ -35,8 +35,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_DECLARE_WEAK_AND_REF_PTRS(GarchUdimTexture);
-
 enum HgiFormat : int;
 using HgiTextureHandle = HgiHandle<class HgiTexture>;
 
@@ -51,9 +49,7 @@ HDST_API bool HdStIsSupportedUdimTexture(std::string const& imageFilePath);
 
 /// \class HdStUdimTextureObject
 ///
-/// A udim texture - it is using Glf to both load the texture
-/// and allocate the GPU resources (unlike the other texture
-/// types).
+/// A UDIM texture.
 ///
 class HdStUdimTextureObject final : public HdStTextureObject
 {
@@ -96,14 +92,13 @@ private:
     std::vector<float> _layoutData;
 
     GfVec3i _dimensions;
+    size_t _tileCount;
     size_t _mipCount;
-    size_t _numBytesPerPixel;
     HgiFormat _hgiFormat;
 
     HgiTextureHandle _texelTexture;
     HgiTextureHandle _layoutTexture;
-    
-    HDST_API
+
     void _DestroyTextures();
 };
 

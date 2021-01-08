@@ -70,6 +70,36 @@ HdStRenderPassStateMetal::~HdStRenderPassStateMetal()
 {
     /*NOTHING*/
 }
+
+// Note: The geometric shader may override the state set below if necessary,
+// including disabling h/w culling altogether.
+// Disabling h/w culling is required to handle instancing wherein
+// instanceScale/instanceTransform can flip the xform handedness.
+namespace {
+
+void
+_SetCullState(MtlfMetalContextSharedPtr context, HdCullStyle cullstyle)
+{
+    switch (cullstyle) {
+        case HdCullStyleFront:
+        case HdCullStyleFrontUnlessDoubleSided:
+            context->SetCullMode(MTLCullModeFront);
+            break;
+        case HdCullStyleBack:
+        case HdCullStyleBackUnlessDoubleSided:
+            context->SetCullMode(MTLCullModeBack);
+            break;
+        case HdCullStyleNothing:
+        case HdCullStyleDontCare:
+        default:
+            // disable culling
+            context->SetCullMode(MTLCullModeNone);
+            break;
+    }
+}
+
+}
+
 void
 HdStRenderPassStateMetal::Bind()
 {
@@ -84,6 +114,8 @@ HdStRenderPassStateMetal::Bind()
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
+    _SetCullState(context, _cullStyle);
+    
     // Blending
     if (_blendEnabled) {
         context->SetAlphaBlendingEnable(true);

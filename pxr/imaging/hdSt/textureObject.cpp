@@ -21,11 +21,11 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/garch/glApi.h"
 
 #include "pxr/imaging/hdSt/textureObject.h"
 
 #include "pxr/imaging/hdSt/glfTextureCpuData.h"
+#include "pxr/imaging/hdSt/assetUvTextureCpuData.h"
 #include "pxr/imaging/hdSt/ptexTextureObject.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/textureCpuData.h"
@@ -36,7 +36,6 @@
 #include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/udimTextureObject.h"
 
-#include "pxr/imaging/garch/uvTextureData.h"
 #include "pxr/imaging/garch/fieldTextureData.h"
 #ifdef PXR_OPENVDB_SUPPORT_ENABLED
 #include "pxr/imaging/garch/vdbTextureData.h"
@@ -128,7 +127,7 @@ HdStTextureObject::_SubtractFromTotalTextureMemory(
 }
 
 std::string
-HdStTextureObject::_GetDebugName(const HdStTextureIdentifier &textureId)
+HdStTextureObject::_GetDebugName(const HdStTextureIdentifier &textureId) const
 {
     const std::string &filePath = textureId.GetFilePath().GetString();
     const HdStSubtextureIdentifier * const subId =
@@ -183,7 +182,7 @@ HdStTextureObject::_GetDebugName(const HdStTextureIdentifier &textureId)
             + " - sourceColorSpace="
             + udimSubId->GetSourceColorSpace().GetString();
     }
-     
+
     return filePath + " - unknown subtexture identifier";
 }
 
@@ -192,22 +191,31 @@ HdStTextureObject::~HdStTextureObject() = default;
 ///////////////////////////////////////////////////////////////////////////////
 // Helpers
 
-namespace {
-
 // Read from the HdStSubtextureIdentifier whether we need
 // to pre-multiply the texture by alpha
 //
-static
 bool
-_GetPremultiplyAlpha(const HdStSubtextureIdentifier * const subId, 
-                     const HdTextureType textureType)
-{    
-    switch(textureType) {
+HdStTextureObject::_GetPremultiplyAlpha(
+        const HdStSubtextureIdentifier * const subId) const
+{
+    switch(GetTextureType()) {
     case HdTextureType::Uv:
-        if (const HdStAssetUvSubtextureIdentifier* const uvSubId = 
+        if (const HdStAssetUvSubtextureIdentifier* const uvSubId =
             dynamic_cast<const HdStAssetUvSubtextureIdentifier *>(subId)) {
             return uvSubId->GetPremultiplyAlpha();
-        } 
+        }
+        return false;
+    case HdTextureType::Ptex:
+        if (const HdStPtexSubtextureIdentifier* const ptexSubId =
+            dynamic_cast<const HdStPtexSubtextureIdentifier *>(subId)) {
+        return ptexSubId->GetPremultiplyAlpha();
+        }
+        return false;
+    case HdTextureType::Udim:
+        if (const HdStUdimSubtextureIdentifier* const udimSubId =
+                dynamic_cast<const HdStUdimSubtextureIdentifier *>(subId)) {
+            return udimSubId->GetPremultiplyAlpha();
+        }
         return false;
     default:
         return false;
@@ -216,15 +224,26 @@ _GetPremultiplyAlpha(const HdStSubtextureIdentifier * const subId,
 
 // Read from the HdStSubtextureIdentifier its source color space
 //
-static
 HioImage::SourceColorSpace
-_GetSourceColorSpace(const HdStSubtextureIdentifier * const subId,
-                   const HdTextureType textureType)
+HdStTextureObject::_GetSourceColorSpace(
+        const HdStSubtextureIdentifier * const subId) const
 {
     TfToken sourceColorSpace;
-    if (const HdStAssetUvSubtextureIdentifier* const uvSubId =
-        dynamic_cast<const HdStAssetUvSubtextureIdentifier *>(subId)) {
-        sourceColorSpace = uvSubId->GetSourceColorSpace();
+    switch(GetTextureType()) {
+    case HdTextureType::Uv:
+        if (const HdStAssetUvSubtextureIdentifier* const uvSubId =
+            dynamic_cast<const HdStAssetUvSubtextureIdentifier *>(subId)) {
+            sourceColorSpace = uvSubId->GetSourceColorSpace();
+        }
+        break;
+    case HdTextureType::Udim:
+        if (const HdStUdimSubtextureIdentifier* const udimSubId =
+                dynamic_cast<const HdStUdimSubtextureIdentifier *>(subId)) {
+            sourceColorSpace = udimSubId->GetSourceColorSpace();
+        }
+        break;
+    default:
+        break;
     }
 
     if (sourceColorSpace == HdStTokens->sRGB) {
@@ -235,8 +254,6 @@ _GetSourceColorSpace(const HdStSubtextureIdentifier * const subId,
     }
     return HioImage::Auto;
 }
-
-} // anonymous namespace
 
 ///////////////////////////////////////////////////////////////////////////////
 // Uv texture
@@ -290,7 +307,7 @@ HdStUvTextureObject::_CreateTexture(const HgiTextureDesc &desc)
     }
 
     _DestroyTexture();
- 
+
     _gpuTexture = hgi->CreateTexture(desc);
     _AddToTotalTextureMemory(_gpuTexture);
 }
@@ -323,48 +340,6 @@ HdStUvTextureObject::_DestroyTexture()
 ///////////////////////////////////////////////////////////////////////////////
 // Uv asset texture
 
-static
-HdWrap
-_GetWrapParameter(const bool hasWrapMode, const GLenum wrapMode)
-{
-    if (hasWrapMode) {
-        switch(wrapMode) {
-        case GL_CLAMP_TO_EDGE: return HdWrapClamp;
-        case GL_REPEAT: return HdWrapRepeat;
-        case GL_CLAMP_TO_BORDER: return HdWrapBlack;
-        case GL_MIRRORED_REPEAT: return HdWrapMirror;
-        //
-        // For HioImage legacy plugins that still use the GL_CLAMP
-        // (obsoleted in OpenGL 3.0).
-        //
-        // Note that some graphics drivers produce results for GL_CLAMP
-        // that match neither GL_CLAMP_TO_BORDER not GL_CLAMP_TO_EDGE.
-        //
-        // We pick GL_CLAMP_TO_EDGE here - breaking backwards compatibility.
-        //
-        case GL_CLAMP: return HdWrapClamp;
-        default:
-            TF_CODING_ERROR("Unsupported GL wrap mode 0x%04x", wrapMode);
-        }
-    }
-
-    return HdWrapNoOpinion;
-}
-
-static
-std::pair<HdWrap, HdWrap>
-_GetWrapParameters(GarchUVTextureDataRefPtr const &uvTexture)
-{
-    if (!uvTexture) {
-        return { HdWrapUseMetadata, HdWrapUseMetadata };
-    }
-
-    const GarchBaseTextureData::WrapInfo &wrapInfo = uvTexture->GetWrapInfo();
-
-    return { _GetWrapParameter(wrapInfo.hasWrapModeS, wrapInfo.wrapModeS), 
-             _GetWrapParameter(wrapInfo.hasWrapModeT, wrapInfo.wrapModeT) };
-}
-
 // Read from the HdStAssetUvSubtextureIdentifier whether we need
 // to flip the image.
 //
@@ -376,7 +351,7 @@ HioImage::ImageOriginLocation
 _GetImageOriginLocation(const HdStSubtextureIdentifier * const subId)
 {
     using SubId = const HdStAssetUvSubtextureIdentifier;
-    
+
     if (SubId* const uvSubId = dynamic_cast<SubId*>(subId)) {
         if (uvSubId->GetFlipVertically()) {
             return HioImage::OriginUpperLeft;
@@ -399,37 +374,18 @@ HdStAssetUvTextureObject::_Load()
 {
     TRACE_FUNCTION();
 
-    GarchUVTextureDataRefPtr const textureData =
-        GarchUVTextureData::New(
+    std::unique_ptr<HdStAssetUvTextureCpuData> cpuData =
+        std::make_unique<HdStAssetUvTextureCpuData>(
             GetTextureIdentifier().GetFilePath(),
             GetTargetMemory(),
-            /* borders */ 0, 0, 0, 0,
-            _GetSourceColorSpace(
-                GetTextureIdentifier().GetSubtextureIdentifier(),
-                GetTextureType()));
-
-    textureData->Read(
-        /* degradeLevel = */ 0,
-        /* generateMipmap = */ false,
-        _GetImageOriginLocation(
-            GetTextureIdentifier().GetSubtextureIdentifier()));
-
-    _SetWrapParameters(_GetWrapParameters(textureData));
-
-    _SetCpuData(
-        std::make_unique<HdStGlfTextureCpuData>(
-            textureData,
-            _GetDebugName(GetTextureIdentifier()),
-            /* useOrGenerateMips = */ true,
             _GetPremultiplyAlpha(
-                GetTextureIdentifier().GetSubtextureIdentifier(), 
-                GetTextureType())));
-
-    if (_GetCpuData()->IsValid()) {
-        if (_GetCpuData()->GetTextureDesc().type != HgiTextureType2D) {
-            TF_CODING_ERROR("Wrong texture type for uv");
-        }
-    }
+                GetTextureIdentifier().GetSubtextureIdentifier()),
+            _GetImageOriginLocation(
+                GetTextureIdentifier().GetSubtextureIdentifier()),
+            HdStTextureObject::_GetSourceColorSpace(
+                GetTextureIdentifier().GetSubtextureIdentifier()));
+    _SetWrapParameters(cpuData->GetWrapInfo());
+    _SetCpuData(std::move(cpuData));
 }
 
 void
@@ -595,7 +551,7 @@ HdStFieldTextureObject::_Commit()
     if (!hgi) {
         return;
     }
-        
+
     // Free previously allocated texture
     _SubtractFromTotalTextureMemory(_gpuTexture);
     hgi->DestroyTexture(&_gpuTexture);

@@ -97,13 +97,7 @@ public:
     
     HDST_API
     virtual void AddCustomBindings(GarchBindingMapRefPtr bindingMap) const = 0;
-    
-    HDST_API
-    virtual void BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const = 0;
 
-    HDST_API
-    virtual void UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const = 0;
-    
     HDST_API
     virtual void SetProgram(char const* const label = NULL) = 0;
     

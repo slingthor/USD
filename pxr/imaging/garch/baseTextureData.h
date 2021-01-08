@@ -27,16 +27,12 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/api.h"
 #include "pxr/imaging/hio/image.h"
-#include "pxr/imaging/garch/utils.h"
-#include "pxr/imaging/garch/glApi.h"
 #include "pxr/base/tf/declarePtrs.h"
-#include "pxr/base/tf/refPtr.h"
-#include "pxr/base/tf/weakPtr.h"
+#include "pxr/base/tf/refBase.h"
+#include "pxr/base/tf/weakBase.h"
 
 #include <boost/noncopyable.hpp>
-
 PXR_NAMESPACE_OPEN_SCOPE
-
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchBaseTextureData);
 
@@ -46,19 +42,18 @@ class GarchBaseTextureData : public TfRefBase,
 {
 public:
     GARCH_API
-    virtual ~GarchBaseTextureData() override;
+    ~GarchBaseTextureData() override;
 
     struct WrapInfo {
-        WrapInfo() :
-          hasWrapModeS(false), hasWrapModeT(false), hasWrapModeR(false),
-          wrapModeS(GL_REPEAT), wrapModeT(GL_REPEAT), wrapModeR(GL_REPEAT) {};
+        WrapInfo()
+          : wrapModeS{false, HioAddressModeRepeat}
+          , wrapModeT{false, HioAddressModeRepeat}
+          , wrapModeR{false, HioAddressModeRepeat}
+        {}
 
-        bool    hasWrapModeS;
-        bool    hasWrapModeT;
-        bool    hasWrapModeR;
-        GLenum  wrapModeS;
-        GLenum  wrapModeT;
-        GLenum  wrapModeR;
+        std::pair<bool, HioAddressMode> wrapModeS;
+        std::pair<bool, HioAddressMode> wrapModeT;
+        std::pair<bool, HioAddressMode> wrapModeR;
     };
 
     /// Is this a 1-, 2- or 3-dimensional texture.

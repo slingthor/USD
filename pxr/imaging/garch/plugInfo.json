@@ -3,11 +3,6 @@
         {
             "Info": {
                 "Types": {
-                    "GarchPtexTexture" : {
-                        "bases": ["GarchTexture"],
-                        "textureTypes": ["ptx", "ptex"],
-                        "precedence": 1
-                    },
                     "GarchUVTexture" : {
                         "bases": ["GarchBaseTexture"],
                         "textureTypes": ["*"],

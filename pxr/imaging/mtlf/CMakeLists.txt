@@ -27,7 +27,6 @@ pxr_library(mtlf
         ${Boost_PYTHON_LIBRARY}
         ${Boost_SYSTEM_LIBRARY}
         ${OIIO_LIBRARIES}
-        ${GLEW_LIBRARY}
         ${X11_LIBRARIES}
         ${OPENEXR_LIBRARY}
 

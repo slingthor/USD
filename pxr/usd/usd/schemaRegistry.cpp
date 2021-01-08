@@ -66,6 +66,15 @@ TF_DEFINE_PRIVATE_TOKENS(
     (multipleApplyAPISchemas)
     (multipleApplyAPISchemaPrefixes)
     (autoApplyAPISchemas)
+
+    (apiSchemaAutoApplyTo)
+    (schemaKind)
+    (nonAppliedAPI)
+    (singleApplyAPI)
+    (multipleApplyAPI)
+    (concreteTyped)
+    (abstractTyped)
+    (abstractBase)
 );
 
 using _TypeToTokenVecMap = 
@@ -190,6 +199,230 @@ UsdSchemaRegistry::GetAPITypeFromSchemaTypeName(const TfToken &typeName)
         it->second.type : TfType();
 }
 
+static bool 
+_IsConcreteSchemaKind(const UsdSchemaKind schemaKind)
+{
+    return schemaKind == UsdSchemaKind::ConcreteTyped;
+}
+
+static bool 
+_IsAppliedAPISchemaKind(const UsdSchemaKind schemaKind)
+{
+    return schemaKind == UsdSchemaKind::SingleApplyAPI ||
+           schemaKind == UsdSchemaKind::MultipleApplyAPI;
+}
+
+static bool 
+_IsMultipleApplySchemaKind(const UsdSchemaKind schemaKind)
+{
+    return schemaKind == UsdSchemaKind::MultipleApplyAPI;
+}
+
+static UsdSchemaKind 
+_GetSchemaKindFromMetadata(const JsObject &dict)
+{
+    const JsValue *kindValue = TfMapLookupPtr(dict, _tokens->schemaKind);
+    if (!kindValue) {
+        return UsdSchemaKind::Invalid;
+    }
+
+    const TfToken schemaTypeToken(kindValue->GetString());
+    if (schemaTypeToken == _tokens->nonAppliedAPI) {
+        return UsdSchemaKind::NonAppliedAPI;
+    } else if (schemaTypeToken == _tokens->singleApplyAPI) {
+        return UsdSchemaKind::SingleApplyAPI;
+    } else if (schemaTypeToken == _tokens->multipleApplyAPI) {
+        return UsdSchemaKind::MultipleApplyAPI;
+    } else if (schemaTypeToken == _tokens->concreteTyped) {
+        return UsdSchemaKind::ConcreteTyped;
+    } else if (schemaTypeToken == _tokens->abstractTyped) {
+        return UsdSchemaKind::AbstractTyped;
+    } else if (schemaTypeToken == _tokens->abstractBase) {
+        return UsdSchemaKind::AbstractBase;
+    }
+
+    TF_CODING_ERROR("Invalid schema kind name '%s' found for plugin metadata "
+                    "key '%s'.", 
+                    schemaTypeToken.GetText(), _tokens->schemaKind.GetText());
+    return UsdSchemaKind::Invalid;
+}
+
+static UsdSchemaKind
+_GetSchemaKindFromPlugin(const TfType &schemaType)
+{
+    PlugPluginPtr plugin =
+        PlugRegistry::GetInstance().GetPluginForType(schemaType);
+    if (!plugin) {
+        TF_CODING_ERROR("Failed to find plugin for schema type '%s'",
+                        schemaType.GetTypeName().c_str());
+        return UsdSchemaKind::Invalid;
+    }
+
+    return _GetSchemaKindFromMetadata(plugin->GetMetadataForType(schemaType));
+}
+
+// This result struct is useful for handling the fact that we're going to 
+// support backwards compatibility (for a bit) with schemas that were generated 
+// before usdGenSchema has started putting schema kind in the plugInfo. When we
+// can't find schema kind metadata we need to know if it's because the metadata
+// doesn't exist yet or if the type is just not a schema type.
+namespace {
+struct _SchemaKindResult {
+    UsdSchemaKind schemaKind;
+    bool isSchemaType;
+};
+}
+
+static _SchemaKindResult 
+_GetSchemaKind(const TfType &schemaType)
+{
+    const _TypeMapCache & typeMapCache = _GetTypeMapCache();
+    auto it = typeMapCache.typeToName.find(schemaType);
+    if (it == typeMapCache.typeToName.end()) {
+        // No schema kind because it is not a schema type.
+        return {UsdSchemaKind::Invalid, false};
+    }
+    // Is a valid schema type.
+    return {_GetSchemaKindFromPlugin(schemaType), true};
+}
+
+static _SchemaKindResult 
+_GetSchemaKind(const TfToken &typeName)
+{
+    const _TypeMapCache & typeMapCache = _GetTypeMapCache();
+    auto it = typeMapCache.nameToType.find(typeName);
+    if (it == typeMapCache.nameToType.end()) {
+        // No schema kind because it is not a schema type.
+        return {UsdSchemaKind::Invalid, false};
+    }
+    // Is a valid schema type.
+    return {_GetSchemaKindFromPlugin(it->second.type), true};
+}
+
+/*static*/
+UsdSchemaKind 
+UsdSchemaRegistry::GetSchemaKind(const TfType &schemaType)
+{
+    return _GetSchemaKind(schemaType).schemaKind;
+}
+
+/*static*/
+UsdSchemaKind 
+UsdSchemaRegistry::GetSchemaKind(const TfToken &typeName)
+{
+    return _GetSchemaKind(typeName).schemaKind;
+}
+
+/*static*/
+bool 
+UsdSchemaRegistry::IsConcrete(const TfType& primType)
+{
+    const _SchemaKindResult result = _GetSchemaKind(primType);
+    if (!result.isSchemaType) {
+        return false;
+    }
+    // XXX: Backward compatibility with valid schema types that haven't been 
+    // regenerated since schemaKind was added to the plugInfo. We have to 
+    // instantiate the registry and look for a prim definition.
+    if (result.schemaKind == UsdSchemaKind::Invalid) {
+        return UsdSchemaRegistry::GetInstance()._HasConcretePrimDefinition(
+            GetSchemaTypeName(primType));
+    }
+    return _IsConcreteSchemaKind(result.schemaKind);
+}
+
+/*static*/
+bool 
+UsdSchemaRegistry::IsConcrete(const TfToken& primType)
+{
+    const _SchemaKindResult result = _GetSchemaKind(primType);
+    if (!result.isSchemaType) {
+        return false;
+    }
+    // XXX: Backward compatibility with valid schema types that haven't been 
+    // regenerated since schemaKind was added to the plugInfo. We have to 
+    // instantiate the registry and look for a prim definition.
+    if (result.schemaKind == UsdSchemaKind::Invalid) {
+        return UsdSchemaRegistry::GetInstance()._HasConcretePrimDefinition(
+            primType);
+    }
+    return _IsConcreteSchemaKind(result.schemaKind);
+}
+
+/*static*/
+bool 
+UsdSchemaRegistry::IsMultipleApplyAPISchema(const TfType& apiSchemaType)
+{
+    const _SchemaKindResult result = _GetSchemaKind(apiSchemaType);
+    if (!result.isSchemaType) {
+        return false;
+    }
+    // XXX: Backward compatibility with valid schema types that haven't been 
+    // regenerated since schemaKind was added to the plugInfo. We have to 
+    // instantiate the registry and look for a prim definition.
+    if (result.schemaKind == UsdSchemaKind::Invalid) {
+        return UsdSchemaRegistry::GetInstance().
+            _HasMultipleApplyAPIPrimDefinition(
+                GetSchemaTypeName(apiSchemaType));
+    }
+    return _IsMultipleApplySchemaKind(result.schemaKind);
+}
+
+/*static*/
+bool 
+UsdSchemaRegistry::IsMultipleApplyAPISchema(const TfToken& apiSchemaType)
+{
+    const _SchemaKindResult result = _GetSchemaKind(apiSchemaType);
+    if (!result.isSchemaType) {
+        return false;
+    }
+    // XXX: Backward compatibility with valid schema types that haven't been 
+    // regenerated since schemaKind was added to the plugInfo. We have to 
+    // instantiate the registry and look for a prim definition.
+    if (result.schemaKind == UsdSchemaKind::Invalid) {
+        return UsdSchemaRegistry::GetInstance().
+            _HasMultipleApplyAPIPrimDefinition(apiSchemaType);
+    }
+    return _IsMultipleApplySchemaKind(result.schemaKind);
+}
+
+/*static*/
+bool 
+UsdSchemaRegistry::IsAppliedAPISchema(const TfType& apiSchemaType)
+{
+    const _SchemaKindResult result = _GetSchemaKind(apiSchemaType);
+    if (!result.isSchemaType) {
+        return false;
+    }
+    // XXX: Backward compatibility with valid schema types that haven't been 
+    // regenerated since schemaKind was added to the plugInfo. We have to 
+    // instantiate the registry and look for a prim definition.
+    if (result.schemaKind == UsdSchemaKind::Invalid) {
+        return UsdSchemaRegistry::GetInstance().
+            _HasAppliedAPIPrimDefinition(
+                GetSchemaTypeName(apiSchemaType));
+    }
+    return _IsAppliedAPISchemaKind(result.schemaKind);
+}
+
+/*static*/
+bool 
+UsdSchemaRegistry::IsAppliedAPISchema(const TfToken& apiSchemaType)
+{
+    const _SchemaKindResult result = _GetSchemaKind(apiSchemaType);
+    if (!result.isSchemaType) {
+        return false;
+    }
+    // XXX: Backward compatibility with valid schema types that haven't been 
+    // regenerated since schemaKind was added to the plugInfo. We have to 
+    // instantiate the registry and look for a prim definition.
+    if (result.schemaKind == UsdSchemaKind::Invalid) {
+        return UsdSchemaRegistry::GetInstance().
+            _HasAppliedAPIPrimDefinition(apiSchemaType);
+    }
+    return _IsAppliedAPISchemaKind(result.schemaKind);
+}
+
 template <class T>
 static void
 _CopySpec(const T &srcSpec, const T &dstSpec)
@@ -247,6 +480,30 @@ _GetGeneratedSchema(const PlugPluginPtr &plugin)
        (layer ? "valid" : "invalid") 
     );
     return layer;
+}
+
+// Gets the names of all applied API schema types.
+// XXX: Note that this only gets the API schema types that have their kind set
+// in plugin metadata. This will eventually be all schemas once they've been 
+// regenerated with usdGenSchema.
+static TfToken::HashSet
+_GetAppliedAPISchemaNames()
+{
+    TfToken::HashSet result;
+
+    // Get all types that derive UsdSchemaBase by getting the type map cache.
+    const _TypeMapCache &typeCache = _GetTypeMapCache();
+
+    for (const auto &valuePair : typeCache.typeToName) {
+        const TfType &type = valuePair.first;
+        const TfToken &typeName = valuePair.second.name;
+
+        if (!valuePair.second.isConcrete &&
+            _IsAppliedAPISchemaKind(_GetSchemaKind(type).schemaKind)) {
+            result.insert(typeName);
+        }
+    }
+    return result;
 }
 
 static bool
@@ -322,66 +579,77 @@ _CollectMultipleApplyAPISchemaNamespaces(
     return success;
 }
 
-static bool
-_CollectAutoAppliedAPISchemaNames(
-    const VtDictionary &customDataDict,
-    const TfToken::HashSet &appliedAPISchemaNames,
-    _TokenToTokenMap &multipleApplyAPISchemaNamespaces,
-    _TypeToTokenVecMap *concreteTypeToAutoAppliedAPISchemaNames)
+static TfTokenVector
+_GetApiSchemaAutoApplyToNamesFromMetadata(const JsObject &dict)
 {
-    auto it = customDataDict.find(_tokens->autoApplyAPISchemas);
-    if (it == customDataDict.end()) {
-        return true;
+    const JsValue *autoApplyToValue = 
+        TfMapLookupPtr(dict, _tokens->apiSchemaAutoApplyTo);
+    if (!autoApplyToValue) {
+        return TfTokenVector();
     }
 
-    if (!it->second.IsHolding<VtDictionary>()) {
-        TF_CODING_ERROR("Found an unexpected value type for layer "
-            "customData key '%s'; expected a dictionary. Auto apply API "
-            "schemas may be incorrect.",
-            _tokens->autoApplyAPISchemas.GetText());
-        return false;
+    if (!autoApplyToValue->IsArrayOf<std::string>()) {
+        TF_CODING_ERROR("Plugin metadata value for key '%s' does not hold a "
+                        "string array", 
+                        _tokens->apiSchemaAutoApplyTo.GetText());
+        return TfTokenVector();
     }
+    return TfToTokenVector(autoApplyToValue->GetArrayOf<std::string>());
+}
 
-    bool success = true;
+static std::vector<std::pair<TfToken, TfTokenVector>>
+_GetAutoApplyAPISchemas()
+{
+    std::vector<std::pair<TfToken, TfTokenVector>> result;
 
-    const VtDictionary &autoApplyAPISchemas = 
-        it->second.UncheckedGet<VtDictionary>();
-    for (const auto &it : autoApplyAPISchemas) {
-        const TfToken apiSchemaName(it.first);
+    // Get all types that derive UsdSchemaBase by getting the type map cache.
+    const _TypeMapCache &typeCache = _GetTypeMapCache();
 
-        if (!it.second.IsHolding<VtTokenArray>()) {
-            TF_CODING_ERROR("Found an unexpected value type for key '%s' in "
-                "the dictionary for layer customData field '%s'; expected a "
-                "token array. API schemas of type '%s' will not be auto "
-                "applied.",
-                apiSchemaName.GetText(),
-                _tokens->autoApplyAPISchemas.GetText(),
-                apiSchemaName.GetText());
-            success = false;
+    for (const auto &valuePair : typeCache.typeToName) {
+        const TfType &type = valuePair.first;
+        PlugPluginPtr plugin =
+            PlugRegistry::GetInstance().GetPluginForType(type);
+        if (!plugin) {
+            TF_CODING_ERROR("Failed to find plugin for schema type '%s'",
+                            type.GetTypeName().c_str());
             continue;
         }
-        if (!appliedAPISchemaNames.count(apiSchemaName)) {
-            TF_CODING_ERROR("Schema type '%s' is not an applied API schema "
-                "type in the generated schema file that defines it and cannot "
-                "be auto applied.",
-                apiSchemaName.GetText());
-            success = false;
+
+        // We don't load the plugin, we just use its metadata.
+        const JsObject dict = plugin->GetMetadataForType(type);
+
+        // Only single apply API schemas can be auto applied
+        if (_GetSchemaKindFromMetadata(dict) != UsdSchemaKind::SingleApplyAPI) {
             continue;
         }
-        if (multipleApplyAPISchemaNamespaces.count(apiSchemaName)) {
-            TF_CODING_ERROR("Schema type '%s' is a multiple apply API schema "
-                "and cannot be auto applied.",
-                apiSchemaName.GetText());
-            success = false;
-            continue;
+
+        TfTokenVector apiSchemaAutoApplyToNames = 
+            _GetApiSchemaAutoApplyToNamesFromMetadata(dict);
+
+        if (!apiSchemaAutoApplyToNames.empty()) {
+            result.push_back(std::make_pair(
+                valuePair.second.name, std::move(apiSchemaAutoApplyToNames)));
         }
+    }
+    return result;
+}
+
+static _TypeToTokenVecMap
+_GetConcreteTypeToAutoAppliedAPISchemaNames()
+{
+    _TypeToTokenVecMap result;
+
+    std::vector<std::pair<TfToken, TfTokenVector>> autoApplyAPISchemas =
+        _GetAutoApplyAPISchemas();
+
+    for (const auto &valuePair : autoApplyAPISchemas) {
+        const TfToken &apiSchemaName = valuePair.first;
+        const TfTokenVector &autoApplyToSchemas = valuePair.second;
 
         // Collect all the types to apply the API schema to which includes any
         // derived types of each of the listed types. 
         std::set<TfType> applyToTypes;
-        const VtTokenArray &applyToSchemas = 
-            it.second.UncheckedGet<VtTokenArray>(); 
-        for (const TfToken &schemaName : applyToSchemas) {
+        for (const TfToken &schemaName : autoApplyToSchemas) {
             // The names listed are the USD type names (not the full TfType 
             // name) so we get actual concrete TfType and its derived types.
             // 
@@ -402,8 +670,7 @@ _CollectAutoAppliedAPISchemaNames(
         // With all the apply to types collected we can add the API schema to
         // the list of applied schemas for each concrete type.
         for (const TfType &applyToType : applyToTypes) {
-            (*concreteTypeToAutoAppliedAPISchemaNames)[applyToType].push_back(
-                apiSchemaName);
+            result[applyToType].push_back(apiSchemaName);
         }
     }
 
@@ -415,11 +682,11 @@ _CollectAutoAppliedAPISchemaNames(
     // schemas have unique property names so that application order doesn't 
     // matter, but this at least gives us consistent behavior if property name 
     // collisions occur.
-    for (auto &valuePair : *concreteTypeToAutoAppliedAPISchemaNames) {
+    for (auto &valuePair : result) {
         std::sort(valuePair.second.begin(), valuePair.second.end());
     }
 
-    return success;
+    return result;
 }
 
 void
@@ -459,8 +726,9 @@ UsdSchemaRegistry::_FindAndAddPluginSchema()
     }
 
     SdfChangeBlock block;
-    TfToken::HashSet appliedAPISchemaNames;
-    _TypeToTokenVecMap  concreteTypeToAutoAppliedAPISchemaNames;
+    TfToken::HashSet appliedAPISchemaNames = _GetAppliedAPISchemaNames();
+    _TypeToTokenVecMap concreteTypeToAutoAppliedAPISchemaNames =
+        _GetConcreteTypeToAutoAppliedAPISchemaNames();
 
     for (const SdfLayerRefPtr& generatedSchema : generatedSchemas) {
         if (generatedSchema) {
@@ -468,6 +736,11 @@ UsdSchemaRegistry::_FindAndAddPluginSchema()
 
             bool hasErrors = false;
 
+            // XXX: For backwards compatibility with schemas that haven't been
+            // regenerated, we still collect API schema names from the 
+            // generated schemas if present as they won't be obtained from 
+            // _GetAppliedSchemaNames with no schema kind plugin metadata 
+            // defined.
             if (!_CollectAppliedAPISchemaNames(
                     customDataDict, &appliedAPISchemaNames)) {
                 hasErrors = true;
@@ -475,13 +748,6 @@ UsdSchemaRegistry::_FindAndAddPluginSchema()
 
             if (!_CollectMultipleApplyAPISchemaNamespaces(
                     customDataDict, &_multipleApplyAPISchemaNamespaces)) {
-                hasErrors = true;
-            }
-
-            if (!_CollectAutoAppliedAPISchemaNames(
-                    customDataDict, appliedAPISchemaNames,
-                    _multipleApplyAPISchemaNamespaces,
-                    &concreteTypeToAutoAppliedAPISchemaNames)) {
                 hasErrors = true;
             }
 
@@ -690,26 +956,15 @@ UsdSchemaRegistry::IsTyped(const TfType& primType)
 }
 
 bool 
-UsdSchemaRegistry::IsConcrete(const TfType& primType) const
-{
-    return IsConcrete(GetSchemaTypeName(primType));
-}
-
-bool 
-UsdSchemaRegistry::IsConcrete(const TfToken& primType) const
+UsdSchemaRegistry::_HasConcretePrimDefinition(const TfToken& primType) const
 {
     return _concreteTypedPrimDefinitions.find(primType) != 
         _concreteTypedPrimDefinitions.end();
 }
 
 bool 
-UsdSchemaRegistry::IsMultipleApplyAPISchema(const TfType& apiSchemaType) const
-{
-    return IsMultipleApplyAPISchema(GetSchemaTypeName(apiSchemaType));
-}
-
-bool 
-UsdSchemaRegistry::IsMultipleApplyAPISchema(const TfToken& apiSchemaType) const
+UsdSchemaRegistry::_HasMultipleApplyAPIPrimDefinition(
+    const TfToken& apiSchemaType) const
 {
     return IsAppliedAPISchema(apiSchemaType) && 
         (_multipleApplyAPISchemaNamespaces.find(apiSchemaType) !=
@@ -717,13 +972,8 @@ UsdSchemaRegistry::IsMultipleApplyAPISchema(const TfToken& apiSchemaType) const
 }
 
 bool 
-UsdSchemaRegistry::IsAppliedAPISchema(const TfType& apiSchemaType) const
-{
-    return IsAppliedAPISchema(GetSchemaTypeName(apiSchemaType));
-}
-
-bool 
-UsdSchemaRegistry::IsAppliedAPISchema(const TfToken& apiSchemaType) const
+UsdSchemaRegistry::_HasAppliedAPIPrimDefinition(
+    const TfToken& apiSchemaType) const
 {
     return _appliedAPIPrimDefinitions.find(apiSchemaType) != 
         _appliedAPIPrimDefinitions.end();
@@ -754,6 +1004,26 @@ UsdSchemaRegistry::GetTypeAndInstance(const TfToken &apiSchemaName)
         return std::make_pair(TfToken(typeString.substr(0, delim)),
                               TfToken(typeString.c_str() + delim + 1));
     }
+}
+
+/*static*/
+std::map<TfToken, TfTokenVector> 
+UsdSchemaRegistry::GetAutoApplyAPISchemas()
+{
+    std::map<TfToken, TfTokenVector> result;
+    for (auto &autoApplyToPair : _GetAutoApplyAPISchemas()) {
+        result.emplace(std::move(autoApplyToPair));
+    }
+    return result;
+}
+
+TfToken 
+UsdSchemaRegistry::GetPropertyNamespacePrefix(
+    const TfToken &multiApplyAPISchemaName) const
+{
+    const TfToken *prefix = TfMapLookupPtr(
+        _multipleApplyAPISchemaNamespaces, multiApplyAPISchemaName);
+    return prefix ? *prefix : TfToken();
 }
 
 std::unique_ptr<UsdPrimDefinition>

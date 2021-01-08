@@ -88,7 +88,6 @@ pxr_library(hd
         strategyBase
         task
         texture
-        textureResource
         timeSampleArray
         tokens
         topology

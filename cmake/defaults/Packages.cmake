@@ -71,6 +71,12 @@ if(PXR_ENABLE_PYTHON_SUPPORT)
         find_package(PythonLibs 2.7 REQUIRED)
     endif()
 
+    # This option indicates that we don't want to explicitly link to the python
+    # libraries. See BUILDING.md for details.
+    if(PXR_PY_UNDEFINED_DYNAMIC_LOOKUP AND NOT WIN32 )
+        set(PYTHON_LIBRARIES "")
+    endif()
+
     find_package(Boost
         COMPONENTS
             program_options
@@ -203,7 +209,6 @@ if (PXR_BUILD_IMAGING)
             cmake_policy(SET CMP0072 OLD)
         endif()
         find_package(OpenGL REQUIRED)
-        find_package(GLEW REQUIRED)
         add_definitions(-DPXR_OPENGL_SUPPORT_ENABLED)
     endif()
     # --Metal
@@ -315,7 +320,9 @@ endif()
 
 if (PXR_BUILD_MATERIALX_PLUGIN)
     find_package(MaterialX REQUIRED)
-    add_definitions(-DPXR_MATERIALX_SUPPORT_ENABLED)
+    if (PXR_ENABLE_MATERIALX_IMAGING_SUPPORT)
+        add_definitions(-DPXR_MATERIALX_IMAGING_SUPPORT_ENABLED)
+    endif()
 endif()
 
 if(PXR_ENABLE_OSL_SUPPORT)

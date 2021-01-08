@@ -37,15 +37,15 @@ PXR_NAMESPACE_OPEN_SCOPE
 HgiMetalShaderFunction::HgiMetalShaderFunction(
     HgiMetal *hgi,
     HgiShaderFunctionDesc const& desc)
-    : HgiShaderFunction(desc)
-    , _shaderId(nil)
+  : HgiShaderFunction(desc)
+  , _shaderId(nil)
 {
     if (desc.shaderCode) {
         id<MTLDevice> device = hgi->GetPrimaryDevice();
 
         HgiMetalShaderGenerator shaderGenerator {desc, device};
         std::stringstream ss;
-        shaderGenerator.HgiShaderGenerator::Execute(ss);
+        shaderGenerator.Execute(ss);
         MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
         options.fastMathEnabled = YES;
         options.languageVersion = MTLLanguageVersion2_1;
@@ -56,8 +56,8 @@ HgiMetalShaderFunction::HgiMetalShaderFunction(
         NSError *error = NULL;
         std::string shaderStr = ss.str();
         id<MTLLibrary> library =
-        [hgi->GetPrimaryDevice() newLibraryWithSource:@(shaderStr.c_str())
-                                                      options:options
+            [hgi->GetPrimaryDevice() newLibraryWithSource:@(shaderStr.c_str())
+                                                        options:options
                                                         error:&error];
 
         NSString *entryPoint = nullptr;

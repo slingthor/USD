@@ -25,11 +25,11 @@
 
 #include "pxr/imaging/hdSt/textureBinder.h"
 #include "pxr/imaging/hdSt/ptexTextureObject.h"
+#include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/samplerObject.h"
 #include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/textureObject.h"
 #include "pxr/imaging/hdSt/udimTextureObject.h"
-#include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
 PXR_NAMESPACE_OPEN_SCOPE

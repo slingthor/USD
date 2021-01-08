@@ -30,6 +30,7 @@
 
 #include "pxr/imaging/hgi/handle.h"
 
+#include "pxr/base/gf/vec2i.h"
 #include "pxr/base/gf/vec3i.h"
 
 #ifdef PXR_PTEX_SUPPORT_ENABLED
@@ -49,15 +50,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 HDST_API bool HdStIsSupportedPtexTexture(std::string const & imageFilePath);
 
 enum HgiFormat : int;
-using HgiBufferHandle = HgiHandle<class HgiBuffer>;
 using HgiTextureHandle = HgiHandle<class HgiTexture>;
-using HgiTextureBufferHandle = HgiHandle<class HgiTextureBuffer>;
 
 /// \class HdStPtexTextureObject
 ///
-/// A ptex texture - it is using Garch to both load the texture
-/// and allocate the GPU resources (unlike the other texture
-/// types).
+/// A Ptex texture.
 ///
 class HdStPtexTextureObject final : public HdStTextureObject
 {
@@ -80,8 +77,7 @@ public:
     ///
     /// Only valid after commit phase.
     ///
-    HDST_API
-    HgiBufferHandle GetLayoutBuffer() const { return _layoutBuffer; }
+    HgiTextureHandle GetLayoutTexture() const { return _layoutTexture; }
 
     HDST_API
     bool IsValid() const override;
@@ -97,18 +93,18 @@ protected:
     void _Commit() override;
 
 private:
-
     HgiFormat _format;
     size_t _numChannels;
     size_t _numBytesPerPixel;
-    GfVec3i _dimensions;
+    GfVec3i _texelDimensions;
+    GfVec2i _layoutDimensions;
     size_t _numFaces;
 
     std::unique_ptr<uint8_t[]> _texelData;
-    std::unique_ptr<uint16_t[]> _layoutData;
+    std::unique_ptr<uint32_t[]> _layoutData;
 
     HgiTextureHandle _texelTexture;
-    HgiBufferHandle _layoutBuffer;
+    HgiTextureHandle _layoutTexture;
 
     void _DestroyTextures();
 };

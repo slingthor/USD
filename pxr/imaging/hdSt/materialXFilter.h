@@ -26,16 +26,17 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hd/material.h"
-#include "pxr/base/vt/value.h"
 #include "pxr/usd/sdf/path.h"
-#include "pxr/usd/ndr/declare.h"
-#include <map>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 /// MaterialX Filter
-/// XXX Converting MaterialX node to one with a hard-coded glslfx file
-void HdSt_ApplyMaterialXFilter(HdMaterialNetwork2 * hdNetwork);
+/// Converting a MaterialX node to one with a generated MaterialX glslfx file
+void HdSt_ApplyMaterialXFilter(
+    HdMaterialNetwork2 * hdNetwork,
+    SdfPath const& materialPath,
+    HdMaterialNode2 const& terminalNode,
+    SdfPath const& terminalNodePath);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

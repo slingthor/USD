@@ -77,27 +77,6 @@ public:
     HDST_API
     virtual HdSt_ResourceBinder *NewResourceBinder() const override;
     
-    /// Create a texture resource around a Garch handle.
-    /// While the texture handle maybe shared between many references to a
-    /// texture.
-    /// The texture resource represents a single texture binding.
-    ///
-    /// The memory request can be used to limit, the amount of texture memory
-    /// this reference requires of the texture.  Set to 0 for unrestricted.
-    HDST_API
-    virtual HdStSimpleTextureResource *NewSimpleTextureResource(
-        GarchTextureHandleRefPtr const &textureHandle,
-        HdTextureType textureType,
-        size_t memoryRequest) const override;
-    
-    HDST_API
-    virtual HdStSimpleTextureResource *NewSimpleTextureResource(
-        GarchTextureHandleRefPtr const &textureHandle,
-        HdTextureType textureType,
-        HdWrap wrapS, HdWrap wrapT, HdWrap wrapR,
-        HdMinFilter minFilter, HdMagFilter magFilter,
-        size_t memoryRequest = 0) const override;
-    
     HDST_API
     virtual const char* const GetComputeShaderFilename() const override {
         return "compute.glslfx";

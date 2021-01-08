@@ -81,12 +81,6 @@ public:
     void AddCustomBindings(GarchBindingMapRefPtr bindingMap) const override;
     
     HDST_API
-    void BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const override;
-    
-    HDST_API
-    void UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const override;
-
-    HDST_API
     void SetProgram(char const* const label) override;
     
     HDST_API

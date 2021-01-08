@@ -48,7 +48,7 @@ HdStPtexMipmapTextureLoader::Block::guttering(
     int lineBufferSize = std::max(wid, hei) * bpp;
     unsigned char * lineBuffer = new unsigned char[lineBufferSize];
 
-    int numEdges = ptex->meshType() == Ptex::mt_triangle ? 3 : 4;  
+    int numEdges = ptex->meshType() == Ptex::mt_triangle ? 3 : 4;
 
     for (int edge = 0; edge < numEdges; edge++) {
         int len = (edge == 0 || edge == 2) ? wid : hei;
@@ -231,7 +231,7 @@ struct HdStPtexMipmapTextureLoader::Page
     {
         explicit SlotLimit(size_t num, uint16_t w, uint16_t h) :
             numTexels(num), width(w), height(h) { }
-        
+
         const uint32_t numTexels;
         const uint16_t width, height;
     };
@@ -406,7 +406,7 @@ public:
                 _currentFace = _ptex->getFaceInfo(_currentFace).adjface(2);
                 _currentEdge = 1;
                 _mid = false;
-            } else if (info.isSubface() && 
+            } else if (info.isSubface() &&
                 (!_ptex->getFaceInfo(_currentFace).isSubface()) &&
                 _currentEdge == 3) {
                 _mid = true;
@@ -436,7 +436,7 @@ public:
             }
         }
         Ptex::FaceInfo nextFaceInfo = _ptex->getFaceInfo(_currentFace);
-        if ((!_clockWise) && 
+        if ((!_clockWise) &&
             (!info.isSubface()) && (nextFaceInfo.isSubface())) {
              // needs tricky traverse for boundary subface...
              if (_currentEdge == 3) {
@@ -578,7 +578,7 @@ HdStPtexMipmapTextureLoader::resampleBorder(int face, int edgeId,
             --res.vlog2;
             srcLength /= 2;
         }
-        
+
         PtexFaceData * data = _ptex->getData(face, res);
         if (!data) {
             // XXX:validation
@@ -934,7 +934,7 @@ HdStPtexMipmapTextureLoader::optimizePacking(int maxNumPages,
         smallestBlockWidth = std::min(smallestBlockWidth, (*it)->width);
         smallestBlockHeight = std::min(smallestBlockHeight, (*it)->height);
     }
-    
+
     // compute page size ---------------------------------------------
     {
         // page size is set to the largest edge of the largest block :
@@ -957,7 +957,7 @@ HdStPtexMipmapTextureLoader::optimizePacking(int maxNumPages,
         if (w < minPageSize) {
             w = minPageSize;
         }
-        
+ 
         if (h < minPageSize) {
             h = minPageSize;
         }
@@ -1068,7 +1068,7 @@ HdStPtexMipmapTextureLoader::generateBuffers()
     int numPages = (int)_pages.size();
 
     // populate the texels
-    size_t pageStride = _bpp * _pageWidth * _pageHeight;
+    int pageStride = _bpp * _pageWidth * _pageHeight;
 
     _texelBuffer = new unsigned char[pageStride * numPages];
     _memoryUsage = pageStride * numPages;

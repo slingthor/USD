@@ -28,6 +28,8 @@
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hdSt/renderDelegate.h"
 
+#include <pxr/imaging/hgiMetal/hgi.h>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 ///

@@ -36,6 +36,7 @@
 #include "pxr/usd/sdf/fileFormat.h"
 #include "pxr/usd/sdf/layerRegistry.h"
 #include "pxr/usd/sdf/layerStateDelegate.h"
+#include "pxr/usd/sdf/layerUtils.h"
 #include "pxr/usd/sdf/notice.h"
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/sdf/primSpec.h"
@@ -145,10 +146,8 @@ SdfLayer::SdfLayer(
         validateAuthoring || TfGetEnvSetting<bool>(SDF_LAYER_VALIDATE_AUTHORING))
     , _hints{/*.mightHaveRelocates =*/ false}
 {
-    const string realPathFinal = Sdf_CanonicalizeRealPath(realPath);
-
     TF_DEBUG(SDF_LAYER).Msg("SdfLayer::SdfLayer('%s', '%s')\n",
-        identifier.c_str(), realPathFinal.c_str());
+        identifier.c_str(), realPath.c_str());
 
     // If the identifier has the anonymous layer identifier prefix, it is a
     // template into which the layer address must be inserted. This ensures
@@ -165,7 +164,7 @@ SdfLayer::SdfLayer(
 
     // Initialize layer asset information.
     _InitializeFromIdentifier(
-        layerIdentifier, realPathFinal, std::string(), assetInfo);
+        layerIdentifier, realPath, std::string(), assetInfo);
 
     // A new layer is not dirty.
     _MarkCurrentStateAsClean();
@@ -221,13 +220,11 @@ SdfLayer::_CreateNewWithFormat(
     const ArAssetInfo& assetInfo,
     const FileFormatArguments& args)
 {
-    const string realPathFinal = Sdf_CanonicalizeRealPath(realPath);
-
     // This method should be called with the layerRegistryMutex already held.
 
     // Create and return a new layer with _initializationComplete set false.
     return fileFormat->NewLayer(
-        fileFormat, identifier, realPathFinal, assetInfo, args);
+        fileFormat, identifier, realPath, assetInfo, args);
 }
 
 void
@@ -391,19 +388,25 @@ SdfLayer::_CreateNew(
 
     ArResolver& resolver = ArGetResolver();
 
+    ArAssetInfo assetInfo;
+
+#if AR_VERSION == 1
     // When creating a new layer, assume that relative identifiers are
     // relative to the current working directory.
     const bool isRelativePath = resolver.IsRelativePath(identifier);
     const string absIdentifier = 
         isRelativePath ? TfAbsPath(identifier) : identifier;
 
-#if AR_VERSION == 1
     // Direct newly created layers to a local path.
     const string localPath = resolver.ComputeLocalPath(absIdentifier);
 #else
+    const string absIdentifier =
+        resolver.CreateIdentifierForNewAsset(identifier);
+
     // Resolve the identifier to the path where new assets should go.
     const string localPath = resolver.ResolveForNewAsset(absIdentifier);
 #endif
+
     if (localPath.empty()) {
         TF_CODING_ERROR(
             "Failed to compute path for new layer with "
@@ -499,10 +502,15 @@ SdfLayer::New(
 
     tbb::queuing_rw_mutex::scoped_lock lock(_GetLayerRegistryMutex());
 
+#if AR_VERSION == 1
     // When creating a new layer, assume that relative identifiers are
     // relative to the current working directory.
     const string absIdentifier = ArGetResolver().IsRelativePath(identifier) ?
         TfAbsPath(identifier) : identifier;
+#else
+    const string absIdentifier = 
+        ArGetResolver().CreateIdentifierForNewAsset(identifier);
+#endif
 
     SdfLayerRefPtr layer = _CreateNewWithFormat(
         fileFormat, absIdentifier, std::string(), ArAssetInfo(), args);
@@ -643,7 +651,13 @@ SdfLayer::_ComputeInfoToFindOrOpenLayer(
         return false;
     }
 
-    bool isAnonymous = IsAnonymousLayerIdentifier(layerPath);
+    const bool isAnonymous = IsAnonymousLayerIdentifier(layerPath);
+
+#if AR_VERSION > 1
+    if (!isAnonymous) {
+        layerPath = ArGetResolver().CreateIdentifier(layerPath);
+    }
+#endif
 
     // If we're trying to open an anonymous layer, do not try to compute the
     // real path for it.
@@ -780,6 +794,31 @@ SdfLayer::FindOrOpen(const string &identifier,
 
 /* static */
 SdfLayerRefPtr
+SdfLayer::FindOrOpenRelativeToLayer(
+    const SdfLayerHandle &anchor,
+    const string &identifier,
+    const FileFormatArguments &args)
+{
+    TRACE_FUNCTION();
+
+    if (!anchor) {
+        TF_CODING_ERROR("Anchor layer is invalid");
+        return TfNullPtr;
+    }
+
+    // For consistency with FindOrOpen, we silently bail out if identifier
+    // is empty here to avoid the coding error that is emitted in that case
+    // in SdfComputeAssetPathRelativeToLayer.
+    if (identifier.empty()) {
+        return TfNullPtr;
+    }
+
+    return FindOrOpen(
+        SdfComputeAssetPathRelativeToLayer(anchor, identifier), args);
+}
+
+/* static */
+SdfLayerRefPtr
 SdfLayer::OpenAsAnonymous(
     const std::string &layerPath,
     bool metadataOnly,
@@ -843,7 +882,7 @@ _GetExternalAssetModificationTimes(const SdfLayer& layer)
         // asset dependencies only returns resolved paths so pass the same
         // path for both params.
         result[resolvedPath] = ArGetResolver().GetModificationTimestamp(
-            resolvedPath, resolvedPath);
+            resolvedPath, ArResolvedPath(resolvedPath));
     }
     return result;
 }
@@ -882,15 +921,15 @@ SdfLayer::_Reload(bool force)
     } else {
         // The physical location of the file may have changed since
         // the last load, so re-resolve the identifier.
-        string oldRealPath = GetRealPath();
+        const ArResolvedPath oldResolvedPath = GetResolvedPath();
         UpdateAssetInfo();
-        string realPath = GetRealPath();
+        const ArResolvedPath resolvedPath = GetResolvedPath();
 
-        // If path resolution in UpdateAssetInfo failed, we may end
+        // If asset resolution in UpdateAssetInfo failed, we may end
         // up with an empty real path, and cannot reload the layer.
-        if (realPath.empty()) {
+        if (resolvedPath.empty()) {
             TF_RUNTIME_ERROR(
-                "Cannot determine real path for '%s', skipping reload.",
+                "Cannot determine resolved path for '%s', skipping reload.",
                 identifier.c_str());
             return _ReloadFailed;
         }
@@ -911,11 +950,11 @@ SdfLayer::_Reload(bool force)
 
         // Get the layer's modification timestamp.
         VtValue timestamp = ArGetResolver().GetModificationTimestamp(
-            GetIdentifier(), realPath);
+            GetIdentifier(), resolvedPath);
         if (timestamp.IsEmpty()) {
             TF_CODING_ERROR(
                 "Unable to get modification time for '%s (%s)'",
-                GetIdentifier().c_str(), realPath.c_str());
+                GetIdentifier().c_str(), resolvedPath.GetPathString().c_str());
             return _ReloadFailed;
         }
 
@@ -925,20 +964,20 @@ SdfLayer::_Reload(bool force)
 
         // See if we can skip reloading.
         if (!force && !IsDirty()
-            && (realPath == oldRealPath)
+            && (resolvedPath == oldResolvedPath)
             && (timestamp == _assetModificationTime)
             && (externalAssetTimestamps == _externalAssetModificationTimes)) {
             return _ReloadSkipped;
         }
 
-        if (!_Read(GetIdentifier(), realPath, /* metadataOnly = */ false)) {
+        if (!_Read(GetIdentifier(), resolvedPath, /* metadataOnly = */ false)) {
             return _ReloadFailed;
         }
 
         _assetModificationTime.Swap(timestamp);
         _externalAssetModificationTimes = std::move(externalAssetTimestamps);
 
-        if (realPath != oldRealPath) {
+        if (resolvedPath != oldResolvedPath) {
             Sdf_ChangeManager::Get().DidChangeLayerResolvedPath(_self);
         }
     }
@@ -1061,7 +1100,7 @@ SdfLayer::Find(const string &identifier,
 SdfLayerHandle
 SdfLayer::FindRelativeToLayer(
     const SdfLayerHandle &anchor,
-    const string &layerPath,
+    const string &identifier,
     const FileFormatArguments &args)
 {
     TRACE_FUNCTION();
@@ -1071,7 +1110,15 @@ SdfLayer::FindRelativeToLayer(
         return TfNullPtr;
     }
 
-    return Find(anchor->ComputeAbsolutePath(layerPath), args);
+    // For consistency with FindOrOpen, we silently bail out if identifier
+    // is empty here to avoid the coding error that is emitted in that case
+    // in SdfComputeAssetPathRelativeToLayer.
+    if (identifier.empty()) {
+        return TfNullPtr;
+    }
+
+    return Find(
+        SdfComputeAssetPathRelativeToLayer(anchor, identifier), args);
 }
 
 std::set<double>
@@ -1349,7 +1396,7 @@ SdfLayer::_InitializeFromIdentifier(
     // must occur prior to updating the layer registry, as the new layer
     // information is used to recompute registry indices.
     string oldIdentifier = _assetInfo->identifier;
-    string oldRealPath = _assetInfo->realPath;
+    ArResolvedPath oldResolvedPath = _assetInfo->resolvedPath;
     _assetInfo.swap(newInfo);
 
     // Update layer state delegate.
@@ -1369,7 +1416,7 @@ SdfLayer::_InitializeFromIdentifier(
             Sdf_ChangeManager::Get().DidChangeLayerIdentifier(
                 _self, oldIdentifier);
         }
-        if (oldRealPath != GetRealPath()) {
+        if (oldResolvedPath != GetResolvedPath()) {
             Sdf_ChangeManager::Get().DidChangeLayerResolvedPath(_self);
         }
     }
@@ -2348,12 +2395,20 @@ SdfLayer::SetIdentifier(const string &identifier)
         return;
     }
 
+#if AR_VERSION == 1
     // When changing a layer's identifier, assume that relative identifiers are
     // relative to the current working directory.
     const string absIdentifier = ArGetResolver().IsRelativePath(identifier) ?
         TfAbsPath(identifier) : identifier;
+#else
+    // Create an identifier for the layer based on the desired identifier
+    // that was passed in. Since this may identifier may point to an asset
+    // that doesn't exist yet, use CreateIdentifierForNewAsset.
+    const string absIdentifier =
+        ArGetResolver().CreateIdentifierForNewAsset(identifier);
+#endif
 
-    const string oldRealPath = GetRealPath();
+    const ArResolvedPath oldResolvedPath = GetResolvedPath();
 
     // Hold open a change block to defer identifier-did-change
     // notification until the mutex is unlocked.
@@ -2368,12 +2423,14 @@ SdfLayer::SetIdentifier(const string &identifier)
     // location, and we get an empty timestamp from the resolver. 
     // This is OK -- this means the layer hasn't been serialized to this 
     // new location yet.
-    const string newRealPath = GetRealPath();
-    if (oldRealPath != newRealPath) {
+    const ArResolvedPath newResolvedPath = GetResolvedPath();
+    if (oldResolvedPath != newResolvedPath) {
         _assetModificationTime = ArGetResolver().GetModificationTimestamp(
-            GetIdentifier(), GetRealPath());
+            GetIdentifier(), newResolvedPath);
     }
 }
+
+#if AR_VERSION == 1
 
 void
 SdfLayer::UpdateAssetInfo(const string &fileVersion)
@@ -2405,16 +2462,53 @@ SdfLayer::UpdateAssetInfo(const string &fileVersion)
     }
 }
 
+#else
+
+void
+SdfLayer::UpdateAssetInfo()
+{
+    TRACE_FUNCTION();
+    TF_DEBUG(SDF_LAYER).Msg("SdfLayer::UpdateAssetInfo()\n");
+
+    // Hold open a change block to defer identifier-did-change
+    // notification until the mutex is unlocked.
+    SdfChangeBlock block;
+    {
+        // If the layer has a resolve info with a non-empty asset name, this
+        // means that the layer identifier is a search-path to a layer within
+        // an asset, which last resolved to a pinnable location. Bind the
+        // original context found in the resolve info within this block so the
+        // layer's search path identifier can be properly re-resolved within
+        // _InitializeFromIdentifier.
+        std::unique_ptr<ArResolverContextBinder> binder;
+        if (!GetAssetName().empty()) {
+            binder.reset(new ArResolverContextBinder(
+                    _assetInfo->resolverContext));
+        }    
+
+        tbb::queuing_rw_mutex::scoped_lock lock(_GetLayerRegistryMutex());
+        _InitializeFromIdentifier(GetIdentifier());
+    }
+}
+
+#endif // AR_VERSION
+
 string
 SdfLayer::GetDisplayName() const
 {
     return GetDisplayNameFromIdentifier(GetIdentifier());
 }
 
+const ArResolvedPath&
+SdfLayer::GetResolvedPath() const
+{
+    return _assetInfo->resolvedPath;
+}
+
 const string&
 SdfLayer::GetRealPath() const
 {
-    return _assetInfo->realPath;
+    return _assetInfo->resolvedPath.GetPathString();
 }
 
 string
@@ -3074,7 +3168,7 @@ SdfLayer::_OpenLayerAndUnlockRegistry(
     if (!info.isAnonymous) {
         // Grab modification timestamp.
         VtValue timestamp = ArGetResolver().GetModificationTimestamp(
-            info.identifier, readFilePath);
+            info.identifier, ArResolvedPath(readFilePath));
         if (timestamp.IsEmpty()) {
             TF_CODING_ERROR(
                 "Unable to get modification timestamp for '%s (%s)'",
@@ -4295,7 +4389,7 @@ SdfLayer::_Save(bool force) const
         return false;
     }
 
-    string path(GetRealPath());
+    const ArResolvedPath path = GetResolvedPath();
     if (path.empty())
         return false;
 
@@ -4317,7 +4411,7 @@ SdfLayer::_Save(bool force) const
     if (timestamp.IsEmpty()) {
         TF_CODING_ERROR(
             "Unable to get modification timestamp for '%s (%s)'",
-            GetIdentifier().c_str(), path.c_str());
+            GetIdentifier().c_str(), path.GetPathString().c_str());
         return false;
     }
     _assetModificationTime.Swap(timestamp);

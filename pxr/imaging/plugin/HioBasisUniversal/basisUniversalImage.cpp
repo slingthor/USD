@@ -87,8 +87,8 @@ public:
     {
         return false;
     };
-    virtual bool GetSamplerMetadata(HioAddressDimension pname,
-                                    VtValue *param) const override
+    virtual bool GetSamplerMetadata(HioAddressDimension dim,
+                                    HioAddressMode * param) const override
     {
         return false;
     };

@@ -96,6 +96,7 @@ HdStMesh::HdStMesh(SdfPath const& id)
     , _pointsDataType(HdTypeInvalid)
     , _sceneNormalsInterpolation()
     , _cullStyle(HdCullStyleDontCare)
+    , _hasMirroredTransform(false)
     , _doubleSided(false)
     , _flatShadingEnabled(false)
     , _displacementEnabled(true)
@@ -141,12 +142,18 @@ HdStMesh::Sync(HdSceneDelegate *delegate,
                       HdChangeTracker::DirtyDoubleSided|
                       HdChangeTracker::DirtyMaterialId|
                       HdChangeTracker::DirtyTopology| // topological visibility
+                      HdChangeTracker::DirtyInstancer|
                       HdChangeTracker::NewRepr)) {
         updateGeometricShader = true;
     }
 
     bool displayOpacity = _displayOpacity;
+    bool hasMirroredTransform = _hasMirroredTransform;
     _UpdateRepr(delegate, reprToken, dirtyBits);
+
+    if (hasMirroredTransform != _hasMirroredTransform) {
+        updateGeometricShader = true;
+    }
 
     if (updateMaterialTag || 
         (GetMaterialId().IsEmpty() && displayOpacity != _displayOpacity)) { 
@@ -1032,6 +1039,14 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
         &_sharedData,
         sceneDelegate->GetRenderIndex());
 
+    if (!sources.empty() || !computations.empty()) {
+        // If sources or computations are to be queued against the resulting
+        // BAR, we expect it to be valid.
+        if (!TF_VERIFY(drawItem->GetVertexPrimvarRange()->IsValid())) {
+            return;
+        }
+    }
+
     // schedule buffer sources
     if (!sources.empty()) {
         // add sources to update queue
@@ -1065,7 +1080,11 @@ HdStMesh::_PopulateFaceVaryingPrimvars(HdSceneDelegate *sceneDelegate,
     HdPrimvarDescriptorVector primvars =
         HdStGetPrimvarDescriptors(this, drawItem, sceneDelegate,
                                   HdInterpolationFaceVarying);
-    if (primvars.empty()) return;
+    if (primvars.empty() &&
+        !drawItem->GetFaceVaryingPrimvarRange())
+    {
+        return;
+    }
 
     HdStResourceRegistrySharedPtr const& resourceRegistry = 
         std::static_pointer_cast<HdStResourceRegistry>(
@@ -1157,9 +1176,13 @@ HdStMesh::_PopulateFaceVaryingPrimvars(HdSceneDelegate *sceneDelegate,
         &_sharedData,
         sceneDelegate->GetRenderIndex());
 
-    TF_VERIFY(drawItem->GetFaceVaryingPrimvarRange()->IsValid());
 
     if (!sources.empty()) {
+        // If sources are to be queued against the resulting BAR, we expect it 
+        // to be valid.
+        if (!TF_VERIFY(drawItem->GetFaceVaryingPrimvarRange()->IsValid())) {
+            return;
+        }
         resourceRegistry->AddSources(
             drawItem->GetFaceVaryingPrimvarRange(), std::move(sources));
     }
@@ -1287,7 +1310,13 @@ HdStMesh::_PopulateElementPrimvars(HdSceneDelegate *sceneDelegate,
         &_sharedData,
         sceneDelegate->GetRenderIndex());
 
-    TF_VERIFY(drawItem->GetElementPrimvarRange()->IsValid());
+    if (!sources.empty() || !computations.empty()) {
+        // If sources or computations are to be queued against the resulting
+        // BAR, we expect it to be valid.
+        if (!TF_VERIFY(drawItem->GetElementPrimvarRange()->IsValid())) {
+            return;
+        }
+    }
 
     if (!sources.empty()) {
         resourceRegistry->AddSources(
@@ -1530,10 +1559,13 @@ HdStMesh::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
         HdPrimvarDescriptorVector constantPrimvars =
             HdStGetPrimvarDescriptors(this, drawItem, sceneDelegate,
                                         HdInterpolationConstant);
-
+        
+        bool hasMirroredTransform = _hasMirroredTransform;
         HdStPopulateConstantPrimvars(this, &_sharedData, sceneDelegate, 
-            drawItem, dirtyBits, constantPrimvars);
-
+            drawItem, dirtyBits, constantPrimvars,
+            &hasMirroredTransform);
+        _hasMirroredTransform = hasMirroredTransform;
+        
         // Check if normals are provided as a constant primvar
         for (const HdPrimvarDescriptor& pv : constantPrimvars) {
             if (pv.name == HdTokens->normals) {
@@ -1682,6 +1714,8 @@ HdStMesh::_UpdateDrawItemGeometricShader(HdSceneDelegate *sceneDelegate,
     bool useCustomDisplacement = hasCustomDisplacementTerminal &&
         desc.useCustomDisplacement && _displacementEnabled;
 
+    bool hasInstancer = !GetInstancerId().IsEmpty();
+
     // create a shaderKey and set to the geometric shader.
     HdSt_MeshShaderKey shaderKey(primType,
                                  desc.shadingTerminal,
@@ -1695,6 +1729,8 @@ HdStMesh::_UpdateDrawItemGeometricShader(HdSceneDelegate *sceneDelegate,
                                  cullStyle,
                                  geomStyle,
                                  desc.lineWidth,
+                                 _hasMirroredTransform,
+                                 hasInstancer,
                                  desc.enableScalarOverride);
 
     HdStResourceRegistrySharedPtr resourceRegistry =

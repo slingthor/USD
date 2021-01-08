@@ -2429,8 +2429,12 @@ HdSt_CodeGenMSL::Compile(HdStResourceRegistry* const registry)
     // prep interstage plumbing function
     _procVS  << "void ProcessPrimvars() {\n";
 //    _procTCS << "void ProcessPrimvars() {\n";
-//    _procTES << "void ProcessPrimvars(vec4 basis, int i0, int i1, int i2, int i3) {\n";
-    
+//    _procTES << "float ProcessPrimvar(float inPv0, float inPv1, float inPv2, float inPv3, vec4 basis, vec2 uv);\n";
+//    _procTES << "vec2 ProcessPrimvar(vec2 inPv0, vec2 inPv1, vec2 inPv2, vec2 inPv3, vec4 basis, vec2 uv);\n";
+//    _procTES << "vec3 ProcessPrimvar(vec3 inPv0, vec3 inPv1, vec3 inPv2, vec3 inPv3, vec4 basis, vec2 uv);\n";
+//    _procTES << "vec4 ProcessPrimvar(vec4 inPv0, vec4 inPv1, vec4 inPv3, vec4 inPv3, vec4 basis, vec2 uv);\n";
+//    _procTES << "void ProcessPrimvars(vec4 basis, int i0, int i1, int i2, int i3, vec2 uv) {\n";
+
     // geometry shader plumbing
     switch(_geometricShader->GetPrimitiveType())
     {
@@ -2769,6 +2773,9 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "template <typename T>\n"
             << "T bitfieldReverse(T x) { return reverse_bits(x); }\n\n"
             << "template <typename T>\n"
+            << "T bitfieldExtract(T value, int offset, int bits) {\n"
+            << "  return extract_bits(value, offset, bits); }\n"
+            << "template <typename T>\n"
             << "ivec2 imageSize(T texture) {\n"
             << "    return ivec2(texture.get_width(), texture.get_height());\n"
             << "}\n\n"
@@ -2777,7 +2784,7 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "ivec2 textureSize(T texture, int lod) {\n"
             << "    return ivec2(texture.get_width(lod), texture.get_height(lod));\n"
             << "}\n\n"
-    
+        
             << "#define texelFetch(sampler, coords, lod) sampler.read(uint2(coords.x, coords.y))\n"
 
             << "constexpr sampler texelSampler(address::clamp_to_edge,\n"
@@ -3024,6 +3031,23 @@ static void _EmitStructAccessor(std::stringstream &str,
         str << _GetUnpackedType(type, false) << " HdGet_" << name
             << "()" << " { return HdGet_" << name << "(0); }\n";
     }
+}
+
+static void _EmitBufferAccessor(std::stringstream &str,
+                                TfToken const &name,
+                                TfToken const &type,
+                                const char *index)
+{
+    if (index) {
+        str << _GetUnpackedType(type, false) << " HdGet_" << name
+            << "(int localIndex) {\n"
+            << "  int index = " << index << ";\n"
+            << "  return "
+                << _GetPackedTypeAccessor(type, true) << "("
+            << name << "[index]);\n}\n";
+    }
+    str << _GetUnpackedType(type, false) << " HdGet_" << name << "()"
+        << " { return HdGet_" << name << "(0); }\n";
 }
 
 static int _GetNumComponents(TfToken const& type)
@@ -3414,6 +3438,9 @@ HdSt_CodeGenMSL::_GenerateCommonDefinitions()
     TF_FOR_ALL (it, _metaData.vertexData) {
         _genDefinitions << "#define HD_HAS_" << it->second.name << " 1\n";
     }
+    TF_FOR_ALL (it, _metaData.varyingData) {
+        _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
+    }
     TF_FOR_ALL (it, _metaData.shaderParameterBinding) {
         // XXX: HdBinding::PRIMVAR_REDIRECT won't define an accessor if it's
         // an alias of like-to-like, so we want to suppress the HD_HAS_* flag
@@ -3680,6 +3707,8 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
            int primitiveCoord;      // primitive ids     (per tri/quad/line)
            int fvarCoord;           // fvar primvars     (per face-vertex)
            int shaderCoord;         // shader parameters (per shader/object)
+           int topologyVisibilityCoord // topological visibility data (per face/point)
+           int varyingCoord;        // varying primvars  (per vertex)
            int instanceIndex[];     // (see below)
            int instanceCoords[];    // (see below)
        };
@@ -3775,6 +3804,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
                << "  int fvarCoord;                               \n"
                << "  int shaderCoord;                             \n"
                << "  int topologyVisibilityCoord;                 \n"
+               << "  int varyingCoord;                            \n"
                << "  int instanceIndex[HD_INSTANCE_INDEX_WIDTH];  \n"
                << "  int instanceCoords[HD_INSTANCE_INDEX_WIDTH]; \n"
                << "};\n";
@@ -3790,7 +3820,8 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     // [indirect]
     //   layout (location=x) in ivec4 drawingCoord0
     //   layout (location=y) in ivec4 drawingCoord1
-    //   layout (location=z) in int   drawingCoordI[N]
+    //   layout (location=z) in ivec2 drawingCoord2
+    //   layout (location=w) in int   drawingCoordI[N]
 
     _EmitDeclaration(_genVS, _metaData.drawingCoord0Binding);
     _AddInputParam(_mslVSInputParams, _metaData.drawingCoord0Binding);
@@ -3961,7 +3992,8 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
            << "  dc.fvarCoord      = drawingCoord1.x; \n"
            << "  dc.shaderCoord    = drawingCoord1.z; \n"
            << "  dc.vertexCoord    = drawingCoord1.w; \n"
-           << "  dc.topologyVisibilityCoord = drawingCoord2; \n"
+           << "  dc.topologyVisibilityCoord = drawingCoord2.x; \n"
+           << "  dc.varyingCoord            = drawingCoord2.y; \n"
            << "  hd_instanceIndex r = GetInstanceIndex();\n"
            << "  for(int i = 0; i < HD_INSTANCE_INDEX_WIDTH; ++i)\n"
            << "    dc.instanceIndex[i]  = r.indices[i];\n";
@@ -4677,11 +4709,26 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
 void
 HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
 {
-    // Vertex and FVar primvar flow into the fragment shader as per-fragment
-    // attribute data that has been interpolated by the rasterizer, and hence
-    // have similarities for code gen.
+    // VS specific accessor for the "vertex drawing coordinate"
+    // Even though we currently always plumb vertexCoord as part of the drawing
+    // coordinate, we expect clients to use this accessor when querying the base
+    // vertex offset for a draw call.
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
+    _genVS << "int GetBaseVertexOffset() {\n";
+    if (caps.shaderDrawParametersEnabled) {
+        _genVS << "  return gl_BaseVertex;\n";
+    } else {
+        _genVS << "  return GetDrawingCoord().vertexCoord;\n";
+    }
+    _genVS << "}\n";
+    
+    // Vertex, Varying, and FVar primvar flow into the fragment shader as
+    // per-fragment attribute data that has been interpolated by the rasterizer,
+    // and hence have similarities for code gen.
     // While vertex primvar are authored per vertex and require plumbing
     // through all shader stages, fVar is emitted only in the GS stage.
+    // Varying primvar are bound in the VS via buffer array but are processed as
+    // vertex data for the rest of the stages.
     /*
       // --------- vertex data declaration (VS) ----------
       layout (location = 0) in vec3 normals;
@@ -4711,7 +4758,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
           outPrimvars = inPrimvars[index];
       }
 
-      // --------- vertex data accessors (used in geometry/fragment shader) ---
+     // --------- vertex/varying data accessors (used in GS/FS) ---
       in Primvars {
           vec3 normals;
           vec3 points;
@@ -4735,7 +4782,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
     TfToken structName("Primvars");
     interstageStruct << "struct " << structName << " {\n";
     
-    // vertex varying
+    // vertex
     TF_FOR_ALL (it, _metaData.vertexData) {
         HdBinding binding = it->first;
         TfToken const &name = it->second.name;
@@ -4798,6 +4845,74 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                  << "         , inPrimvars[i2]." << name << ", u),"
                  << "       mix(inPrimvars[i1]." << name
                  << "         , inPrimvars[i0]." << name << ", u), v);\n";
+        
+        _procGS  << "    // MTL_HINT EXPORTS:outPrimvars." << name << " PASSTHROUGH\n"
+                 << "  outPrimvars." << name
+                 << " = inPrimvars[index]." << name << ";\n";
+    }
+
+    /*
+      // --------- varying data declaration (VS) ----------------
+      layout (std430, binding=?) buffer buffer0 {
+          vec3 displayColor[];
+      };
+
+      vec3 HdGet_displayColor(int localIndex) {
+        int index =  GetDrawingCoord().varyingCoord + gl_VertexID -
+            GetBaseVertexOffset();
+        return vec3(displayColor[index]);
+      }
+      vec3 HdGet_displayColor() { return HdGet_displayColor(0); }
+
+      out Primvars {
+          vec3 displayColor;
+      } outPrimvars;
+
+      void ProcessPrimvars() {
+          outPrimvars.displayColor = HdGet_displayColor();
+      }
+
+      // --------- fragment stage plumbing -------
+      in Primvars {
+          vec3 displayColor;
+      } inPrimvars;
+    */
+
+    std::stringstream varyingDeclarations;
+
+    TF_FOR_ALL (it, _metaData.varyingData) {
+        HdBinding binding = it->first;
+        TfToken const &name = it->second.name;
+        TfToken const &dataType = it->second.dataType;
+
+        _EmitDeclarationPtr(varyingDeclarations, name, dataType, TfToken(), binding);
+        
+        interstageStruct << "  " << _GetPackedType(dataType, false)
+                         << " " << name << ";\n";
+
+        // primvar accessors
+        _EmitBufferAccessor(accessorsVS, name, dataType,
+            "GetDrawingCoord().varyingCoord + gl_VertexID - GetBaseVertexOffset()");
+        _EmitStructAccessor(accessorsTCS, _tokens->inPrimvars,
+                            name, dataType, /*arraySize=*/1, false, "gl_InvocationID");
+        _EmitStructAccessor(accessorsTES, _tokens->inPrimvars,
+                            name, dataType, /*arraySize=*/1, false, "localIndex");
+        _EmitStructAccessor(accessorsGS,  _tokens->inPrimvars,
+                            name, dataType, /*arraySize=*/1, false, "localIndex");
+        _EmitStructAccessor(accessorsFS,  _tokens->inPrimvars,
+                            name, dataType, /*arraySize=*/1, false);
+
+        // interstage plumbing
+        _procVS << "  outPrimvars." << name
+                << " = " << "HdGet_" << name << "();\n";
+//        _procTCS << "  outPrimvars[gl_InvocationID]." << name
+//                 << " = inPrimvars[gl_InvocationID]." << name << ";\n";
+//        _procTES << "  outPrimvars." << name  << " = ProcessPrimvar("
+//                 << "inPrimvars[i0]." << name
+//                 << ", inPrimvars[i1]." << name
+//                 << ", inPrimvars[i2]." << name
+//                 << ", inPrimvars[i3]." << name
+//                 << ", basis, uv);\n";
         
         _procGS  << "    // MTL_HINT EXPORTS:outPrimvars." << name << " PASSTHROUGH\n"
                  << "    outPrimvars." << name
@@ -4944,6 +5059,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
 
     _genVS << fvarDeclarations.str()
            << vertexInputs.str()
+           << varyingDeclarations.str()
            << interstageStruct.str()
            << " outPrimvars;\n"
            << accessorsVS.str();
@@ -4974,14 +5090,6 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
     _genFS << "vec4 GetPatchCoord() { return GetPatchCoord(0); }\n";
 
     //_genGS << "vec4 GetPatchCoord(int localIndex);\n";  ..... No 
-    
-    // VS specific accessor for the "vertex drawing coordinate"
-    // Even though we currently always plumb vertexCoord as part of the drawing
-    // coordinate, we expect clients to use this accessor when querying the base
-    // vertex offset for a draw call.
-    _genVS << "int GetBaseVertexOffset() {\n";
-    _genVS << "  return gl_BaseVertex;\n";
-    _genVS << "}\n";
 }
 
 void
@@ -5345,10 +5453,10 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << " HdGet_" << it->second.name << "(int localIndex) {\n"
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
-                << "(GlopPtexTextureLookup("
+                << "(PtexTextureLookup("
                 << "sampler2DArray(materialParams[shaderCoord]."
                 << it->second.name << "),"
-                << "isamplerBuffer(materialParams[shaderCoord]."
+                << "isampler1DArray(materialParams[shaderCoord]."
                 << it->second.name << HdSt_ResourceBindingSuffixTokens->layout
                 <<"), "
                 << "GetPatchCoord(localIndex))" << swizzle << ");\n"
@@ -5360,10 +5468,10 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << " HdGet_" << it->second.name << "(vec4 patchCoord) {\n"
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
-                << "(GlopPtexTextureLookup("
+                << "(PtexTextureLookup("
                 << "sampler2DArray(materialParams[shaderCoord]."
                 << it->second.name << "),"
-                << "isamplerBuffer(materialParams[shaderCoord]."
+                << "isampler1DArray(materialParams[shaderCoord]."
                 << it->second.name << HdSt_ResourceBindingSuffixTokens->layout
                 << "), "
                 << "patchCoord)" << swizzle << ");\n"
@@ -5371,35 +5479,32 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
         } else if (bindingType == HdBinding::TEXTURE_PTEX_TEXEL) {
             // appending '_layout' for layout is by convention.
             std::string texelBindName("textureBind_" + it->second.name.GetString());
-            std::string samplerBindName("samplerBind_" + it->second.name.GetString());
-            std::string layoutBindName("bufferBind_" + it->second.name.GetString() + "_layout");
+            std::string texelSamplerBindName("samplerBind_" + it->second.name.GetString());
+            std::string layoutBindName(texelBindName + "_layout");
             
             declarations
                 << "texture2d_array<float> " << texelBindName << ";\n"
-                << "const device ushort * " << layoutBindName << ";\n"
-                << "sampler " << samplerBindName << ";\n";
+                << "texture1d_array<int> " << layoutBindName << ";\n"
+                << "sampler " << texelSamplerBindName << ";\n";
             
-            _AddInputParam(_mslPSInputParams, TfToken(samplerBindName),
+            _AddInputParam(_mslPSInputParams, TfToken(texelSamplerBindName),
                            TfToken("sampler"), TfToken(), it->first).usage
                 |= HdSt_CodeGenMSL::TParam::Sampler;
             _AddInputParam(_mslPSInputParams, TfToken(texelBindName),
                            TfToken("texture2d_array<float>"), TfToken(), it->first).usage
                 |= HdSt_CodeGenMSL::TParam::Texture;
-
-            HdBinding layoutBinding(HdBinding::TEXTURE_PTEX_LAYOUT,
-                it->first.GetLocation(),
-                it->first.GetTextureUnit());
-            _AddInputPtrParam(_mslPSInputParams, TfToken(layoutBindName),
-                TfToken("ushort"), TfToken(), HdBinding(HdBinding::UNIFORM, 0));
+            _AddInputParam(_mslPSInputParams, TfToken(layoutBindName),
+                           TfToken("texture1d_array<int>"), TfToken(), it->first).usage
+                |= HdSt_CodeGenMSL::TParam::Texture;
 
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "(int localIndex) {\n"
                 << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
-                << "(GlopPtexTextureLookup("
+                << "(PtexTextureLookup("
                 << texelBindName << ","
                 << layoutBindName << ","
-                << samplerBindName << ","
+                << texelSamplerBindName << ","
                 << "GetPatchCoord(localIndex))" << swizzle << ");\n"
                 << "}\n"
                 << _GetUnpackedType(it->second.dataType, false)
@@ -5408,10 +5513,10 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "(vec4 patchCoord) {\n"
                 << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
-                << "(GlopPtexTextureLookup("
+                << "(PtexTextureLookup("
                 << texelBindName<< ","
                 << layoutBindName << ","
-                << samplerBindName << ","
+                << texelSamplerBindName << ","
                 << "patchCoord)" << swizzle << ");\n"
                 << "}\n";
             addScalarAccessor = false;
@@ -5424,7 +5529,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
 //                << LayoutQualifier(HdBinding(it->first.GetType(),
 //                                            it->first.GetLocation(),
 //                                            it->first.GetTextureUnit()))
-//                << "uniform isamplerBuffer isamplerbuffer_"
+//                << "uniform isampler1DArray isampler1darray_"
 //                << it->second.name << ";\n";
         } else if (bindingType == HdBinding::PRIMVAR_REDIRECT) {
             // Create an HdGet_INPUTNAME for the shader to access a primvar

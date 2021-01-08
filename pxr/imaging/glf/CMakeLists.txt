@@ -9,10 +9,6 @@ endif()
 set(optionalLibs "")
 set(optionalIncludeDirs "")
 
-if (OPENSUBDIV_HAS_GLSL_COMPUTE)
-    add_definitions(-DOPENSUBDIV_HAS_GLSL_COMPUTE)
-endif()
-
 if (NOT ${PXR_ENABLE_GL_SUPPORT})
     message(STATUS
         "Building minimal ${PXR_PACKAGE} because PXR_ENABLE_GL_SUPPORT is OFF")
@@ -20,8 +16,7 @@ if (NOT ${PXR_ENABLE_GL_SUPPORT})
     set(OPENGL_LIBRARY  "")
 if (NOT APPLEIOS)
     set(OPENGL_LIBRARY              ${OPENGL_gl_LIBRARY}
-                                    ${OPENGL_glu_LIBRARY}
-                                    ${GLEW_LIBRARY})
+                                    ${OPENGL_glu_LIBRARY})
 endif()
 
     pxr_library(glf
@@ -40,10 +35,8 @@ endif()
 
         INCLUDE_DIRS
             ${Boost_INCLUDE_DIRS}
-            ${GLEW_INCLUDE_DIR}
 
         PUBLIC_CLASSES
-            glew
             glContext
             glRawContext
             info
@@ -60,11 +53,10 @@ endif()
 
         PYMODULE_CPPFILES
             module.cpp
-            wrapGlew.cpp
 
         PYMODULE_FILES
             __init__.py
-)
+    )
 else()
     pxr_library(glf
         LIBRARIES
@@ -80,13 +72,11 @@ else()
             sdf
             ${Boost_PYTHON_LIBRARY}
             ${OPENGL_gl_LIBRARY}
-            ${GLEW_LIBRARY}
             ${X11_LIBRARIES}
             ${optionalLibs}
 
         INCLUDE_DIRS
             ${Boost_INCLUDE_DIRS}
-            ${GLEW_INCLUDE_DIR}
             ${optionalIncludeDirs}
 
         PUBLIC_CLASSES
@@ -96,15 +86,12 @@ else()
             contextCaps
             diagnostic
             drawTarget
-            glew
             glContext
             glRawContext
             info
-            ptexTexture
             resourceFactory
             simpleLightingContext
             simpleShadowArray
-            udimTexture
             uniformBlock
             utils
             ${optionalPublicClasses}
@@ -122,7 +109,6 @@ else()
         PYMODULE_CPPFILES
             module.cpp
             wrapDiagnostic.cpp
-            wrapGlew.cpp
 
         PYMODULE_FILES
             __init__.py

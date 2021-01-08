@@ -644,6 +644,29 @@ class HUD():
 
         GL.glUseProgram(0)
 
+def _ComputeCameraFraming(viewport, renderBufferSize):
+    x, y, w, h = viewport
+    renderBufferWidth  = renderBufferSize[0]
+    renderBufferHeight = renderBufferSize[1]
+
+    # Set display window equal to viewport - but flipped
+    # since viewport is in y-Up coordinate system but
+    # display window is y-Down.
+    displayWindow = Gf.Range2f(
+        Gf.Vec2f(x,     renderBufferHeight - y - h),
+        Gf.Vec2f(x + w, renderBufferHeight - y))
+
+    # Intersect the display window with render buffer rect for
+    # data window.
+    renderBufferRect = Gf.Rect2i(
+        Gf.Vec2i(0, 0), renderBufferWidth, renderBufferHeight)
+    dataWindow = renderBufferRect.GetIntersection(
+        Gf.Rect2i(
+            Gf.Vec2i(x, renderBufferHeight - y - h),
+            w, h))
+
+    return CameraUtil.Framing(displayWindow, dataWindow)
+
 class StageView(QtOpenGL.QGLWidget):
     '''
     QGLWidget that displays a USD Stage.  A StageView requires a dataModel
@@ -1691,8 +1714,19 @@ class StageView(QtOpenGL.QGLWidget):
             if self._cropImageToCameraViewport:
                 viewport = cameraViewport
 
-            renderer.SetRenderViewport(viewport)
-            renderer.SetWindowPolicy(self.computeWindowPolicy(cameraAspect))
+            # For legacy implementation (--renderer HydraDisabled)
+            if not renderer.IsHydraEnabled():
+                renderer.SetRenderViewport(viewport)
+                renderer.SetWindowPolicy(self.computeWindowPolicy(cameraAspect))
+
+            renderBufferSize = Gf.Vec2i(self.computeWindowSize())
+
+            renderer.SetRenderBufferSize(
+                renderBufferSize)
+            renderer.SetFraming(
+                _ComputeCameraFraming(viewport, renderBufferSize))
+            renderer.SetOverrideWindowPolicy(
+                self.computeWindowPolicy(cameraAspect))
 
             sceneCam = self.getActiveSceneCamera()
             if sceneCam:
@@ -1847,7 +1881,7 @@ class StageView(QtOpenGL.QGLWidget):
             if (not self._dataModel.playing) & (not renderer.IsConverged()):
                 QtCore.QTimer.singleShot(self.frameDelay, self.update)
         
-        except Tf.ErrorException as e:
+        except Exception as e:
             # If we encounter an error during a render, we want to continue 
             # running. Just log the error and continue.
             sys.stderr.write(

@@ -270,6 +270,7 @@ public:
         StructBlockBinding topologyVisibilityData;
         PrimvarBinding elementData;
         PrimvarBinding vertexData;
+        PrimvarBinding varyingData;
         PrimvarBinding fvarData;
         PrimvarBinding computeReadWriteData;
         PrimvarBinding computeReadOnlyData;

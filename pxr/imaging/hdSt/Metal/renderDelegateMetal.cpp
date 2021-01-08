@@ -174,8 +174,7 @@ void HdStRenderDelegateMetal::PrepareRender(
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
 
     // hydra orients all geometry during topological processing so that
-    // front faces have ccw winding. We disable culling because culling
-    // is handled by fragment shader discard.
+    // front faces have ccw winding.
     if (!params.flipFrontFacing) {
         context->SetFrontFaceWinding(MTLWindingClockwise);
     } else {

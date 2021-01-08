@@ -105,99 +105,54 @@ public:
     virtual bool IsRelativePath(const std::string& path) override;
 
     AR_API
-    virtual bool IsRepositoryPath(const std::string& path) override;
-
-    AR_API
     virtual bool IsSearchPath(const std::string& path) override;
-
-    AR_API
-    virtual std::string GetExtension(const std::string& path) override;
-
-    AR_API
-    virtual std::string ComputeNormalizedPath(const std::string& path) override;
-
-    AR_API
-    virtual std::string ComputeRepositoryPath(const std::string& path) override;
-
-    AR_API
-    virtual void UpdateAssetInfo(
-       const std::string& identifier,
-       const std::string& filePath,
-       const std::string& fileVersion,
-       ArAssetInfo* assetInfo) override;
-
-    AR_API
-    virtual VtValue GetModificationTimestamp(
-        const std::string& path,
-        const std::string& resolvedPath) override;
-
-    AR_API
-    virtual bool FetchToLocalResolvedPath(
-        const std::string& path,
-        const std::string& resolvedPath) override;
 
     AR_API
     virtual bool CreatePathForLayer(
         const std::string& path) override;
 
-    AR_API
-    virtual bool CanWriteLayerToPath(
-        const std::string& path,
-        std::string* whyNot) override;
-
-    AR_API
-    virtual bool CanCreateNewLayerWithIdentifier(
-        const std::string& identifier, 
-        std::string* whyNot) override;
-
-    AR_API
-    virtual ArResolverContext CreateDefaultContext() override;
-
-    /// Creates a context that adds the directory containing \p filePath
-    /// as a first directory to be searched, when the resulting context is
-    /// bound (\see ArResolverContextBinder).  
-    ///
-    /// If \p filePath is empty, returns an empty context; otherwise, if
-    /// \p filePath is not an absolute filesystem path, it will first be
-    /// anchored to the process's current working directory.
-    AR_API
-    virtual ArResolverContext CreateDefaultContextForAsset(
-        const std::string& filePath) override;
-
-    AR_API
-    virtual void RefreshContext(const ArResolverContext& context) override;
-
-    AR_API
-    virtual ArResolverContext GetCurrentContext() override;
-
-    AR_API
-    virtual void BeginCacheScope(
-        VtValue* cacheScopeData) override;
-
-    AR_API
-    virtual void EndCacheScope(
-        VtValue* cacheScopeData) override;
-
-    AR_API
-    virtual void BindContext(
-        const ArResolverContext& context,
-        VtValue* bindingData) override;
-
-    AR_API
-    virtual void UnbindContext(
-        const ArResolverContext& context,
-        VtValue* bindingData) override;
-
 protected:
     AR_API
-    virtual ArResolvedPath _Resolve(
+    virtual std::string _CreateIdentifier(
         const std::string& assetPath,
-        ArAssetInfo* assetInfo) override;
+        const ArResolvedPath& anchorAssetPath) override;
+
+    AR_API
+    virtual std::string _CreateIdentifierForNewAsset(
+        const std::string& assetPath,
+        const ArResolvedPath& anchorAssetPath) override;
+
+    AR_API
+    virtual ArResolvedPath _Resolve(
+        const std::string& assetPath) override;
 
     AR_API
     virtual ArResolvedPath _ResolveForNewAsset(
-        const std::string& assetPath,
-        ArAssetInfo* assetInfo) override;
+        const std::string& assetPath) override;
+
+    AR_API
+    virtual void _BindContext(
+        const ArResolverContext& context,
+        VtValue* bindingData) override;
+
+    AR_API
+    virtual void _UnbindContext(
+        const ArResolverContext& context,
+        VtValue* bindingData) override;
+
+    AR_API
+    virtual ArResolverContext _CreateDefaultContext() override;
+
+    /// Creates a context that adds the directory containing \p assetPath
+    /// as a first directory to be searched, when the resulting context is
+    /// bound (\see ArResolverContextBinder).  
+    ///
+    /// If \p assetPath is empty, returns an empty context; otherwise, if
+    /// \p assetPath is not an absolute filesystem path, it will first be
+    /// anchored to the process's current working directory.
+    AR_API
+    virtual ArResolverContext _CreateDefaultContextForAsset(
+        const std::string& assetPath) override;
 
     /// Creates an ArDefaultResolverContext from \p contextStr. This
     /// string is expected to be a list of directories delimited by
@@ -207,8 +162,39 @@ protected:
         const std::string& contextStr) override;
 
     AR_API
+    virtual ArResolverContext _GetCurrentContext() override;
+
+    AR_API
+    virtual bool _IsContextDependentPath(
+        const std::string& assetPath) override;
+
+    AR_API
+    virtual std::string _GetExtension(
+        const std::string& path) override;
+
+    AR_API
+    virtual VtValue _GetModificationTimestamp(
+        const std::string& path,
+        const ArResolvedPath& resolvedPath) override;
+
+    AR_API
     virtual std::shared_ptr<ArAsset> _OpenAsset(
         const ArResolvedPath& resolvedPath) override;
+
+    /// Creates an ArFilesystemWriteableAsset for the asset at the
+    /// given \p resolvedPath.
+    AR_API
+    virtual std::shared_ptr<ArWritableAsset> _OpenAssetForWrite(
+        const ArResolvedPath& resolvedPath,
+        WriteMode writeMode) override;
+
+    AR_API
+    virtual void _BeginCacheScope(
+        VtValue* cacheScopeData) override;
+
+    AR_API
+    virtual void _EndCacheScope(
+        VtValue* cacheScopeData) override;
 
 private:
     struct _Cache;
@@ -216,7 +202,7 @@ private:
     using _CachePtr = _PerThreadCache::CachePtr;
     _CachePtr _GetCurrentCache();
 
-    const ArDefaultResolverContext* _GetCurrentContext();
+    const ArDefaultResolverContext* _GetCurrentContextPtr();
 
     ArResolvedPath _ResolveNoCache(const std::string& path);
 

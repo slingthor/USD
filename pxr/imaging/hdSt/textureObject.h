@@ -32,13 +32,14 @@
 #include "pxr/imaging/hd/types.h"
 
 #include "pxr/imaging/hgi/handle.h"
+#include "pxr/imaging/hio/image.h"
+
 #include "pxr/base/gf/bbox3d.h"
 #include "pxr/base/tf/declarePtrs.h"
 
 #include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
-
 class Hgi;
 using HgiTextureHandle = HgiHandle<class HgiTexture>;
 class HdSt_TextureObjectRegistry;
@@ -102,7 +103,15 @@ protected:
     Hgi* _GetHgi() const;
     
     HDST_API
-    std::string _GetDebugName(const HdStTextureIdentifier &textureId);
+    std::string _GetDebugName(const HdStTextureIdentifier &textureId) const;
+
+    HDST_API
+    bool
+    _GetPremultiplyAlpha(const HdStSubtextureIdentifier * const subId) const;
+
+    HDST_API
+    HioImage::SourceColorSpace
+    _GetSourceColorSpace(const HdStSubtextureIdentifier * const subId) const;
 
     /// Load texture to CPU (thread-safe)
     ///

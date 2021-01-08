@@ -69,6 +69,37 @@ HdStRenderPassStateGL::~HdStRenderPassStateGL()
     /*NOTHING*/
 }
 
+// Note: The geometric shader may override the state set below if necessary,
+// including disabling h/w culling altogether.
+// Disabling h/w culling is required to handle instancing wherein
+// instanceScale/instanceTransform can flip the xform handedness.
+namespace {
+
+void
+_SetGLCullState(HdCullStyle cullstyle)
+{
+    switch (cullstyle) {
+        case HdCullStyleFront:
+        case HdCullStyleFrontUnlessDoubleSided:
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_FRONT);
+            break;
+        case HdCullStyleBack:
+        case HdCullStyleBackUnlessDoubleSided:
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_BACK);
+            break;
+        case HdCullStyleNothing:
+        case HdCullStyleDontCare:
+        default:
+            // disable culling
+            glDisable(GL_CULL_FACE);
+            break;
+    }
+}
+
+} // anonymous namespace
+
 void
 HdStRenderPassStateGL::Bind()
 {

@@ -104,7 +104,7 @@ Support for Python can optionally be disabled by specifying the cmake flag
 Support for Python 3 can be enabled by specifying the cmake flag
 ```PXR_USE_PYTHON_3=ON```.
 
-##### OpenGL and GLEW
+##### OpenGL
 
 Support for OpenGL can optionally be disabled by specifying the cmake flag
 ```PXR_ENABLE_GL_SUPPORT=FALSE```.  This will skip components and libraries
@@ -575,6 +575,25 @@ to get the path to the library. We also link 'usd_m' separately so cmake
 will add usd_m's interface link libraries, etc. This second instance
 doesn't increase the resulting file size because all symbols will be
 found in the first (-WHOLEARCHIVE) instance.
+
+###### Avoiding linking statically to Python
+
+The default build with python support will link to the python static lib for
+your interpreter. This is to support running python code from C++. If that is
+not desirable, python static linking can be disabled using the flag
+
+```
+-DPXR_PY_UNDEFINED_DYNAMIC_LOOKUP=ON
+```
+
+The primary motivating case for this is generating wheel packages for PyPI, but
+the parameter was made more generic in case it has other uses in the future. It
+is useful when we want to take advantage of python's approach to ABI
+compatibility.
+
+Note that this flag has no effect on Windows, see 
+[here for more info](https://docs.python.org/3/extending/windows.html)
+    
 
 ## Build Issues FAQ
 

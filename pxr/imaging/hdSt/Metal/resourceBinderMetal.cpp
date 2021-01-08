@@ -354,14 +354,14 @@ public:
         
         // Bind the layout
         {
-            auto metalBuffer = dynamic_cast<HgiMetalBuffer const*>(
-                texture.GetLayoutBuffer().Get());
+            auto metalTexture = dynamic_cast<HgiMetalTexture const*>(
+                texture.GetLayoutTexture().Get());
+            auto textureId = metalTexture ? metalTexture->GetTextureId() : nil;
 
-            mslProgram.BindBuffer(
+            mslProgram.BindTexture(
                 HdSt_ResourceBinder::_Concat(
                     name, HdSt_ResourceBindingSuffixTokens->layout),
-                metalBuffer?metalBuffer->GetBufferId():nil,
-                true);
+                textureId, MTLTextureType1DArray);
         }
     }
 

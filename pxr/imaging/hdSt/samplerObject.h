@@ -179,14 +179,16 @@ public:
     }
 
     /// Similar to GetGLTexelsTextureHandle but for layout.
-    const HgiBufferHandle &GetLayoutBufferHandle() const {
-        return _layoutBuffer;
+    ///
+    uint64_t GetLayoutGLTextureHandle() const {
+        return _layoutGLTextureHandle;
     }
 
 private:
     HgiSamplerHandle _texelsSampler;
+
     const uint64_t _texelsGLTextureHandle;
-    HgiBufferHandle _layoutBuffer;
+    const uint64_t _layoutGLTextureHandle;
 };
 
 /// \class HdStUdimSamplerObject

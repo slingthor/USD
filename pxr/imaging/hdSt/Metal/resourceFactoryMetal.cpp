@@ -86,29 +86,6 @@ HdSt_ResourceBinder *HdStResourceFactoryMetal::NewResourceBinder() const
     return new HdSt_ResourceBinderMetal();
 }
 
-HdStSimpleTextureResource *
-HdStResourceFactoryMetal::NewSimpleTextureResource(
-    GarchTextureHandleRefPtr const &textureHandle,
-    HdTextureType textureType,
-    size_t memoryRequest) const
-{
-    return new HdStSimpleTextureResourceMetal(
-        textureHandle, textureType, memoryRequest);
-}
-
-HdStSimpleTextureResource *
-HdStResourceFactoryMetal::NewSimpleTextureResource(
-    GarchTextureHandleRefPtr const &textureHandle,
-    HdTextureType textureType,
-    HdWrap wrapS, HdWrap wrapT, HdWrap wrapR,
-    HdMinFilter minFilter, HdMagFilter magFilter,
-    size_t memoryRequest) const
-{
-    return new HdStSimpleTextureResourceMetal(
-        textureHandle, textureType, wrapS, wrapT, wrapR, minFilter, magFilter,
-        memoryRequest);
-}
-
 HdStGLSLProgram *HdStResourceFactoryMetal::NewProgram(
     TfToken const &role, HdStResourceRegistry *const registry) const
 {

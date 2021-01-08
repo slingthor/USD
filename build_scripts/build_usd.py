@@ -1668,92 +1668,6 @@ def updateOpenEXRIOS(context, srcDir):
 OPENEXR = Dependency("OpenEXR", InstallOpenEXR, "include/OpenEXR/ImfVersion.h")
 
 ############################################################
-# GLEW
-
-if Windows():
-    GLEW_URL = "https://downloads.sourceforge.net/project/glew/glew/2.0.0/glew-2.0.0-win32.zip"
-else:
-    # Important to get source package from this URL and NOT github. This package
-    # contains pre-generated code that the github repo does not.
-    GLEW_URL = "https://downloads.sourceforge.net/project/glew/glew/2.0.0/glew-2.0.0.tgz"
-
-def InstallGLEW(context, force, buildArgs):
-    if Windows():
-        return InstallGLEW_Windows(context, force)
-    elif Linux() or MacOS():
-        return InstallGLEW_LinuxOrMacOS(context, force, buildArgs)
-
-def InstallGLEW_Windows(context, force):
-    with CurrentWorkingDirectory(DownloadURL(GLEW_URL, context, force)):
-        # On Windows, we install headers and pre-built binaries per
-        # https://glew.sourceforge.net/install.html
-        # Note that we are installing just the shared library. This is required
-        # by the USD build; if the static library is present, that one will be
-        # used and that causes errors with USD and OpenSubdiv.
-        CopyFiles(context, "bin\\Release\\x64\\glew32.dll", "bin")
-        CopyFiles(context, "lib\\Release\\x64\\glew32.lib", "lib")
-        CopyDirectory(context, "include\\GL", "include\\GL")
-
-        return os.getcwd()
-
-def InstallGLEW_LinuxOrMacOS(context, force, buildArgs):
-    with CurrentWorkingDirectory(DownloadURL(GLEW_URL, context, force)):
-
-        if context.buildUniversal and SupportsMacOSUniversalBinaries():
-            PatchFile("config/Makefile.darwin", 
-                [("CFLAGS.EXTRA = -dynamic -fno-common",
-                  "CFLAGS.EXTRA = -arch x86_64 -dynamic -fno-common"),
-                 ("LDFLAGS.EXTRA =",
-                  "LDFLAGS.EXTRA = -arch x86_64")])
-            sdkPath = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path']).strip()
-            PatchFile("config/Makefile.darwin", 
-                [("CFLAGS.EXTRA = -arch arm64 -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
-                  "CFLAGS.EXTRA = -arch x86_64 -dynamic -fno-common"),
-                 ("LDFLAGS.EXTRA = -arch arm64 -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
-                  "LDFLAGS.EXTRA = -arch x86_64")])
-            Run('make clean')
-            Run('make GLEW_DEST="{instDir}/_tmp/x86_64" -j{procs} {buildArgs} install'
-                .format(instDir=context.instDir,
-                    procs=context.numJobs,
-                    buildArgs=" ".join(buildArgs)))
-
-            PatchFile("config/Makefile.darwin", 
-                [("CFLAGS.EXTRA = -arch x86_64 -dynamic -fno-common",
-                  "CFLAGS.EXTRA = -arch arm64 -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath)),
-                 ("LDFLAGS.EXTRA = -arch x86_64",
-                  "LDFLAGS.EXTRA = -arch arm64 -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath))]),
-            Run('make clean')
-            Run('make GLEW_DEST="{instDir}/_tmp/arm64" -j{procs} {buildArgs} install'
-                .format(instDir=context.instDir,
-                        procs=context.numJobs,
-                        buildArgs=" ".join(buildArgs)))
-
-            x86Dir = os.path.join(context.instDir, "_tmp/x86_64/lib")
-            armDir = os.path.join(context.instDir, "_tmp/arm64/lib")
-            libNames = [f for f in os.listdir(x86Dir) if os.path.isfile(os.path.join(x86Dir, f))]
-            CreateUniversalBinaries(context, libNames, x86Dir, armDir)
-
-            for libName in libNames:
-                filename, file_extension = os.path.splitext(libName)
-                if not os.path.islink("{instDir}/lib/{libName}".format(instDir=context.instDir, libName=libName)) and \
-                file_extension == ".dylib":
-                    Run('install_name_tool -id "@rpath/{libName}" {instDir}/lib/{libName}'.format(
-                        instDir=context.instDir, libName=libName))
-            CopyDirectory(context, os.path.join(context.instDir, "_tmp/x86_64/include/GL"), "include/GL")
-
-            shutil.rmtree(os.path.join(context.instDir, "_tmp"))
-        else :
-            Run('make GLEW_DEST="{instDir}" -j{procs} {buildArgs} install'
-                .format(instDir=context.instDir,
-                        procs=context.numJobs,
-                        buildArgs=" ".join(buildArgs)))
-
-        glewCWD = os.getcwd()
-        return glewCWD
-
-GLEW = Dependency("GLEW", InstallGLEW, "include/GL/glew.h")
-
-############################################################
 # Ptex
 
 PTEX_URL = "https://github.com/wdas/ptex/archive/v2.1.28.zip"
@@ -1873,7 +1787,10 @@ def InstallOpenVDB(context, force, buildArgs):
         # OpenVDB needs Half type from IlmBase
         extraArgs.append('-DILMBASE_ROOT="{instDir}"'
                          .format(instDir=context.instDir))
-        
+
+        # Add on any user-specified extra arguments.
+        extraArgs += buildArgs
+
         RunCMake(context, force, extraArgs)
         return os.getcwd()
 
@@ -2236,11 +2153,19 @@ DRACO = Dependency("Draco", InstallDraco, "include/draco/compression/decode.h")
 ############################################################
 # MaterialX
 
-MATERIALX_URL = "https://github.com/materialx/MaterialX/archive/v1.37.1.zip"
+MATERIALX_URL = "https://github.com/materialx/MaterialX/archive/v1.37.3.zip"
 
 def InstallMaterialX(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(MATERIALX_URL, context, force)):
-        RunCMake(context, force, buildArgs)
+        # USD requires MaterialX to be built as a shared library on Linux
+        # Currently MaterialX does not support shared builds on Windows or MacOS
+        cmakeOptions = []
+        if Linux():
+            cmakeOptions += ['-DMATERIALX_BUILD_SHARED_LIBS=ON']
+
+        cmakeOptions += buildArgs;
+
+        RunCMake(context, force, cmakeOptions)
         return os.getcwd()
 
 MATERIALX = Dependency("MaterialX", InstallMaterialX, "include/MaterialXCore/Library.h")
@@ -2959,9 +2884,6 @@ if context.buildBasisu:
 if context.buildImaging:
     if context.enablePtex:
         requiredDependencies += [PTEX]
-
-    if context.enableOpenGL:
-        requiredDependencies += [GLEW]
 
     requiredDependencies += [OPENSUBDIV]
     

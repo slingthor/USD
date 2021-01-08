@@ -37,6 +37,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdRenderPassState::HdRenderPassState()
     : _camera(nullptr)
     , _viewport(0, 0, 1, 1)
+    , _overrideWindowPolicy{false, CameraUtilFit}
     , _cullMatrix(1)
     , _worldToViewMatrix(1)
     , _projectionMatrix(1)
@@ -80,6 +81,7 @@ HdRenderPassState::HdRenderPassState()
     , _colorMaskUseDefault(true)
     , _colorMask(HdRenderPassState::ColorMaskRGBA)
     , _useMultiSampleAov(true)
+
 {
 }
 
@@ -116,6 +118,23 @@ HdRenderPassState::SetCameraAndViewport(HdCamera const *camera,
     _camera = camera;
     _viewport = GfVec4f((float)viewport[0], (float)viewport[1],
                         (float)viewport[2], (float)viewport[3]);
+
+    // Invalidate framing so that it isn't used by GetProjectionMatrix().
+    _framing = CameraUtilFraming();
+}
+
+void
+HdRenderPassState::SetCameraAndFraming(
+    HdCamera const *camera,
+    const CameraUtilFraming &framing,
+    const std::pair<bool, CameraUtilConformWindowPolicy> &overrideWindowPolicy)
+{
+    if (!camera) {
+        TF_CODING_ERROR("Received null camera\n");
+    }
+    _camera = camera;
+    _framing = framing;
+    _overrideWindowPolicy = overrideWindowPolicy;
 }
 
 GfMatrix4d
@@ -128,11 +147,31 @@ HdRenderPassState::GetWorldToViewMatrix() const
     return _camera->GetViewMatrix();
 }
 
+CameraUtilConformWindowPolicy
+HdRenderPassState::GetWindowPolicy() const
+{
+    if (_overrideWindowPolicy.first) {
+        return _overrideWindowPolicy.second;
+    }
+    if (_camera) {
+        return _camera->GetWindowPolicy();
+    }
+
+    return CameraUtilFit;
+}
+
 GfMatrix4d
 HdRenderPassState::GetProjectionMatrix() const
 {
     if (!_camera) {
         return _projectionMatrix;
+    }
+
+    if (_framing.IsValid()) {
+        return
+            _framing.ApplyToProjectionMatrix(
+                _camera->GetProjectionMatrix(),
+                GetWindowPolicy());
     }
 
     CameraUtilConformWindowPolicy const policy = _camera->GetWindowPolicy();

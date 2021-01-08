@@ -82,8 +82,6 @@ public:
     HDST_API
     HdBufferArrayRangeSharedPtr const& GetShaderData() const override;
     HDST_API
-    TextureDescriptorVector GetTextures() const override;
-    HDST_API
     NamedTextureHandleVector const & GetNamedTextureHandles() const override;
     HDST_API
     void BindResources(HdStGLSLProgram const &program,
@@ -112,8 +110,6 @@ public:
     HDST_API
     void SetParams(const HdSt_MaterialParamVector &params);
     HDST_API
-    void SetTextureDescriptors(const TextureDescriptorVector &texDesc);
-    HDST_API
     void SetNamedTextureHandles(const NamedTextureHandleVector &);
     HDST_API
     void SetBufferSources(
@@ -133,9 +129,6 @@ public:
 
     HDST_API
     void SetMaterialTag(TfToken const &materialTag);
-
-    HDST_API
-    TextureDescriptorVector const& GetTextureDescriptors() const { return _textureDescriptors; }
     
     /// If the prim is based on asset, reload that asset.
     HDST_API
@@ -183,10 +176,6 @@ private:
     mutable size_t              _computedTextureSourceHash;
     mutable bool                _isValidComputedTextureSourceHash;
 
-    // Old texture system
-    TextureDescriptorVector _textureDescriptors;
-
-    // New texture system
     NamedTextureHandleVector _namedTextureHandles;
 
     TfToken _materialTag;

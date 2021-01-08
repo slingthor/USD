@@ -27,15 +27,15 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/subtextureIdentifier.h"
 #include "pxr/imaging/hdSt/tokens.h"
-#include "pxr/imaging/hdSt/udimTextureObject.h"
 
-#ifdef PXR_MATERIALX_SUPPORT_ENABLED
+#ifdef PXR_MATERIALX_IMAGING_SUPPORT_ENABLED
 #include "pxr/imaging/hdSt/materialXFilter.h"
 #endif
 
 #include "pxr/imaging/hd/material.h"
 
-#include "pxr/imaging/garch/udimTexture.h"
+#include "pxr/imaging/hdSt/udimTextureObject.h"
+
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hio/glslfx.h"
@@ -307,9 +307,9 @@ _GetGlslfxForTerminal(
 
 static HdMaterialNode2 const*
 _GetTerminalNode(
-    SdfPath const& id,
     HdMaterialNetwork2 const& network,
-    TfToken const & terminalName)
+    TfToken const& terminalName,
+    SdfPath * terminalNodePath)
 {
     // Get the Surface or Volume Terminal
     auto const& terminalConnIt = network.terminals.find(terminalName);
@@ -319,6 +319,7 @@ _GetTerminalNode(
     HdMaterialConnection2 const& connection = terminalConnIt->second;
     SdfPath const& terminalPath = connection.upstreamNode;
     auto const& terminalIt = network.nodes.find(terminalPath);
+    *terminalNodePath = terminalPath;
     return &terminalIt->second;
 }
 
@@ -921,11 +922,8 @@ _MakeMaterialParamsForTexture(
             // Use the type of the filePath attribute to determine
             // whether to use the Storm texture system (for
             // SdfAssetPath/std::string/ HdStTextureIdentifier) or use
-            // the HdSceneDelegate::GetTextureResource/ID (for all
-            // other types). The
-            // HdSceneDelegate::GetTextureResource/ID path will be
-            // obsoleted and probably removed at some point.
-
+            // the render buffer associated to a draw target.
+            //
             if (v.IsHolding<HdStTextureIdentifier>()) {
                 //
                 // Clients can explicitly give an HdStTextureIdentifier for
@@ -1085,12 +1083,6 @@ _MakeMaterialParamsForTexture(
         1048576 *
         _ResolveParameter<float>(node, sdrNode, _tokens->textureMemory, 0.0f);
 
-    // Given to HdSceneDelegate::GetTextureResourceID.
-    // This is equal to nodePath. With one exception: it is empty if
-    // there is no file attribute on the texture node.
-    //
-    // Unfortunately, some clients depend on this exception.
-    //
     textureDescriptors->push_back(
         { paramName,
           textureId,
@@ -1098,9 +1090,7 @@ _MakeMaterialParamsForTexture(
           _GetSamplerParameters(nodePath, node, sdrNode),
           memoryRequest,
           useTexturePrimToFindTexture,
-          texturePrimPathForSceneDelegate,
-          // Default value for the old texture system
-          _GetParamFallbackValue(network, downstreamNode, paramName) });
+          texturePrimPathForSceneDelegate });
 
     params->push_back(std::move(texParam));
 }
@@ -1339,13 +1329,16 @@ HdStMaterialNetwork::ProcessMaterialNetwork(
     const TfToken &terminalName = (isVolume) ? HdMaterialTerminalTokens->volume 
                                             : HdMaterialTerminalTokens->surface;
 
-#ifdef PXR_MATERIALX_SUPPORT_ENABLED
-    HdSt_ApplyMaterialXFilter(&surfaceNetwork);
-#endif
-
+    SdfPath surfTerminalPath;
     if (HdMaterialNode2 const* surfTerminal = 
-            _GetTerminalNode(materialId, surfaceNetwork, terminalName)) {
+            _GetTerminalNode(surfaceNetwork, terminalName, &surfTerminalPath)) {
 
+#ifdef PXR_MATERIALX_IMAGING_SUPPORT_ENABLED
+        if (!isVolume) {
+            HdSt_ApplyMaterialXFilter(&surfaceNetwork, materialId,
+                                      *surfTerminal, surfTerminalPath);
+        }
+#endif
         // Extract the glslfx and metadata for surface/volume.
         _GetGlslfxForTerminal(_surfaceGfx, &_surfaceGfxHash,
                               surfTerminal->nodeTypeId, resourceRegistry);

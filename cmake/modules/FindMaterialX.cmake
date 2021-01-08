@@ -103,7 +103,15 @@ find_path(MATERIALX_STDLIB_DIR
 
 foreach(MATERIALX_LIB
     Core
-    Format)
+    Format
+    GenGlsl
+    GenOsl
+    GenShader
+    Render
+    RenderGlsl
+    RenderHw
+    RenderOsl
+    )
     find_library(MATERIALX_${MATERIALX_LIB}_LIBRARY
             MaterialX${MATERIALX_LIB}
         HINTS

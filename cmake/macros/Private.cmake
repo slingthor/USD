@@ -1138,6 +1138,21 @@ function(_pxr_library NAME)
             ${args_PUBLIC_HEADERS}
             ${args_PRIVATE_HEADERS}
         )
+        if(PXR_PY_UNDEFINED_DYNAMIC_LOOKUP)
+            # When not explicitly linking to the python lib we need to allow
+            # the linker to complete without resolving all symbols. This lets
+            # python resolve at runtime, and use this to support python
+            # versions built with different compilers and point versions.
+            # This only needed on macOS; this is not an issue on Windows,
+            # and on Linux the equivalent --allow-shlib-undefined option for ld
+            # is enabled by default when creating shared libraries.
+            if(APPLE)
+                target_link_options(${NAME}
+                    PUBLIC
+                    "LINKER:SHELL:-undefined dynamic_lookup"
+                )
+            endif()
+        endif()
     endif()
 
     #
@@ -1288,6 +1303,8 @@ function(_pxr_library NAME)
         set(docBuildDir ${CMAKE_BINARY_DIR}/docs/${headerInstallPrefix})
         set(doxygenFiles "${args_PUBLIC_HEADERS};${args_DOXYGEN_FILES}")
 
+        set(files_copied "")
+
         foreach(doxygenFile ${doxygenFiles})
             add_custom_command(
                 OUTPUT ${docBuildDir}/${doxygenFile}
@@ -1301,7 +1318,19 @@ function(_pxr_library NAME)
                     ${CMAKE_CURRENT_SOURCE_DIR}/${doxygenFile}
                 VERBATIM
             )
+
+            list(APPEND files_copied ${docBuildDir}/${doxygenFile})
         endforeach()
+
+        add_custom_target(${NAME}_docfiles
+            DEPENDS ${files_copied}
+        )
+        add_dependencies(${NAME} ${NAME}_docfiles)
+
+        set_target_properties(${NAME}_docfiles
+            PROPERTIES
+                FOLDER "docs"
+        )
     endif()
 
     # XXX -- May want some plugins to be baked into monolithic.

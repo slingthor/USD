@@ -169,6 +169,8 @@ GarchUVTexture::IsMinFilterSupported(GLenum filter)
 void
 GarchUVTexture::_ReadTexture()
 {
+    GarchGLApiLoad();
+
     GarchUVTextureDataRefPtr texData =
         GarchUVTextureData::New(_GetImageFilePath(), GetMemoryRequested(),
                               _GetCropTop(), _GetCropBottom(),

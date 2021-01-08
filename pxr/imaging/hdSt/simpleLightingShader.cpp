@@ -313,7 +313,9 @@ HdStShaderCode::NamedTextureHandle
 _MakeNamedTextureHandle(
     const TfToken &name,
     const std::string &texturePath,
-    const HdWrap wrapMode,
+    const HdWrap wrapModeS,
+    const HdWrap wrapModeT,
+    const HdWrap wrapModeR,
     const HdMinFilter minFilter,
     HdStResourceRegistry * const resourceRegistry,
     HdStShaderCodeSharedPtr const &shader)
@@ -323,7 +325,7 @@ _MakeNamedTextureHandle(
         std::make_unique<HdStDynamicUvSubtextureIdentifier>());
 
     const HdSamplerParameters samplerParameters{
-        wrapMode, wrapMode, wrapMode,
+        wrapModeS, wrapModeT, wrapModeR,
         minFilter, HdMagFilterLinear};
 
     HdStTextureHandleSharedPtr const textureHandle =
@@ -379,7 +381,7 @@ HdStSimpleLightingShader::AllocateTextureHandles(HdSceneDelegate *const delegate
 	        /* sourceColorSpace = */ HdStTokens->colorSpaceAuto));
 
     static const HdSamplerParameters envSamplerParameters{
-        HdWrapClamp, HdWrapClamp, HdWrapClamp,
+        HdWrapRepeat, HdWrapClamp, HdWrapClamp,
         HdMinFilterLinearMipmapLinear, HdMagFilterLinear};
 
     _domeLightEnvironmentTextureHandle =
@@ -395,7 +397,7 @@ HdStSimpleLightingShader::AllocateTextureHandles(HdSceneDelegate *const delegate
         _MakeNamedTextureHandle(
             _tokens->domeLightIrradiance,
             resolvedPath,
-            HdWrapRepeat,
+            HdWrapRepeat, HdWrapClamp, HdWrapRepeat,
             HdMinFilterLinear,
             resourceRegistry,
             shared_from_this()),
@@ -403,7 +405,7 @@ HdStSimpleLightingShader::AllocateTextureHandles(HdSceneDelegate *const delegate
         _MakeNamedTextureHandle(
             _tokens->domeLightPrefilter,
             resolvedPath,
-            HdWrapRepeat,
+            HdWrapRepeat, HdWrapClamp, HdWrapRepeat,
             HdMinFilterLinearMipmapLinear,
             resourceRegistry,
             shared_from_this()),
@@ -411,7 +413,7 @@ HdStSimpleLightingShader::AllocateTextureHandles(HdSceneDelegate *const delegate
         _MakeNamedTextureHandle(
             _tokens->domeLightBRDF,
             resolvedPath,
-            HdWrapClamp,
+            HdWrapClamp, HdWrapClamp, HdWrapClamp,
             HdMinFilterLinear,
             resourceRegistry,
             shared_from_this())

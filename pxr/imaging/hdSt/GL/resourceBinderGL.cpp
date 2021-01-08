@@ -472,7 +472,7 @@ HdSt_ResourceBinderGL::IntrospectBindings(HdStGLSLProgramSharedPtr programResour
             } else if (type == HdBinding::TEXTURE_PTEX_TEXEL) {
                 textureName = "sampler2darray_" + name;
             } else if (type == HdBinding::TEXTURE_PTEX_LAYOUT) {
-                textureName = "isamplerbuffer_" + name;
+                textureName = "isampler1darray_" + name;
             } else if (type == HdBinding::TEXTURE_UDIM_ARRAY) {
                 textureName = "sampler2dArray_" + name;
             } else if (type == HdBinding::TEXTURE_UDIM_LAYOUT) {
@@ -590,11 +590,12 @@ public:
         }
 
         const HdBinding layoutBinding = binder.GetBinding(
-            HdSt_ResourceBinder::_Concat(name, HdSt_ResourceBindingSuffixTokens->layout));
-        const int layoutBufferLocation = layoutBinding.GetLocation();
-        
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, layoutBufferLocation,
-            bind ? texture.GetLayoutBuffer()->GetRawResource() : 0);
+            HdSt_ResourceBinderGL::_Concat(name, HdSt_ResourceBindingSuffixTokens->layout));
+        const int layoutSamplerUnit = layoutBinding.GetTextureUnit();
+
+        glActiveTexture(GL_TEXTURE0 + layoutSamplerUnit);
+        glBindTexture(GL_TEXTURE_1D_ARRAY,
+                      bind ? texture.GetLayoutTexture()->GetRawResource() : 0);
     }
 
     static void Compute(

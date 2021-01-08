@@ -31,5 +31,4 @@ TF_WRAP_MODULE
 #if defined(ARCH_GFX_OPENGL)
     TF_WRAP( Diagnostic );
 #endif
-    TF_WRAP( Glew );
 }

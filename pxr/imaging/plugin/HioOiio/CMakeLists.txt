@@ -15,7 +15,7 @@ pxr_plugin(HioOiio
         hio
         tf
         ${OIIO_LIBRARIES}
-        ${OPENEXR_LIBRARY}
+        ${OPENEXR_LIBRARIES}
 
     INCLUDE_DIRS
         ${OIIO_INCLUDE_DIRS}

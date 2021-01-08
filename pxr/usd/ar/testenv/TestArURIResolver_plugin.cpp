@@ -65,48 +65,39 @@ public:
         return true;
     }
 
-    virtual bool IsRepositoryPath(
-        const std::string& path) final
-    {
-        TF_AXIOM(TfStringStartsWith(TfStringToLower(path), "test:"));
-        return false;
-    }
-
-    virtual bool IsSearchPath(
-        const std::string& path) final
-    {
-        TF_AXIOM(TfStringStartsWith(TfStringToLower(path), "test:"));
-        return false;
-    }
-
-    virtual std::string GetExtension(
+    virtual std::string _GetExtension(
         const std::string& path) final
     {
         TF_AXIOM(TfStringStartsWith(TfStringToLower(path), "test:"));
         return TfGetExtension(path);
     }
 
-    virtual std::string ComputeNormalizedPath(
-        const std::string& path) final
+    virtual std::string _CreateIdentifier(
+        const std::string& assetPath,
+        const ArResolvedPath& anchorAssetPath) final
     {
-        TF_AXIOM(TfStringStartsWith(TfStringToLower(path), "test:"));
-        return path;
+        TF_AXIOM(
+            TfStringStartsWith(TfStringToLower(assetPath), "test:") ||
+            TfStringStartsWith(TfStringToLower(anchorAssetPath), "test:"));
+        return assetPath;
     }
 
-    virtual std::string ComputeRepositoryPath(
-        const std::string& path) final
+    virtual std::string _CreateIdentifierForNewAsset(
+        const std::string& assetPath,
+        const ArResolvedPath& anchorAssetPath) final
     {
-        TF_AXIOM(TfStringStartsWith(TfStringToLower(path), "test:"));
-        return std::string();
+        TF_AXIOM(
+            TfStringStartsWith(TfStringToLower(assetPath), "test:") ||
+            TfStringStartsWith(TfStringToLower(anchorAssetPath), "test:"));
+        return assetPath;
     }
 
     virtual ArResolvedPath _Resolve(
-        const std::string& assetPath,
-        ArAssetInfo* assetInfo) final
+        const std::string& assetPath) final
     {
         TF_AXIOM(TfStringStartsWith(TfStringToLower(assetPath), "test:"));
 
-        const _TestURIResolverContext* uriContext = _GetCurrentContext();
+        const _TestURIResolverContext* uriContext = _GetCurrentContextPtr();
         if (uriContext && !uriContext->data.empty()) {
             return ArResolvedPath(assetPath + "?" + uriContext->data);
         }
@@ -115,13 +106,12 @@ public:
     }
 
     virtual ArResolvedPath _ResolveForNewAsset(
-        const std::string& assetPath,
-        ArAssetInfo* assetInfo) final
+        const std::string& assetPath) final
     {
-        return _Resolve(assetPath, assetInfo);
+        return _Resolve(assetPath);
     }
 
-    virtual void BindContext(
+    virtual void _BindContext(
         const ArResolverContext& context,
         VtValue* bindingData) final
     {
@@ -129,7 +119,7 @@ public:
         contextStack.push_back(context.Get<_TestURIResolverContext>());
     }
 
-    virtual void UnbindContext(
+    virtual void _UnbindContext(
         const ArResolverContext& context,
         VtValue* bindingData) final
     {
@@ -138,55 +128,33 @@ public:
         contextStack.pop_back();
     }
 
-    virtual ArResolverContext CreateDefaultContext() final
+    virtual ArResolverContext _CreateDefaultContext() final
     {
         return ArResolverContext(_TestURIResolverContext());
     }
 
-    virtual ArResolverContext CreateDefaultContextForAsset(
+    virtual ArResolverContext _CreateDefaultContextForAsset(
         const std::string& filePath) final
     {
         TF_AXIOM(TfStringStartsWith(TfStringToLower(filePath), "test:"));
         return ArResolverContext(_TestURIResolverContext());
     }
 
-    virtual void RefreshContext(
-        const ArResolverContext& context) final
+    virtual ArResolverContext _GetCurrentContext() final
     {
-    }
-
-    virtual ArResolverContext GetCurrentContext() final
-    {
-        const _TestURIResolverContext* uriContext = _GetCurrentContext();
+        const _TestURIResolverContext* uriContext = _GetCurrentContextPtr();
         if (uriContext) {
             return ArResolverContext(*uriContext);
         }
         return ArResolverContext();
     }
 
-    virtual void UpdateAssetInfo(
-        const std::string& identifier,
-        const std::string& filePath,
-        const std::string& fileVersion,
-        ArAssetInfo* assetInfo) final
-    {
-        TF_AXIOM(TfStringStartsWith(TfStringToLower(identifier), "test:"));
-    }
-
-    virtual VtValue GetModificationTimestamp(
+    virtual VtValue _GetModificationTimestamp(
         const std::string& path,
-        const std::string& resolvedPath) final
+        const ArResolvedPath& resolvedPath) final
     {
         TF_AXIOM(TfStringStartsWith(TfStringToLower(path), "test:"));
         return VtValue(42);
-    }
-
-    virtual bool FetchToLocalResolvedPath(
-        const std::string& path,
-        const std::string& resolvedPath) final
-    {
-        TF_AXIOM(TfStringStartsWith(TfStringToLower(path), "test:"));
-        return false;
     }
 
     virtual std::shared_ptr<ArAsset> _OpenAsset(
@@ -203,28 +171,12 @@ public:
         return false;
     }
 
-    virtual bool CanWriteLayerToPath(
-        const std::string& path,
-        std::string* whyNot) final
-    {
-        TF_AXIOM(TfStringStartsWith(TfStringToLower(path), "test:"));
-        return false;
-    }
-
-    virtual bool CanCreateNewLayerWithIdentifier(
-        const std::string& identifier, 
-        std::string* whyNot) final
-    {
-        TF_AXIOM(TfStringStartsWith(TfStringToLower(identifier), "test:"));
-        return false;
-    }
-
-    virtual void BeginCacheScope(
+    virtual void _BeginCacheScope(
         VtValue* cacheScopeData) final
     {
     }
 
-    virtual void EndCacheScope(
+    virtual void _EndCacheScope(
         VtValue* cacheScopeData) final
     {
     }
@@ -236,8 +188,17 @@ protected:
         return ArResolverContext(_TestURIResolverContext(contextStr));
     };
 
+    virtual std::shared_ptr<ArWritableAsset>
+    _OpenAssetForWrite(
+        const ArResolvedPath& resolvedPath,
+        WriteMode writeMode) override
+    {
+        TF_AXIOM(TfStringStartsWith(TfStringToLower(resolvedPath), "test:"));
+        return nullptr;
+    }
+
 private:
-    const _TestURIResolverContext* _GetCurrentContext()
+    const _TestURIResolverContext* _GetCurrentContextPtr()
     {
         const _ContextStack& contextStack = _threadContextStack.local();
         return contextStack.empty() ? nullptr : contextStack.back();
