@@ -341,7 +341,7 @@ HgiInteropMetal::HgiInteropMetal(Hgi* hgi)
         // depth buffers when there's an empty render target performing the
         // load/resolve
         "    float maxDepth = 1.0f - FLT_EPSILON;\n"
-        "    depth = depth == 0.0f?maxDepth:min(maxDepth, depth);\n"
+        "    depth = depth <= FLT_EPSILON?maxDepth:min(maxDepth, depth);\n"
         "    float4 encodedDepth =\n"
         "        float4(1.0f, 255.0f, 65025.0f, 16581375.0f) * depth;\n"
         "    encodedDepth = fract(encodedDepth);\n"
