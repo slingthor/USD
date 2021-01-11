@@ -578,18 +578,13 @@ struct _MmapStream {
 
         // Range check first.
         if (doRangeChecks) {
-            char const *mapStart = _mapping->GetMapStart();
-            size_t mapLen = _mapping->GetLength();
-            
-            bool inRange = mapStart <= _cur &&
-                (_cur + nBytes) <= (mapStart + mapLen);
-            
+            bool inRange = CheckRange(nBytes);
             if (ARCH_UNLIKELY(!inRange)) {
-                ptrdiff_t offset = _cur - mapStart;
+                ptrdiff_t offset = _cur - _mapping->GetMapStart();
                 TF_RUNTIME_ERROR(
                     "Read out-of-bounds: %zd bytes at offset %td in "
                     "a mapping of length %zd",
-                    nBytes, offset, mapLen);
+                    nBytes, offset, _mapping->GetLength());
                 memset(dest, 0x99, nBytes);
                 return;
             }
@@ -635,6 +630,13 @@ struct _MmapStream {
         ArchMemAdvise(
             _mapping->GetMapStart() + offset, size, ArchMemAdviceWillNeed);
     }
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+    inline bool CheckRange(size_t nBytes) {
+        char const *mapStart = _mapping->GetMapStart();
+        size_t mapLen = _mapping->GetLength();
+        return mapStart <= _cur && (_cur + nBytes) <= (mapStart + mapLen);
+    }
+#endif
 
     Vt_ArrayForeignDataSource *
     CreateZeroCopyDataSource(void *addr, size_t numBytes) {
@@ -680,7 +682,11 @@ struct _PreadStream {
     explicit _PreadStream(FileRange const &fr)
         : _start(fr.startOffset)
         , _cur(0)
-        , _file(fr.file) {}
+        , _file(fr.file) {
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+        _length = fr.length;
+#endif
+        }
     inline void Read(void *dest, size_t nBytes) {
         _cur += ArchPRead(_file, dest, nBytes, _start + _cur);
     }
@@ -689,11 +695,19 @@ struct _PreadStream {
     inline void Prefetch(int64_t offset, int64_t size) {
         ArchFileAdvise(_file, _start+offset, size, ArchFileAdviceWillNeed);
     }
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+    inline bool CheckRange(size_t nBytes) {
+        return _start <= _cur && (_cur + nBytes) <= (_start + _length);
+    }
+#endif
 
 private:
     int64_t _start;
     int64_t _cur;
     FILE *_file;
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+    int64_t _length;
+#endif
 };
 
 struct _AssetStream {
@@ -711,6 +725,15 @@ struct _AssetStream {
     inline void Prefetch(int64_t offset, int64_t size) {
         /* no prefetch impl */
     }
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+    inline bool CheckRange(size_t nBytes) {
+        const auto buffer = _asset->GetBuffer();
+        if (!buffer) return false;
+        char const * _start = buffer.get();
+        size_t _length = _asset->GetSize();
+        return 0 <= _cur && (_cur + nBytes) <= _length;
+    }
+#endif
 
 private:
     ArAssetSharedPtr _asset;
@@ -1290,6 +1313,15 @@ public:
     template <class T>
     vector<T> Read(vector<T> *) {
         auto sz = Read<uint64_t>();
+
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+        auto nBytes = sizeof(T) * sz;
+        if (ARCH_UNLIKELY(!CheckRange(nBytes))) {
+            TF_RUNTIME_ERROR("Failed to read vector of size %llu using %llu bytes - exceeding file bounds.", sz, nBytes);
+            return vector<T>();
+        }
+#endif
+
         vector<T> vec(sz);
         ReadContiguous(vec.data(), sz);
         return vec;
@@ -1306,6 +1338,12 @@ public:
     ReadContiguous(T *values, size_t sz) {
         std::for_each(values, values + sz, [this](T &v) { v = Read<T>(); });
     }
+
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+    inline bool CheckRange(size_t nBytes) {
+        return src.CheckRange(nBytes);
+    }
+#endif
 
     ByteStream src;
 };
@@ -1774,10 +1812,19 @@ _ReadUncompressedArray(
     // The reader's bytestream does not support zero-copy, or the element type
     // is not bitwise identical in memory and on disk, so just read the contents
     // into memory.
-    out->resize(
-        ver < CrateFile::Version(0,7,0) ?
+    uint64_t size = ver < CrateFile::Version(0,7,0) ?
         reader.template Read<uint32_t>() :
-        reader.template Read<uint64_t>());
+        reader.template Read<uint64_t>();
+
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+    uint64_t nBytes = sizeof(T) * size;
+    if (ARCH_UNLIKELY(!reader.CheckRange(nBytes))) {
+        TF_RUNTIME_ERROR("Failed to read uncompressedArray, size >= file size.");
+        return;
+    }
+#endif
+
+    out->resize(size);
     reader.ReadContiguous(out->data(), out->size());
 }
 
@@ -1802,6 +1849,14 @@ _ReadUncompressedArray(
     // Check size and alignment -- the standard requires that alignments
     // are power-of-two.
     size_t numBytes = sizeof(T) * size;
+
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+    if (ARCH_UNLIKELY(!reader.CheckRange(numBytes))) {
+        TF_RUNTIME_ERROR("Failed to read uncompressedArray, size >= file size.");
+        return;
+    }
+#endif
+
     static constexpr size_t MinZeroCopyArrayBytes = 2048; // Half a page?
     if (zeroCopyEnabled &&
         /* size reasonable? */numBytes >= MinZeroCopyArrayBytes &&
@@ -1907,9 +1962,19 @@ _ReadPossiblyCompressedArray(
     }
     else {
         // Read total elements.
-        out->resize(ver < CrateFile::Version(0,7,0) ?
-                    reader.template Read<uint32_t>() :
-                    reader.template Read<uint64_t>());
+        uint64_t size = ver < CrateFile::Version(0,7,0) ?
+            reader.template Read<uint32_t>() :
+            reader.template Read<uint64_t>();
+
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+        uint64_t nBytes = sizeof(T) * size;
+        if (ARCH_UNLIKELY(!reader.CheckRange(nBytes))) {
+            TF_RUNTIME_ERROR("Failed to read possibly compressed array, size >= file size.");
+            return;
+        }
+#endif
+
+        out->resize(size);
         if (out->size() < MinCompressedArraySize) {
             reader.ReadContiguous(out->data(), out->size());
         } else {
@@ -1933,9 +1998,20 @@ _ReadPossiblyCompressedArray(
         return;
     }
 
-    out->resize(ver < CrateFile::Version(0,7,0) ?
-                reader.template Read<uint32_t>() :
-                reader.template Read<uint64_t>());
+    uint64_t size = ver < CrateFile::Version(0,7,0) ?
+            reader.template Read<uint32_t>() :
+            reader.template Read<uint64_t>();
+
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+    uint64_t nBytes = sizeof(T) * size;
+    if (ARCH_UNLIKELY(!reader.CheckRange(nBytes))) {
+        TF_RUNTIME_ERROR("Failed to read possibly compressed array, size >= file size.");
+        return;
+    }
+#endif
+
+    out->resize(size);
+
     auto odata = out->data();
     auto osize = out->size();
 
@@ -3258,15 +3334,31 @@ CrateFile::_ReadFields(Reader reader)
             // Compressed fields in 0.4.0.
             auto numFields = reader.template Read<uint64_t>();
             _fields.resize(numFields);
+
+            // Create temporary space for decompressing.
+            const size_t compressedBufferSize = Usd_IntegerCompression::GetCompressedBufferSize(numFields);
+            std::unique_ptr<char[]> compBuffer(
+                new char[compressedBufferSize]);
             vector<uint32_t> tmp(numFields);
-            _ReadCompressedInts(reader, tmp.data(), tmp.size());
+            auto fieldsSize = reader.template Read<uint64_t>();
+
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+             if (ARCH_UNLIKELY(fieldsSize > compressedBufferSize)) {
+                 TF_RUNTIME_ERROR("Failed read fields, buffer overflow.");
+                 return;
+             }
+#endif
+
+            reader.ReadContiguous(compBuffer.get(), fieldsSize);
+            Usd_IntegerCompression::DecompressFromBuffer(
+                compBuffer.get(), fieldsSize, tmp.data(), numFields);
             for (size_t i = 0; i != numFields; ++i) {
                 _fields[i].tokenIndex.value = tmp[i];
             }
 
-            // Compressed value reps.
+            // Value reps
             uint64_t repsSize = reader.template Read<uint64_t>();
-            std::unique_ptr<char[]> compBuffer(new char[repsSize]);
+            compBuffer.reset(new char[repsSize]);
             reader.ReadContiguous(compBuffer.get(), repsSize);
             vector<uint64_t> repsData;
             repsData.resize(numFields);
@@ -3551,6 +3643,14 @@ CrateFile::_BuildDecompressedPathsImpl(
     bool hasChild = false, hasSibling = false;
     do {
         auto thisIndex = curIndex++;
+
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+        if (ARCH_UNLIKELY(pathIndexes[thisIndex] >= _paths.size())) {
+            TF_RUNTIME_ERROR("Failed to build paths, (pathIndex[%lu] == %d) > _paths.size().", thisIndex, pathIndexes[thisIndex]);
+            return;
+        }
+#endif
+
         if (parentPath.IsEmpty()) {
             parentPath = SdfPath::AbsoluteRootPath();
             _paths[pathIndexes[thisIndex]] = parentPath;
@@ -3558,6 +3658,14 @@ CrateFile::_BuildDecompressedPathsImpl(
             int32_t tokenIndex = elementTokenIndexes[thisIndex];
             bool isPrimPropertyPath = tokenIndex < 0;
             tokenIndex = std::abs(tokenIndex);
+
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+            if (ARCH_UNLIKELY(tokenIndex >= _tokens.size())) {
+                TF_RUNTIME_ERROR("Failed to read _tokens, tokenIndex out of bounds");
+                return;
+            }
+#endif
+
             auto const &elemToken = _tokens[tokenIndex];
             _paths[pathIndexes[thisIndex]] =
                 isPrimPropertyPath ?
