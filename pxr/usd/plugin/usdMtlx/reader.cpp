@@ -1333,7 +1333,7 @@ _Context::AddShaderRef(const mx::ConstShaderRefPtr& mtlxShaderRef)
         // The shaderref specified a node instead of a nodeDef. Find
         // the best matching nodedef since the MaterialX API doesn't.
         mtlxNodeDef =
-            _FindMatchingNodeDef(mtlxNodeDef->getDocument(),
+            _FindMatchingNodeDef(mtlxShaderRef->getDocument(),
                                  mtlxNodeDef,
                                  mtlxShaderRef->getNodeString(),
                                  UsdMtlxGetVersion(mtlxShaderRef),
