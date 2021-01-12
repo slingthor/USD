@@ -30,10 +30,8 @@
 #include <pxr/imaging/glf/bindingMap.h>
 #include <pxr/imaging/glf/contextCaps.h>
 #include <pxr/imaging/glf/drawTarget.h>
-#include <pxr/imaging/glf/ptexTexture.h>
 #include <pxr/imaging/glf/simpleLightingContext.h>
 #include <pxr/imaging/glf/simpleShadowArray.h>
-#include <pxr/imaging/glf/udimTexture.h>
 #include <pxr/imaging/glf/uniformBlock.h>
 
 #include <pxr/base/tf/diagnostic.h>

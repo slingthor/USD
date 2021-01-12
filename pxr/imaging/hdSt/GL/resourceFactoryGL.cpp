@@ -33,7 +33,6 @@
 #include "pxr/imaging/hdSt/GL/renderPassStateGL.h"
 #include "pxr/imaging/hdSt/GL/renderPassShaderGL.h"
 #include "pxr/imaging/hdSt/GL/resourceBinderGL.h"
-#include "pxr/imaging/hdSt/GL/textureResourceGL.h"
 
 #include <boost/smart_ptr.hpp>
 

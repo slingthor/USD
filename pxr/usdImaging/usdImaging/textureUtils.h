@@ -28,7 +28,6 @@
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/timeCode.h"
-#include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/usdImaging/usdImaging/api.h"
 
 PXR_NAMESPACE_OPEN_SCOPE

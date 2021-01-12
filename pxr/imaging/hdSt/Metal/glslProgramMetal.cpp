@@ -34,8 +34,6 @@
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"
-#include "pxr/imaging/hdSt/textureResourceHandle.h"
-#include "pxr/imaging/hdSt/textureResource.h"
 
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"

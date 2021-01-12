@@ -33,7 +33,6 @@
 #include "pxr/imaging/hdSt/Metal/renderPassShaderMetal.h"
 #include "pxr/imaging/hdSt/Metal/renderPassStateMetal.h"
 #include "pxr/imaging/hdSt/Metal/resourceBinderMetal.h"
-#include "pxr/imaging/hdSt/Metal/textureResourceMetal.h"
 
 #include <boost/smart_ptr.hpp>
 
