@@ -623,9 +623,42 @@ struct _MmapStream {
         return _cur - _mapping->GetMapStart();
     }
     inline void Seek(int64_t offset) {
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+        char const *mapStart = _mapping->GetMapStart();
+        size_t mapLen = _mapping->GetLength();
+        bool offsetInRange =  (mapStart + offset) <= (mapStart + mapLen);
+        if (ARCH_UNLIKELY(!offsetInRange)) {
+            TF_RUNTIME_ERROR(
+                "Read out-of-bounds: offset %td in "
+                "a mapping of length %zd",
+                offset, mapLen);
+            return;
+        }
+#endif
         _cur = _mapping->GetMapStart() + offset;
     }
     inline void Prefetch(int64_t offset, int64_t size) {
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+        char const *mapStart = _mapping->GetMapStart();
+        size_t mapLen = _mapping->GetLength();
+        bool offsetInRange =  (mapStart + offset) <= (mapStart + mapLen);
+        if (ARCH_UNLIKELY(!offsetInRange)) {
+            TF_RUNTIME_ERROR(
+                "Read out-of-bounds: offset %td in "
+                "a mapping of length %zd",
+                offset, mapLen);
+            return;
+        }
+
+        bool sizeInRange = (mapStart + offset + size) <= (mapStart + mapLen);
+        if (ARCH_UNLIKELY(!sizeInRange)) {
+            TF_RUNTIME_ERROR(
+                "Read out-of-bounds: tring to read %td bytes "
+                "in a mapping of length %zd",
+                offset, mapLen);
+            return;
+        }
+#endif
         ArchMemAdvise(
             _mapping->GetMapStart() + offset, size, ArchMemAdviceWillNeed);
     }
@@ -1148,6 +1181,14 @@ public:
     Map ReadMap() {
         Map map;
         auto sz = Read<uint64_t>();
+
+#ifdef PXR_PREFER_SAFETY_OVER_SPEED
+        if (ARCH_UNLIKELY(!CheckRange(sz))) {
+            TF_RUNTIME_ERROR("Failed to read map of size %llu - exceeding file bounds.", sz);
+            return map;
+        }
+#endif
+
         while (sz--) {
             // Do not combine the following into one statement.  It must be
             // separate because the two modifications to 'src' must be correctly
