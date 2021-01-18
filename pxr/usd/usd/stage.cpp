@@ -2599,6 +2599,10 @@ UsdStage::_ComposeChildren(Usd_PrimDataPtr prim,
         const SdfPath& parentPath = prim->GetPath();
         Usd_PrimDataPtr head = nullptr, prev = nullptr, tail = nullptr;
         for (; curName != nameEnd; ++curName) {
+            if (ARCH_UNLIKELY(curName->IsEmpty())) {
+                TF_RUNTIME_ERROR("Unable to instantiate prim with empty path.");
+                return;
+            }
             tail = _InstantiatePrim(parentPath.AppendChild(*curName));
             if (recurse) {
                 _ComposeChildSubtree(tail, prim, mask);
