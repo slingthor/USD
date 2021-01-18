@@ -542,7 +542,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
     # (Ninja, make), and --config for multi-configuration generators 
     # (Visual Studio); technically we don't need BOTH at the same
     # time, but specifying both is simpler than branching
-    config=("Debug" if context.buildDebug else "MinSizeRelease")
+    config=("Debug" if context.buildDebug else "Release")
 
     with CurrentWorkingDirectory(buildDir):
         Run('cmake '
