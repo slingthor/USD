@@ -664,9 +664,19 @@ struct _MmapStream {
     }
 #ifdef PXR_PREFER_SAFETY_OVER_SPEED
     inline bool CheckRange(size_t nBytes) {
-        char const *mapStart = _mapping->GetMapStart();
-        size_t mapLen = _mapping->GetLength();
-        return mapStart <= _cur && (_cur + nBytes) <= (mapStart + mapLen);
+        return CheckRange(Tell(), nBytes);
+    }
+
+    inline bool CheckRange(size_t offset, size_t nBytes) {
+        return offset + nBytes <= _mapping->GetLength();
+    }
+
+    inline bool CheckOffset(size_t offset) {
+        return offset < _mapping->GetLength();
+    }
+
+    inline size_t GetFileSize() {
+        return _mapping->GetLength();
     }
 #endif
 
@@ -729,7 +739,19 @@ struct _PreadStream {
     }
 #ifdef PXR_PREFER_SAFETY_OVER_SPEED
     inline bool CheckRange(size_t nBytes) {
-        return _start <= _cur && (_cur + nBytes) <= (_start + _length);
+        return CheckRange(_cur, nBytes);
+    }
+
+    inline bool CheckRange(size_t offset, size_t nBytes) {
+        return _start <= offset && offset + nBytes <= _length;
+    }
+
+    inline bool CheckOffset(size_t offset) {
+        return _start <= offset && offset < _length;
+    }
+
+    inline size_t GetFileSize() {
+        return _length;
     }
 #endif
 
@@ -752,24 +774,32 @@ struct _AssetStream {
     inline void Read(void *dest, size_t nBytes) {
         _cur += _asset->Read(dest, nBytes, _cur);
     }
-    inline int64_t Tell() const { return _cur; }
-    inline void Seek(int64_t offset) { _cur = offset; }
-    inline void Prefetch(int64_t offset, int64_t size) {
+    inline size_t Tell() const { return _cur; }
+    inline void Seek(size_t offset) { _cur = offset; }
+    inline void Prefetch(size_t offset, size_t size) {
         /* no prefetch impl */
     }
 #ifdef PXR_PREFER_SAFETY_OVER_SPEED
     inline bool CheckRange(size_t nBytes) {
-        const auto buffer = _asset->GetBuffer();
-        if (!buffer) return false;
-        char const * _start = buffer.get();
-        size_t _length = _asset->GetSize();
-        return 0 <= _cur && (_cur + nBytes) <= _length;
+        return CheckRange(_cur, nBytes);
+    }
+
+    inline bool CheckRange(size_t offset, size_t nBytes) {
+        return offset + nBytes < _asset->GetSize();
+    }
+
+    inline bool CheckOffset(size_t offset) {
+        return  offset < _asset->GetSize();
+    }
+
+    inline size_t GetFileSize() {
+        return _asset->GetSize();
     }
 #endif
 
 private:
     ArAssetSharedPtr _asset;
-    int64_t _cur;
+    size_t _cur;
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -1147,14 +1177,14 @@ class CrateFile::_Reader : public _ReaderBase
     void _RecursiveRead() {
         auto start = src.Tell();
         auto offset = Read<int64_t>();
-        src.Seek(start + offset);
+        Seek(start + offset);
     }
 
     void _RecursiveReadAndPrefetch() {
         auto start = src.Tell();
         auto offset = Read<int64_t>();
-        src.Prefetch(start, offset);
-        src.Seek(start + offset);
+        Prefetch(start, offset);
+        Seek(start + offset);
     }
 
 public:
@@ -1172,9 +1202,23 @@ public:
         return bits;
     }
 
-    void Prefetch(int64_t offset, int64_t size) { src.Prefetch(offset, size); }
+    void Prefetch(int64_t offset, int64_t size) {
+        if (!doRangeChecks || ARCH_LIKELY(src.CheckRange(offset, size))) {
+            src.Prefetch(offset, size);
+        }
+        else {
+            _errorFlag = true;
+        }
+    }
 
-    void Seek(uint64_t offset) { src.Seek(offset); }
+    void Seek(uint64_t offset) {
+        if (!doRangeChecks || ARCH_LIKELY(src.CheckOffset(offset))) {
+            src.Seek(offset);
+        }
+        else {
+            _errorFlag = true;
+        }
+    }
 
     // Map helper.
     template <class Map>
@@ -1195,6 +1239,12 @@ public:
             // sequenced.
             auto key = Read<typename Map::key_type>();
             map[key] = Read<typename Map::mapped_type>();
+
+            if (_errorFlag) {
+                TF_RUNTIME_ERROR("Corrupt data detected while reading map");
+                static Map defaultMap;
+                return defaultMap;
+            }
         }
         return map;
     }
@@ -1354,13 +1404,13 @@ public:
     vector<T> Read(vector<T> *) {
         auto sz = Read<uint64_t>();
 
-#ifdef PXR_PREFER_SAFETY_OVER_SPEED
-        auto nBytes = sizeof(T) * sz;
-        if (ARCH_UNLIKELY(!CheckRange(nBytes))) {
-            TF_RUNTIME_ERROR("Failed to read vector of size %llu using %llu bytes - exceeding file bounds.", sz, nBytes);
-            return vector<T>();
+        if (doRangeChecks) {
+            auto nBytes = sizeof(T) * sz;
+            if (ARCH_UNLIKELY(!CheckRange(nBytes))) {
+                TF_RUNTIME_ERROR("Failed to read vector of size %llu using %llu bytes - exceeding file bounds.", sz, nBytes);
+                return vector<T>();
+            }
         }
-#endif
 
         vector<T> vec(sz);
         ReadContiguous(vec.data(), sz);
@@ -1379,13 +1429,31 @@ public:
         std::for_each(values, values + sz, [this](T &v) { v = Read<T>(); });
     }
 
+    ByteStream src;
+
 #ifdef PXR_PREFER_SAFETY_OVER_SPEED
     inline bool CheckRange(size_t nBytes) {
         return src.CheckRange(nBytes);
     }
-#endif
 
-    ByteStream src;
+    inline bool CheckOffset(size_t offset) {
+        return src.CheckOffset(offset);
+    }
+
+    inline size_t GetFileSize() {
+        return src.GetFileSize();
+    }
+
+    inline size_t Tell() {
+        return src.Tell();
+    }
+
+    const bool doRangeChecks = true;
+private:
+    bool _errorFlag = false;
+#else
+    const bool doRangeChecks = false;
+#endif
 };
 
 template <class ByteStream>
@@ -1930,16 +1998,81 @@ _ReadUncompressedArray(
 template <class Reader, class T>
 static inline void
 _ReadPossiblyCompressedArray(
-    Reader reader, ValueRep rep, VtArray<T> *out, CrateFile::Version ver, ...)
+    Reader reader, ValueRep rep, VtArray<T> *out, CrateFile::Version ver, bool *success, ...)
 {
     // Fallback uncompressed case.
     _ReadUncompressedArray(reader, rep, out, ver);
 }
 
+template <class Reader, class Int>
+struct _CompressedIntsInfo
+{
+    _CompressedIntsInfo(Reader &reader, size_t numInts)
+        : numInts(numInts)
+        , reqBufferSize(0)
+        , reqWorkingSize(0)
+        , compressedSize(0)
+    {
+        if (numInts < MinCompressedArraySize) {
+            return;
+        }
+
+        using Compressor = typename std::conditional<
+            sizeof(Int) == 4,
+            Usd_IntegerCompression,
+            Usd_IntegerCompression64>::type;
+        
+        reqBufferSize = Compressor::GetCompressedBufferSize(numInts);
+        reqWorkingSize = Compressor::GetDecompressionWorkingSpaceSize(numInts);
+        compressedSize = reader.template Read<uint64_t>();
+    }
+
+    size_t numInts;
+    size_t reqBufferSize;
+    size_t reqWorkingSize;
+    uint64_t compressedSize;
+};
+
 struct _CompressedIntsReader
 {
     template <class Reader, class Int>
-    void Read(Reader &reader, Int *out, size_t numInts) {
+    bool ReadWithInfo(Reader &reader, Int *out, _CompressedIntsInfo<Reader, Int> &info) {
+        using Compressor = typename std::conditional<
+            sizeof(Int) == 4,
+            Usd_IntegerCompression,
+            Usd_IntegerCompression64>::type;
+
+        if (ARCH_UNLIKELY(info.numInts == 0)) {
+            return true;
+        }
+
+        if (info.reqBufferSize > _compBufferSize) {
+            _compBuffer.reset(new char[info.reqBufferSize]);
+            _compBufferSize = info.reqBufferSize;
+        }
+        if (info.reqWorkingSize > _workingSpaceSize) {
+            _workingSpace.reset(new char[info.reqWorkingSize]);
+            _workingSpaceSize = info.reqWorkingSize;
+        }
+        
+        if (info.compressedSize > _compBufferSize) {
+            // Don't read more than the available memory buffer.
+            info.compressedSize = _compBufferSize;
+        }
+        reader.ReadContiguous(_compBuffer.get(), info.compressedSize);
+        size_t valuesRead = Compressor::DecompressFromBuffer(
+            _compBuffer.get(), info.compressedSize, out, info.numInts,
+            _workingSpace.get());
+        
+        if (ARCH_UNLIKELY(valuesRead == 0)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    template <class Reader, class Int>
+    bool Read(Reader &reader, Int *out, size_t numInts) {
         using Compressor = typename std::conditional<
             sizeof(Int) == 4,
             Usd_IntegerCompression,
@@ -1955,6 +2088,8 @@ struct _CompressedIntsReader
         Compressor::DecompressFromBuffer(
             _compBuffer.get(), compressedSize, out, numInts,
             _workingSpace.get());
+
+        return true;
     }
 
 private:
@@ -1979,11 +2114,19 @@ private:
 };
 
 template <class Reader, class Int>
-static inline void
-_ReadCompressedInts(Reader &reader, Int *out, size_t size)
+static inline bool
+_ReadCompressedInts(Reader &reader, Int *out, _CompressedIntsInfo<Reader, Int> &info)
 {
     _CompressedIntsReader r;
-    r.Read(reader, out, size);
+    return r.ReadWithInfo(reader, out, info);
+}
+
+template <class Reader, class Int>
+static inline bool
+_ReadCompressedInts(Reader &reader, Int *out, size_t numInts)
+{
+    _CompressedIntsReader r;
+    return r.Read(reader, out, numInts);
 }
 
 template <class Reader, class T>
@@ -1994,7 +2137,7 @@ typename std::enable_if<
     std::is_same<T, int64_t>::value ||
     std::is_same<T, uint64_t>::value>::type
 _ReadPossiblyCompressedArray(
-    Reader reader, ValueRep rep, VtArray<T> *out, CrateFile::Version ver, int)
+    Reader reader, ValueRep rep, VtArray<T> *out, CrateFile::Version ver, bool *success, int)
 {
     // Version 0.5.0 introduced compressed int arrays.
     if (ver < CrateFile::Version(0,5,0) || !rep.IsCompressed()) {
@@ -2006,19 +2149,18 @@ _ReadPossiblyCompressedArray(
             reader.template Read<uint32_t>() :
             reader.template Read<uint64_t>();
 
-#ifdef PXR_PREFER_SAFETY_OVER_SPEED
-        uint64_t nBytes = sizeof(T) * size;
-        if (ARCH_UNLIKELY(!reader.CheckRange(nBytes))) {
-            TF_RUNTIME_ERROR("Failed to read possibly compressed array, size >= file size.");
-            return;
-        }
-#endif
+        auto info = _CompressedIntsInfo<Reader, T>(reader, size);
 
-        out->resize(size);
-        if (out->size() < MinCompressedArraySize) {
+        if (size < MinCompressedArraySize) {
+            out->resize(size);
             reader.ReadContiguous(out->data(), out->size());
         } else {
-            _ReadCompressedInts(reader, out->data(), out->size());
+            if (ARCH_LIKELY(reader.CheckRange(info.compressedSize))) {
+                out->resize(size);
+                if (ARCH_UNLIKELY(!_ReadCompressedInts(reader, out->data(), info))) {
+                    *success = false;
+                }
+            }
         }
     }
 }
@@ -2030,7 +2172,7 @@ typename std::enable_if<
     std::is_same<T, float>::value ||
     std::is_same<T, double>::value>::type
 _ReadPossiblyCompressedArray(
-    Reader reader, ValueRep rep, VtArray<T> *out, CrateFile::Version ver, int)
+    Reader reader, ValueRep rep, VtArray<T> *out, CrateFile::Version ver, bool *success, int)
 {
     // Version 0.6.0 introduced compressed floating point arrays.
     if (ver < CrateFile::Version(0,6,0) || !rep.IsCompressed()) {
@@ -2042,48 +2184,50 @@ _ReadPossiblyCompressedArray(
             reader.template Read<uint32_t>() :
             reader.template Read<uint64_t>();
 
-#ifdef PXR_PREFER_SAFETY_OVER_SPEED
-    uint64_t nBytes = sizeof(T) * size;
-    if (ARCH_UNLIKELY(!reader.CheckRange(nBytes))) {
-        TF_RUNTIME_ERROR("Failed to read possibly compressed array, size >= file size.");
-        return;
-    }
-#endif
-
-    out->resize(size);
-
-    auto odata = out->data();
-    auto osize = out->size();
-
-    if (osize < MinCompressedArraySize) {
+    if (size < MinCompressedArraySize) {
         // Not stored compressed.
-        reader.ReadContiguous(odata, osize);
+        out->resize(size);
+        reader.ReadContiguous(out->data(), size);
         return;
     }
-    
+
     // Read the code
     char code = reader.template Read<int8_t>();
     if (code == 'i') {
         // Compressed integers.
-        vector<int32_t> ints(osize);
-        _ReadCompressedInts(reader, ints.data(), ints.size());
-        std::copy(ints.begin(), ints.end(), odata);
-    } else if (code == 't') {
+        auto info = _CompressedIntsInfo<Reader, int32_t>(reader, size);
+        if (ARCH_LIKELY(reader.CheckRange(info.compressedSize))) {
+            out->resize(size);
+            vector<int32_t> ints(size);
+            _ReadCompressedInts(reader, ints.data(), info);
+            std::copy(ints.begin(), ints.end(), out->data());
+            return;
+        }
+    }
+    if (code == 't') {
         // Lookup table & indexes.
         auto lutSize = reader.template Read<uint32_t>();
-        vector<T> lut(lutSize);
-        reader.ReadContiguous(lut.data(), lut.size());
-        vector<uint32_t> indexes(osize);
-        _ReadCompressedInts(reader, indexes.data(), indexes.size());
-        auto o = odata;
-        for (auto index: indexes) {
-            *o++ = lut[index];
+        if (ARCH_LIKELY(reader.CheckRange(lutSize))) {
+            vector<T> lut(lutSize);
+            reader.ReadContiguous(lut.data(), lut.size());
+
+            auto info = _CompressedIntsInfo<Reader, uint32_t>(reader, size);
+            if (ARCH_LIKELY(reader.CheckRange(info.compressedSize))) {
+                out->resize(size);
+                vector<uint32_t> indexes(size);
+                _ReadCompressedInts(reader, indexes.data(), info);
+                auto o = out->data();
+                for (auto index: indexes) {
+                    *o++ = lut[index];
+                }
+                return;
+            }
         }
-    } else {
-        // This is a corrupt data stream.
-        TF_RUNTIME_ERROR("Corrupt data stream detected reading compressed "
-                         "array in <%s>", reader.crate->GetAssetPath().c_str());
     }
+    *success = false;
+    // This is a corrupt data stream.
+    TF_RUNTIME_ERROR("Corrupt data stream detected reading compressed "
+                     "array in <%s>", reader.crate->GetAssetPath().c_str());
 }
 
 // Array handler for types that support arrays -- does deduplication.
@@ -2138,7 +2282,12 @@ struct CrateFile::_ArrayValueHandlerBase<
             // Read and discard shape size.
             reader.template Read<uint32_t>();
         }
-        _ReadPossiblyCompressedArray(reader, rep, out, fileVer, 0);
+        
+        bool success = true;
+        _ReadPossiblyCompressedArray(reader, rep, out, fileVer, &success, 0);
+        if (!success) {
+            *out = VtArray<T>();
+        }
     }
 
     ValueRep PackVtValue(_Writer w, VtValue const &v) {
@@ -3328,8 +3477,11 @@ template <class Reader>
 CrateFile::_TableOfContents
 CrateFile::_ReadTOC(Reader reader, _BootStrap const &b) const
 {
-    reader.Seek(b.tocOffset);
-    return reader.template Read<_TableOfContents>();
+    if (ARCH_LIKELY(reader.CheckOffset(b.tocOffset))) {
+        reader.Seek(b.tocOffset);
+        return reader.template Read<_TableOfContents>();
+    }
+    return _TableOfContents();
 }
 
 template <class Reader>
@@ -3480,7 +3632,7 @@ CrateFile::_ReadTokens(Reader reader, int64_t fileSize)
 
     if ARCH_UNLIKELY(fileSize <= tokensSection->start || tokensSection->start < 0) {
         TF_RUNTIME_ERROR(
-            "Usd crate file corrupt, tokens section is possibly truncated"
+            "Usd crate file corrupt, tokens section is possibly truncated "
             "at offset %" PRId64 " but file size is %" PRId64,
             tokensSection->start, fileSize);
         return;
@@ -3566,8 +3718,9 @@ CrateFile::_ReadPaths(Reader reader)
 
     reader.Seek(pathsSection->start);
 
+    auto numPaths = reader.template Read<uint64_t>();
     // Read # of paths, and fill the _paths vector with empty paths.
-    _paths.resize(reader.template Read<uint64_t>());
+    _paths.resize(numPaths);
     std::fill(_paths.begin(), _paths.end(), SdfPath());
 
     WorkArenaDispatcher dispatcher;
