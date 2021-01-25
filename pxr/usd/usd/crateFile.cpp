@@ -742,9 +742,9 @@ struct _AssetStream {
     inline void Read(void *dest, size_t nBytes) {
         _cur += _asset->Read(dest, nBytes, _cur);
     }
-    inline size_t Tell() const { return _cur; }
-    inline void Seek(size_t offset) { _cur = offset; }
-    inline void Prefetch(size_t offset, size_t size) {
+    inline int64_t Tell() const { return _cur; }
+    inline void Seek(int64_t offset) { _cur = offset; }
+    inline void Prefetch(int64_t offset, int64_t size) {
         /* no prefetch impl */
     }
 #ifdef PXR_PREFER_SAFETY_OVER_SPEED
@@ -752,11 +752,11 @@ struct _AssetStream {
         return CheckRange(_cur, nBytes);
     }
 
-    inline bool CheckRange(size_t offset, size_t nBytes) {
+    inline bool CheckRange(int64_t offset, size_t nBytes) {
         return offset + nBytes < _asset->GetSize();
     }
 
-    inline bool CheckOffset(size_t offset) {
+    inline bool CheckOffset(int64_t offset) {
         return  offset < _asset->GetSize();
     }
 
@@ -767,7 +767,7 @@ struct _AssetStream {
 
 private:
     ArAssetSharedPtr _asset;
-    size_t _cur;
+    int64_t _cur;
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -1987,7 +1987,7 @@ struct _CompressedIntsInfo
         compressedSize = reader.template Read<uint64_t>();
     }
 
-    size_t numInts;
+    int64_t numInts;
     size_t reqBufferSize;
     size_t reqWorkingSize;
     uint64_t compressedSize;
