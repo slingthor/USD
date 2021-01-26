@@ -80,7 +80,6 @@ else()
             ${optionalIncludeDirs}
 
         PUBLIC_CLASSES
-            arrayTexture
             baseTexture
             bindingMap
             contextCaps

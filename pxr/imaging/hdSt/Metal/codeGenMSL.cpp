@@ -2786,6 +2786,7 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "}\n\n"
         
             << "#define texelFetch(sampler, coords, lod) sampler.read(uint2(coords.x, coords.y))\n"
+            << "#define textureQueryLevels(sampler) sampler.get_num_mip_levels()\n"
 
             << "constexpr sampler texelSampler(address::clamp_to_edge,\n"
             << "                               filter::linear);\n";

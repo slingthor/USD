@@ -71,17 +71,7 @@ public:
     // Package Name accessor
     MTLF_API
     virtual std::string GetPackageName() const override { return "mtlf"; }
-    
-    // ArrayTexture creation
-    MTLF_API
-    virtual GarchArrayTextureRefPtr NewArrayTexture(TfTokenVector const &imageFilePaths,
-                                                    unsigned int arraySize,
-                                                    unsigned int cropTop,
-                                                    unsigned int cropBottom,
-                                                    unsigned int cropLeft,
-                                                    unsigned int cropRight,
-                                                    HioImage::ImageOriginLocation originLocation) const override;
-    
+        
     // BaseTexture
     MTLF_API
     virtual GarchBaseTexture *NewBaseTexture() const override;

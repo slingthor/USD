@@ -24,6 +24,7 @@
 #include "pxr/imaging/hdSt/material.h"
 #include "pxr/imaging/hdSt/debugCodes.h"
 #include "pxr/imaging/hdSt/package.h"
+#include "pxr/imaging/hdSt/renderParam.h"
 #include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
@@ -190,8 +191,6 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    TF_UNUSED(renderParam);
-
     HdStResourceRegistrySharedPtr const& resourceRegistry =
         std::static_pointer_cast<HdStResourceRegistry>(
             sceneDelegate->GetRenderIndex().GetResourceRegistry());
@@ -342,7 +341,11 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
     if (markBatchesDirty && _isInitialized) {
         // Only invalidate batches if this isn't our first round through sync.
         // If this is the initial sync, we haven't formed batches yet.
-        sceneDelegate->GetRenderIndex().GetChangeTracker().MarkBatchesDirty();
+        if (TF_VERIFY(renderParam)) {
+            HdStRenderParam *stRenderParam =
+                static_cast<HdStRenderParam*>(renderParam);
+            stRenderParam->MarkDrawBatchesDirty();
+        }
     }
 
     if (needsRprimMaterialStateUpdate && _isInitialized) {

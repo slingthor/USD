@@ -1,5 +1,5 @@
 //
-// Copyright 2016 Pixar
+// Copyright 2021 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,39 +21,45 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/hdSt/texture.h"
 
-#include "pxr/imaging/hd/changeTracker.h"
-#include "pxr/imaging/hd/material.h"
-#include "pxr/imaging/hd/perfLog.h"
-#include "pxr/imaging/hd/sceneDelegate.h"
+#include "pxr/imaging/hdSt/renderParam.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-HdStTexture::HdStTexture(SdfPath const& id)
-  : HdTexture(id)
+HdStRenderParam::HdStRenderParam()
+    : _drawBatchesVersion(1)
+    , _materialTagsVersion(1)
 {
 }
 
-HdStTexture::~HdStTexture() = default;
+HdStRenderParam::~HdStRenderParam() = default;
 
 void
-HdStTexture::Sync(HdSceneDelegate *sceneDelegate,
-                  HdRenderParam   *renderParam,
-                  HdDirtyBits     *dirtyBits)
+HdStRenderParam::MarkDrawBatchesDirty()
 {
-    TF_UNUSED(sceneDelegate);
-    TF_UNUSED(renderParam);
-
-    *dirtyBits = Clean;
+    ++_drawBatchesVersion; // uses std::memory_order_seq_cst 
 }
 
-HdDirtyBits
-HdStTexture::GetInitialDirtyBitsMask() const
+unsigned int
+HdStRenderParam::GetDrawBatchesVersion() const
 {
-    return AllDirty;
+    // Can use relaxed ordering because render passes are expected to
+    // only read the value, and that too in a single threaded fashion.
+    return _drawBatchesVersion.load(std::memory_order_relaxed);
+}
+
+void
+HdStRenderParam::MarkMaterialTagsDirty()
+{
+    ++_materialTagsVersion; // uses std::memory_order_seq_cst 
+}
+
+unsigned int
+HdStRenderParam::GetMaterialTagsVersion() const
+{
+    // Can use relaxed ordering because render passes are expected to
+    // only read the value, and that too in a single threaded fashion.
+    return _materialTagsVersion.load(std::memory_order_relaxed);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
-

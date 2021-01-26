@@ -1,7 +1,7 @@
 -- glslfx version 0.1
 
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -26,6 +26,8 @@
 
 --- This is what an import might look like.
 --- #import $TOOLS/hdx/shaders/renderPassShader.glslfx
+// Render pass shader configuration that writes color and selection information
+// (whether the fragment is selected).
 
 #import $TOOLS/hdSt/shaders/renderPass.glslfx
 #import $TOOLS/hdx/shaders/renderPass.glslfx
@@ -55,10 +57,10 @@
                 "source": [ "RenderPass.Camera",
                             "RenderPass.ShouldCullFace",
                             "Selection.DecodeUtils",
-                            "Selection.RenderUnselected",
                             "Selection.ComputeColor",
+                            "Selection.Fragment",
                             "RenderPass.ApplyColorOverrides",
-                            "RenderPass.RenderColor" ]
+                            "HdxRenderPass.RenderColorAndSelection" ]
             }
         }
     }

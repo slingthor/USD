@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2021 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,15 +21,14 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/garch/glApi.h"
 
-#include "pxr/imaging/garch/debugCodes.h"
-#include "pxr/imaging/garch/utils.h"
-#include "pxr/imaging/garch/vdbTextureData.h"
+#include "pxr/imaging/plugin/hioOpenVDB/vdbTextureData.h"
+#include "pxr/imaging/plugin/hioOpenVDB/debugCodes.h"
+
 #include "pxr/imaging/hf/perfLog.h"
-#include "pxr/imaging/hio/image.h"
+#include "pxr/imaging/hio/fieldTextureData.h"
 
-#include "pxr/base/tf/fileUtils.h"
+#include "pxr/base/tf/type.h"
 #include "pxr/base/trace/trace.h"
 
 #include "openvdb/openvdb.h"
@@ -38,16 +37,29 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-GarchVdbTextureDataRefPtr
-GarchVdbTextureData::New(std::string const &filePath,
-                         std::string const &gridName,
-                         const size_t targetMemory)
+class HioOpenVDB_TextureDataFactory final
+            : public HioFieldTextureDataFactoryBase
 {
-    return TfCreateRefPtr(
-        new GarchVdbTextureData(filePath, gridName, targetMemory));
+protected:
+    HioFieldTextureDataSharedPtr _New(
+        std::string const & filePath,
+        std::string const & fieldName,
+        int,
+        std::string const &,
+        size_t targetMemory) const override {
+            return std::make_shared<HioOpenVDB_TextureData>(
+                    filePath, fieldName, targetMemory);
+        }
+};
+
+TF_REGISTRY_FUNCTION(TfType)
+{
+    using T = HioOpenVDB_TextureData;
+    TfType t = TfType::Define<T, TfType::Bases<T::Base>>();
+    t.SetFactory<HioOpenVDB_TextureDataFactory>();
 }
 
-GarchVdbTextureData::GarchVdbTextureData(
+HioOpenVDB_TextureData::HioOpenVDB_TextureData(
     std::string const &filePath,
     std::string const &gridName,
     const size_t targetMemory)
@@ -63,73 +75,62 @@ GarchVdbTextureData::GarchVdbTextureData(
 {
 }
 
-GarchVdbTextureData::~GarchVdbTextureData() = default;
+HioOpenVDB_TextureData::~HioOpenVDB_TextureData() = default;
 
 const GfBBox3d &
-GarchVdbTextureData::GetBoundingBox() const
+HioOpenVDB_TextureData::GetBoundingBox() const
 {
     return _boundingBox;
 }
- 
-int
-GarchVdbTextureData::NumDimensions() const
-{
-    return 3;
-}
 
 HioFormat
-GarchVdbTextureData::GetFormat() const {
+HioOpenVDB_TextureData::GetFormat() const {
     return _format;
 }
 
 size_t
-GarchVdbTextureData::TargetMemory() const
+HioOpenVDB_TextureData::TargetMemory() const
 {
     return _targetMemory;
 }
 
-GarchVdbTextureData::WrapInfo
-GarchVdbTextureData::GetWrapInfo() const {
-    return _wrapInfo;
-}
-
 int
-GarchVdbTextureData::GetNumMipLevels() const {
+HioOpenVDB_TextureData::GetNumMipLevels() const {
     return 1;
 }
 
 size_t
-GarchVdbTextureData::ComputeBytesUsed() const
+HioOpenVDB_TextureData::ComputeBytesUsed() const
 {
     return _size;
 }
 
 size_t
-GarchVdbTextureData::ComputeBytesUsedByMip(int mipLevel) const
+HioOpenVDB_TextureData::ComputeBytesUsedByMip(int mipLevel) const
 {
     return _size;
 }
 
 int
-GarchVdbTextureData::ResizedWidth(int mipLevel) const
+HioOpenVDB_TextureData::ResizedWidth(int mipLevel) const
 {
     return _resizedWidth;
 }
 
 int
-GarchVdbTextureData::ResizedHeight(int mipLevel) const
+HioOpenVDB_TextureData::ResizedHeight(int mipLevel) const
 {
     return _resizedHeight;
 }
 
 int
-GarchVdbTextureData::ResizedDepth(int mipLevel) const
+HioOpenVDB_TextureData::ResizedDepth(int mipLevel) const
 {
     return _resizedDepth;
 }
 
 bool
-GarchVdbTextureData::HasRawBuffer(int mipLevel) const
+HioOpenVDB_TextureData::HasRawBuffer(int mipLevel) const
 {
     return bool(GetRawBuffer(mipLevel));
 }
@@ -144,7 +145,7 @@ GarchVdbTextureData::HasRawBuffer(int mipLevel) const
 // virtual destructor on the base class after the data have been
 // uploaded to the GPU by GlfBaseTexture::_CreateTexture.
 //
-class GarchVdbTextureData_DenseGridHolderBase
+class HioOpenVDB_TextureData_DenseGridHolderBase
 {
 public:
     // Get the bounding box of the tree of the OpenVDB grid
@@ -153,7 +154,7 @@ public:
     // Get the raw data of the dense grid
     virtual const unsigned char * GetData() const = 0;
 
-    virtual ~GarchVdbTextureData_DenseGridHolderBase() = default;
+    virtual ~HioOpenVDB_TextureData_DenseGridHolderBase() = default;
 };
 
 namespace {
@@ -193,7 +194,7 @@ _ExtractTransformFromGrid(const openvdb::GridBase::Ptr &grid)
 
 // Holds on to an OpenVDB dense grid
 template<typename GridType>
-class _DenseGridHolder final : public GarchVdbTextureData_DenseGridHolderBase
+class _DenseGridHolder final : public HioOpenVDB_TextureData_DenseGridHolderBase
 {
 public:
     using ValueType = typename GridType::ValueType;
@@ -223,7 +224,7 @@ public:
     {
         HF_MALLOC_TAG_FUNCTION();
         {
-            TRACE_FUNCTION_SCOPE("GarchVdbTextureData: Copy to dense");
+            TRACE_FUNCTION_SCOPE("HioOpenVDB_TextureData: Copy to dense");
             HF_MALLOC_TAG("Copy to dense");
             openvdb::tools::copyToDense(grid->tree(), _denseGrid);
         }
@@ -263,7 +264,7 @@ public:
     virtual _GridHolderBase *GetResampled(const GfMatrix4d &newTransform) = 0;
 
     // Convert to dense grid.
-    virtual GarchVdbTextureData_DenseGridHolderBase *GetDense() const = 0;
+    virtual HioOpenVDB_TextureData_DenseGridHolderBase *GetDense() const = 0;
     
     // Get bounding box of the tree in the grid.
     const openvdb::CoordBBox &GetTreeBoundingBox() const {
@@ -342,7 +343,7 @@ public:
         return New(result);
     }
     
-    GarchVdbTextureData_DenseGridHolderBase *GetDense() const override {
+    HioOpenVDB_TextureData_DenseGridHolderBase *GetDense() const override {
         return _DenseGridHolder<GridType>::New(_grid, GetTreeBoundingBox());
     }
 
@@ -394,25 +395,25 @@ _GridHolderBase::New(const openvdb::GridBase::Ptr &grid)
     }
 
     if (_GridHolderBase * g = _GridHolder<openvdb::FloatGrid>::New(grid)) {
-        TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
+        TF_DEBUG(HIOOPENVDB_DEBUG_TEXTURE).Msg(
             "[VdbTextureData] Grid is holding floats\n");
         return g;
     }
 
     if (_GridHolderBase * g = _GridHolder<openvdb::DoubleGrid>::New(grid)) {
-        TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
+        TF_DEBUG(HIOOPENVDB_DEBUG_TEXTURE).Msg(
             "[VdbTextureData] Grid is holding doubles\n");
         return g;
     }
 
     if (_GridHolderBase * g = _GridHolder<openvdb::Vec3fGrid>::New(grid)) {
-        TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
+        TF_DEBUG(HIOOPENVDB_DEBUG_TEXTURE).Msg(
             "[VdbTextureData] Grid is holding float vectors\n");
         return g;
     }
 
     if (_GridHolderBase * g = _GridHolder<openvdb::Vec3dGrid>::New(grid)) {
-        TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
+        TF_DEBUG(HIOOPENVDB_DEBUG_TEXTURE).Msg(
             "[VdbTextureData] Grid is holding double vectors\n");
         return g;
     }
@@ -520,12 +521,11 @@ _ResamplingAdjustment(const int nativeLength, const double scale)
 } // end anonymous namespace
 
 bool
-GarchVdbTextureData::Read(int degradeLevel, bool generateMipmap,
-                        HioImage::ImageOriginLocation originLocation)
+HioOpenVDB_TextureData::Read(int degradeLevel, bool generateMipmap)
 {   
     TRACE_FUNCTION();
 
-    TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
+    TF_DEBUG(HIOOPENVDB_DEBUG_TEXTURE).Msg(
         "[VdbTextureData] Path: %s GridName: %s\n",
         _filePath.c_str(),
         _gridName.c_str());
@@ -559,7 +559,7 @@ GarchVdbTextureData::Read(int degradeLevel, bool generateMipmap,
     
     const size_t nativeSize = nativeTreeBoundingBox.volume() * _bytesPerPixel;
 
-    TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
+    TF_DEBUG(HIOOPENVDB_DEBUG_TEXTURE).Msg(
         "[VdbTextureData] Native dimensions %d x %d x %d\n",
         _nativeWidth, _nativeHeight, _nativeDepth);
 
@@ -575,7 +575,7 @@ GarchVdbTextureData::Read(int degradeLevel, bool generateMipmap,
         const double approxScale =
             cbrt(double(nativeSize) / double(_targetMemory));
 
-        TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
+        TF_DEBUG(HIOOPENVDB_DEBUG_TEXTURE).Msg(
             "[VdbTextureData] Approximate scaling factor %f\n", approxScale);
 
         // There will be additional samples near the boundary
@@ -585,7 +585,7 @@ GarchVdbTextureData::Read(int degradeLevel, bool generateMipmap,
                        _ResamplingAdjustment(_nativeHeight, approxScale),
                        _ResamplingAdjustment(_nativeDepth,  approxScale) });
 
-        TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
+        TF_DEBUG(HIOOPENVDB_DEBUG_TEXTURE).Msg(
             "[VdbTextureData] Scaling by factor %f\n", scale);
         
         // Apply voxel scaling to grid transform
@@ -628,13 +628,13 @@ GarchVdbTextureData::Read(int degradeLevel, bool generateMipmap,
 
     _size = treeBoundingBox.volume() * _bytesPerPixel;
 
-    TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
+    TF_DEBUG(HIOOPENVDB_DEBUG_TEXTURE).Msg(
         "[VdbTextureData] Resized dimensions %d x %d x %d "
         "(size: %zd, target: %zd)\n",
         _resizedWidth, _resizedHeight, _resizedDepth,
         _size, _targetMemory);
 
-    TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
+    TF_DEBUG(HIOOPENVDB_DEBUG_TEXTURE).Msg(
         "[VdbTextureData] %s",
         (_size <= _targetMemory || _targetMemory == 0) ?
             "Target memory was met." :
@@ -643,8 +643,8 @@ GarchVdbTextureData::Read(int degradeLevel, bool generateMipmap,
     return true;
 }
 
-unsigned char *
-GarchVdbTextureData::GetRawBuffer(int mipLevel) const
+unsigned char const *
+HioOpenVDB_TextureData::GetRawBuffer(int mipLevel) const
 {
     if (mipLevel > 0) {
         return nullptr;
@@ -653,7 +653,7 @@ GarchVdbTextureData::GetRawBuffer(int mipLevel) const
     if (!_denseGrid) {
         return nullptr;
     }
-    return const_cast<unsigned char *>(_denseGrid->GetData());
+    return _denseGrid->GetData();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -72,7 +72,7 @@ static os_log_t cullingLog = os_log_create("hydra.metal", "Culling");
 HdStCommandBuffer::HdStCommandBuffer()
     : _visibleSize(0)
     , _visChangeCount(0)
-    , _batchVersion(0)
+    , _drawBatchesVersion(0)
 {
     /*NOTHING*/
 }
@@ -385,20 +385,20 @@ HdStCommandBuffer::ExecuteDraw(
 
 void
 HdStCommandBuffer::SwapDrawItems(std::vector<HdStDrawItem const*>* items,
-                               unsigned currentBatchVersion)
+                                 unsigned currentDrawBatchesVersion)
 {
     _drawItems.swap(*items);
     _RebuildDrawBatches();
-    _batchVersion = currentBatchVersion;
+    _drawBatchesVersion = currentDrawBatchesVersion;
 }
 
 void
-HdStCommandBuffer::RebuildDrawBatchesIfNeeded(unsigned currentBatchVersion)
+HdStCommandBuffer::RebuildDrawBatchesIfNeeded(unsigned currentBatchesVersion)
 {
     HD_TRACE_FUNCTION();
 
-    bool deepValidation = (currentBatchVersion != _batchVersion);
-    _batchVersion = currentBatchVersion;
+    bool deepValidation = (currentBatchesVersion != _drawBatchesVersion);
+    _drawBatchesVersion = currentBatchesVersion;
 
     if (TfDebug::IsEnabled(HDST_DRAW_BATCH) && !_drawBatches.empty()) {
         TfDebug::Helper().Msg(

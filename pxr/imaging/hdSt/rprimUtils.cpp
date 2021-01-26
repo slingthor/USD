@@ -29,8 +29,10 @@
 #include "pxr/imaging/hdSt/instancer.h"
 #include "pxr/imaging/hdSt/material.h"
 #include "pxr/imaging/hdSt/mixinShader.h"
+#include "pxr/imaging/hdSt/renderParam.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSpec.h"
@@ -56,6 +58,29 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_ENV_SETTING(HDST_ENABLE_SHARED_VERTEX_PRIMVAR, 1,
                       "Enable sharing of vertex primvar");
+
+// -----------------------------------------------------------------------------
+// Draw invalidation utilities
+// -----------------------------------------------------------------------------
+void
+HdStMarkDrawBatchesDirty(HdRenderParam *renderParam)
+{
+    if (TF_VERIFY(renderParam)) {
+        HdStRenderParam *stRenderParam =
+            static_cast<HdStRenderParam*>(renderParam);
+        stRenderParam->MarkDrawBatchesDirty();
+    }
+}
+
+void
+HdStMarkMaterialTagsDirty(HdRenderParam *renderParam)
+{
+    if (TF_VERIFY(renderParam)) {
+        HdStRenderParam *stRenderParam =
+            static_cast<HdStRenderParam*>(renderParam);
+        stRenderParam->MarkMaterialTagsDirty();
+    }
+}
 
 // -----------------------------------------------------------------------------
 // Primvar descriptor filtering utilities
@@ -133,9 +158,60 @@ HdStGetInstancerPrimvarDescriptors(
 }
 
 // -----------------------------------------------------------------------------
-// Material shader utility
+// Material processing utilities
 // -----------------------------------------------------------------------------
-HDST_API
+
+void
+HdStSetMaterialId(HdSceneDelegate *delegate,
+                  HdRenderParam *renderParam,
+                  HdRprim *rprim)
+{
+    SdfPath const& newMaterialId = delegate->GetMaterialId(rprim->GetId());
+    if (rprim->GetMaterialId() != newMaterialId) {
+        rprim->SetMaterialId(newMaterialId);
+
+        // The batches need to be validated and rebuilt since a changed shader
+        // may change aggregation.
+        HdStMarkDrawBatchesDirty(renderParam);
+    }
+}
+
+void
+HdStSetMaterialTag(HdSceneDelegate *delegate,
+                   HdRenderParam *renderParam,
+                   HdRprim *rprim,
+                   bool hasDisplayOpacityPrimvar,
+                   bool occludedSelectionShowsThrough)
+{
+    TfToken prevMaterialTag = rprim->GetMaterialTag();
+    TfToken newMaterialTag;
+
+    // Opinion precedence:
+    //   Show occluded selection > Material opinion > displayOpacity primvar
+
+    if (occludedSelectionShowsThrough) {
+        newMaterialTag = HdStMaterialTagTokens->translucentToSelection;
+    } else {
+        const HdStMaterial *material =
+            static_cast<const HdStMaterial *>(
+                    delegate->GetRenderIndex().GetSprim(
+                        HdPrimTypeTokens->material, rprim->GetMaterialId()));
+        if (material) {
+            newMaterialTag = material->GetMaterialTag();
+        } else {
+            newMaterialTag = hasDisplayOpacityPrimvar?
+                HdStMaterialTagTokens->masked :
+                HdMaterialTagTokens->defaultMaterialTag;
+        }
+    }
+
+    if (prevMaterialTag != newMaterialTag) {
+        rprim->SetMaterialTag(newMaterialTag);
+        // Trigger invalidation of the draw items cache of the render pass(es).
+        HdStMarkMaterialTagsDirty(renderParam);
+    }
+}
+
 HdStShaderCodeSharedPtr
 HdStGetMaterialShader(
     HdRprim const * prim,
@@ -282,7 +358,8 @@ HdStUpdateDrawItemBAR(
     HdBufferArrayRangeSharedPtr const& newRange,
     int drawCoordIndex,
     HdRprimSharedData *sharedData,
-    HdRenderIndex &renderIndex)
+    HdRenderParam *renderParam,
+    HdChangeTracker *changeTracker)
 {
     if (!sharedData) {
         TF_CODING_ERROR("Null shared data ptr received\n");
@@ -306,7 +383,7 @@ HdStUpdateDrawItemBAR(
     bool const newRangeValid = HdStIsValidBAR(newRange);
 
     if (curRangeValid) {
-        renderIndex.GetChangeTracker().SetGarbageCollectionNeeded();
+        changeTracker->SetGarbageCollectionNeeded();
 
         TF_DEBUG(HD_RPRIM_UPDATED).Msg(
             "%s: Marking garbage collection needed to possibly reclaim BAR %p"
@@ -330,7 +407,7 @@ HdStUpdateDrawItemBAR(
         !newRange->IsAggregatedWith(curRange) ||
         rebuildDispatchBuffer) {
 
-        renderIndex.GetChangeTracker().MarkBatchesDirty();
+        HdStMarkDrawBatchesDirty(renderParam);
 
         if (TfDebug::IsEnabled(HD_RPRIM_UPDATED)) {
             if (curRangeValid != newRangeValid) {
@@ -434,9 +511,10 @@ HdStShouldPopulateConstantPrimvars(
 
 void
 HdStPopulateConstantPrimvars(
-    HdRprim* prim,
+    HdRprim *prim,
     HdRprimSharedData *sharedData,
-    HdSceneDelegate* delegate,
+    HdSceneDelegate *delegate,
+    HdRenderParam *renderParam,
     HdDrawItem *drawItem,
     HdDirtyBits *dirtyBits,
     HdPrimvarDescriptorVector const& constantPrimvars,
@@ -615,7 +693,8 @@ HdStPopulateConstantPrimvars(
         range,
         drawItem->GetDrawingCoord()->GetConstantPrimvarIndex(),
         sharedData,
-        renderIndex);
+        renderParam,
+        &(renderIndex.GetChangeTracker()));
 
     TF_VERIFY(drawItem->GetConstantPrimvarRange()->IsValid());
 
@@ -632,6 +711,7 @@ HdStPopulateConstantPrimvars(
 void
 HdStUpdateInstancerData(
     HdRenderIndex &renderIndex,
+    HdRenderParam *renderParam,
     HdRprim *prim,
     HdStDrawItem *drawItem,
     HdRprimSharedData *sharedData,
@@ -646,6 +726,7 @@ HdStUpdateInstancerData(
     HdInstancer::_SyncInstancerAndParents(renderIndex, prim->GetInstancerId());
 
     HdDrawingCoord *drawingCoord = drawItem->GetDrawingCoord();
+    HdChangeTracker &changeTracker = renderIndex.GetChangeTracker();
 
     // If the instance topology changes, we want to force an instance index
     // rebuild even if the index dirty bit isn't set...
@@ -662,8 +743,8 @@ HdStUpdateInstancerData(
                 drawingCoord->GetInstancePrimvarIndex(0) + instancerLevels);
             sharedData->instancerLevels = instancerLevels;
 
-            renderIndex.GetChangeTracker().SetGarbageCollectionNeeded();
-            renderIndex.GetChangeTracker().MarkBatchesDirty();
+            changeTracker.SetGarbageCollectionNeeded();
+            HdStMarkDrawBatchesDirty(renderParam);
             forceIndexRebuild = true;
         }
     }
@@ -690,7 +771,10 @@ HdStUpdateInstancerData(
         // update instance primvar slot in the drawing coordinate.
         HdStUpdateDrawItemBAR(
             static_cast<HdStInstancer*>(instancer)->GetInstancePrimvarRange(),
-            drawCoordIndex, sharedData, renderIndex);
+            drawCoordIndex,
+            sharedData,
+            renderParam,
+            &changeTracker);
 
         parentId = instancer->GetParentId();
         ++level;
@@ -737,7 +821,9 @@ HdStUpdateInstancerData(
                 HdStUpdateDrawItemBAR(
                     range,
                     drawingCoord->GetInstanceIndexIndex(),
-                    sharedData, renderIndex);
+                    sharedData,
+                    renderParam,
+                    &changeTracker);
 
                 TF_VERIFY(drawItem->GetInstanceIndexRange()->IsValid());
             }
@@ -850,6 +936,7 @@ void HdStProcessTopologyVisibility(
     int numTotalPoints,
     HdRprimSharedData *sharedData,
     HdStDrawItem *drawItem,
+    HdRenderParam *renderParam,
     HdChangeTracker *changeTracker,
     HdStResourceRegistrySharedPtr const &resourceRegistry,
     SdfPath const& rprimId)
@@ -902,7 +989,7 @@ void HdStProcessTopologyVisibility(
         sharedData->barContainer.Set(
             drawItem->GetDrawingCoord()->GetTopologyVisibilityIndex(), range);
 
-        changeTracker->MarkBatchesDirty();
+        HdStMarkDrawBatchesDirty(renderParam);
 
         if (barNeedsReallocation) {
             changeTracker->SetGarbageCollectionNeeded();

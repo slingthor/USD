@@ -250,7 +250,6 @@ PXR_NAMESPACE_OPEN_SCOPE
     (extComputation)                            \
                                                 \
     /* Bprims */                                \
-    (texture)                                   \
     (renderBuffer)
 
 #define HD_PRIMVAR_ROLE_TOKENS                  \

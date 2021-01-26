@@ -96,23 +96,28 @@ protected:
     virtual HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override;
 
     void _UpdateRepr(HdSceneDelegate *sceneDelegate,
+                     HdRenderParam *renderParam,
                      TfToken const &reprToken,
                      HdDirtyBits *dirtyBitsState);
 
     void _PopulateTopology(HdSceneDelegate *sceneDelegate,
+                           HdRenderParam *renderParam,
                            HdStDrawItem *drawItem,
                            HdDirtyBits *dirtyBits,
                            const HdBasisCurvesReprDesc &desc);
 
     void _PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
+                                 HdRenderParam *renderParam,
                                  HdStDrawItem *drawItem,
                                  HdDirtyBits *dirtyBits);
     
     void _PopulateVaryingPrimvars(HdSceneDelegate *sceneDelegate,
+                                  HdRenderParam *renderParam,
                                   HdStDrawItem *drawItem,
                                   HdDirtyBits *dirtyBits);
 
     void _PopulateElementPrimvars(HdSceneDelegate *sceneDelegate,
+                                  HdRenderParam *renderParam,
                                   HdStDrawItem *drawItem,
                                   HdDirtyBits *dirtyBits);
 
@@ -142,18 +147,19 @@ private:
     bool _SupportsUserWidths(HdStDrawItem* drawItem);
     bool _SupportsUserNormals(HdStDrawItem* drawItem);
     
-    const TfToken& _GetMaterialTag(const HdRenderIndex &renderIndex) const;
-    
     void _UpdateDrawItem(HdSceneDelegate *sceneDelegate,
+                         HdRenderParam *renderParam,
                          HdStDrawItem *drawItem,
                          HdDirtyBits *dirtyBits,
                          const HdBasisCurvesReprDesc &desc);
 
     void _UpdateDrawItemGeometricShader(HdSceneDelegate *sceneDelegate,
+                                        HdRenderParam *renderParam,
                                         HdStDrawItem *drawItem,
                                         const HdBasisCurvesReprDesc &desc);
     
     void _UpdateShadersForAllReprs(HdSceneDelegate *sceneDelegate,
+                                   HdRenderParam *renderParam,
                                    bool updateMaterialShader,
                                    bool updateGeometricShader);
 
@@ -162,7 +168,8 @@ private:
     HdTopology::ID _topologyId;
     HdDirtyBits _customDirtyBitsInUse;
     int _refineLevel;  // XXX: could be moved into HdBasisCurveTopology.
-    bool _displayOpacity;
+    bool _displayOpacity : 1;
+    bool _occludedSelectionShowsThrough : 1;
 };
 
 

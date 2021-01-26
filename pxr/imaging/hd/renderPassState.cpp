@@ -44,16 +44,18 @@ HdRenderPassState::HdRenderPassState()
 
     , _overrideColor(0.0f, 0.0f, 0.0f, 0.0f)
     , _wireframeColor(0.0f, 0.0f, 0.0f, 0.0f)
-    , _maskColor(1.0f, 0.0f, 0.0f, 1.0f)
-    , _indicatorColor(0.0f, 1.0f, 0.0f, 1.0f)
     , _pointColor(0.0f, 0.0f, 0.0f, 1.0f)
     , _pointSize(3.0)
-    , _pointSelectedSize(3.0)
     , _lightingEnabled(true)
+
+    , _maskColor(1.0f, 0.0f, 0.0f, 1.0f)
+    , _indicatorColor(0.0f, 1.0f, 0.0f, 1.0f)
+    , _pointSelectedSize(3.0)
 
     , _alphaThreshold(0.5f)
     , _tessLevel(32.0)
     , _drawRange(0.9, -1.0)
+
     , _depthBiasUseDefault(true)
     , _depthBiasEnabled(false)
     , _depthBiasConstantFactor(0.0f)
@@ -79,7 +81,6 @@ HdRenderPassState::HdRenderPassState()
     , _blendEnabled(false)
     , _alphaToCoverageEnabled(false)
     , _colorMaskUseDefault(true)
-    , _colorMask(HdRenderPassState::ColorMaskRGBA)
     , _useMultiSampleAov(true)
 
 {
@@ -392,9 +393,10 @@ HdRenderPassState::SetColorMaskUseDefault(bool useDefault)
 }
 
 void
-HdRenderPassState::SetColorMask(HdRenderPassState::ColorMask const& mask)
+HdRenderPassState::SetColorMasks(
+    std::vector<HdRenderPassState::ColorMask> const& masks)
 {
-    _colorMask = mask;
+    _colorMasks = masks;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

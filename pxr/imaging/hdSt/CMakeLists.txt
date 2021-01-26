@@ -119,11 +119,11 @@ pxr_library(hdSt
         flatNormals
         geometricShader
         glConversions
-        glfTextureCpuData
         glslfxShader
         glslProgram
         glUtils
         hgiConversions
+        hioConversions
         imageShaderRenderPass
         instancer
         interleavedMemoryManager
@@ -151,7 +151,6 @@ pxr_library(hdSt
         smoothNormals
         subtextureIdentifier
         surfaceShader
-        texture
         textureBinder
         textureCpuData
         textureHandle
@@ -159,6 +158,7 @@ pxr_library(hdSt
         textureIdentifier
         textureObject
         textureObjectRegistry
+        textureUtils
         tokens
         udimTextureObject
         vboMemoryManager
@@ -180,6 +180,7 @@ pxr_library(hdSt
         cullingShaderKey
         drawBatch
         extCompComputeShader
+        fieldTextureCpuData
         imageShaderShaderKey
         immediateDrawBatch
         indirectDrawBatch
@@ -189,11 +190,11 @@ pxr_library(hdSt
         pointsShaderKey
         quadrangulate
         spatialHierarchy
+        renderParam
         resourceBinder
         shaderKey
         subdivision
         subdivision3
-        textureUtils
         triangulate
         unitTestGLDrawing
         unitTestHelper

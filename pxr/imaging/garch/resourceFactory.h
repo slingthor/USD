@@ -49,7 +49,6 @@ class GarchUniformBlock;
 class GarchVdbTexture;
 class GarchVdbTextureContainer;
 
-TF_DECLARE_WEAK_AND_REF_PTRS(GarchArrayTexture);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchDrawTarget);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchUniformBlock);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchUdimTexture);
@@ -91,16 +90,6 @@ public:
 	GARCH_API
     virtual std::string GetPackageName() const = 0;
     
-    // ArrayTexture creation
-	GARCH_API
-    virtual GarchArrayTextureRefPtr NewArrayTexture(TfTokenVector const &imageFilePaths,
-                                                    unsigned int arraySize,
-                                                    unsigned int cropTop,
-                                                    unsigned int cropBottom,
-                                                    unsigned int cropLeft,
-                                                    unsigned int cropRight,
-                                                    HioImage::ImageOriginLocation originLocation) const = 0;
-
     // BaseTexture
 	GARCH_API
     virtual GarchBaseTexture *NewBaseTexture() const = 0;

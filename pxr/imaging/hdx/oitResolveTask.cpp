@@ -248,7 +248,7 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
         // ImageShaders always use HdSt
         _renderPassState = std::shared_ptr<HdStRenderPassState>(HdStResourceFactory::GetInstance()->NewRenderPassState());
         _renderPassState->SetEnableDepthMask(false);
-        _renderPassState->SetColorMask(HdRenderPassState::ColorMaskRGBA);
+        _renderPassState->SetColorMasks({HdRenderPassState::ColorMaskRGBA});
         _renderPassState->SetBlendEnabled(true);
         // We expect pre-multiplied color as input into the OIT resolve shader
         // e.g. vec4(rgb * a, a). Hence the src factor for rgb is "One" since 

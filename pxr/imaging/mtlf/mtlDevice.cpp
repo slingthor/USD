@@ -312,7 +312,9 @@ void MtlfMetalContext::Init()
     blendState.sourceAlphaFactor = MTLBlendFactorSourceAlpha;
     blendState.destAlphaFactor = MTLBlendFactorOneMinusSourceAlpha;
     blendState.blendColor = GfVec4f(1.0f);
-    blendState.writeMask = MTLColorWriteMaskAll;
+    for (int i = 0; i < METAL_MAX_COLOR_ATTACHMENTS; i++) {
+        blendState.writeMask[i] = MTLColorWriteMaskAll;
+    }
     
     depthState.depthWriteEnable = true;
     depthState.depthCompareFunction = MTLCompareFunctionLessEqual;
@@ -724,7 +726,14 @@ void MtlfMetalContext::SetBlendColor(GfVec4f const &blendColor)
 
 void MtlfMetalContext::SetColorWriteMask(MTLColorWriteMask mask)
 {
-    blendState.writeMask = mask;
+    for (int i = 0; i < METAL_MAX_COLOR_ATTACHMENTS; i++) {
+        blendState.writeMask[i] = mask;
+    }
+}
+
+void MtlfMetalContext::SetColorWriteMask(int bufferIndex, MTLColorWriteMask mask)
+{
+    blendState.writeMask[bufferIndex] = mask;
 }
 
 void MtlfMetalContext::SetDepthWriteEnable(bool depthWriteEnable)
@@ -1010,7 +1019,9 @@ void MtlfMetalContext::SetRenderPipelineState()
     boost::hash_combine(hashVal, blendState.sourceAlphaFactor);
     boost::hash_combine(hashVal, blendState.destColorFactor);
     boost::hash_combine(hashVal, blendState.destAlphaFactor);
-    boost::hash_combine(hashVal, blendState.writeMask);
+    for (int i = 0; i < METAL_MAX_COLOR_ATTACHMENTS; i++) {
+        boost::hash_combine(hashVal, blendState.writeMask[i]);
+    }
     boost::hash_combine(hashVal, sampleCount);
 
     // If this matches the current pipeline state then we should already have the correct pipeline bound
@@ -1098,7 +1109,7 @@ void MtlfMetalContext::SetRenderPipelineState()
                     renderPipelineStateDescriptor.colorAttachments[i].blendingEnabled = NO;
                 }
 
-                renderPipelineStateDescriptor.colorAttachments[i].writeMask = blendState.writeMask;
+                renderPipelineStateDescriptor.colorAttachments[i].writeMask = blendState.writeMask[i];
                 renderPipelineStateDescriptor.colorAttachments[i].rgbBlendOperation = blendState.rgbBlendOp;
                 renderPipelineStateDescriptor.colorAttachments[i].alphaBlendOperation = blendState.alphaBlendOp;
 

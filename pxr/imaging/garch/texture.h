@@ -292,8 +292,6 @@ class GarchTextureFactoryBase : public TfType::FactoryBase {
 public:
     virtual GarchTextureRefPtr New(const TfToken& texturePath,
                                    HioImage::ImageOriginLocation originLocation) const = 0;
-    virtual GarchTextureRefPtr New(const TfTokenVector& texturePaths,
-                                   HioImage::ImageOriginLocation originLocation) const = 0;
 };
 
 template <class T>
@@ -304,13 +302,6 @@ public:
                                                 HioImage::OriginUpperLeft) const
     {
         return T::New(texturePath);
-    }
-
-    virtual GarchTextureRefPtr New(const TfTokenVector& texturePaths,
-                                   HioImage::ImageOriginLocation originLocation =
-                                                HioImage::OriginUpperLeft) const
-    {
-        return TfNullPtr;
     }
 };
 

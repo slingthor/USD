@@ -25,7 +25,6 @@
 //
 #include <pxr/imaging/glf/resourceFactory.h>
 
-#include <pxr/imaging/glf/arrayTexture.h>
 #include <pxr/imaging/glf/baseTexture.h>
 #include <pxr/imaging/glf/bindingMap.h>
 #include <pxr/imaging/glf/contextCaps.h>
@@ -78,24 +77,9 @@ GarchUniformBlockRefPtr GlfResourceFactory::NewUniformBlock(char const *label) c
     return TfCreateRefPtr(new GlfUniformBlock(label));
 }
 
-GarchArrayTextureRefPtr GlfResourceFactory::NewArrayTexture(TfTokenVector const &imageFilePaths,
-                                                            unsigned int arraySize,
-                                                            unsigned int cropTop,
-                                                            unsigned int cropBottom,
-                                                            unsigned int cropLeft,
-                                                            unsigned int cropRight,
-                                                            HioImage::ImageOriginLocation originLocation) const
-{
-    return TfCreateRefPtr(new GlfArrayTexture(imageFilePaths, arraySize,
-                                              cropTop, cropBottom,
-                                              cropLeft, cropRight,
-                                              originLocation));
-}
-
 GarchBaseTexture *GlfResourceFactory::NewBaseTexture() const
 {
     return new GlfBaseTexture();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
-

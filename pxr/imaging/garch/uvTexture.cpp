@@ -24,7 +24,6 @@
 /// \file UVTexture.cpp
 // 
 
-#include "pxr/imaging/garch/arrayTexture.h"
 #include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/uvTexture.h"
@@ -44,26 +43,12 @@ public:
                                    HioImage::ImageOriginLocation originLocation =
                                                 HioImage::OriginUpperLeft) const
     {
-        
         return GarchUVTexture::New(texturePath,
-                                   /*cropTop*/ 0,
-                                   /*cropBottom*/ 0,
-                                   /*cropLeft*/ 0,
-                                   /*cropRight*/ 0,
-                                   originLocation);
-    }
-
-    virtual GarchTextureRefPtr New(const TfTokenVector& texturePaths,
-                                   HioImage::ImageOriginLocation originLocation =
-                                                HioImage::OriginUpperLeft) const
-    {
-        return GarchArrayTexture::New(texturePaths,
-                                      texturePaths.size(),
-                                      /*cropTop*/ 0,
-                                      /*cropBottom*/ 0,
-                                      /*cropLeft*/ 0,
-                                      /*cropRight*/ 0,
-                                      originLocation);
+                                 /*cropTop*/ 0,
+                                 /*cropBottom*/ 0,
+                                 /*cropLeft*/ 0,
+                                 /*cropRight*/ 0,
+                                 originLocation);
     }
 };
 

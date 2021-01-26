@@ -39,7 +39,7 @@
 #include "pxr/imaging/hdSt/renderPass.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
-#include "pxr/imaging/hdSt/texture.h"
+#include "pxr/imaging/hdSt/renderParam.h"
 #include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/volume.h"
@@ -179,6 +179,7 @@ HdStRenderDelegate::HdStRenderDelegate()
 HdStRenderDelegate::HdStRenderDelegate(HdRenderSettingsMap const& settingsMap)
     : HdRenderDelegate(settingsMap)
     , _hgi(nullptr)
+    , _renderParam(std::make_unique<HdStRenderParam>())
 {
     // Initialize the settings and settings descriptors.
     _settingDescriptors = {
@@ -281,7 +282,6 @@ TfTokenVector
 _ComputeSupportedBprimTypes()
 {
     TfTokenVector result;
-    result.push_back(HdPrimTypeTokens->texture);
     result.push_back(HdPrimTypeTokens->renderBuffer);
 
     for (const TfToken &primType : HdStField::GetSupportedBprimTypes()) {
@@ -301,7 +301,7 @@ HdStRenderDelegate::GetSupportedBprimTypes() const
 HdRenderParam *
 HdStRenderDelegate::GetRenderParam() const
 {
-    return nullptr;
+    return _renderParam.get();
 }
 
 HdResourceRegistrySharedPtr
@@ -433,9 +433,7 @@ HdBprim *
 HdStRenderDelegate::CreateBprim(TfToken const& typeId,
                                 SdfPath const& bprimId)
 {
-    if (typeId == HdPrimTypeTokens->texture) {
-        return new HdStTexture(bprimId);
-    } else if (HdStField::IsSupportedBprimType(typeId)) {
+    if (HdStField::IsSupportedBprimType(typeId)) {
         return new HdStField(bprimId, typeId);
     } else if (typeId == HdPrimTypeTokens->renderBuffer) {
         return new HdStRenderBuffer(_resourceRegistry.get(), bprimId);
@@ -449,9 +447,7 @@ HdStRenderDelegate::CreateBprim(TfToken const& typeId,
 HdBprim *
 HdStRenderDelegate::CreateFallbackBprim(TfToken const& typeId)
 {
-    if (typeId == HdPrimTypeTokens->texture) {
-        return new HdStTexture(SdfPath::EmptyPath());
-    } else if (HdStField::IsSupportedBprimType(typeId)) {
+    if (HdStField::IsSupportedBprimType(typeId)) {
         return new HdStField(SdfPath::EmptyPath(), typeId);
     } else if (typeId == HdPrimTypeTokens->renderBuffer) {
         return new HdStRenderBuffer(_resourceRegistry.get(),

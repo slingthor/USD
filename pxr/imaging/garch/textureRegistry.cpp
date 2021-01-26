@@ -90,43 +90,6 @@ GarchTextureRegistry::GetTextureHandle(const TfToken &texture,
 }
 
 GarchTextureHandleRefPtr
-GarchTextureRegistry::GetTextureHandle(const TfTokenVector &textures,
-                                   HioImage::ImageOriginLocation originLocation)
-{
-    if (textures.empty()) {
-        TF_WARN("Attempting to register arrayTexture with empty token vector.");
-        return GarchTextureHandlePtr();
-    }
-
-    const size_t numTextures = textures.size();
-    // We register an array texture with the
-    // path of the first texture in the array
-    TfToken texture = textures[0];
-    GarchTextureHandleRefPtr textureHandle;
-
-    _TextureMetadata md(textures);
-
-    // look into exisiting textures
-    std::map<std::pair<TfToken, HioImage::ImageOriginLocation>,
-             _TextureMetadata>::iterator it =
-        _textureRegistry.find(std::make_pair(texture, originLocation));
-    
-    if (it != _textureRegistry.end() && it->second.IsMetadataEqual(md)) {
-        textureHandle = it->second.GetHandle();
-    } else {
-        // if not exists, create it
-        textureHandle = _CreateTexture(textures, numTextures,
-                                       originLocation);
-        if (textureHandle) {
-            md.SetHandle(textureHandle);
-            _textureRegistry[std::make_pair(texture, originLocation)] = md;
-        }
-    }
-
-    return textureHandle;
-}
-
-GarchTextureHandleRefPtr
 GarchTextureRegistry::GetTextureHandle(GarchTextureRefPtr texture)
 {
     GarchTextureHandleRefPtr textureHandle;
@@ -212,27 +175,9 @@ GarchTextureRegistry::_CreateTexture(const TfToken &texture,
 }
 
 GarchTextureHandleRefPtr
-GarchTextureRegistry::_CreateTexture(const TfTokenVector &textures,
-                                     const size_t numTextures,
-                                   HioImage::ImageOriginLocation originLocation)
-{
-    GarchTextureRefPtr result;
-    TfToken filename = textures.empty() ? TfToken() : textures.front();
-    if (GarchTextureFactoryBase* factory = _GetTextureFactory(filename)) {
-        result = factory->New(textures, originLocation);
-        if (!result) {
-            TF_CODING_ERROR("[PluginLoad] Cannot construct texture for "
-                            "type '%s'\n",
-                            TfStringGetSuffix(filename).c_str());
-        }
-    }
-    return result ? GarchTextureHandle::New(result) : TfNullPtr;
-}
-
-GarchTextureHandleRefPtr
 GarchTextureRegistry::_CreateTexture(const TfToken &texture,
                                    HioImage::ImageOriginLocation originLocation,
-                                     const GarchTextureFactoryBase *textureFactory)
+                                   const GarchTextureFactoryBase *textureFactory)
 {
     GarchTextureRefPtr result;
     if (textureFactory != nullptr) {
@@ -411,11 +356,6 @@ GarchTextureRegistry::_TextureMetadata::_TextureMetadata()
 GarchTextureRegistry::_TextureMetadata::_TextureMetadata(
     const TfToken &texture)
     : _TextureMetadata(&texture, 1)
-{}
-
-GarchTextureRegistry::_TextureMetadata::_TextureMetadata(
-    const TfTokenVector &textures)
-    : _TextureMetadata(textures.data(), textures.size())
 {}
 
 GarchTextureRegistry::_TextureMetadata::_TextureMetadata(

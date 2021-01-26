@@ -74,17 +74,7 @@ public:
     // Package Name accessor
     GLF_API
     virtual std::string GetPackageName() const override { return "glf"; }
-    
-    // ArrayTexture creation
-    GLF_API
-    virtual GarchArrayTextureRefPtr NewArrayTexture(TfTokenVector const &imageFilePaths,
-                                                    unsigned int arraySize,
-                                                    unsigned int cropTop,
-                                                    unsigned int cropBottom,
-                                                    unsigned int cropLeft,
-                                                    unsigned int cropRight,
-                                                    HioImage::ImageOriginLocation originLocation) const override;
-    
+        
     // BaseTexture
     GLF_API
     virtual GarchBaseTexture *NewBaseTexture() const override;

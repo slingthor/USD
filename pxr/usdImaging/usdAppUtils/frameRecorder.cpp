@@ -188,7 +188,7 @@ _WriteTextureToFile(HgiTextureDesc const& textureDesc,
     HioImage::StorageSpec storage;
     storage.width = width;
     storage.height = height;
-    storage.format = GetHioFormat(textureDesc.format);
+    storage.format = HdxGetHioFormat(textureDesc.format);
     storage.flipped = flipped;
     storage.data = (void*)buffer.data();
 

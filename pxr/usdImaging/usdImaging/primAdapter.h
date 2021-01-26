@@ -34,7 +34,6 @@
 #include "pxr/usdImaging/usdImaging/resolvedAttributeCache.h"
 
 #include "pxr/imaging/hd/changeTracker.h"
-#include "pxr/imaging/hd/texture.h"
 #include "pxr/imaging/hd/selection.h"
 #include "pxr/usd/usd/attribute.h"
 #include "pxr/usd/usd/prim.h"
@@ -292,6 +291,12 @@ public:
     /// Return the instancerId for this prim.
     USDIMAGING_API
     virtual SdfPath GetInstancerId(
+        UsdPrim const& usdPrim,
+        SdfPath const& cachePath) const;
+
+    /// Return the list of known prototypes of this prim.
+    USDIMAGING_API
+    virtual SdfPathVector GetInstancerPrototypes(
         UsdPrim const& usdPrim,
         SdfPath const& cachePath) const;
 

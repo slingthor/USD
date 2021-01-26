@@ -2160,11 +2160,8 @@ def InstallMaterialX(context, force, buildArgs):
         # USD requires MaterialX to be built as a shared library on Linux
         # Currently MaterialX does not support shared builds on Windows or MacOS
         cmakeOptions = []
-        if Linux() or MacOS():
+        if Linux():
             cmakeOptions += ['-DMATERIALX_BUILD_SHARED_LIBS=ON']
-
-        if MacOS() or iOS():
-            cmakeOptions.append("-DEXTERNAL_LINK_FLAGS='-undefined dynamic_lookup'")
 
         cmakeOptions += buildArgs;
 

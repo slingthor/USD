@@ -1,5 +1,5 @@
 //
-// Copyright 2020 Pixar
+// Copyright 2021 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,43 +21,42 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef PXR_IMAGING_HD_ST_GLF_TEXTURE_CPU_DATA_H
-#define PXR_IMAGING_HD_ST_GLF_TEXTURE_CPU_DATA_H
+#ifndef PXR_IMAGING_HD_ST_FIELD_TEXTURE_CPU_DATA_H
+#define PXR_IMAGING_HD_ST_FIELD_TEXTURE_CPU_DATA_H
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
 
 #include "pxr/imaging/hdSt/textureCpuData.h"
 #include "pxr/imaging/hgi/texture.h"
-#include "pxr/imaging/hio/image.h"
+
 #include "pxr/base/tf/declarePtrs.h"
 
 #include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_DECLARE_REF_PTRS(GarchBaseTextureData);
+using HioFieldTextureDataSharedPtr = std::shared_ptr<class HioFieldTextureData>;
 
 /// \class HdStTextureCpuData
 ///
 /// An implmentation of HdStTextureCpuData that can be initialized
-/// from GlfBaseTextureData.
+/// from HioFieldTextureData.
 ///
-class HdStGlfTextureCpuData : public HdStTextureCpuData
+class HdSt_FieldTextureCpuData : public HdStTextureCpuData
 {
 public:
     /// It is assumed that Read(...) has already been called
     /// on textureData.
 
     HDST_API
-    HdStGlfTextureCpuData(
-        GarchBaseTextureDataConstRefPtr const &textureData,
+    HdSt_FieldTextureCpuData(
+        HioFieldTextureDataSharedPtr const &textureData,
         const std::string &debugName,
-        bool useOrGenerateMips = false,
         bool premultiplyAlpha = true);
 
     HDST_API
-    ~HdStGlfTextureCpuData() override;
+    ~HdSt_FieldTextureCpuData() override;
     
     HDST_API
     const HgiTextureDesc &GetTextureDesc() const override;
@@ -79,7 +78,7 @@ private:
 
     // To avoid a copy, hold on to original data if we
     // can use them.
-    GarchBaseTextureDataConstRefPtr _textureData;
+    HioFieldTextureDataSharedPtr _textureData;
 
     // Buffer if we had to convert the data.
     std::unique_ptr<const unsigned char[]> _convertedData;

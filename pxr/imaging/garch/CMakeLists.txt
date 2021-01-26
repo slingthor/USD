@@ -46,11 +46,6 @@ endif()
 
 set (optionalPublicClasses "")
 set (optionalCppFiles "")
-if (PXR_ENABLE_OPENVDB_SUPPORT)
-    list(APPEND optionalPublicClasses vdbTextureData)
-    list(APPEND optionalLibs ${OPENEXR_Half_LIBRARY} ${OPENVDB_LIBRARY})
-    list(APPEND optionalIncludeDirs ${OPENVDB_INCLUDE_DIR})
-endif()
 pxr_library(garch
     LIBRARIES
         arch
@@ -69,13 +64,11 @@ pxr_library(garch
         ${optionalIncludeDirs}
 
     PUBLIC_CLASSES
-        arrayTexture
         bindingMap
         baseTexture
         baseTextureData
         contextCaps
         drawTarget
-        field3DTextureDataBase
 	    glApi
         glDebugWindow
         glPlatformDebugContext
@@ -100,7 +93,6 @@ pxr_library(garch
 
     PUBLIC_HEADERS
         api.h
-        fieldTextureData.h
         gl.h
         glPlatformContext.h
         khrplatform.h

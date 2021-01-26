@@ -90,6 +90,7 @@ protected:
     virtual HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override;
 
     void _UpdateRepr(HdSceneDelegate *sceneDelegate,
+                     HdRenderParam *renderParam,
                      TfToken const &reprToken,
                      HdDirtyBits *dirtyBitsState);
 
@@ -110,9 +111,8 @@ protected:
 
     bool _UseFlatNormals(const HdMeshReprDesc &desc) const;
 
-    const TfToken& _GetMaterialTag(const HdRenderIndex &renderIndex) const;
-
     void _UpdateDrawItem(HdSceneDelegate *sceneDelegate,
+                         HdRenderParam *renderParam,
                          HdStDrawItem *drawItem,
                          HdDirtyBits *dirtyBits,
                          const HdMeshReprDesc &desc,
@@ -120,14 +120,17 @@ protected:
                          bool requireFlatNormals);
 
     void _UpdateDrawItemGeometricShader(HdSceneDelegate *sceneDelegate,
+                                        HdRenderParam *renderParam,
                                         HdStDrawItem *drawItem,
                                         const HdMeshReprDesc &desc);
 
     void _UpdateShadersForAllReprs(HdSceneDelegate *sceneDelegate,
+                                   HdRenderParam *renderParam,
                                    bool updateMaterialShader,
                                    bool updateGeometricShader);
 
     void _PopulateTopology(HdSceneDelegate *sceneDelegate,
+                           HdRenderParam *renderParam,
                            HdStDrawItem *drawItem,
                            HdDirtyBits *dirtyBits,
                            const HdMeshReprDesc &desc);
@@ -136,16 +139,19 @@ protected:
         HdStResourceRegistrySharedPtr const &resourceRegistry);
 
     void _PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
+                                 HdRenderParam *renderParam,
                                  HdStDrawItem *drawItem,
                                  HdDirtyBits *dirtyBits,
                                  bool requireSmoothNormals);
 
     void _PopulateFaceVaryingPrimvars(HdSceneDelegate *sceneDelegate,
+                                      HdRenderParam *renderParam,
                                       HdStDrawItem *drawItem,
                                       HdDirtyBits *dirtyBits,
                                       const HdMeshReprDesc &desc);
 
     void _PopulateElementPrimvars(HdSceneDelegate *sceneDelegate,
+                                  HdRenderParam *renderParam,
                                   HdStDrawItem *drawItem,
                                   HdDirtyBits *dirtyBits,
                                   bool requireFlatNormals);
@@ -186,6 +192,7 @@ private:
     bool _hasVaryingTopology : 1;  // The prim's topology has changed since
                                    // the prim was created
     bool _displayOpacity : 1;
+    bool _occludedSelectionShowsThrough : 1;
 };
 
 

@@ -191,11 +191,19 @@ public:
     /// this identifier.
     SdfPath const& GetMaterialId() const { return _materialId; }
 
+    /// Sets a new material binding to be used by this rprim
+    HD_API
+    void SetMaterialId(SdfPath const& materialId);
+
     /// The MaterialTag allows rprims to be organized into different
     /// collections based on properties of the prim's material.
     /// E.g. A renderer may wish to organize opaque and translucent prims 
     /// into different collections so they can be rendered seperately.
     TfToken const& GetMaterialTag() const { return _sharedData.materialTag; }
+
+    /// Sets the material tag used by the rprim.
+    HD_API
+    void SetMaterialTag(TfToken const& materialTag);
 
     HdReprSelector const& GetReprSelector() const {
         return _authoredReprSelector;
@@ -279,11 +287,6 @@ protected:
     HD_API
     void _UpdateInstancer(HdSceneDelegate *sceneDelegate,
                           HdDirtyBits *dirtyBits);
-
-    /// Sets a new material binding to be used by this rprim
-    HD_API
-    void _SetMaterialId(HdChangeTracker &changeTracker,
-                        SdfPath const& materialId);
 
 private:
     SdfPath _instancerId;

@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2021 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,17 +21,14 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef PXR_IMAGING_GARCH_VDB_TEXTURE_DATA_H
-#define PXR_IMAGING_GARCH_VDB_TEXTURE_DATA_H
+#ifndef PXR_IMAGING_HIO_OPENVDB_TEXTURE_DATA_H
+#define PXR_IMAGING_HIO_OPENVDB_TEXTURE_DATA_H
 
-/// \file garch/vdbTextureData.h
+/// \file hioOpenVDB/vdbTextureData.h
 
 #include "pxr/pxr.h"
-#include "pxr/base/gf/matrix4d.h"
-#include "pxr/base/gf/vec3i.h"
-#include "pxr/imaging/garch/api.h"
-#include "pxr/imaging/hio/image.h"
-#include "pxr/imaging/garch/fieldTextureData.h"
+#include "pxr/imaging/hio/api.h"
+#include "pxr/imaging/hio/fieldTextureData.h"
 
 #include "pxr/base/gf/bbox3d.h"
 
@@ -39,74 +36,47 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_DECLARE_WEAK_AND_REF_PTRS(GarchVdbTextureData);
+class HioOpenVDB_TextureData_DenseGridHolderBase;
 
-class GarchVdbTextureData_DenseGridHolderBase;
-
-/// \class GarchVdbTextureData
+/// \class HioOpenVDB_TextureData
 ///
-/// Implements GlfBaseTextureData to read grid with given name from
+/// Implements HioFieldTextureData to read grid with given name from
 /// OpenVDB file at given path.
 ///
-class GarchVdbTextureData final : public GarchFieldTextureData {
+class HioOpenVDB_TextureData final : public HioFieldTextureData {
 public:
-    GARCH_API
-    static GarchVdbTextureDataRefPtr
-    New(std::string const &filePath,
-        std::string const &gridName,
-        size_t targetMemory);
+    using Base = HioFieldTextureData;
 
-    GARCH_API
+    HioOpenVDB_TextureData(std::string const & filePath,
+                           std::string const & gridName,
+                           size_t targetMemory);
+    ~HioOpenVDB_TextureData() override;
+
     const GfBBox3d &GetBoundingBox() const override;
 
-    GARCH_API
-    int NumDimensions() const override;
-
-    GARCH_API
     int ResizedWidth(int mipLevel = 0) const override;
 
-    GARCH_API
     int ResizedHeight(int mipLevel = 0) const override;
 
-    GARCH_API
     int ResizedDepth(int mipLevel = 0) const override;
 
-    GARCH_API
     HioFormat GetFormat() const override;
     
-    GARCH_API
     size_t TargetMemory() const override;
 
-    GARCH_API
-    WrapInfo GetWrapInfo() const override;
-
-    GARCH_API
     size_t ComputeBytesUsed() const override;
 
-    GARCH_API
     size_t ComputeBytesUsedByMip(int mipLevel = 0) const override;
 
-    GARCH_API
-    bool Read(int degradeLevel, 
-              bool generateMipmap,
-              HioImage::ImageOriginLocation
-                  originLocation = HioImage::OriginUpperLeft) override;
+    bool Read(int degradeLevel, bool generateMipmap) override;
     
-    GARCH_API
     bool HasRawBuffer(int mipLevel = 0) const override;
 
-    GARCH_API
-    unsigned char * GetRawBuffer(int mipLevel = 0) const override;
+    unsigned char const * GetRawBuffer(int mipLevel = 0) const override;
 
-    GARCH_API
     int GetNumMipLevels() const override;
 
 private:
-    GarchVdbTextureData(std::string const &filePath,
-                        std::string const &gridName,
-                        size_t targetMemory);
-    ~GarchVdbTextureData() override;
-
     const std::string _filePath;
     const std::string _gridName;
 
@@ -119,13 +89,11 @@ private:
 
     HioFormat _format;
 
-    WrapInfo _wrapInfo;
-
     size_t _size;
 
     GfBBox3d _boundingBox;
 
-    std::unique_ptr<GarchVdbTextureData_DenseGridHolderBase> _denseGrid;
+    std::unique_ptr<HioOpenVDB_TextureData_DenseGridHolderBase> _denseGrid;
 };
 
 

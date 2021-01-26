@@ -321,8 +321,8 @@ public:
     };
 
     HD_API
-    void SetColorMask(ColorMask const& mask);
-    ColorMask GetColorMask() const { return _colorMask; }
+    void SetColorMasks(std::vector<ColorMask> const& masks);
+    std::vector<ColorMask> const& GetColorMasks() const { return _colorMasks; }
 
 protected:
     // ---------------------------------------------------------------------- //
@@ -350,12 +350,13 @@ protected:
     // ---------------------------------------------------------------------- //
     GfVec4f _overrideColor;
     GfVec4f _wireframeColor;
-    GfVec4f _maskColor;
-    GfVec4f _indicatorColor;
     GfVec4f _pointColor;
     float _pointSize;
-    float _pointSelectedSize;
     bool _lightingEnabled;
+
+    GfVec4f _maskColor;
+    GfVec4f _indicatorColor;
+    float _pointSelectedSize;
 
     // ---------------------------------------------------------------------- //
     // Render pipeline state
@@ -364,15 +365,11 @@ protected:
     float _tessLevel;
     GfVec2f _drawRange;
 
-    // Depth Bias RenderPassState
-    // When use default is true - state
-    // is inherited and onther values are
-    // ignored.  Otherwise the raster state
-    // is set using the values specified.
-    bool _depthBiasUseDefault;
+    bool _depthBiasUseDefault; // inherit existing state, ignore values below.
     bool _depthBiasEnabled;
     float _depthBiasConstantFactor;
     float _depthBiasSlopeFactor;
+
     HdCompareFunction _depthFunc;
     bool _depthMaskEnabled;
     HdCullStyle _cullStyle;
@@ -403,7 +400,7 @@ protected:
     bool _alphaToCoverageEnabled;
 
     bool _colorMaskUseDefault;
-    ColorMask _colorMask;
+    std::vector<ColorMask> _colorMasks;
 
     HdRenderPassAovBindingVector _aovBindings;
     bool _useMultiSampleAov;

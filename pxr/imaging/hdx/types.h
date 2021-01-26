@@ -57,7 +57,7 @@ std::ostream& operator<<(std::ostream& out, const HdxShaderInputs& pv);
 
 /// Returns the HioFormat for the given HgiFormat
 HDX_API
-HioFormat GetHioFormat(HgiFormat hgiFormat);
+HioFormat HdxGetHioFormat(HgiFormat hgiFormat);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

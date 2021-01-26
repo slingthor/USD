@@ -1,5 +1,5 @@
 //
-// Copyright 2016 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,53 +21,25 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef PXR_IMAGING_HD_ST_TEXTURE_H
-#define PXR_IMAGING_HD_ST_TEXTURE_H
+#ifndef PXR_IMAGING_HD_ST_HIO_CONVERSIONS_H
+#define PXR_IMAGING_HD_ST_HIO_CONVERSIONS_H
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
-#include "pxr/imaging/hd/version.h"
-#include "pxr/imaging/hd/texture.h"
 #include "pxr/imaging/hd/types.h"
-#include "pxr/imaging/hd/enums.h"
-
-#include "pxr/usd/sdf/path.h"
+#include "pxr/imaging/hio/types.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-class HdSceneDelegate;
-class HdRenderIndex;
-
-///
-/// Represents a Texture Buffer Prim.
-///
-/// Implements no behaviors.
-///
-class HdStTexture : public HdTexture
+class HdStHioConversions 
 {
 public:
     HDST_API
-    HdStTexture(SdfPath const & id);
-    HDST_API
-    ~HdStTexture() override;
-
-    /// Synchronizes state from the delegate to Hydra, for example, allocating
-    /// parameters into GPU memory.
-    HDST_API
-    void Sync(HdSceneDelegate *sceneDelegate,
-              HdRenderParam   *renderParam,
-              HdDirtyBits     *dirtyBits) override;
-
-    /// Returns the minimal set of dirty bits to place in the
-    /// change tracker for use in the first sync of this prim.
-    /// Typically this would be all dirty bits.
-    HDST_API
-    HdDirtyBits GetInitialDirtyBitsMask() const override;
+    static HioFormat GetHioFormat(HdFormat inFormat);
 };
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif //PXR_IMAGING_HD_ST_TEXTURE_H
-
+#endif // PXR_IMAGING_HD_ST_HIO_CONVERSIONS_H

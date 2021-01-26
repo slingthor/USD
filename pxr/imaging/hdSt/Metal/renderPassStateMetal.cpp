@@ -98,6 +98,33 @@ _SetCullState(MtlfMetalContextSharedPtr context, HdCullStyle cullstyle)
     }
 }
 
+void
+_SetColorMask(MtlfMetalContextSharedPtr context,
+              int drawBufferIndex,
+              HdRenderPassState::ColorMask const& mask)
+{
+    MTLColorWriteMask colorWriteMask;
+    switch (mask)
+    {
+        case HdStRenderPassState::ColorMaskNone:
+            colorWriteMask = MTLColorWriteMaskNone;
+            break;
+        case HdStRenderPassState::ColorMaskRGB:
+            colorWriteMask = MTLColorWriteMaskRed | MTLColorWriteMaskGreen
+                | MTLColorWriteMaskBlue;
+            break;
+        default:
+            colorWriteMask = MTLColorWriteMaskAll;
+            break;
+    }
+
+    if (drawBufferIndex == -1) {
+        context->SetColorWriteMask(colorWriteMask);
+    } else {
+        context->SetColorWriteMask(drawBufferIndex, colorWriteMask);
+    }
+}
+
 }
 
 void
@@ -139,19 +166,17 @@ HdStRenderPassStateMetal::Bind()
     
     context->SetDepthComparisonFunction(HdStMetalConversions::GetGlDepthFunc(_depthFunc));
     context->SetDepthWriteEnable(_depthMaskEnabled);
-    
-    if (!_colorMaskUseDefault) {
-        switch(_colorMask) {
-            case HdStRenderPassState::ColorMaskNone:
-                context->SetColorWriteMask(MTLColorWriteMaskNone);
-                break;
-            case HdStRenderPassState::ColorMaskRGB:
-                context->SetColorWriteMask(
-                    MTLColorWriteMaskRed|MTLColorWriteMaskGreen|MTLColorWriteMaskBlue);
-                break;
-            case HdStRenderPassState::ColorMaskRGBA:
-                context->SetColorWriteMask(MTLColorWriteMaskAll);
-                break;
+    if (_colorMaskUseDefault) {
+        // Enable color writes for all components for all attachments.
+        _SetColorMask(context, -1, ColorMaskRGBA);
+    } else {
+        if (_colorMasks.size() == 1) {
+            // Use the same color mask for all attachments.
+            _SetColorMask(context, -1, _colorMasks[0]);
+        } else {
+            for (size_t i = 0; i < _colorMasks.size(); i++) {
+                _SetColorMask(context, i, _colorMasks[i]);
+            }
         }
     }
 /*

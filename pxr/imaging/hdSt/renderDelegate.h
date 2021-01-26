@@ -34,6 +34,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class Hgi;
+class HdStRenderParam;
 
 class Hgi;
 
@@ -55,8 +56,9 @@ enum class HdStDrawMode
 ///
 /// HdStRenderDelegate
 ///
-/// The Storm Render Delegate provides a Hydra render that uses a
-/// streaming graphics implementation to draw the scene.
+/// The Storm Render Delegate provides a rasterizer renderer to draw the scene.
+/// While it currently has some ties to GL, the goal is to use Hgi to allow
+/// it to be graphics API agnostic.
 ///
 class HdStRenderDelegate : public HdRenderDelegate {
 public:
@@ -105,6 +107,10 @@ public:
     
     HDST_API
     virtual ~HdStRenderDelegate();
+    
+    // ---------------------------------------------------------------------- //
+    /// \name HdRenderDelegate virtual API
+    // ---------------------------------------------------------------------- //
 
     HDST_API
     virtual void SetDrivers(HdDriverVector const& drivers) override;
@@ -168,11 +174,6 @@ public:
     HDST_API
     virtual bool IsPrimvarFilteringNeeded() const override;
 
-    // Returns whether or not HdStRenderDelegate can run on the current
-    // hardware.
-    HDST_API
-    static bool IsSupported();
-
     HDST_API
     virtual HdRenderSettingDescriptorList
         GetRenderSettingDescriptors() const override;
@@ -189,6 +190,15 @@ public:
     HDST_API
     virtual HdAovDescriptor
         GetDefaultAovDescriptor(TfToken const& name) const override;
+    
+    // ---------------------------------------------------------------------- //
+    /// \name Misc public API
+    // ---------------------------------------------------------------------- //
+
+    // Returns whether or not HdStRenderDelegate can run on the current
+    // hardware.
+    HDST_API
+    static bool IsSupported();
 
     // Returns Hydra graphics interface
     HDST_API
@@ -204,21 +214,22 @@ protected:
     
 private:
     void _ApplyTextureSettings();
+    HdSprim *_CreateFallbackMaterialPrim();
+
+    HdStRenderDelegate(const HdStRenderDelegate &)             = delete;
+    HdStRenderDelegate &operator =(const HdStRenderDelegate &) = delete;
 
     static const TfTokenVector SUPPORTED_RPRIM_TYPES;
     static const TfTokenVector SUPPORTED_SPRIM_TYPES;
 
-    /// Resource registry used in this render delegate
+    // Resource registry used in this render delegate
     HdStResourceRegistrySharedPtr _resourceRegistry;
 
     HdRenderSettingDescriptorList _settingDescriptors;
 
     void _Initialize();
 
-    HdSprim *_CreateFallbackMaterialPrim();
-
-    HdStRenderDelegate(const HdStRenderDelegate &)             = delete;
-    HdStRenderDelegate &operator =(const HdStRenderDelegate &) = delete;
+    std::unique_ptr<HdStRenderParam> _renderParam;
 };
 
 

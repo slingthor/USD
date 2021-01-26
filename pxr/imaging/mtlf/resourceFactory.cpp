@@ -25,7 +25,6 @@
 //
 #include "pxr/imaging/mtlf/resourceFactory.h"
 
-#include "pxr/imaging/mtlf/arrayTexture.h"
 #include "pxr/imaging/mtlf/baseTexture.h"
 #include "pxr/imaging/mtlf/bindingMap.h"
 #include "pxr/imaging/mtlf/contextCaps.h"
@@ -76,20 +75,6 @@ GarchDrawTarget *MtlfResourceFactory::NewDrawTarget(GarchDrawTargetPtr const & d
 GarchUniformBlockRefPtr MtlfResourceFactory::NewUniformBlock(char const *label) const
 {
     return TfCreateRefPtr(new MtlfUniformBlock(label));
-}
-
-GarchArrayTextureRefPtr MtlfResourceFactory::NewArrayTexture(TfTokenVector const &imageFilePaths,
-                                                             unsigned int arraySize,
-                                                             unsigned int cropTop,
-                                                             unsigned int cropBottom,
-                                                             unsigned int cropLeft,
-                                                             unsigned int cropRight,
-                                                             HioImage::ImageOriginLocation originLocation) const
-{
-    return TfCreateRefPtr(new MtlfArrayTexture(imageFilePaths, arraySize,
-                                               cropTop, cropBottom,
-                                               cropLeft, cropRight,
-                                               originLocation));
 }
 
 GarchBaseTexture *MtlfResourceFactory::NewBaseTexture() const

@@ -347,6 +347,30 @@ HdStRenderPassState::GetShaders() const
 }
 
 void
+_SetColorMask(int drawBufferIndex, HdRenderPassState::ColorMask const& mask)
+{
+    bool colorMask[4] = {true, true, true, true};
+    switch (mask)
+    {
+        case HdStRenderPassState::ColorMaskNone:
+            colorMask[0] = colorMask[1] = colorMask[2] = colorMask[3] = false;
+            break;
+        case HdStRenderPassState::ColorMaskRGB:
+            colorMask[3] = false;
+            break;
+        default:
+            ; // no-op
+    }
+
+    if (drawBufferIndex == -1) {
+        glColorMask(colorMask[0], colorMask[1], colorMask[2], colorMask[3]);
+    } else {
+        glColorMaski((uint32_t) drawBufferIndex,
+                     colorMask[0], colorMask[1], colorMask[2], colorMask[3]);
+    }
+}
+
+void
 HdStRenderPassState::Bind()
 {
     GLF_GROUP_FUNCTION();

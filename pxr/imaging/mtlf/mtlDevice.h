@@ -271,6 +271,9 @@ public:
     void SetColorWriteMask(MTLColorWriteMask mask);
     
     MTLF_API
+    void SetColorWriteMask(int bufferIndex, MTLColorWriteMask mask);
+    
+    MTLF_API
     void SetDepthWriteEnable(bool depthWriteEnable);
     
     MTLF_API
@@ -562,7 +565,7 @@ protected:
         MTLBlendFactor destColorFactor;
         MTLBlendFactor sourceAlphaFactor;
         MTLBlendFactor destAlphaFactor;
-        MTLColorWriteMask writeMask;
+        MTLColorWriteMask writeMask[METAL_MAX_COLOR_ATTACHMENTS];
         GfVec4f blendColor;
         size_t hashValue;
     } blendState;

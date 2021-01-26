@@ -165,7 +165,7 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     extendedState->SetRenderPassShader(_oitOpaqueRenderPassShader);
     renderPassState->SetEnableDepthMask(true);
     renderPassState->SetColorMaskUseDefault(false);
-    renderPassState->SetColorMask(HdRenderPassState::ColorMaskRGBA);
+    renderPassState->SetColorMasks({HdRenderPassState::ColorMaskRGBA});
 
     // We resolve the AOVs just before rendering any OIT geometry, so
     // avoid using the multisampled AOVs.
@@ -177,7 +177,7 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     //
     extendedState->SetRenderPassShader(_oitTranslucentRenderPassShader);
     renderPassState->SetEnableDepthMask(false);
-    renderPassState->SetColorMask(HdRenderPassState::ColorMaskNone);
+    renderPassState->SetColorMasks({HdRenderPassState::ColorMaskNone});
     HdxRenderTask::Execute(ctx);
 
     //

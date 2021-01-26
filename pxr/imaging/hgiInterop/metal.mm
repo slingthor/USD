@@ -361,7 +361,7 @@ HgiInteropMetal::HgiInteropMetal(Hgi* hgi)
         "}\n";
 
     MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
-    options.fastMathEnabled = YES;
+    options.fastMathEnabled = NO;
         
     _defaultLibrary = [_device newLibraryWithSource:shaderSource
                                             options:options
@@ -372,7 +372,6 @@ HgiInteropMetal::HgiInteropMetal(Hgi* hgi)
         TF_FATAL_CODING_ERROR(
             "Failed to create interop pipeline state: %s",
             [errStr UTF8String]);
-        [errStr release];
     }
     
     // Load the fragment program into the library
@@ -405,8 +404,6 @@ HgiInteropMetal::HgiInteropMetal(Hgi* hgi)
         TF_FATAL_CODING_ERROR(
             "Failed to create compute pipeline state, error %s",
             [errStr UTF8String]);
-        [errStr release];
-        [error release];
     }
         
     computePipelineStateDescriptor.computeFunction = _computeColorCopyProgram;
@@ -425,8 +422,6 @@ HgiInteropMetal::HgiInteropMetal(Hgi* hgi)
         TF_FATAL_CODING_ERROR(
             "Failed to create compute pipeline state, error %s",
             [errStr UTF8String]);
-        [errStr release];
-        [error release];
     }
 
     CVReturn cvret;

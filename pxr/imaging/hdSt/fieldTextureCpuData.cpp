@@ -1,5 +1,5 @@
 //
-// Copyright 2020 Pixar
+// Copyright 2021 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,11 +21,11 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/hdSt/glfTextureCpuData.h"
+#include "pxr/imaging/hdSt/fieldTextureCpuData.h"
 
 #include "pxr/imaging/hdSt/textureUtils.h"
 
-#include "pxr/imaging/garch/baseTextureData.h"
+#include "pxr/imaging/hio/fieldTextureData.h"
 
 #include "pxr/base/trace/trace.h"
 
@@ -33,22 +33,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
-HgiTextureType
-_GetTextureType(const int numDimensions)
-{
-    switch(numDimensions) {
-    case 2:
-        return HgiTextureType2D;
-    case 3:
-        return HgiTextureType3D;
-    default:
-        TF_CODING_ERROR("Unsupported number of dimensions");
-        return HgiTextureType2D;
-    }
-}
-
 bool
-_IsValid(GarchBaseTextureDataConstRefPtr const &textureData)
+_IsValid(HioFieldTextureDataSharedPtr const &textureData)
 {
     return
         textureData->ResizedWidth() > 0 &&
@@ -59,10 +45,9 @@ _IsValid(GarchBaseTextureDataConstRefPtr const &textureData)
 
 } // anonymous namespace
 
-HdStGlfTextureCpuData::HdStGlfTextureCpuData(
-    GarchBaseTextureDataConstRefPtr const &textureData,
+HdSt_FieldTextureCpuData::HdSt_FieldTextureCpuData(
+    HioFieldTextureDataSharedPtr const &textureData,
     const std::string &debugName,
-    const bool useOrGenerateMipmaps,
     const bool premultiplyAlpha)
   : _generateMipmaps(false)
 {
@@ -84,8 +69,7 @@ HdStGlfTextureCpuData::HdStGlfTextureCpuData(
     // by now and left _textureDesc.initalData null indicating to
     // our clients that the texture is invalid.
 
-    // Is this 2D or 3D texture?
-    _textureDesc.type = _GetTextureType(textureData->NumDimensions());
+    _textureDesc.type = HgiTextureType3D;
 
     // Determine the format (e.g., float/byte, RED/RGBA) and give
     // function to convert data if necessary.
@@ -96,12 +80,13 @@ HdStGlfTextureCpuData::HdStGlfTextureCpuData(
 
     const HioFormat hioFormat = textureData->GetFormat();
 
-    HdStTextureUtils::ConversionFunction conversionFunction = nullptr;
     _textureDesc.format = HdStTextureUtils::GetHgiFormat(
         hioFormat,
-        premultiplyAlpha,
-        /* avoidThreeComponentFormats = */ true,
-        &conversionFunction);
+        premultiplyAlpha);
+    const HdStTextureUtils::ConversionFunction conversionFunction =
+        HdStTextureUtils::GetHioToHgiConversion(
+            hioFormat,
+            premultiplyAlpha);
 
     // Handle grayscale textures by expanding value to green and blue.
     if (HgiGetComponentCount(_textureDesc.format) == 1) {
@@ -125,26 +110,10 @@ HdStGlfTextureCpuData::HdStGlfTextureCpuData(
 
     // How many mipmaps to use from the file.
     unsigned int numGivenMipmaps = 1;
-
-    if (useOrGenerateMipmaps) {
-        numGivenMipmaps = textureData->GetNumMipLevels();
-        if (numGivenMipmaps > 1) {
-            // Use mipmaps from file.
-            if (numGivenMipmaps > mipInfos.size()) {
-                TF_CODING_ERROR("Too many mip maps in texture data.");
-                numGivenMipmaps = mipInfos.size();
-            }
-            _textureDesc.mipLevels = numGivenMipmaps;
-        } else {
-            // No mipmaps in file, generate mipmaps on GPU.
-            _generateMipmaps = true;
-            _textureDesc.mipLevels = mipInfos.size();
-        }
-    }
     const HgiMipInfo &mipInfo = mipInfos[numGivenMipmaps - 1];
 
     // Size of initial data.
-    _textureDesc.pixelsByteSize = mipInfo.byteOffset + mipInfo.byteSize;
+    _textureDesc.pixelsByteSize = mipInfo.byteOffset + mipInfo.byteSizePerLayer;
 
     if (conversionFunction) {
         const size_t numPixels = 
@@ -169,23 +138,23 @@ HdStGlfTextureCpuData::HdStGlfTextureCpuData(
     }
 }
 
-HdStGlfTextureCpuData::~HdStGlfTextureCpuData() = default;
+HdSt_FieldTextureCpuData::~HdSt_FieldTextureCpuData() = default;
 
 const
 HgiTextureDesc &
-HdStGlfTextureCpuData::GetTextureDesc() const
+HdSt_FieldTextureCpuData::GetTextureDesc() const
 {
     return _textureDesc;
 }
 
 bool
-HdStGlfTextureCpuData::GetGenerateMipmaps() const
+HdSt_FieldTextureCpuData::GetGenerateMipmaps() const
 {
     return _generateMipmaps;
 }
 
 bool
-HdStGlfTextureCpuData::IsValid() const
+HdSt_FieldTextureCpuData::IsValid() const
 {
     return _textureDesc.initialData;
 }
