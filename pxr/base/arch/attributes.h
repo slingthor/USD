@@ -206,12 +206,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 template <class StaticInit>
 struct ARCH_HIDDEN Arch_PerLibInit {
     Arch_PerLibInit() { /* "use" of init here forces instantiation */
+        static StaticInit init;
         (void)init; }
 private:
-    static StaticInit init;
 };
-template <class StaticInit>
-StaticInit Arch_PerLibInit<StaticInit>::init;
 
 #define _ARCH_CAT_NOEXPAND(a, b) a ## b
 #define _ARCH_CAT(a, b) _ARCH_CAT_NOEXPAND(a, b)

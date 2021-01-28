@@ -35,18 +35,17 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
-const std::thread::id _mainThreadId = std::this_thread::get_id();
-
 } // anonymous namespace
 
 bool ArchIsMainThread()
 {
-    return std::this_thread::get_id() == _mainThreadId;
+    return std::this_thread::get_id() == ArchGetMainThreadId();
 }
 
 std::thread::id
 ArchGetMainThreadId()
 {
+    static const std::thread::id _mainThreadId = std::this_thread::get_id();
     return _mainThreadId;
 }
 
