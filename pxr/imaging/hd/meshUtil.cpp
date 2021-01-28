@@ -80,7 +80,8 @@ HdMeshUtil::ComputeTriangleIndices(VtVec3iArray *indices,
 {
     HD_TRACE_FUNCTION();
 
-    if (_topology == nullptr) {
+    if (_topology == nullptr ||
+        _topology->GetFaceVertexIndices().empty()) {
         TF_CODING_ERROR("No topology provided for triangulation");
         return;
     }
