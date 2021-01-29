@@ -116,7 +116,8 @@ Work_OverrideConcurrencyLimit(unsigned weakValue, unsigned strongValue)
     return strongValue ? strongValue : weakValue;
 }
 
-static void 
+// static void
+void //@AAPL
 Work_InitializeThreading()
 {
     // Get the thread limit from the environment setting. Note that this value
@@ -140,7 +141,7 @@ Work_InitializeThreading()
     if (settingVal)
         _tbbTaskSchedInit = new tbb::task_scheduler_init(_threadLimit);
 }
-static int _forceInitialization = (Work_InitializeThreading(), 0);
+// static int _forceInitialization = (Work_InitializeThreading(), 0);
 
 void
 WorkSetConcurrencyLimit(unsigned n)

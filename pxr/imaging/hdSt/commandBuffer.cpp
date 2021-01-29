@@ -67,8 +67,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-static os_log_t cullingLog = os_log_create("hydra.metal", "Culling");
-
 HdStCommandBuffer::HdStCommandBuffer()
     : _visibleSize(0)
     , _visChangeCount(0)

@@ -64,8 +64,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-static os_log_t cullingLog = os_log_create("hydra.metal", "Culling");
-
 float const sizeThreshold = 1.0f;
 float const sizeThresholdSq = sizeThreshold * sizeThreshold;
 
@@ -473,10 +471,15 @@ BVH::~BVH()
 //    NSLog(@"BVH dead,%i", BVHCounter);
 }
 
+os_log_t BVH::cullingLog(void) {
+    static const os_log_t _cullingLog = os_log_create("hydra.metal", "Culling");
+    return _cullingLog;
+}
+
 void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
 {
-    os_signpost_id_t bvhGenerate = os_signpost_id_generate(cullingLog);
-    os_signpost_id_t bvhBake = os_signpost_id_generate(cullingLog);
+    os_signpost_id_t bvhGenerate = os_signpost_id_generate(cullingLog());
+    os_signpost_id_t bvhBake = os_signpost_id_generate(cullingLog());
 
     if (root) {
         delete root;
@@ -490,7 +493,7 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
         return;
     }
     
-    os_signpost_interval_begin(cullingLog, bvhGenerate, "BVH Generation");
+    os_signpost_interval_begin(cullingLog(), bvhGenerate, "BVH Generation");
 
     for (size_t idx = 0; idx < drawableItems.size(); ++idx) {
         delete drawableItems[idx];
@@ -520,11 +523,11 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
         unsigned currentDepth = root->Insert(drawableItems[idx], 0);
         depth = MAX(depth, currentDepth);
     }
-    os_signpost_interval_end(cullingLog, bvhGenerate, "BVH Generation");
+    os_signpost_interval_end(cullingLog(), bvhGenerate, "BVH Generation");
     
-    os_signpost_interval_begin(cullingLog, bvhBake, "BVH Bake");
+    os_signpost_interval_begin(cullingLog(), bvhBake, "BVH Bake");
     Bake();
-    os_signpost_interval_end(cullingLog, bvhBake, "BVH Bake");
+    os_signpost_interval_end(cullingLog(), bvhBake, "BVH Bake");
 
     buildTimeMS = (ArchGetTickTime() - buildStart) / 1000.0f;
     
@@ -550,10 +553,10 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
         return;
     }
 
-    os_signpost_id_t bvhCulling = os_signpost_id_generate(cullingLog);
-    os_signpost_id_t bvhCullingCull = os_signpost_id_generate(cullingLog);
-    os_signpost_id_t bvhCullingFinal = os_signpost_id_generate(cullingLog);
-    os_signpost_id_t bvhCullingBuildBuffer = os_signpost_id_generate(cullingLog);
+    os_signpost_id_t bvhCulling = os_signpost_id_generate(cullingLog());
+    os_signpost_id_t bvhCullingCull = os_signpost_id_generate(cullingLog());
+    os_signpost_id_t bvhCullingFinal = os_signpost_id_generate(cullingLog());
+    os_signpost_id_t bvhCullingBuildBuffer = os_signpost_id_generate(cullingLog());
 
     uint64_t cullStart = ArchGetTickTime();
 
@@ -596,11 +599,11 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
         clipPlanes[i] = clipPlanes[i] * inv;
     }
 
-    os_signpost_interval_begin(cullingLog, bvhCulling, "Culling: BVH");
-    os_signpost_interval_begin(cullingLog, bvhCullingCull, "Culling: BVH -- Culllist");
+    os_signpost_interval_begin(cullingLog(), bvhCulling, "Culling: BVH");
+    os_signpost_interval_begin(cullingLog(), bvhCullingCull, "Culling: BVH -- Culllist");
     cullList.clear();
     root->PerformCulling(viewProjMatrix, clipPlanes, dimensions, &bakedVisibility[0], cullList, false);
-    os_signpost_interval_end(cullingLog, bvhCullingCull, "Culling: BVH -- Culllist");
+    os_signpost_interval_end(cullingLog(), bvhCullingCull, "Culling: BVH -- Culllist");
     float cullListTimeMS = (ArchGetTickTime() - cullStart) / 1000.0f;
     
     static matrix_float4x4 const *_viewProjMatrix;
@@ -678,7 +681,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
     unsigned grainApply = 1;
     unsigned grainBuild = 2;
 
-    os_signpost_interval_begin(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
+    os_signpost_interval_begin(cullingLog(), bvhCullingFinal, "Culling: BVH -- Apply");
     uint64_t cullApplyStart = ArchGetTickTime();
 
     WorkParallelForN(cullList.perItemContained.size(),
@@ -697,18 +700,18 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                                std::placeholders::_2),
                      grainApply * 10);
 
-    os_signpost_interval_end(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
+    os_signpost_interval_end(cullingLog(), bvhCullingFinal, "Culling: BVH -- Apply");
     float cullApplyTimeMS = (ArchGetTickTime() - cullApplyStart) / 1000.0f;
     
     uint64_t cullBuildBufferTimeBegin = ArchGetTickTime();
-    os_signpost_interval_begin(cullingLog, bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
+    os_signpost_interval_begin(cullingLog(), bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
     WorkParallelForN(drawableVisibilityOwners.size(),
                      std::bind(&_Worker::processInstancesVisible, &drawableVisibilityOwners,
                                std::placeholders::_1,
                                std::placeholders::_2));
-    os_signpost_interval_end(cullingLog, bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
+    os_signpost_interval_end(cullingLog(), bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
 
-    os_signpost_interval_end(cullingLog, bvhCulling, "Culling: BVH");
+    os_signpost_interval_end(cullingLog(), bvhCulling, "Culling: BVH");
 
     uint64_t end = ArchGetTickTime();
     float cullBuildBufferTimeMS = (end - cullBuildBufferTimeBegin) / 1000.0f;

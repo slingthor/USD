@@ -34,6 +34,9 @@ void ResetTBBTaskSchedInit();
 
 /// \file work/threadLimits.h
 
+
+WORK_API void //@AAPL
+Work_InitializeThreading();
 /// Return the current concurrency limit, always >= 1.
 ///
 /// The initial value is determined by the PXR_WORK_THREAD_LIMIT env setting,

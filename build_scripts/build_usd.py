@@ -1164,7 +1164,19 @@ def InstallTBB_Windows(context, force, buildArgs):
         return os.getcwd()
 
 def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
+    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    patch_path = os.path.join(dir_path, "patches/tbb_minimal.diff")
+
     with CurrentWorkingDirectory(DownloadURL(TBB_URL, context, force)):
+
+        #Patch for static initializers:
+        Run("git apply  " + patch_path)
+        if MacOS():
+            PatchFile("src/tbb/scheduler.cpp", 
+                    [("my_innermost_running_task = my_dummy_task = &allocate_task( sizeof(task), __TBB_CONTEXT_ARG(NULL, &the_dummy_context) );",
+                      "my_innermost_running_task = my_dummy_task = &allocate_task( sizeof(task), __TBB_CONTEXT_ARG(NULL, &the_dummy_context()) );")])
+
+
         # Note: TBB installation fails on OSX when cuda is installed, a 
         # suggested fix:
         # https://github.com/spack/spack/issues/6000#issuecomment-358817701
@@ -1213,9 +1225,11 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
                       "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/MacOSX.*' 2>/dev/null | head -1)"),
                      ("-m64",
                       "-m64 -arch x86_64"),
+                     ("CPLUS_FLAGS +=", "CPLUS_FLAGS += -std=c++14"), 
                      ("ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64))",
                       "ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64 arm64e))")],
                     True)
+
 
         archPrimary = GetMacArch()
         archSecondary = ""
@@ -2217,7 +2231,12 @@ PYSIDE = PythonDependency("PySide", GetPySideInstructions,
 HDF5_URL = "https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.0-patch1/src/hdf5-1.10.0-patch1.zip"
 
 def InstallHDF5(context, force, buildArgs):
+    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    patch_path = os.path.join(dir_path, "patches/hdf.diff")
+
     with CurrentWorkingDirectory(DownloadURL(HDF5_URL, context, force)):
+        Run("git apply  " + patch_path)
+
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
             PatchFile("config/cmake_ext_mod/ConfigureChecks.cmake", 
                     [("if (ARCH_LENGTH GREATER 1)", "if (FALSE)")])
@@ -2236,7 +2255,12 @@ HDF5 = Dependency("HDF5", InstallHDF5, "include/hdf5.h")
 ALEMBIC_URL = "https://github.com/alembic/alembic/archive/1.7.10.zip"
 
 def InstallAlembic(context, force, buildArgs):
+    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    patch_path = os.path.join(dir_path, "patches/alembic.diff")
+
     with CurrentWorkingDirectory(DownloadURL(ALEMBIC_URL, context, force)):
+        Run("git apply  " + patch_path)
+
         cmakeOptions = ['-DUSE_BINARIES=OFF', '-DUSE_TESTS=OFF']
         if context.enableHDF5:
             # HDF5 requires the H5_BUILT_AS_DYNAMIC_LIB macro be defined if

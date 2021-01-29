@@ -36,6 +36,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include <vector>
+#include <os/signpost.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -211,6 +212,7 @@ public:
     int BVHCounter;
 private:
     void Bake();
+    os_log_t cullingLog();
 
     std::vector<DrawableItem*> bakedDrawableItems;
     std::vector<uint8_t> bakedVisibility;

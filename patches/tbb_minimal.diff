@@ -1,0 +1,188 @@
+Only in oneTBB-2017_U6: .gitattributes
+Only in oneTBB-2017_U6: .gitignore
+Only in oneTBB-2017_U6: Makefile
+Only in oneTBB-2017_U6: build
+Only in oneTBB-2017_U6: doc
+Only in oneTBB-2017_U6: examples
+Only in oneTBB-2017_U6/include: index.html
+Only in oneTBB-2017_U6/include/tbb: index.html
+diff --minimal -r -U1 oneTBB-2017_U6/include/tbb/spin_mutex.h tbb/include/tbb/spin_mutex.h
+--- oneTBB-2017_U6/include/tbb/spin_mutex.h	2017-05-14 11:42:22.000000000 +0100
++++ tbb/include/tbb/spin_mutex.h	2021-01-25 11:09:43.000000000 +0000
+@@ -46,3 +46,3 @@
+     /** Equivalent to zero-initialization of *this. */
+-    spin_mutex() : flag(0) {
++    constexpr spin_mutex() : flag(0) {
+ #if TBB_USE_THREADING_TOOLS
+diff --minimal -r -U1 oneTBB-2017_U6/include/tbb/tbb_stddef.h tbb/include/tbb/tbb_stddef.h
+--- oneTBB-2017_U6/include/tbb/tbb_stddef.h	2017-05-14 11:42:22.000000000 +0100
++++ tbb/include/tbb/tbb_stddef.h	2021-01-25 11:09:43.000000000 +0000
+@@ -321,3 +321,3 @@
+     //! Explicitly define default construction, because otherwise gcc issues gratuitous warning.
+-    no_assign() {}
++    constexpr no_assign() {}
+ #endif /* __GNUC__ */
+@@ -331,3 +331,3 @@
+     //! Allow default construction
+-    no_copy() {}
++    constexpr no_copy() {}
+ };
+Only in oneTBB-2017_U6: index.html
+Only in oneTBB-2017_U6: jni
+Only in oneTBB-2017_U6: python
+Only in oneTBB-2017_U6/src: Makefile
+Only in oneTBB-2017_U6/src: index.html
+Only in oneTBB-2017_U6/src: old
+Only in oneTBB-2017_U6/src: perf
+diff --minimal -r -U1 oneTBB-2017_U6/src/tbb/custom_scheduler.h tbb/src/tbb/custom_scheduler.h
+--- oneTBB-2017_U6/src/tbb/custom_scheduler.h	2017-05-14 11:42:22.000000000 +0100
++++ tbb/src/tbb/custom_scheduler.h	2021-01-25 11:09:43.000000000 +0000
+@@ -271,3 +271,3 @@
+ #if __TBB_SCHEDULER_OBSERVER
+-        the_global_observer_list.notify_entry_observers( my_last_global_observer, is_worker() );
++        the_global_observer_list()->notify_entry_observers( my_last_global_observer, is_worker() );
+ #endif /* __TBB_SCHEDULER_OBSERVER */
+diff --minimal -r -U1 oneTBB-2017_U6/src/tbb/dynamic_link.cpp tbb/src/tbb/dynamic_link.cpp
+--- oneTBB-2017_U6/src/tbb/dynamic_link.cpp	2017-05-14 11:42:22.000000000 +0100
++++ tbb/src/tbb/dynamic_link.cpp	2021-01-25 11:09:43.000000000 +0000
+@@ -59,3 +59,3 @@
+ #define __USE_TBB_ATOMICS       ( !(__linux__&&__ia64__) || __TBB_BUILD )
+-#define __USE_STATIC_DL_INIT    ( !__ANDROID__ )
++#define __USE_STATIC_DL_INIT    ( !__ANDROID__ && !__APPLE__ )
+ 
+diff --minimal -r -U1 oneTBB-2017_U6/src/tbb/market.cpp tbb/src/tbb/market.cpp
+--- oneTBB-2017_U6/src/tbb/market.cpp	2017-05-14 11:42:22.000000000 +0100
++++ tbb/src/tbb/market.cpp	2021-01-25 11:09:43.000000000 +0000
+@@ -172,2 +172,3 @@
+ #endif /* __TBB_COUNT_TASK_NODES */
++    // @AAPL Fix: <rdar://problem/47972366> clang-1100 introduced new instances of -Wdelete-non-abstract-non-virtual-dtor in Yellowstone for USDKit
+     this->market::~market(); // qualified to suppress warning
+diff --minimal -r -U1 oneTBB-2017_U6/src/tbb/observer_proxy.cpp tbb/src/tbb/observer_proxy.cpp
+--- oneTBB-2017_U6/src/tbb/observer_proxy.cpp	2017-05-14 11:42:22.000000000 +0100
++++ tbb/src/tbb/observer_proxy.cpp	2021-01-25 11:09:43.000000000 +0000
+@@ -33,3 +33,6 @@
+ 
+-padded<observer_list> the_global_observer_list;
++padded<observer_list> *the_global_observer_list(void) {
++    static auto the_list = new padded<observer_list>();
++    return the_list;
++}
+ 
+@@ -95,3 +98,3 @@
+ void observer_list::clear () {
+-    __TBB_ASSERT( this != &the_global_observer_list, "Method clear() cannot be used on the list of global observers" );
++    __TBB_ASSERT( this != the_global_observer_list(), "Method clear() cannot be used on the list of global observers" );
+     // Though the method will work fine for the empty list, we require the caller
+@@ -387,3 +390,3 @@
+                     DoOneTimeInitializations();
+-                my_proxy->my_list = &the_global_observer_list;
++                my_proxy->my_list = the_global_observer_list();
+                 my_proxy->my_list->insert(my_proxy);
+@@ -392,3 +395,3 @@
+                     // Any other pending observers are notified too.
+-                    the_global_observer_list.notify_entry_observers( s->my_last_global_observer, s->is_worker() );
++                    the_global_observer_list()->notify_entry_observers( s->my_last_global_observer, s->is_worker() );
+                 }
+diff --minimal -r -U1 oneTBB-2017_U6/src/tbb/observer_proxy.h tbb/src/tbb/observer_proxy.h
+--- oneTBB-2017_U6/src/tbb/observer_proxy.h	2017-05-14 11:42:22.000000000 +0100
++++ tbb/src/tbb/observer_proxy.h	2021-01-25 11:09:43.000000000 +0000
+@@ -168,3 +168,3 @@
+ 
+-extern padded<observer_list> the_global_observer_list;
++extern padded<observer_list> *the_global_observer_list(void);
+ 
+diff --minimal -r -U1 oneTBB-2017_U6/src/tbb/scheduler.cpp tbb/src/tbb/scheduler.cpp
+--- oneTBB-2017_U6/src/tbb/scheduler.cpp	2017-05-14 11:42:22.000000000 +0100
++++ tbb/src/tbb/scheduler.cpp	2021-01-25 11:09:43.000000000 +0000
+@@ -52,3 +52,6 @@
+     of avoiding one extra conditional branch in the end of wait_for_all method. **/
+-static task_group_context the_dummy_context(task_group_context::isolated);
++static task_group_context& the_dummy_context(void) {
++    static auto ctx = new task_group_context(task_group_context::isolated);
++    return *ctx;
++}
+ #endif /* __TBB_TASK_GROUP_CONTEXT */
+@@ -61,6 +64,6 @@
+     __TBB_ASSERT(!(task_group_context::low_unused_state_bit & (task_group_context::low_unused_state_bit-1)), NULL);
+-    the_dummy_context.my_state = task_group_context::low_unused_state_bit;
++    the_dummy_context().my_state = task_group_context::low_unused_state_bit;
+ #if __TBB_TASK_PRIORITY
+     // It should never prevent tasks from being passed to execution.
+-    the_dummy_context.my_priority = num_priority_levels - 1;
++    the_dummy_context().my_priority = num_priority_levels - 1;
+ #endif /* __TBB_TASK_PRIORITY */
+@@ -1201,3 +1204,3 @@
+ #if __TBB_SCHEDULER_OBSERVER
+-    the_global_observer_list.notify_entry_observers( s->my_last_global_observer, /*worker=*/false );
++    the_global_observer_list()->notify_entry_observers( s->my_last_global_observer, /*worker=*/false );
+ #endif /* __TBB_SCHEDULER_OBSERVER */
+@@ -1211,3 +1214,3 @@
+     if ( worker ) // can be called by master for worker, do not notify master twice
+-        the_global_observer_list.notify_exit_observers( s.my_last_global_observer, /*worker=*/true );
++        the_global_observer_list()->notify_exit_observers( s.my_last_global_observer, /*worker=*/true );
+ #endif /* __TBB_SCHEDULER_OBSERVER */
+@@ -1242,3 +1245,3 @@
+ #if __TBB_SCHEDULER_OBSERVER
+-    the_global_observer_list.notify_exit_observers( my_last_global_observer, /*worker=*/false );
++    the_global_observer_list()->notify_exit_observers( my_last_global_observer, /*worker=*/false );
+ #endif /* __TBB_SCHEDULER_OBSERVER */
+diff --minimal -r -U1 oneTBB-2017_U6/src/tbb/tbb_main.cpp tbb/src/tbb/tbb_main.cpp
+--- oneTBB-2017_U6/src/tbb/tbb_main.cpp	2017-05-14 11:42:22.000000000 +0100
++++ tbb/src/tbb/tbb_main.cpp	2021-01-25 11:09:43.000000000 +0000
+@@ -28,2 +28,4 @@
+ 
++#include <array>
++
+ namespace tbb {
+@@ -69,3 +71,3 @@
+ 
+-#if !(_WIN32||_WIN64) || __TBB_SOURCE_DIRECTLY_INCLUDED
++#if !defined(__APPLE__) && (!(_WIN32||_WIN64) || __TBB_SOURCE_DIRECTLY_INCLUDED)
+     static __TBB_InitOnce __TBB_InitOnceHiddenInstance;
+@@ -430,3 +432,3 @@
+     size_t my_active_value;
+-    atomic<global_control*> my_head;
++    atomic<global_control*> my_head = NULL;
+     spin_mutex my_list_mutex;
+@@ -484,9 +486,18 @@
+ 
+-static allowed_parallelism_control allowed_parallelism_ctl;
+-static stack_size_control stack_size_ctl;
++static allowed_parallelism_control &allowed_parallelism_ctl(void) {
++    static auto ctl = new allowed_parallelism_control;
++    return *ctl;
++};
++static stack_size_control &stack_size_ctl(void) {
++    static auto ctl = new stack_size_control;
++    return *ctl;
++}
+ 
+-static control_storage *controls[] = {&allowed_parallelism_ctl, &stack_size_ctl};
++static control_storage **controls(void) {
++    static auto ctls = new std::array<control_storage*, 2> { &allowed_parallelism_ctl(), &stack_size_ctl() };
++    return ctls->data();
++};
+ 
+ unsigned market::app_parallelism_limit() {
+-    return allowed_parallelism_ctl.active_value_if_present();
++    return allowed_parallelism_ctl().active_value_if_present();
+ }
+@@ -502,3 +513,3 @@
+     __TBB_ASSERT_RELEASE( my_param < global_control::parameter_max, NULL );
+-    control_storage *const c = controls[my_param];
++    control_storage *const c = controls()[my_param];
+ 
+@@ -520,3 +531,3 @@
+     __TBB_ASSERT_RELEASE( my_param < global_control::parameter_max, NULL );
+-    control_storage *const c = controls[my_param];
++    control_storage *const c = controls()[my_param];
+     __TBB_ASSERT( c->my_head, NULL );
+@@ -558,3 +569,3 @@
+     __TBB_ASSERT_RELEASE( param < global_control::parameter_max, NULL );
+-    return controls[param]->active_value();
++    return controls()[param]->active_value();
+ }
+Only in tbb/src/tbb: version_string.ver
+Only in oneTBB-2017_U6/src: tbbmalloc
+Only in oneTBB-2017_U6/src: tbbproxy
+Only in oneTBB-2017_U6/src: test

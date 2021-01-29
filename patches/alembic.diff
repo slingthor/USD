@@ -1,0 +1,637 @@
+diff -U 1 -r --minimal alembic-1.7.1/LICENSE.txt alembic/LICENSE.txt
+--- alembic-1.7.1/LICENSE.txt	2017-03-23 17:18:20.000000000 +0000
++++ alembic/LICENSE.txt	2021-01-25 11:09:42.000000000 +0000
+@@ -1,2 +1,2 @@
+-TM & © 2009-2015 Lucasfilm Entertainment Company Ltd. or Lucasfilm Ltd.
++TM & © 2009-2013 Lucasfilm Entertainment Company Ltd. or Lucasfilm Ltd.
+ All rights reserved.
+@@ -6,3 +6,3 @@
+ 
+-© 2009-2015 Sony Pictures Imageworks Inc.  All rights reserved.
++© 2009-2013 Sony Pictures Imageworks Inc.  All rights reserved.
+ 
+Only in alembic-1.7.1: NEWS.txt
+diff -U 1 -r --minimal alembic-1.7.1/README.txt alembic/README.txt
+--- alembic-1.7.1/README.txt	2017-03-23 17:18:20.000000000 +0000
++++ alembic/README.txt	2021-01-25 11:09:42.000000000 +0000
+@@ -3,3 +3,3 @@
+ -
+-- Copyright 2009-2016 Sony Pictures Imageworks, Inc. and
++- Copyright 2009-2013 Sony Pictures Imageworks, Inc. and
+ - Industrial Light and Magic, a division of Lucasfilm Entertainment Company Ltd.
+@@ -9,20 +9,19 @@
+ 
+-
+ 0) Before Alembic can be built, you will need to satisfy its external
+-dependencies:
+-
+-Required:
++dependencies.  They are, as of July, 2012:
+ 
+-    CMake (2.8.11+ newer is better for Windows builds) www.cmake.org
+-    OpenEXR (2.2.0) www.openexr.com (for ilmbase)
++A unix-like OS (Linux, Mac OS X); Windows support is experimental
++CMake (2.8.0) www.cmake.org
++Boost (1.44) www.boost.org
++ilmbase (1.0.3) www.openexr.com
++HDF5 (1.8.9) www.hdfgroup.org/HDF5
++zlib
+ 
+ Optional:
+-
+-    HDF5 (1.8.9) www.hdfgroup.org/HDF5
+-    Boost (1.55) www.boost.org
+-    pyilmbase (1.0.0) (to build the python bindings)
+-    Arnold (3.0)
+-    Pixar PRMan (15.x)
+-    Autodesk Maya (2012+)
+-    zlib
++pyilmbase (1.0.0) # to build the python bindings
++Arnold (3.0)
++Autodesk Maya (2012)
++Pixar PRMan (15.x)
++OpenEXR (1.7.1) www.openexr.com
++Sphinx (1.1.3) # to build the python documentation
+ 
+@@ -33,48 +32,59 @@
+ They may be installed in their default system locations (typically somewhere
+-under /usr/local), or some other centralized directory at your discretion; it's
+-best not to install your dependencies under the Alembic source root.
+-
++under /usr/local), or some other centralized directory at
++your discretion; it's best not to install your dependencies under the Alembic
++source root. If you do install under a centralized directory you can specify
++this root in the bootstrap using --dependency-install-root; this will make the
++process of searching for depedencies go smoothly.
+ 
+-1) Clone the Alembic repo source into your desired source root:
++Look in your Alembic source root's "doc" directory for
++instructions on building Boost and HDF5; see next step for details.
+ 
+-    $ git clone https://github.com/alembic/alembic [<source root>]
++Note: for building the Alembic Python bindings (aka PyAlembic), only Boost versions
++1.44 through 1.48 are known to work. For more information see this OpenEXR
++support ticket on github:
+ 
+-This will create your source root directory that contains the Alembic source
+-code.
++https://github.com/openexr/openexr/issues/41
+ 
++1) Untar the Alembic source into your desired directory:
+ 
+-2) Run the cmake command. You should create a separate build root and pass the
+-source root to cmake:
++$ cd ~/ ; tar xzf ALEMBIC_SOURCE_-xxxxxxxx.tgz
+ 
+-    $ cd <build root>
+-    $ cmake  [OPTIONS] <source root>
++This will create a directory, ~/ALEMBIC_SOURCE, that contains the Alembic
++source code (if you're reading this, you've probably already done this).
+ 
+-Some examples of OPTIONS you may want or need to use include:
++As alluded to in Step 0, ~/ALEMBIC_SOURCE/doc/ will contain instructional
++files for building Boost and HDF5.  Mostly, those packages' libraries just
++need a little encouragement to build static archives and with -fPIC.
+ 
+-    -DALEMBIC_SHARED_LIBS=OFF  If you want the primary Alembic library to be
+-    built as a static library, instead of a dynamic one.
++2) The Alembic build bootstrap script assumes
++an out-of-source build.  For purposes of illustration, this document assumes
++that your build root is located parallel to your source root, though that is
++not required.
+ 
+-    -DUSE_HDF5=ON
+-    Specify this if you want to include optional HDF5 support.
+-    -DHDF_ROOT=HDF5Path may need to be specified if HDF5 is not installed in
+-    a standard location.
++3) Run the Alembic bootstrap script. The following should work:
+ 
+-    -DUSE_MAYA=ON If you want to build AbcExport and AbcImport.
+-    -DMAYA_ROOT=MayaPath may need to be specified to point at a specific
+-    installation of Maya.
++$ python ~/ALEMBIC_SOURCE/build/bootstrap/alembic_bootstrap.py [build_dir]
+ 
+-    -DALEMBIC_LIB_USES_TR1=ON or -DALEMBIC_LIB_USES_BOOST=ON if you do not have
+-    a C++11 capable compiler specify one of these to use TR1, or boost as
+-    a dependency of the Alembic library.
++You can give it several options and flags; '-h' for a list of them.  If you
++don't specify a complete set of options when you run it, it will prompt you
++interactively for the information it needs to initialize the build system.
+ 
+-    -G "Visual Studio 14 2015 Win64"  If you want to create the project file for
+-    the 64 bit build of Alembic with the Visual Studio 2015 Community Edition.
++It's worth pointing out that running the bootstrap script is optional; there
++is a fairly comprehensive set of CMake files there that might just work for
++you "out of the box".  On the other hand, we do strongly recommend running
++the bootstrapper; it will make things so much easier for you.
+ 
+-    -DCMAKE_INSTALL_PREFIX=customPath  If you want to install the Alembic into
+-    an arbitrary location.
++4) Once the system is bootstrapped, there will be a file called "CMakeCache.txt"
++in your build root.  You can examine and manipulate this file with the cmake
++commands "ccmake" (curses-based console program), or "cmake-gui" (Qt-based
++gui program).  This file is the control file for CMake itself; the main thing
++the bootstrapper does is create it and populate it appropriately (the bootstrap
++script will also use it to get default values for the things it asks you for).
+ 
+-For Unix like operating systems:
++You can also just edit it directly, if you know what you're doing.  If you
++change it, just be sure to run "cmake ." in the same directory as it so that
++it regenerates the Makefiles.
+ 
+-3a) Run the make command.  Kind of a no-brainer, really.  You can safely run
+-make with the '-j' flag, for doing multi-process builds.  In general, you can
++5) Run the make command.  Kind of a no-brainer, really.  You can safely run make
++with the '-j' flag, for doing multi-process builds.  In general, you can
+ profitably run as many "make" processes as you have CPUs, so for a dual-proc
+@@ -82,3 +92,3 @@
+ 
+-    $ make -j2
++$ make -j2
+ 
+@@ -87,3 +97,3 @@
+ 
+-    $ make test
++$ make test
+ 
+@@ -91,3 +101,3 @@
+ 
+-    $ make install
++$ make install
+ 
+@@ -95,18 +105,12 @@
+ 
+-    $ make help
++$ make help
+ 
+ will give you a list of possible targets.  If you want to make a debug build,
++you can either run the bootstrap script again with the option '--debug', or
+ run ccmake or cmake-gui (depending on what you installed when you installed
+-cmake), and change the build type to "Debug".
+-
+-For Windows:
+-3b) Open the Visual Studio project file and build the solution. (ALL_BUILD)
+-
+-Once the Alembic project has been built, you can optionally run the unit tests:
+-    C:\BUILD_DIR\> PATH=%PATH%;location of Alembic dlls (and OpenExr if not in a standard place)
+-    C:\BUILD_DIR\> ctest
++cmake, as described in 4a), and change the build type to "Debug".
+ 
+-4) To build the API documentation via Doxygen:
++6) To build the API documentation via Doxygen:
+ 
+-    $ doxygen Doxyfile
++$ cd ../ALEMBIC_SOURCE; doxygen Doxyfile
+ 
+@@ -114,6 +118,5 @@
+ 
+-If you get stuck, contact us on the alembic-discussion mailing list. You can
+-view the mailing list archives and join the mailing list via
+ 
++If you get stuck, contact us on the alembic-discussion mailing list. You
++can view the mailing list archives and join the mailing list via
+ http://groups.google.com/group/alembic-discussion
+-
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/Abc/IBaseProperty.h alembic/lib/Alembic/Abc/IBaseProperty.h
+--- alembic-1.7.1/lib/Alembic/Abc/IBaseProperty.h	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/Abc/IBaseProperty.h	2021-01-25 11:09:42.000000000 +0000
+@@ -200,4 +200,4 @@
+     // Not all error handlers throw, so have a default behavior.
+-    static const AbcA::PropertyHeader phd;
+-    return phd;
++    static const auto phd = new AbcA::PropertyHeader;
++    return *phd;
+ };
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/Abc/ICompoundProperty.cpp alembic/lib/Alembic/Abc/ICompoundProperty.cpp
+--- alembic-1.7.1/lib/Alembic/Abc/ICompoundProperty.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/Abc/ICompoundProperty.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -99,2 +99,6 @@
+ {
++    if(m_property == NULL) { //@AAPL <rdar://problem/36382901> CloudFuzz: *exploitable* out of bounds writes with ModelIO
++        return 0;
++    }
++    
+     ALEMBIC_ABC_SAFE_CALL_BEGIN( "ICompoundProperty::getNumProperties()" );
+@@ -119,4 +123,4 @@
+     // Not all error handlers throw, have a default.
+-    static const AbcA::PropertyHeader hd;
+-    return hd;
++    static const auto hd = new AbcA::PropertyHeader;
++    return *hd;
+ }
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/Abc/IObject.cpp alembic/lib/Alembic/Abc/IObject.cpp
+--- alembic-1.7.1/lib/Alembic/Abc/IObject.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/Abc/IObject.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -59,8 +59,2 @@
+ 
+-namespace {
+-
+-const AbcA::ObjectHeader g_ohd;
+-
+-}
+-
+ //-*****************************************************************************
+@@ -78,3 +72,4 @@
+     // Not all error handlers throw, so have a default behavior.
+-    return g_ohd;
++    static const auto g_ohd = new AbcA::ObjectHeader;
++    return *g_ohd;
+ };
+@@ -296,4 +291,4 @@
+     // Not all error handlers throw, have a default.
+-    static const AbcA::ObjectHeader hd;
+-    return hd;
++    static const auto hd = new AbcA::ObjectHeader;
++    return *hd;
+ }
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/Abc/OBaseProperty.h alembic/lib/Alembic/Abc/OBaseProperty.h
+--- alembic-1.7.1/lib/Alembic/Abc/OBaseProperty.h	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/Abc/OBaseProperty.h	2021-01-25 11:09:42.000000000 +0000
+@@ -200,8 +200,2 @@
+ 
+-namespace {
+-
+-const AbcA::PropertyHeader g_phd;
+-
+-}
+-
+ //-*****************************************************************************
+@@ -219,3 +213,4 @@
+     // Not all error handlers throw, so have a default behavior.
+-    return g_phd;
++    static const auto g_phd = new AbcA::PropertyHeader;
++    return *g_phd;
+ };
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/Abc/OCompoundProperty.cpp alembic/lib/Alembic/Abc/OCompoundProperty.cpp
+--- alembic-1.7.1/lib/Alembic/Abc/OCompoundProperty.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/Abc/OCompoundProperty.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -105,8 +105,2 @@
+ 
+-namespace {
+-
+-const AbcA::PropertyHeader g_hd;
+-
+-}
+-
+ //-*****************************************************************************
+@@ -121,3 +115,4 @@
+     // Not all error handlers throw, have a default.
+-    return g_hd;
++    static const auto g_hd = new AbcA::PropertyHeader;
++    return *g_hd;
+ }
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/Abc/OObject.cpp alembic/lib/Alembic/Abc/OObject.cpp
+--- alembic-1.7.1/lib/Alembic/Abc/OObject.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/Abc/OObject.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -70,8 +70,2 @@
+ 
+-namespace {
+-
+-const AbcA::ObjectHeader g_ohd;
+-
+-}
+-
+ //-*****************************************************************************
+@@ -89,3 +83,4 @@
+     // Not all error handlers throw, so have a default behavior.
+-    return g_ohd;
++    static const auto g_ohd = new AbcA::ObjectHeader;
++    return *g_ohd;
+ };
+@@ -157,3 +152,4 @@
+     // Not all error handlers throw, have a default.
+-    return g_ohd;
++    static const auto g_ohd = new AbcA::ObjectHeader;
++    return *g_ohd;
+ }
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/AbcCoreAbstract/DataType.h alembic/lib/Alembic/AbcCoreAbstract/DataType.h
+--- alembic-1.7.1/lib/Alembic/AbcCoreAbstract/DataType.h	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/AbcCoreAbstract/DataType.h	2021-01-25 11:09:42.000000000 +0000
+@@ -58,3 +58,3 @@
+     //! determined.
+-    DataType()
++    constexpr DataType()
+       : m_pod( kUnknownPOD ), m_extent( 0 ) {}
+@@ -65,3 +65,3 @@
+     //! For String and Wstring types, the extent _must_ be 1.
+-    explicit DataType( PlainOldDataType iPod, uint8_t iExtent = 1 )
++    constexpr explicit DataType( PlainOldDataType iPod, uint8_t iExtent = 1 )
+       : m_pod( iPod ), m_extent( iExtent ) {}
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/AbcCoreHDF5/ArImpl.cpp alembic/lib/Alembic/AbcCoreHDF5/ArImpl.cpp
+--- alembic-1.7.1/lib/Alembic/AbcCoreHDF5/ArImpl.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/AbcCoreHDF5/ArImpl.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -275,3 +275,4 @@
+             m_file = -1;
+-            ABCA_THROW( strm.str() );
++            //@AAPL <rdar://problem/41497118> FuzzDragon - Invalid Mem. Access PREVIEWBLEED Double-Free @ com.apple.ModelIO: H5MM_xfree + 14 :: Preview(1273,ADDRESS) malloc: *** error for object ADDRESS: pointer being freed was not allocated
++            //ABCA_THROW( strm.str() );
+         }
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/AbcCoreHDF5/HDF5Hierarchy.cpp alembic/lib/Alembic/AbcCoreHDF5/HDF5Hierarchy.cpp
+--- alembic-1.7.1/lib/Alembic/AbcCoreHDF5/HDF5Hierarchy.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/AbcCoreHDF5/HDF5Hierarchy.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -175,4 +175,4 @@
+ namespace {
+-    const std::string g_strInfo( ".info" );
+-    const std::string g_strMeta( ".meta" );
++    const char * g_strInfo( ".info" );
++    const char * g_strMeta( ".meta" );
+ }
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/AbcCoreHDF5/OrData.cpp alembic/lib/Alembic/AbcCoreHDF5/OrData.cpp
+--- alembic-1.7.1/lib/Alembic/AbcCoreHDF5/OrData.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/AbcCoreHDF5/OrData.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -90,2 +90,6 @@
+ 
++    
++    if(status < 0) {    //@AAPL <rdar://problem/36382901> CloudFuzz: *exploitable* out of bounds writes with ModelIO
++        CloseObject(m_group);
++    }
+     ABCA_ASSERT( status >= 0,
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/AbcCoreOgawa/AprImpl.cpp alembic/lib/Alembic/AbcCoreOgawa/AprImpl.cpp
+--- alembic-1.7.1/lib/Alembic/AbcCoreOgawa/AprImpl.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/AbcCoreOgawa/AprImpl.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -113,3 +113,6 @@
+ 
+-    ReadArraySample( dims, data, id, m_header->header.getDataType(), oSample );
++    // @AAPL <rdar://problem/44360639> FuzzDragon - DOS ASAN Null Ptr Deref @ *: __asan::ScopedInErrorReport::~ScopedInErrorReport + 294
++    if (dims && data) {
++        ReadArraySample( dims, data, id, m_header->header.getDataType(), oSample );
++    }
+ }
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/AbcCoreOgawa/ArImpl.cpp alembic/lib/Alembic/AbcCoreOgawa/ArImpl.cpp
+--- alembic-1.7.1/lib/Alembic/AbcCoreOgawa/ArImpl.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/AbcCoreOgawa/ArImpl.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -174,2 +179,8 @@
+ {
++    if(m_timeSamples.size() == 0) { //@AAPL <rdar://problem/46872272> Invalid Mem. Access SIGSEGV @ com.apple.ModelIO: Alembic::AbcCoreOgawa::v10::ArImpl::getTimeSampling + 54 - FuzzDragon
++        m_timeSamples.push_back(AbcA::TimeSamplingPtr( new AbcA::TimeSampling() ));
++    }
++    if (iIndex >= m_timeSamples.size()) //@AAPL <rdar://problem/41793347> FuzzDragon - Invalid Mem. Access on memmove @ com.apple.ModelIO: Alembic::AbcCoreOgawa::v10::ReadTimeSamplesAndMax + 263
++        return m_timeSamples[m_timeSamples.size() - 1];
++    
+     ABCA_ASSERT( iIndex < m_timeSamples.size(),
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/AbcCoreOgawa/ReadUtil.cpp alembic/lib/Alembic/AbcCoreOgawa/ReadUtil.cpp
+--- alembic-1.7.1/lib/Alembic/AbcCoreOgawa/ReadUtil.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/AbcCoreOgawa/ReadUtil.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -70,4 +70,9 @@
+         {
+-            oDim = Util::Dimensions( ( iData->getSize() - 16 ) /
+-                                     iDataType.getNumBytes() );
++            size_t dataTypeSize = iDataType.getNumBytes(); // @AAPL <rdar://problem/48608022> DOS SIGFPE @ com.apple.ModelIO: Alembic::AbcCoreOgawa::v10::ReadDimensions - FuzzDragon
++            if(dataTypeSize != 0) {
++                oDim = Util::Dimensions( ( iData->getSize() - 16 ) /
++                                      dataTypeSize);
++            } else {
++                oDim = Util::Dimensions( 0 );
++            }
+         }
+@@ -1325,2 +1330,5 @@
+ 
++    if(!iData) {   //@AAPL <rdar://problem/36382901> CloudFuzz: *exploitable* out of bounds writes with ModelIO
++        return;
++    }
+     std::size_t dataSize = iData->getSize();
+@@ -1353,3 +1361,3 @@
+         {
+-            if ( buf[i] == 0 )
++            if ( buf[i] == 0 && strPos < strPtr->length()) // <rdar://problem/42349665> FuzzDragon - Invalid Mem. Access SIGSEGV on memmove @ com.apple.ModelIO: Alembic::Ogawa::v10::IStreams::read + 258
+             {
+@@ -1438,8 +1446,12 @@
+     ReadDimensions( iDims, iData, iThreadId, iDataType, dims );
+-
+     oSample = AbcA::AllocateArraySample( iDataType, dims );
+ 
+-    ReadData( const_cast<void*>( oSample->getData() ), iData,
+-        iThreadId, iDataType, iDataType.getPod() );
+-
++    size_t keyLength = 16;
++    //@AAPL <rdar://problem/43626974> FuzzDragon - Invalid Mem. Access SIGSEGV on memmove @ com.apple.ModelIO: Alembic::Ogawa::v10::IStreams::read + 260
++    if(iData != NULL &&
++       iData->getSize() > keyLength &&
++       (oSample->size() * iDataType.getExtent() * PODNumBytes(iDataType.getPod()) >= iData->getSize() - keyLength)) {
++        ReadData( const_cast<void*>( oSample->getData() ), iData,
++            iThreadId, iDataType, iDataType.getPod() );
++    }
+ }
+@@ -1462,2 +1474,4 @@
+     {
++        if (sizeof(Util::uint32_t) + sizeof(chrono_t) + sizeof(Util::uint32_t) > sizeof(char) * (buf.size() - pos))   //@AAPL <rdar://problem/41795116> FuzzDragon - Invalid Mem. Access SIGSEGV @ com.apple.ModelIO: Alembic::AbcCoreOgawa::v10::ReadTimeSamplesAndMax + 181
++            break;
+         Util::uint32_t maxSample = *( (Util::uint32_t *)( &buf[pos] ) );
+@@ -1474,2 +1488,4 @@
+         std::vector< chrono_t > sampleTimes( numSamples );
++        if (sizeof(chrono_t) * numSamples > sizeof(char) * (buf.size() - pos))   //@AAPL <rdar://problem/41793347> FuzzDragon - Invalid Mem. Access on memmove @ com.apple.ModelIO: Alembic::AbcCoreOgawa::v10::ReadTimeSamplesAndMax + 263
++            break;
+         memcpy( &( sampleTimes.front() ), &buf[pos],
+@@ -1520,3 +1536,3 @@
+     std::size_t pos = 0;
+-    while ( pos < buf.size() )
++    while ( pos + 4 < buf.size() ) // @AAPL <rdar://problem/48298896> Invalid Mem. Access SIGSEGV @ com.apple.ModelIO: Alembic::AbcCoreOgawa::v10::ReadObjectHeaders + 207 - FuzzDragon
+     {
+@@ -1525,2 +1541,6 @@
+ 
++        if(pos + nameSize > buf.size()) {   //@AAPL <rdar://problem/36418177> FuzzDragon - Invalid Mem. Access - SIGSEGV on memmove @ com.apple.ModelIO: Alembic::AbcCoreOgawa::v6::ReadObjectHeaders + 763
++            break;
++        }
++        
+         std::string name( &buf[pos], nameSize );
+@@ -1536,2 +1556,5 @@
+         {
++            if(pos + 4 > buf.size()) {   //@AAPL <rdar://problem/41350265> FuzzDragon - Invalid Mem. Access SIGSEGV @ com.apple.ModelIO: Alembic::AbcCoreOgawa::v10::ReadObjectHeaders + 700
++                break;
++            }
+             Util::uint32_t metaDataSize = *( (Util::uint32_t *)( &buf[pos] ) );
+@@ -1539,2 +1562,5 @@
+ 
++            if(pos + metaDataSize > buf.size()) {   //@AAPL <rdar://problem/36418177> FuzzDragon - Invalid Mem. Access - SIGSEGV on memmove @ com.apple.ModelIO: Alembic::AbcCoreOgawa::v6::ReadObjectHeaders + 763
++                break;
++            }
+             std::string metaData( &buf[pos], metaDataSize );
+@@ -1546,2 +1572,5 @@
+         {
++            if(metaDataIndex >= iMetaDataVec.size()) { // @AAPL <rdar://problem/36382901> CloudFuzz: *exploitable* out of bounds writes with ModelIO
++                break;
++            }
+             objPtr->getMetaData() = iMetaDataVec[metaDataIndex];
+@@ -1560,3 +1589,3 @@
+ 
+-    if ( iSizeHint == 0 )
++    if ( iSizeHint == 0 && ioPos + 1 < iBuf.size()) //@ AAPL <rdar://problem/41385078> FuzzDragon - Invalid Mem. Access SIGSEGV @ com.apple.ModelIO: Alembic::AbcCoreOgawa::v10::ReadPropertyHeaders + 649
+     {
+@@ -1565,3 +1594,3 @@
+     }
+-    else if ( iSizeHint == 1 )
++    else if ( iSizeHint == 1 && ioPos + 2 < iBuf.size()) //@ AAPL <rdar://problem/41385078> FuzzDragon - Invalid Mem. Access SIGSEGV @ com.apple.ModelIO: Alembic::AbcCoreOgawa::v10::ReadPropertyHeaders + 649
+     {
+@@ -1570,3 +1599,3 @@
+     }
+-    else if ( iSizeHint == 2 )
++    else if ( iSizeHint == 2 && ioPos + 4 < iBuf.size()) //@ AAPL <rdar://problem/41385078> FuzzDragon - Invalid Mem. Access SIGSEGV @ com.apple.ModelIO: Alembic::AbcCoreOgawa::v10::ReadPropertyHeaders + 649
+     {
+@@ -1649,2 +1678,5 @@
+ 
++        if(pos + 4 > buf.size()) { // <rdar://problem/36382901> CloudFuzz: *exploitable* out of bounds writes with ModelIO
++            break;
++        }
+         // first 4 bytes is always info
+@@ -1737,2 +1769,5 @@
+ 
++        if(pos + nameSize > buf.size()) { // <rdar://problem/36382901> CloudFuzz: *exploitable* out of bounds writes with ModelIO
++            break;
++        }
+         std::string name( &buf[pos], nameSize );
+@@ -1748,2 +1783,5 @@
+ 
++            if(pos + metaDataSize > buf.size()) { // @AAPL <rdar://problem/39220121> CloudFuzz: multiple reads and writes out of bounds in Model Kit
++                return;
++            }
+             std::string metaData( &buf[pos], metaDataSize );
+@@ -1757,2 +1795,5 @@
+         {
++            if(metaDataIndex >= iMetaDataVec.size()) { //@AAPL <rdar://problem/36382901> CloudFuzz: *exploitable* out of bounds writes with ModelIO
++                break;
++            }
+             header->header.setMetaData( iMetaDataVec[metaDataIndex] );
+@@ -1786,2 +1827,5 @@
+         Util::uint8_t metaDataSize = buf[pos++];
++        if(pos + metaDataSize > buf.size()) {   //@AAPL <rdar://problem/36382901> CloudFuzz: *exploitable* out of bounds writes with ModelIO
++            break;
++        }
+         std::string metaData( &buf[pos], metaDataSize );
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/AbcCoreOgawa/SprImpl.cpp alembic/lib/Alembic/AbcCoreOgawa/SprImpl.cpp
+--- alembic-1.7.1/lib/Alembic/AbcCoreOgawa/SprImpl.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/AbcCoreOgawa/SprImpl.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -111,2 +111,13 @@
+     Ogawa::IDataPtr data = m_group->getData( index, id );
++    if(data == NULL) {  //@AAPL 
++        return;
++    }
++    size_t dstDataSize = getDataType().getNumBytes();
++    size_t srcDataSize = data->getSize();
++    const size_t dataKeySize = 16;
++    if (srcDataSize >= dataKeySize && dstDataSize < srcDataSize - dataKeySize) {
++        // Invalid stream
++        return;
++    }
++    
+     ReadData( iIntoLocation, data, id,
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/AbcGeom/ICamera.cpp alembic/lib/Alembic/AbcGeom/ICamera.cpp
+--- alembic-1.7.1/lib/Alembic/AbcGeom/ICamera.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/AbcGeom/ICamera.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -193,3 +193,3 @@
+             std::size_t opChannels = curOp.getNumChannels();
+-            for ( std::size_t j = 0; j < opChannels; ++j, ++curChan )
++            for ( std::size_t j = 0; j < opChannels && curChan < channels.size(); ++j, ++curChan ) // @AAPL <rdar://problem/39220121> CloudFuzz: multiple reads and writes out of bounds in Model Kit
+             {
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/AbcGeom/IGeomParam.h alembic/lib/Alembic/AbcGeom/IGeomParam.h
+--- alembic-1.7.1/lib/Alembic/AbcGeom/IGeomParam.h	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/AbcGeom/IGeomParam.h	2021-01-25 11:09:42.000000000 +0000
+@@ -441,5 +441,2 @@
+ 
+-namespace {
+-    const std::string g_emptyStr;
+-}
+ //-*****************************************************************************
+@@ -455,3 +452,4 @@
+ 
+-    return g_emptyStr;
++    static const auto g_emptyStr = new std::string;
++    return *g_emptyStr;
+ }
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/AbcGeom/IXform.cpp alembic/lib/Alembic/AbcGeom/IXform.cpp
+--- alembic-1.7.1/lib/Alembic/AbcGeom/IXform.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/AbcGeom/IXform.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -114,5 +114,7 @@
+             p.get( animSamp, p.getNumSamples() - 1 );
+-            for ( std::size_t i = 0; i < animSamp->size(); ++i )
+-            {
+-                animChannels.insert( (*animSamp)[i] );
++            if(animSamp != NULL) { //@AAPL <rdar://problem/48605612> DOS Null Ptr Deref @ com.apple.SceneKit -- loadMDLAssetWithURL + 114 / com.apple.ModelIO: Alembic::Ogawa::v10::IData::getSize const - FuzzDragon
++                for ( std::size_t i = 0; i < animSamp->size(); ++i )
++                {
++                    animChannels.insert( (*animSamp)[i] );
++                }
+             }
+@@ -260,3 +262,3 @@
+     {
+-        for ( std::size_t j = 0; j < op->getNumChannels();
++        for ( std::size_t j = 0; j < op->getNumChannels() && chanPos < dataVec.size();  //<rdar://problem/41350058> FuzzDragon - Invalid Mem. Access SIGSEGV @ com.apple.ModelIO: Alembic::AbcGeom::v10::IXformSchema::getChannelValues const + 384
+             ++j, ++chanPos )
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/AbcGeom/OPolyMesh.cpp alembic/lib/Alembic/AbcGeom/OPolyMesh.cpp
+--- alembic-1.7.1/lib/Alembic/AbcGeom/OPolyMesh.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/AbcGeom/OPolyMesh.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -435,5 +435,2 @@
+ 
+-namespace {
+-    OFaceSet g_emptyFaceSet;
+-}
+ 
+@@ -455,3 +452,4 @@
+ 
+-    return g_emptyFaceSet;
++    static auto g_emptyFaceSet = new OFaceSet;
++    return *g_emptyFaceSet;
+ }
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/AbcGeom/OSubD.cpp alembic/lib/Alembic/AbcGeom/OSubD.cpp
+--- alembic-1.7.1/lib/Alembic/AbcGeom/OSubD.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/AbcGeom/OSubD.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -686,5 +686,2 @@
+ 
+-namespace {
+-    OFaceSet g_empty;
+-}
+ //-*****************************************************************************
+@@ -705,3 +702,4 @@
+ 
+-    return g_empty;
++    static const auto g_empty = new OFaceSet;
++    return *g_empty;
+ }
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/AbcGeom/Visibility.h alembic/lib/Alembic/AbcGeom/Visibility.h
+--- alembic-1.7.1/lib/Alembic/AbcGeom/Visibility.h	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/AbcGeom/Visibility.h	2021-01-25 11:09:42.000000000 +0000
+@@ -77,3 +77,3 @@
+ //! store visibility.
+-static ALEMBIC_EXPORT_CONST std::string kVisibilityPropertyName = "visible";
++static ALEMBIC_EXPORT_CONST char * kVisibilityPropertyName = "visible";
+ 
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/AbcGeom/XformOp.cpp alembic/lib/Alembic/AbcGeom/XformOp.cpp
+--- alembic-1.7.1/lib/Alembic/AbcGeom/XformOp.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/AbcGeom/XformOp.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -266,3 +266,7 @@
+ {
+-    return m_channels[iIndex];
++    if(iIndex >= m_channels.size()) { // <rdar://problem/42604991> FuzzDragon - Invalid Mem. Access SIGSEGV @ com.apple.ModelIO: Alembic::AbcCoreOgawa::v10::ReadData + 221
++        return 0;
++    } else {
++        return m_channels[iIndex];
++    }
+ }
+Only in alembic-1.7.1/lib/Alembic: AlembicConfig.cmake.in
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/Ogawa/IData.cpp alembic/lib/Alembic/Ogawa/IData.cpp
+--- alembic-1.7.1/lib/Alembic/Ogawa/IData.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/Ogawa/IData.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -82,2 +82,5 @@
+         mData->streams->read(iThreadId, mData->pos, 8, &size);
++        if(size > (long) 1<<32) { // @AAPL <rdar://problem/36382901> CloudFuzz: *exploitable* out of bounds writes with ModelIO
++            size = 0;
++        }
+         mData->size = size;
+diff -U 1 -r --minimal alembic-1.7.1/lib/Alembic/Ogawa/IGroup.cpp alembic/lib/Alembic/Ogawa/IGroup.cpp
+--- alembic-1.7.1/lib/Alembic/Ogawa/IGroup.cpp	2017-03-23 17:18:20.000000000 +0000
++++ alembic/lib/Alembic/Ogawa/IGroup.cpp	2021-01-25 11:09:42.000000000 +0000
+@@ -77,3 +77,6 @@
+     mData->streams->read(iThreadIndex, iPos, 8, &mData->numChildren);
+-
++    
++    if(mData->numChildren > (1 << 30)) { //@AAPL <rdar://problem/36382901> CloudFuzz: *exploitable* out of bounds writes with ModelIO
++        mData->numChildren = 0;
++    }
+     // 0 should NOT have been written, this groups should have been the
+Only in alembic/lib/Alembic/Util: Config.h
+Only in alembic/lib/python: .DS_Store
+Only in alembic/lib/python/abcutils: CMakeCache.pyc
+Only in alembic/lib/python/abcutils: Path.pyc
+Only in alembic/lib/python/abcutils: __init__.pyc
+Only in alembic-1.7.1: maya
+Only in alembic-1.7.1: prman
+Only in alembic-1.7.1: python
