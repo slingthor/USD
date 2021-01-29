@@ -1876,8 +1876,6 @@ _EvalRefOrPayloadArcs(PcpNodeRef node,
                       const std::vector<RefOrPayloadType> &arcs,
                       const PcpSourceArcInfoVector &infoVec)
 {
-    const SdfPath & srcPath = node.GetPath();
-
     for (size_t arcNum=0; arcNum < arcs.size(); ++arcNum) {
         const RefOrPayloadType & refOrPayload = arcs[arcNum];
         const PcpSourceArcInfo& info = infoVec[arcNum];
@@ -1915,7 +1913,7 @@ _EvalRefOrPayloadArcs(PcpNodeRef node,
                 PcpErrorInvalidReferenceOffset::New();
             err->rootSite = PcpSite(node.GetRootNode().GetSite());
             err->layer      = srcLayer;
-            err->sourcePath = srcPath;
+            err->sourcePath = node.GetPath();
             err->assetPath  = info.authoredAssetPath;
             err->targetPath = refOrPayload.GetPrimPath();
             err->offset     = srcLayerOffset;
