@@ -98,7 +98,7 @@ HgiMetalComputeCmds::SetConstantValues(
 void
 HgiMetalComputeCmds::Dispatch(int dimX, int dimY)
 {
-    if (!dimX && !dimY) {
+    if (dimX == 0 || dimY == 0) {
         return;
     }
 

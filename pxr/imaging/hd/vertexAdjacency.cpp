@@ -49,6 +49,12 @@ Hd_VertexAdjacency::~Hd_VertexAdjacency()
 bool
 Hd_VertexAdjacency::BuildAdjacencyTable(HdMeshTopology const *topology)
 {
+    if (topology == nullptr ||
+        topology->GetFaceVertexIndices().empty()) {
+        TF_CODING_ERROR("No topology provided for triangulation");
+        return false;
+    }
+
     // compute adjacency
 
     int const * numVertsPtr = topology->GetFaceVertexCounts().cdata();
