@@ -48,7 +48,7 @@ TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_COUNT_VISIBLE_INSTANCES, false,
                       "Enable GPU frustum culling visible count query");
 TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_FRUSTUM_CULLING, true,
                       "Enable GPU frustum culling");
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_INSTANCE_FRUSTUM_CULLING, false,
+TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_INSTANCE_FRUSTUM_CULLING, true,
                       "Enable GPU per-instance frustum culling");
 
 // To enable GPU compute features, OpenSubdiv must be configured to support
