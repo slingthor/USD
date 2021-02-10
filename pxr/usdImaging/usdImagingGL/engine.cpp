@@ -46,6 +46,10 @@
 #include "pxr/imaging/glf/glContext.h"
 #include "pxr/imaging/glf/info.h"
 
+// APPLE METAL: DO NOT MERGE BACK
+#include "pxr/imaging/hd/engine.h"
+// END APPLE METAL
+
 #include "pxr/imaging/hd/rendererPlugin.h"
 #include "pxr/imaging/hd/rendererPluginRegistry.h"
 #include "pxr/imaging/hdx/taskController.h"
@@ -270,6 +274,9 @@ UsdImagingGLEngine::PrepareBatch(
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return;
     }
+// APPLE METAL: DO NOT MERGE BACK
+    HdEngineEvent::Signal();
+// END APPLE METAL
 
     HD_TRACE_FUNCTION();
 
@@ -320,6 +327,10 @@ UsdImagingGLEngine::RenderBatch(
         return;
     }
 
+// APPLE METAL: DO NOT MERGE BACK
+    HdEngineEvent::Signal();
+// END APPLE METAL
+
     ResourceFactoryGuard guard(_resourceFactory);
 
     TF_VERIFY(_taskController);
@@ -346,6 +357,10 @@ UsdImagingGLEngine::RenderBatch(
     VtValue selectionValue(_selTracker);
     _engine->SetTaskContextData(HdxTokens->selectionState, selectionValue);
     _Execute(params, _taskController->GetRenderingTasks());
+
+// APPLE METAL: DO NOT MERGE BACK
+    HdEngineEvent::Signal();
+// END APPLE METAL
 }
 
 void 
