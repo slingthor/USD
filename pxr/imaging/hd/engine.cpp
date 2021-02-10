@@ -122,6 +122,7 @@ HdEngine::Execute(HdRenderIndex *index, HdTaskSharedPtrVector *tasks)
 
     index->SyncAll(tasks, &_taskContext);
 
+    HdEngineEvent::Signal();
 
     // --------------------------------------------------------------------- //
     // PREPARE PHASE
@@ -150,7 +151,6 @@ HdEngine::Execute(HdRenderIndex *index, HdTaskSharedPtrVector *tasks)
         task->Prepare(&_taskContext, index);
     }
 
-
     // --------------------------------------------------------------------- //
     // DATA COMMIT PHASE
     // --------------------------------------------------------------------- //
@@ -177,11 +177,29 @@ HdEngine::Execute(HdRenderIndex *index, HdTaskSharedPtrVector *tasks)
             "==============================================================\n"
             "             HdEngine [Execute Phase](Task::Execute)          \n"
             "--------------------------------------------------------------\n");
+    
+    HdEngineEvent::Signal();
 
     for (size_t taskNum = 0; taskNum < numTasks; ++taskNum) {
         const HdTaskSharedPtr &task = (*tasks)[taskNum];
 
         task->Execute(&_taskContext);
+    }
+
+    HdEngineEvent::Signal();
+}
+
+HdEngineEvent::Callback HdEngineEvent::_callback;
+
+void HdEngineEvent::RegisterCallback(Callback callback)
+{
+    _callback = callback;
+}
+
+void HdEngineEvent::Signal()
+{
+    if (_callback) {
+        _callback();
     }
 }
 

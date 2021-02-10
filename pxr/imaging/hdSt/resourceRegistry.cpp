@@ -25,6 +25,9 @@
 
 #include "pxr/base/work/loops.h"
 
+// APPLE METAL: DO NOT MERGE BACK
+#include "pxr/imaging/hd/engine.h"
+// END APPLE METAL
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hdSt/copyComputation.h"
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
@@ -747,7 +750,9 @@ HdStResourceRegistry::_Commit()
     // (such as the grid transform for an OpenVDB file) or texture
     // handles (for bindless textures).
     _CommitTextures();
-
+// APPLE METAL: DO NOT MERGE BACK
+    HdEngineEvent::Signal();
+// END APPLE METAL
     // TODO: requests should be sorted by resource, and range.
     {
         HD_TRACE_SCOPE("Resolve");
@@ -801,6 +806,10 @@ HdStResourceRegistry::_Commit()
         HD_PERF_COUNTER_ADD(HdPerfTokens->bufferSourcesResolved,
                             numBufferSourcesResolved);
     }
+
+// APPLE METAL: DO NOT MERGE BACK
+    HdEngineEvent::Signal();
+// END APPLE METAL
 
     {
         HD_TRACE_SCOPE("GPU computation prep");
@@ -885,6 +894,10 @@ HdStResourceRegistry::_Commit()
             }
         }
     }
+
+// APPLE METAL: DO NOT MERGE BACK
+    HdEngineEvent::Signal();
+// END APPLE METAL
 
     {
         HD_TRACE_SCOPE("Flush");
