@@ -97,7 +97,7 @@ HdEngine::Execute(HdRenderIndex *index, HdTaskSharedPtrVector *tasks)
         TF_CODING_ERROR("Passed nullptr to HdEngine::Execute()");
         return;
     }
-    
+
     // Some render tasks may need access to the same rendering context / driver
     // as the render delegate. For example some tasks use Hgi.
     _taskContext[HdTokens->drivers] = VtValue(index->GetDrivers());
