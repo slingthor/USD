@@ -93,9 +93,7 @@ private:
     
     void _EndGPUCountVisibleInstances(GLsync resultSync, size_t * result);
     
-    static const int32_t MULTIBUFFER = 3;
-    HdStBufferResourceSharedPtr _resultBuffers[MULTIBUFFER];
-    int32_t _bufferIndex;
+    HdStBufferResourceSharedPtr _resultBuffer;
 };
 
 

@@ -73,19 +73,14 @@ static const GLuint64 HD_CULL_RESULT_TIMEOUT_NS = 5e9; // XXX how long to wait?
 HdSt_IndirectDrawBatchMetal::HdSt_IndirectDrawBatchMetal(
     HdStDrawItemInstance * drawItemInstance)
     : HdSt_IndirectDrawBatch(drawItemInstance)
-    , _bufferIndex(0)
+    , _resultBuffer(0)
 {
-    for (int32_t i = 0; i < MULTIBUFFER; ++i) {
-        _resultBuffers[i] = nil;
-    }
     _Init(drawItemInstance);
 }
 
 HdSt_IndirectDrawBatchMetal::~HdSt_IndirectDrawBatchMetal()
 {
-    for (int32_t i = 0; i < MULTIBUFFER; ++i) {
-        _resultBuffers[i] = nil;
-    }
+    /* empty */
 }
 
 HdSt_IndirectDrawBatch::_CullingProgram *HdSt_IndirectDrawBatchMetal::NewCullingProgram() const
@@ -105,8 +100,6 @@ HdSt_IndirectDrawBatchMetal::_PrepareDraw(
 //            _EndGPUCountVisibleInstances(_cullResultSync, &_numVisibleItems);
 //            _cullResultSync = 0;
         }
-        
-        _bufferIndex = (_bufferIndex + 1) % MULTIBUFFER;
     }
 }
 
@@ -234,13 +227,13 @@ void
 HdSt_IndirectDrawBatchMetal::_BeginGPUCountVisibleInstances(
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
-    if (!_resultBuffers[_bufferIndex]) {
+    if (!_resultBuffer) {
         HdTupleType tupleType;
         tupleType.type = HdTypeInt32;
         tupleType.count = 1;
 
-        _resultBuffers[_bufferIndex] = resourceRegistry->RegisterBufferResource(
-            _tokens->drawIndirectResult, tupleType);
+        _resultBuffer = resourceRegistry->RegisterBufferResource(
+                _tokens->drawIndirectResult, tupleType);
     }
 
     // Reset visible item count
@@ -249,7 +242,7 @@ HdSt_IndirectDrawBatchMetal::_BeginGPUCountVisibleInstances(
     HgiBufferCpuToGpuOp op;
     op.cpuSourceBuffer = &count;
     op.sourceByteOffset = 0;
-    op.gpuDestinationBuffer = _resultBuffers[_bufferIndex]->GetId();
+    op.gpuDestinationBuffer = _resultBuffer->GetId();
     op.destinationByteOffset = 0;
     op.byteSize = sizeof(count);
     blitCmds->CopyBufferCpuToGpu(op);
