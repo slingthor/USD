@@ -747,7 +747,9 @@ HdStResourceRegistry::_Commit()
     // (such as the grid transform for an OpenVDB file) or texture
     // handles (for bindless textures).
     _CommitTextures();
-
+// APPLE METAL: DO NOT MERGE BACK
+    SignalProgressEvent();
+// END APPLE METAL
     // TODO: requests should be sorted by resource, and range.
     {
         HD_TRACE_SCOPE("Resolve");
@@ -801,6 +803,10 @@ HdStResourceRegistry::_Commit()
         HD_PERF_COUNTER_ADD(HdPerfTokens->bufferSourcesResolved,
                             numBufferSourcesResolved);
     }
+
+// APPLE METAL: DO NOT MERGE BACK
+    SignalProgressEvent();
+// END APPLE METAL
 
     {
         HD_TRACE_SCOPE("GPU computation prep");
@@ -885,6 +891,10 @@ HdStResourceRegistry::_Commit()
             }
         }
     }
+
+// APPLE METAL: DO NOT MERGE BACK
+    SignalProgressEvent();
+// END APPLE METAL
 
     {
         HD_TRACE_SCOPE("Flush");
@@ -1232,6 +1242,5 @@ HdStResourceRegistry::AllocateTextureObject(
         textureId, textureType);
             
 }    
-
 
 PXR_NAMESPACE_CLOSE_SCOPE

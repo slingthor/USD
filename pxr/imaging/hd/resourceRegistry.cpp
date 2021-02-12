@@ -101,6 +101,22 @@ HdResourceRegistry::_GarbageCollectBprims()
 {
 }
 
+// APPLE METAL: DO NOT MERGE BACK
+void
+HdResourceRegistry::SetFrameProgressCallback(std::function<void()> callback)
+{
+    _frameProgressCallback = callback;
+}
+
+void
+HdResourceRegistry::SignalProgressEvent() const
+{
+    if (_frameProgressCallback) {
+        _frameProgressCallback();
+    }
+}
+// END APPLE METAL
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
