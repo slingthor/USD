@@ -25,9 +25,6 @@
 
 #include "pxr/base/work/loops.h"
 
-// APPLE METAL: DO NOT MERGE BACK
-#include "pxr/imaging/hd/engine.h"
-// END APPLE METAL
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hdSt/copyComputation.h"
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
