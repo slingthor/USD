@@ -73,8 +73,8 @@ constexpr bool _CompileTimeValidateFormatTable() {
             HdFormatUNorm8 == 0 && HgiFormatUNorm8 == 0 &&
             HdFormatFloat16Vec4 == 11 && HgiFormatFloat16Vec4 == 9 &&
             HdFormatFloat32Vec4 == 15 && HgiFormatFloat32Vec4 == 13 &&
-            HdFormatUInt16Vec4 == 19 && HgiFormatUInt16Vec4 == 17 &&
-            HdFormatInt32Vec4 == 23 && HgiFormatInt32Vec4 == 21) ? true : false;
+            HdFormatUInt16Vec4 == 19 && HgiFormatUInt16Vec4 == 21 &&
+            HdFormatInt32Vec4 == 23 && HgiFormatInt32Vec4 == 25) ? true : false;
 }
 
 static_assert(_CompileTimeValidateFormatTable(), 

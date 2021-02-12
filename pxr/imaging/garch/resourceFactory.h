@@ -39,7 +39,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class GarchBaseTexture;
 class GarchBindingMap;
 class GarchContextCaps;
 class GarchDrawTarget;
@@ -90,10 +89,6 @@ public:
 	GARCH_API
     virtual std::string GetPackageName() const = 0;
     
-    // BaseTexture
-	GARCH_API
-    virtual GarchBaseTexture *NewBaseTexture() const = 0;
-
 protected:
 	GARCH_API
     GarchResourceFactoryInterface() {}

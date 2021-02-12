@@ -25,7 +25,6 @@
 //
 #include <pxr/imaging/glf/resourceFactory.h>
 
-#include <pxr/imaging/glf/baseTexture.h>
 #include <pxr/imaging/glf/bindingMap.h>
 #include <pxr/imaging/glf/contextCaps.h>
 #include <pxr/imaging/glf/drawTarget.h>
@@ -75,11 +74,6 @@ GarchDrawTarget *GlfResourceFactory::NewDrawTarget(GarchDrawTargetPtr const & dr
 GarchUniformBlockRefPtr GlfResourceFactory::NewUniformBlock(char const *label) const
 {
     return TfCreateRefPtr(new GlfUniformBlock(label));
-}
-
-GarchBaseTexture *GlfResourceFactory::NewBaseTexture() const
-{
-    return new GlfBaseTexture();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

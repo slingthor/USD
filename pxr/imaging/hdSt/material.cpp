@@ -363,6 +363,18 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
     *dirtyBits = Clean;
 }
 
+/*virtual*/
+void
+HdStMaterial::Finalize(HdRenderParam *renderParam)
+{
+    // Flag GC to reclaim resources owned by the surface shader.
+    if (TF_VERIFY(renderParam)) {
+        HdStRenderParam *stRenderParam =
+            static_cast<HdStRenderParam*>(renderParam);
+        stRenderParam->SetGarbageCollectionNeeded();
+    }
+}
+
 bool
 HdStMaterial::_GetHasLimitSurfaceEvaluation(VtDictionary const & metadata) const
 {

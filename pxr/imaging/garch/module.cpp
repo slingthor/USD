@@ -32,8 +32,4 @@ TF_WRAP_MODULE
     TF_WRAP( SimpleLight );
     TF_WRAP( SimpleMaterial );
     TF_WRAP( Texture );
-    TF_WRAP( TextureRegistry );
-    TF_WRAP( BaseTexture );
-    TF_WRAP( UVTexture );
-    TF_WRAP( UVTextureStorage );
 }

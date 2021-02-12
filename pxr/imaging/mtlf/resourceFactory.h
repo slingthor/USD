@@ -71,10 +71,6 @@ public:
     // Package Name accessor
     MTLF_API
     virtual std::string GetPackageName() const override { return "mtlf"; }
-        
-    // BaseTexture
-    MTLF_API
-    virtual GarchBaseTexture *NewBaseTexture() const override;
 
 private:
     MtlfContextCaps contextCaps;

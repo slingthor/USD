@@ -36,8 +36,6 @@
 
 #include "pxr/imaging/hgi/texture.h"
 
-#include "pxr/imaging/garch/textureHandle.h"
-
 #include "pxr/base/tf/singleton.h"
 
 #include <boost/noncopyable.hpp>

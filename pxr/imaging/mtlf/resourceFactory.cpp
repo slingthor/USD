@@ -25,7 +25,6 @@
 //
 #include "pxr/imaging/mtlf/resourceFactory.h"
 
-#include "pxr/imaging/mtlf/baseTexture.h"
 #include "pxr/imaging/mtlf/bindingMap.h"
 #include "pxr/imaging/mtlf/contextCaps.h"
 #include "pxr/imaging/mtlf/drawTarget.h"
@@ -75,11 +74,6 @@ GarchDrawTarget *MtlfResourceFactory::NewDrawTarget(GarchDrawTargetPtr const & d
 GarchUniformBlockRefPtr MtlfResourceFactory::NewUniformBlock(char const *label) const
 {
     return TfCreateRefPtr(new MtlfUniformBlock(label));
-}
-
-GarchBaseTexture *MtlfResourceFactory::NewBaseTexture() const
-{
-    return new MtlfBaseTexture();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

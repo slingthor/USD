@@ -56,6 +56,11 @@ static const MTLPixelFormat _PIXEL_FORMAT_DESC[] =
     MTLPixelFormatInvalid,      // Unsupported by Metal
     MTLPixelFormatRGBA32Float,  // HgiFormatFloat32Vec4,
 
+    MTLPixelFormatR16Sint,      // HgiFormatInt16,
+    MTLPixelFormatRG16Sint,     // HgiFormatInt16Vec2,
+    MTLPixelFormatInvalid,      // Unsupported by Metal
+    MTLPixelFormatRGBA16Sint,   // HgiFormatInt16Vec4,
+
     MTLPixelFormatR16Uint,      // HgiFormatUInt16,
     MTLPixelFormatRG16Uint,     // HgiFormatUInt16Vec2,
     MTLPixelFormatInvalid,      // Unsupported by Metal
@@ -97,9 +102,9 @@ constexpr bool _CompileTimeValidateHgiFormatTable() {
             HgiFormatUNorm8 == 0 &&
             HgiFormatFloat16Vec4 == 9 &&
             HgiFormatFloat32Vec4 == 13 &&
-            HgiFormatUInt16Vec4 == 17 &&
-            HgiFormatUNorm8Vec4srgb == 22 &&
-            HgiFormatBC3UNorm8Vec4 == 28) ? true : false;
+            HgiFormatUInt16Vec4 == 21 &&
+            HgiFormatUNorm8Vec4srgb == 26 &&
+            HgiFormatBC3UNorm8Vec4 == 32) ? true : false;
 }
 
 static_assert(_CompileTimeValidateHgiFormatTable(),
@@ -131,6 +136,11 @@ static const MTLVertexFormat _VERTEX_FORMAT_DESC[] =
     MTLVertexFormatFloat3,              // HgiFormatFloat32Vec3,
     MTLVertexFormatFloat4,              // HgiFormatFloat32Vec4,
 
+    MTLVertexFormatShort,               // HgiFormatInt16,
+    MTLVertexFormatShort2,              // HgiFormatInt16Vec2,
+    MTLVertexFormatShort3,              // HgiFormatInt16Vec3,
+    MTLVertexFormatShort4,              // HgiFormatInt16Vec4,
+
     MTLVertexFormatUShort,              // HgiFormatUInt16,
     MTLVertexFormatUShort2,             // HgiFormatUInt16Vec2,
     MTLVertexFormatUShort3,             // HgiFormatUInt16Vec3,
@@ -159,9 +169,9 @@ constexpr bool _CompileTimeValidateHgiVertexFormatTable() {
             HgiFormatUNorm8 == 0 &&
             HgiFormatFloat16Vec4 == 9 &&
             HgiFormatFloat32Vec4 == 13 &&
-            HgiFormatUInt16Vec4 == 17 &&
-            HgiFormatUNorm8Vec4srgb == 22 &&
-            HgiFormatBC3UNorm8Vec4 == 28) ? true : false;
+            HgiFormatUInt16Vec4 == 21 &&
+            HgiFormatUNorm8Vec4srgb == 26 &&
+            HgiFormatBC3UNorm8Vec4 == 32) ? true : false;
 }
 
 static_assert(_CompileTimeValidateHgiVertexFormatTable(),

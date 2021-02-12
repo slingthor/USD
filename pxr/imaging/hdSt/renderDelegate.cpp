@@ -58,7 +58,6 @@
 
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
-#include "pxr/imaging/garch/textureRegistry.h"
 
 #include "pxr/imaging/glf/diagnostic.h"
 
@@ -238,8 +237,6 @@ HdStRenderDelegate::~HdStRenderDelegate()
     // Here we could destroy the resource registry when the last render
     // delegate HdSt is destroyed, however we prefer to keep the resources
     // around to match previous singleton behaviour (for now).
-
-    GarchTextureRegistry::GetInstance().GarbageCollectIfNeeded();
 }
 
 void
@@ -482,6 +479,7 @@ HdStRenderDelegate::_CreateFallbackMaterialPrim()
 void
 HdStRenderDelegate::CommitResources(HdChangeTracker *tracker)
 {
+    TF_UNUSED(tracker);
     GLF_GROUP_FUNCTION();
     
     _ApplyTextureSettings();
@@ -498,9 +496,10 @@ HdStRenderDelegate::CommitResources(HdChangeTracker *tracker)
     // Commit all pending source data.
     _resourceRegistry->Commit();
 
-    if (tracker->IsGarbageCollectionNeeded()) {
+    HdStRenderParam *stRenderParam = _renderParam.get();
+    if (stRenderParam->IsGarbageCollectionNeeded()) {
         _resourceRegistry->GarbageCollect();
-        tracker->ClearGarbageCollectionNeeded();
+        stRenderParam->ClearGarbageCollectionNeeded();
     }
 
     // see bug126621. currently dispatch buffers need to be released

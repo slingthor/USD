@@ -65,8 +65,6 @@ pxr_library(garch
 
     PUBLIC_CLASSES
         bindingMap
-        baseTexture
-        baseTextureData
         contextCaps
         drawTarget
 	    glApi
@@ -74,18 +72,12 @@ pxr_library(garch
         glPlatformDebugContext
         resourceFactory
         texture
-        textureHandle
-        textureRegistry
         simpleLight
         simpleLightingContext
         simpleMaterial
         simpleShadowArray
         uniformBlock
         utils
-        uvTexture
-        uvTextureData
-        uvTextureStorage
-        uvTextureStorageData
         ${optionalPublicClasses}
 
     PRIVATE_CLASSES
@@ -111,15 +103,11 @@ pxr_library(garch
 
     PYMODULE_CPPFILES
         module.cpp
-        wrapBaseTexture.cpp
         wrapDrawTarget.cpp
         wrapPlatformDebugContext.cpp
         wrapSimpleLight.cpp
         wrapSimpleMaterial.cpp
         wrapTexture.cpp
-        wrapTextureRegistry.cpp
-        wrapUVTexture.cpp
-        wrapUVTextureStorage.cpp
 
     PYMODULE_FILES
         __init__.py

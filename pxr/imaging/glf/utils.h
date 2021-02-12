@@ -29,38 +29,12 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/glf/api.h"
 #include "pxr/imaging/garch/glApi.h"
-#include "pxr/imaging/hio/image.h"
 #include "pxr/imaging/hio/types.h"
 
 #include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-/// Base image format
-///
-/// Returns the base image format for the given number of components
-///
-/// Supported number of components: 1, 2, 3, 4
-GLF_API
-GLenum GlfGetBaseFormat(int numComponents);
-
-/// GL type.
-///
-/// Returns the GL type for a given HioFormat.
-GLF_API
-GLenum GlfGetGLType(HioFormat format);
-
-/// GL format.
-///
-/// Returns the GL format for a given HioFormat.
-GLF_API
-GLenum GlfGetGLFormat(HioFormat format);
-
-/// GL Internal Format.
-///
-/// Returns the GL Internal Format for a given HioFormat.
-GLF_API
-GLenum GlfGetGLInternalFormat(HioFormat format);
 
 /// Checks the valitidy of a GL framebuffer
 ///

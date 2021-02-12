@@ -74,10 +74,6 @@ public:
     // Package Name accessor
     GLF_API
     virtual std::string GetPackageName() const override { return "glf"; }
-        
-    // BaseTexture
-    GLF_API
-    virtual GarchBaseTexture *NewBaseTexture() const override;
 
 private:
     GlfContextCaps contextCaps;

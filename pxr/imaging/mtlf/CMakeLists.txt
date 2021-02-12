@@ -37,7 +37,6 @@ pxr_library(mtlf
         ${OPENEXR_INCLUDE_DIRS}
 
     PUBLIC_CLASSES
-        baseTexture
         bindingMap
         contextCaps
         diagnostic
