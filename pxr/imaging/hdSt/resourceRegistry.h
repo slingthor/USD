@@ -45,10 +45,6 @@
 #include <map>
 #include <memory>
 
-// APPLE METAL: DO NOT MERGE BACK
-#include <functional>
-// END APPLE METAL
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 using HdComputationSharedPtr = std::shared_ptr<class HdComputation>;
