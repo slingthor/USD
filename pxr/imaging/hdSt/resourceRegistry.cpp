@@ -25,9 +25,6 @@
 
 #include "pxr/base/work/loops.h"
 
-// APPLE METAL: DO NOT MERGE BACK
-#include "pxr/imaging/hd/engine.h"
-// END APPLE METAL
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hdSt/copyComputation.h"
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
@@ -751,7 +748,7 @@ HdStResourceRegistry::_Commit()
     // handles (for bindless textures).
     _CommitTextures();
 // APPLE METAL: DO NOT MERGE BACK
-    HdEngineEvent::Signal();
+    SignalProgressEvent();
 // END APPLE METAL
     // TODO: requests should be sorted by resource, and range.
     {
@@ -808,7 +805,7 @@ HdStResourceRegistry::_Commit()
     }
 
 // APPLE METAL: DO NOT MERGE BACK
-    HdEngineEvent::Signal();
+    SignalProgressEvent();
 // END APPLE METAL
 
     {
@@ -896,7 +893,7 @@ HdStResourceRegistry::_Commit()
     }
 
 // APPLE METAL: DO NOT MERGE BACK
-    HdEngineEvent::Signal();
+    SignalProgressEvent();
 // END APPLE METAL
 
     {
@@ -1245,6 +1242,5 @@ HdStResourceRegistry::AllocateTextureObject(
         textureId, textureType);
             
 }    
-
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -47,9 +47,6 @@
 #include "pxr/imaging/glf/info.h"
 
 // APPLE METAL: DO NOT MERGE BACK
-#include "pxr/imaging/hd/engine.h"
-// END APPLE METAL
-
 #include "pxr/imaging/hd/rendererPlugin.h"
 #include "pxr/imaging/hd/rendererPluginRegistry.h"
 #include "pxr/imaging/hdx/taskController.h"
@@ -275,7 +272,8 @@ UsdImagingGLEngine::PrepareBatch(
         return;
     }
 // APPLE METAL: DO NOT MERGE BACK
-    HdEngineEvent::Signal();
+    TF_VERIFY(_renderIndex);
+    _renderIndex->GetResourceRegistry()->SignalProgressEvent();
 // END APPLE METAL
 
     HD_TRACE_FUNCTION();
@@ -328,7 +326,8 @@ UsdImagingGLEngine::RenderBatch(
     }
 
 // APPLE METAL: DO NOT MERGE BACK
-    HdEngineEvent::Signal();
+    TF_VERIFY(_renderIndex);
+    _renderIndex->GetResourceRegistry()->SignalProgressEvent();
 // END APPLE METAL
 
     ResourceFactoryGuard guard(_resourceFactory);
@@ -359,7 +358,8 @@ UsdImagingGLEngine::RenderBatch(
     _Execute(params, _taskController->GetRenderingTasks());
 
 // APPLE METAL: DO NOT MERGE BACK
-    HdEngineEvent::Signal();
+    TF_VERIFY(_renderIndex);
+    _renderIndex->GetResourceRegistry()->SignalProgressEvent();
 // END APPLE METAL
 }
 
@@ -1603,6 +1603,15 @@ UsdImagingGLEngine::_IsUsingLegacyImpl() const
 {
     return bool(_legacyImpl);
 }
+
+// APPLE METAL: DO NOT MERGE BACK
+void
+UsdImagingGLEngine::SetFrameProgressCallback(std::function<void()> callback)
+{
+    TF_VERIFY(_renderIndex);
+    _renderIndex->GetResourceRegistry()->SetFrameProgressCallback(callback);
+}
+// END APPLE METAL
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

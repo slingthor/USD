@@ -30,10 +30,6 @@
 
 #include "pxr/imaging/hd/task.h"
 
-// APPLE METAL: DO NOT MERGE BACK
-#include <functional>
-// END APPLE METAL
-
 #include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -96,23 +92,6 @@ private:
 
     void _InitCaps() const;
 };
-
-// APPLE METAL: DO NOT MERGE BACK
-class HdEngineEvent
-{
-public:
-    typedef std::function<void()> Callback;
-
-    HD_API
-    static void RegisterCallback(Callback callback);
-
-    HD_API
-    static void Signal();
-
-private:
-    static Callback _callback;
-};
-// END APPLE METAL
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

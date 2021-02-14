@@ -121,8 +121,10 @@ HdEngine::Execute(HdRenderIndex *index, HdTaskSharedPtrVector *tasks)
             "--------------------------------------------------------------\n");
 
     index->SyncAll(tasks, &_taskContext);
-
-    HdEngineEvent::Signal();
+    
+    // APPLE METAL: DO NOT MERGE BACK
+    index->GetResourceRegistry()->SignalProgressEvent();
+    // END APPLE METAL
 
     // --------------------------------------------------------------------- //
     // PREPARE PHASE
@@ -178,29 +180,19 @@ HdEngine::Execute(HdRenderIndex *index, HdTaskSharedPtrVector *tasks)
             "             HdEngine [Execute Phase](Task::Execute)          \n"
             "--------------------------------------------------------------\n");
     
-    HdEngineEvent::Signal();
+    // APPLE METAL: DO NOT MERGE BACK
+    index->GetResourceRegistry()->SignalProgressEvent();
+    // END APPLE METAL
 
     for (size_t taskNum = 0; taskNum < numTasks; ++taskNum) {
         const HdTaskSharedPtr &task = (*tasks)[taskNum];
 
         task->Execute(&_taskContext);
     }
-
-    HdEngineEvent::Signal();
-}
-
-HdEngineEvent::Callback HdEngineEvent::_callback;
-
-void HdEngineEvent::RegisterCallback(Callback callback)
-{
-    _callback = callback;
-}
-
-void HdEngineEvent::Signal()
-{
-    if (_callback) {
-        _callback();
-    }
+    
+    // APPLE METAL: DO NOT MERGE BACK
+    index->GetResourceRegistry()->SignalProgressEvent();
+    // END APPLE METAL
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

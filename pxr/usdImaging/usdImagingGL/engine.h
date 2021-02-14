@@ -467,6 +467,11 @@ public:
     HdStResourceFactoryInterface *GetResourceFactory() {
         return _resourceFactory;
     }
+
+    // APPLE METAL: DO NOT MERGE BACK
+    USDIMAGINGGL_API
+    void SetFrameProgressCallback(std::function<void()> callback);
+    // END APPLE METAL
     
     struct ResourceFactoryGuard {
         ResourceFactoryGuard(HdStResourceFactoryInterface *resourceFactory);

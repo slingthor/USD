@@ -92,6 +92,14 @@ public:
     /// a summary total allocation of GPU memory in bytes for this registry.
     HD_API
     virtual VtDictionary GetResourceAllocation() const;
+    
+    // APPLE METAL: DO NOT MERGE BACK
+    HD_API
+    void SetFrameProgressCallback(std::function<void()> callback);
+    
+    HD_API
+    void SignalProgressEvent() const;
+    // END APPLE METAL
 
 protected:
     /// A hook for derived registries to perform additional resource commits.
@@ -110,6 +118,10 @@ private:
     // Not copyable
     HdResourceRegistry(const HdResourceRegistry&) = delete;
     HdResourceRegistry& operator=(const HdResourceRegistry&) = delete;
+    
+    // APPLE METAL: DO NOT MERGE BACK
+    std::function<void()> _frameProgressCallback;
+    // END APPLE METAL
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
