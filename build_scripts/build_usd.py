@@ -1935,8 +1935,21 @@ OIIO_URL = "https://github.com/OpenImageIO/oiio/archive/Release-2.1.16.0.zip"
 def InstallOpenImageIO(context, force, buildArgs):
     # if context.static_dependencies_macOS:
     #     unexported_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'unexported_symbols_list_oiio')
+    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    patch_path = os.path.join(dir_path, "patches/oiio.diff")
 
     with CurrentWorkingDirectory(DownloadURL(OIIO_URL, context, force)):
+        if MacOS():
+            Run("mv src/libutil/strutil.cpp src/libutil/strutil.mm")
+            Run("mv src/libutil/ustring.cpp src/libutil/ustring.mm")
+            Run("mv src/libtexture/texture3d.cpp src/libtexture/texture3d.mm")
+            Run("mv src/libtexture/texoptions.cpp src/libtexture/texoptions.mm")
+            Run("mv src/libtexture/imagecache.cpp src/libtexture/imagecache.mm")
+            Run("mv src/openexr.imageio/exrinput.cpp src/openexr.imageio/exrinput.mm")
+            Run("mv src/libOpenImageIO/imagebuf.cpp src/libOpenImageIO/imagebuf.mm")
+            Run("mv src/libOpenImageIO/imageio.cpp src/libOpenImageIO/imageio.mm")
+            Run("git apply  " + patch_path)
+
         extraArgs = ['-DOIIO_BUILD_TESTS=OFF',
                      '-DUSE_PYTHON=OFF',
                      '-DSTOP_ON_WARNING=OFF']
@@ -1978,7 +1991,9 @@ def InstallOpenImageIO(context, force, buildArgs):
             PatchFile("CMakeLists.txt",
                     [("set (CMAKE_ALLOW_LOOSE_LOOP_CONSTRUCTS TRUE)",
                         "set (CMAKE_ALLOW_LOOSE_LOOP_CONSTRUCTS TRUE)\n"
-                        "cmake_policy (SET CMP0008 NEW)")])
+                        "cmake_policy (SET CMP0008 NEW)"),
+                      ("LANGUAGES CXX C)", "LANGUAGES CXX C OBJCXX)")])
+
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs

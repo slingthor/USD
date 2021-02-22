@@ -1,0 +1,1040 @@
+diff -ru oiio-Release-2.1.16.0/src/libOpenImageIO/CMakeLists.txt oiio-Release-2.1.16.0_new/src/libOpenImageIO/CMakeLists.txt
+--- oiio-Release-2.1.16.0/src/libOpenImageIO/CMakeLists.txt	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0_new/src/libOpenImageIO/CMakeLists.txt	2021-02-01 18:49:13.000000000 +0000
+@@ -56,8 +56,8 @@
+                           imagebufalgo_xform.cpp
+                           imagebufalgo_yee.cpp imagebufalgo_opencv.cpp
+                           deepdata.cpp exif.cpp exif-canon.cpp
+-                          formatspec.cpp imagebuf.cpp
+-                          imageinput.cpp imageio.cpp imageioplugin.cpp
++                          formatspec.cpp imagebuf.mm
++                          imageinput.cpp imageio.mm imageioplugin.cpp
+                           imageoutput.cpp iptc.cpp xmp.cpp
+                           color_ocio.cpp
+                           maketexture.cpp
+@@ -71,18 +71,18 @@
+                           ../libutil/paramlist.cpp 
+                           ../libutil/plugin.cpp 
+                           ../libutil/SHA1.cpp 
+-                          ../libutil/strutil.cpp 
++                          ../libutil/strutil.mm 
+                           ../libutil/sysutil.cpp 
+                           ../libutil/thread.cpp 
+                           ../libutil/timer.cpp 
+                           ../libutil/typedesc.cpp 
+-                          ../libutil/ustring.cpp 
++                          ../libutil/ustring.mm 
+                           ../libutil/xxhash.cpp 
+                           ../libtexture/texturesys.cpp 
+-                          ../libtexture/texture3d.cpp 
++                          ../libtexture/texture3d.mm 
+                           ../libtexture/environment.cpp 
+-                          ../libtexture/texoptions.cpp 
+-                          ../libtexture/imagecache.cpp
++                          ../libtexture/texoptions.mm 
++                          ../libtexture/imagecache.mm
+                           ${libOpenImageIO_srcs}
+                           ${libOpenImageIO_hdrs}
+                          )
+diff -ru oiio-Release-2.1.16.0/src/libOpenImageIO/imagebuf.mm oiio-Release-2.1.16.0_new/src/libOpenImageIO/imagebuf.mm
+--- oiio-Release-2.1.16.0/src/libOpenImageIO/imagebuf.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0_new/src/libOpenImageIO/imagebuf.mm	2021-02-01 11:51:37.000000000 +0000
+@@ -20,6 +20,7 @@
+ #include <OpenImageIO/simd.h>
+ #include <OpenImageIO/strutil.h>
+ #include <OpenImageIO/thread.h>
++#import <Foundation/Foundation.h>
+ 
+ #include "imageio_pvt.h"
+ 
+@@ -791,7 +792,38 @@
+     m_spec_valid = true;
+ }
+ 
+-
++ustring* s_subimages() {
++	static dispatch_once_t onceToken;
++	static ustring* s;
++	
++	dispatch_once(&onceToken, ^{
++		s = new ustring("subimages");
++	});
++	
++	return s;
++}
++
++ustring* s_miplevels() {
++	static dispatch_once_t onceToken;
++	static ustring* s;
++	
++	dispatch_once(&onceToken, ^{
++		s = new ustring("miplevels");
++	});
++	
++	return s;
++}
++
++ustring* s_fileformat() {
++	static dispatch_once_t onceToken;
++	static ustring* s;
++	
++	dispatch_once(&onceToken, ^{
++		s = new ustring("fileformat");
++	});
++	
++	return s;
++}
+ 
+ bool
+ ImageBufImpl::init_spec(string_view filename, int subimage, int miplevel)
+@@ -809,8 +841,7 @@
+     m_name         = filename;
+     m_nsubimages   = 0;
+     m_nmiplevels   = 0;
+-    static ustring s_subimages("subimages"), s_miplevels("miplevels");
+-    static ustring s_fileformat("fileformat");
++
+     if (m_configspec) {  // Pass configuration options to cache
+         // Invalidate the file in the cache, and add with replacement
+         // because it might have a different config than last time.
+@@ -818,12 +849,12 @@
+         m_imagecache->add_file(m_name, nullptr, m_configspec.get(),
+                                /*replace=*/true);
+     }
+-    m_imagecache->get_image_info(m_name, subimage, miplevel, s_subimages,
++    m_imagecache->get_image_info(m_name, subimage, miplevel, *s_subimages(),
+                                  TypeInt, &m_nsubimages);
+-    m_imagecache->get_image_info(m_name, subimage, miplevel, s_miplevels,
++    m_imagecache->get_image_info(m_name, subimage, miplevel, *s_miplevels(),
+                                  TypeInt, &m_nmiplevels);
+     const char* fmt = NULL;
+-    m_imagecache->get_image_info(m_name, subimage, miplevel, s_fileformat,
++    m_imagecache->get_image_info(m_name, subimage, miplevel, *s_fileformat(),
+                                  TypeString, &fmt);
+     m_fileformat = ustring(fmt);
+     m_imagecache->get_imagespec(m_name, m_spec, subimage, miplevel);
+diff -ru oiio-Release-2.1.16.0/src/libOpenImageIO/imageio.mm oiio-Release-2.1.16.0_new/src/libOpenImageIO/imageio.mm
+--- oiio-Release-2.1.16.0/src/libOpenImageIO/imageio.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0_new/src/libOpenImageIO/imageio.mm	2021-02-01 16:59:38.000000000 +0000
+@@ -21,6 +21,7 @@
+ #include <OpenImageIO/thread.h>
+ #include <OpenImageIO/timer.h>
+ #include <OpenImageIO/typedesc.h>
++#import <Foundation/Foundation.h>
+ 
+ #include "imageio_pvt.h"
+ 
+@@ -43,7 +44,8 @@
+ atomic_int oiio_read_chunk(256);
+ int tiff_half(0);
+ int tiff_multithread(1);
+-ustring plugin_searchpath(OIIO_DEFAULT_PLUGIN_SEARCHPATH);
++ustring* plugin_searchpath;
++//ustring plugin_searchpath(OIIO_DEFAULT_PLUGIN_SEARCHPATH);
+ std::string format_list;         // comma-separated list of all formats
+ std::string input_format_list;   // comma-separated list of readable formats
+ std::string output_format_list;  // comma-separated list of writeable formats
+@@ -58,6 +60,16 @@
+ int oiio_log_times = Strutil::from_string<int>(
+     Sysutil::getenv("OPENIMAGEIO_LOG_TIMES"));
+ std::vector<float> oiio_missingcolor;
++
++void init_plugin_searchpath() {
++	static dispatch_once_t onceToken;
++	
++	dispatch_once(&onceToken, ^{
++		plugin_searchpath = new ustring(OIIO_DEFAULT_PLUGIN_SEARCHPATH);
++	});
++}
++
++
+ }  // namespace pvt
+ 
+ using namespace pvt;
+@@ -282,6 +294,8 @@
+ bool
+ attribute(string_view name, TypeDesc type, const void* val)
+ {
++	init_plugin_searchpath();
++	
+     if (name == "options" && type == TypeDesc::STRING) {
+         GlobalOptSetter gos;
+         return optparser(gos, *(const char**)val);
+@@ -300,7 +314,7 @@
+         return true;
+     }
+     if (name == "plugin_searchpath" && type == TypeString) {
+-        plugin_searchpath = ustring(*(const char**)val);
++		plugin_searchpath = new ustring(*(const char**)val);
+         return true;
+     }
+     if (name == "exr_threads" && type == TypeInt) {
+@@ -357,36 +371,36 @@
+         return true;
+     }
+     if (name == "plugin_searchpath" && type == TypeString) {
+-        *(ustring*)val = plugin_searchpath;
++        *(ustring*)val = *plugin_searchpath;
+         return true;
+     }
+     if (name == "format_list" && type == TypeString) {
+         if (format_list.empty())
+-            pvt::catalog_all_plugins(plugin_searchpath.string());
++            pvt::catalog_all_plugins(plugin_searchpath->string());
+         *(ustring*)val = ustring(format_list);
+         return true;
+     }
+     if (name == "input_format_list" && type == TypeString) {
+         if (input_format_list.empty())
+-            pvt::catalog_all_plugins(plugin_searchpath.string());
++            pvt::catalog_all_plugins(plugin_searchpath->string());
+         *(ustring*)val = ustring(input_format_list);
+         return true;
+     }
+     if (name == "output_format_list" && type == TypeString) {
+         if (output_format_list.empty())
+-            pvt::catalog_all_plugins(plugin_searchpath.string());
++            pvt::catalog_all_plugins(plugin_searchpath->string());
+         *(ustring*)val = ustring(output_format_list);
+         return true;
+     }
+     if (name == "extension_list" && type == TypeString) {
+         if (extension_list.empty())
+-            pvt::catalog_all_plugins(plugin_searchpath.string());
++            pvt::catalog_all_plugins(plugin_searchpath->string());
+         *(ustring*)val = ustring(extension_list);
+         return true;
+     }
+     if (name == "library_list" && type == TypeString) {
+         if (library_list.empty())
+-            pvt::catalog_all_plugins(plugin_searchpath.string());
++            pvt::catalog_all_plugins(plugin_searchpath->string());
+         *(ustring*)val = ustring(library_list);
+         return true;
+     }
+diff -ru oiio-Release-2.1.16.0/src/libOpenImageIO/imageio_pvt.h.in oiio-Release-2.1.16.0_new/src/libOpenImageIO/imageio_pvt.h.in
+--- oiio-Release-2.1.16.0/src/libOpenImageIO/imageio_pvt.h.in	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0_new/src/libOpenImageIO/imageio_pvt.h.in	2021-02-01 23:25:27.000000000 +0000
+@@ -25,7 +25,7 @@
+ extern recursive_mutex imageio_mutex;
+ extern atomic_int oiio_threads;
+ extern atomic_int oiio_read_chunk;
+-extern ustring plugin_searchpath;
++extern ustring* plugin_searchpath;
+ extern std::string format_list;
+ extern std::string input_format_list;
+ extern std::string output_format_list;
+diff -ru oiio-Release-2.1.16.0/src/libOpenImageIO/imageioplugin.cpp oiio-Release-2.1.16.0_new/src/libOpenImageIO/imageioplugin.cpp
+--- oiio-Release-2.1.16.0/src/libOpenImageIO/imageioplugin.cpp	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0_new/src/libOpenImageIO/imageioplugin.cpp	2021-02-01 16:59:38.000000000 +0000
+@@ -475,7 +475,7 @@
+         if (found == output_formats.end()) {
+             catalog_all_plugins(plugin_searchpath.size()
+                                     ? plugin_searchpath
+-                                    : pvt::plugin_searchpath.string());
++                                    : (pvt::plugin_searchpath)->string());
+             found = output_formats.find(format);
+         }
+         if (found != output_formats.end()) {
+@@ -576,7 +576,7 @@
+         InputPluginMap::const_iterator found = input_formats.find(format);
+         if (found == input_formats.end()) {
+             if (plugin_searchpath.empty())
+-                plugin_searchpath = pvt::plugin_searchpath;
++                plugin_searchpath = *pvt::plugin_searchpath;
+             catalog_all_plugins(plugin_searchpath);
+             found = input_formats.find(format);
+         }
+diff -ru oiio-Release-2.1.16.0/src/libtexture/imagecache.mm oiio-Release-2.1.16.0_new/src/libtexture/imagecache.mm
+--- oiio-Release-2.1.16.0/src/libtexture/imagecache.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0_new/src/libtexture/imagecache.mm	2021-01-30 00:44:15.000000000 +0000
+@@ -30,7 +30,7 @@
+ 
+ #include "imagecache_pvt.h"
+ #include "imageio_pvt.h"
+-
++#import <Foundation/Foundation.h>
+ 
+ OIIO_NAMESPACE_BEGIN
+ using namespace pvt;
+@@ -49,18 +49,216 @@
+ static std::shared_ptr<ImageCacheImpl> shared_image_cache;
+ static spin_mutex shared_image_cache_mutex;
+ 
++
+ // Make some static ustring constants to avoid strcmp's
+-static ustring s_resolution("resolution"), s_texturetype("texturetype");
+-static ustring s_textureformat("textureformat"), s_fileformat("fileformat");
+-static ustring s_format("format"), s_cachedformat("cachedformat");
+-static ustring s_channels("channels"), s_cachedpixeltype("cachedpixeltype");
+-static ustring s_exists("exists"), s_broken("broken");
+-static ustring s_UDIM("UDIM");
+-static ustring s_subimages("subimages"), s_miplevels("miplevels");
+-static ustring s_datawindow("datawindow"), s_displaywindow("displaywindow");
+-static ustring s_averagecolor("averagecolor"), s_averagealpha("averagealpha");
+-static ustring s_constantcolor("constantcolor");
+-static ustring s_constantalpha("constantalpha");
++ustring* s_resolution() {
++	static dispatch_once_t onceToken;
++	static ustring* s_resolution;
++	
++	dispatch_once(&onceToken, ^{
++		s_resolution = new ustring("resolution");
++	});
++	
++	return s_resolution;
++}
++
++ustring* s_texturetype() {
++	static dispatch_once_t onceToken;
++	static ustring* s_texturetype;
++	
++	dispatch_once(&onceToken, ^{
++		s_texturetype = new ustring("texturetype");
++	});
++	
++	return s_texturetype;
++}
++
++ustring* s_textureformat() {
++	static dispatch_once_t onceToken;
++	static ustring* s_textureformat;
++	
++	dispatch_once(&onceToken, ^{
++		s_textureformat = new ustring("textureformat");
++	});
++	
++	return s_textureformat;
++}
++
++ustring* s_fileformat() {
++	static dispatch_once_t onceToken;
++	static ustring* s_fileformat;
++	
++	dispatch_once(&onceToken, ^{
++		s_fileformat = new ustring("fileformat");
++	});
++	
++	return s_fileformat;
++}
++
++ustring* s_format() {
++	static dispatch_once_t onceToken;
++	static ustring* s_format;
++	
++	dispatch_once(&onceToken, ^{
++		s_format = new ustring("format");
++	});
++	
++	return s_format;
++}
++
++ustring* s_cachedformat() {
++	static dispatch_once_t onceToken;
++	static ustring* s_cachedformat;
++	
++	dispatch_once(&onceToken, ^{
++		s_cachedformat = new ustring("cachedformat");
++	});
++	
++	return s_cachedformat;
++}
++
++ustring* s_channels() {
++	static dispatch_once_t onceToken;
++	static ustring* s_channels;
++	
++	dispatch_once(&onceToken, ^{
++		s_channels = new ustring("channels");
++	});
++	
++	return s_channels;
++}
++
++ustring* s_cachedpixeltype() {
++	static dispatch_once_t onceToken;
++	static ustring* s_cachedpixeltype;
++	
++	dispatch_once(&onceToken, ^{
++		s_cachedpixeltype = new ustring("cachedpixeltype");
++	});
++	
++	return s_cachedpixeltype;
++}
++
++ustring* s_exists() {
++	static dispatch_once_t onceToken;
++	static ustring* s_exists;
++	
++	dispatch_once(&onceToken, ^{
++		s_exists = new ustring("exists");
++	});
++	
++	return s_exists;
++}
++
++ustring* s_broken() {
++	static dispatch_once_t onceToken;
++	static ustring* s_broken;
++	
++	dispatch_once(&onceToken, ^{
++		s_broken = new ustring("broken");
++	});
++	
++	return s_broken;
++}
++
++ustring* s_UDIM() {
++	static dispatch_once_t onceToken;
++	static ustring* s;
++	
++	dispatch_once(&onceToken, ^{
++		s = new ustring("UDIM");
++	});
++	
++	return s;
++}
++
++ustring* s_subimages() {
++	static dispatch_once_t onceToken;
++	static ustring* s;
++	
++	dispatch_once(&onceToken, ^{
++		s = new ustring("subimages");
++	});
++	
++	return s;
++}
++
++ustring* s_miplevels() {
++	static dispatch_once_t onceToken;
++	static ustring* s;
++	
++	dispatch_once(&onceToken, ^{
++		s = new ustring("miplevels");
++	});
++	
++	return s;
++}
++
++ustring* s_datawindow() {
++	static dispatch_once_t onceToken;
++	static ustring* s;
++	
++	dispatch_once(&onceToken, ^{
++		s = new ustring("datawindow");
++	});
++	
++	return s;
++}
++
++ustring* s_displaywindow() {
++	static dispatch_once_t onceToken;
++	static ustring* s;
++	
++	dispatch_once(&onceToken, ^{
++		s = new ustring("displaywindow");
++	});
++	
++	return s;
++}
++
++ustring* s_averagecolor() {
++	static dispatch_once_t onceToken;
++	static ustring* s;
++	
++	dispatch_once(&onceToken, ^{
++		s = new ustring("averagecolor");
++	});
++	
++	return s;
++}
++
++ustring* s_averagealpha() {
++	static dispatch_once_t onceToken;
++	static ustring* s;
++	
++	dispatch_once(&onceToken, ^{
++		s = new ustring("averagealpha");
++	});
++	
++	return s;
++}
++
++ustring* s_constantcolor() {
++	static dispatch_once_t onceToken;
++	static ustring* s;
++	
++	dispatch_once(&onceToken, ^{
++		s = new ustring("constantcolor");
++	});
++	
++	return s;
++}
++
++ustring* s_constantalpha() {
++	static dispatch_once_t onceToken;
++	static ustring* s;
++	
++	dispatch_once(&onceToken, ^{
++		s = new ustring("constantalpha");
++	});
++	
++	return s;
++}
+ 
+ 
+ // Functor to compare filenames
+@@ -2503,7 +2701,7 @@
+ {
+     ImageCachePerThreadInfo* thread_info = get_perthread_info();
+     ImageCacheFile* file = find_file(filename, thread_info, nullptr, true);
+-    if (!file && dataname != s_exists) {
++    if (!file && dataname != *s_exists()) {
+         errorf("Invalid image file \"%s\"", filename);
+         return false;
+     }
+@@ -2530,7 +2728,7 @@
+     ImageCacheStatistics& stats(thread_info->m_stats);
+     ++stats.imageinfo_queries;
+     file = verify_file(file, thread_info, true);
+-    if (dataname == s_exists && datatype == TypeInt) {
++    if (dataname == *s_exists() && datatype == TypeInt) {
+         // Just check for existence.  Need to do this before the invalid
+         // file error below, since in this one case, it's not an error
+         // for the file to be nonexistent or broken!
+@@ -2546,7 +2744,7 @@
+         error("Invalid image file");
+         return false;
+     }
+-    ATTR_DECODE(s_broken, int, file->broken());
++    ATTR_DECODE(*s_broken(), int, file->broken());
+     if (Strutil::starts_with(dataname, "stat:")) {
+         ATTR_DECODE("stat:tilesread", long long, file->m_tilesread);
+         ATTR_DECODE("stat:bytesread", long long, file->m_bytesread);
+@@ -2575,14 +2773,14 @@
+     }
+     // No other queries below are expected to work with broken
+ 
+-    if (dataname == s_UDIM && datatype == TypeInt) {
++    if (dataname == *s_UDIM() && datatype == TypeInt) {
+         // Just check for existence.  Need to do this before the invalid
+         // file error below, since in this one case, it's not an error
+         // for the file to be nonexistent or broken!
+         *(int*)data = file->is_udim();
+         return true;
+     }
+-    if (file->is_udim() && dataname == s_channels) {
++    if (file->is_udim() && dataname == *s_channels()) {
+         // Special case -- it's ok to ask for a UDIM's channels. It'll
+         // search for a concrete file. Beware, this will cause trouble
+         // if different panels of the same UDIM scheme have different
+@@ -2610,7 +2808,7 @@
+     if (file->is_udim()) {
+         return false;  // UDIM-like files fail all other queries
+     }
+-    if (dataname == s_subimages && datatype == TypeInt) {
++    if (dataname == *s_subimages() && datatype == TypeInt) {
+         *(int*)data = file->subimages();
+         return true;
+     }
+@@ -2631,55 +2829,55 @@
+     }
+ 
+     const ImageSpec& spec(file->spec(subimage, miplevel));
+-    if (dataname == s_resolution && datatype == TypeDesc(TypeDesc::INT, 2)) {
++    if (dataname == *s_resolution() && datatype == TypeDesc(TypeDesc::INT, 2)) {
+         int* d = (int*)data;
+         d[0]   = spec.width;
+         d[1]   = spec.height;
+         return true;
+     }
+-    if (dataname == s_resolution && datatype == TypeDesc(TypeDesc::INT, 3)) {
++    if (dataname == *s_resolution() && datatype == TypeDesc(TypeDesc::INT, 3)) {
+         int* d = (int*)data;
+         d[0]   = spec.width;
+         d[1]   = spec.height;
+         d[2]   = spec.depth;
+         return true;
+     }
+-    if (dataname == s_texturetype && datatype == TypeString) {
++    if (dataname == *s_texturetype() && datatype == TypeString) {
+         ustring s(texture_type_name(file->textureformat()));
+         *(const char**)data = s.c_str();
+         return true;
+     }
+-    if (dataname == s_textureformat && datatype == TypeString) {
++    if (dataname == *s_textureformat() && datatype == TypeString) {
+         ustring s(texture_format_name(file->textureformat()));
+         *(const char**)data = s.c_str();
+         return true;
+     }
+-    if (dataname == s_fileformat && datatype == TypeString) {
++    if (dataname == *s_fileformat() && datatype == TypeString) {
+         *(const char**)data = file->fileformat().c_str();
+         return true;
+     }
+-    if (dataname == s_channels && datatype == TypeInt) {
++    if (dataname == *s_channels() && datatype == TypeInt) {
+         *(int*)data = spec.nchannels;
+         return true;
+     }
+-    if (dataname == s_channels && datatype == TypeFloat) {
++    if (dataname == *s_channels() && datatype == TypeFloat) {
+         *(float*)data = spec.nchannels;
+         return true;
+     }
+-    if (dataname == s_format && datatype == TypeInt) {
++    if (dataname == *s_format() && datatype == TypeInt) {
+         *(int*)data = (int)spec.format.basetype;
+         return true;
+     }
+-    if ((dataname == s_cachedformat || dataname == s_cachedpixeltype)
++    if ((dataname == *s_cachedformat() || dataname == *s_cachedpixeltype())
+         && datatype == TypeInt) {
+         *(int*)data = (int)file->datatype(subimage).basetype;
+         return true;
+     }
+-    if (dataname == s_miplevels && datatype == TypeInt) {
++    if (dataname == *s_miplevels() && datatype == TypeInt) {
+         *(int*)data = file->miplevels(subimage);
+         return true;
+     }
+-    if (dataname == s_datawindow && datatype.basetype == TypeDesc::INT
++    if (dataname == *s_datawindow() && datatype.basetype == TypeDesc::INT
+         && (datatype == TypeDesc(TypeDesc::INT, 4)
+             || datatype == TypeDesc(TypeDesc::INT, 6))) {
+         int* d = (int*)data;
+@@ -2698,7 +2896,7 @@
+         }
+         return true;
+     }
+-    if (dataname == s_displaywindow && datatype.basetype == TypeDesc::INT
++    if (dataname == *s_displaywindow() && datatype.basetype == TypeDesc::INT
+         && (datatype == TypeDesc(TypeDesc::INT, 4)
+             || datatype == TypeDesc(TypeDesc::INT, 6))) {
+         int* d = (int*)data;
+@@ -2717,24 +2915,24 @@
+         }
+         return true;
+     }
+-    if (dataname == s_averagecolor && datatype.basetype == TypeDesc::FLOAT) {
++    if (dataname == *s_averagecolor() && datatype.basetype == TypeDesc::FLOAT) {
+         int datalen = datatype.numelements() * datatype.aggregate;
+         return file->get_average_color((float*)data, subimage, 0, datalen);
+     }
+-    if (dataname == s_averagealpha && datatype == TypeDesc::FLOAT
++    if (dataname == *s_averagealpha() && datatype == TypeDesc::FLOAT
+         && spec.alpha_channel >= 0) {
+         return file->get_average_color((float*)data, subimage,
+                                        spec.alpha_channel,
+                                        spec.alpha_channel + 1);
+     }
+-    if (dataname == s_constantcolor && datatype.basetype == TypeDesc::FLOAT) {
++    if (dataname == *s_constantcolor() && datatype.basetype == TypeDesc::FLOAT) {
+         if (file->subimageinfo(subimage).is_constant_image) {
+             int datalen = datatype.numelements() * datatype.aggregate;
+             return file->get_average_color((float*)data, subimage, 0, datalen);
+         }
+         return false;  // Fail if it's not a constant image
+     }
+-    if (dataname == s_constantalpha && datatype == TypeDesc::FLOAT
++    if (dataname == *s_constantalpha() && datatype == TypeDesc::FLOAT
+         && spec.alpha_channel >= 0) {
+         if (file->subimageinfo(subimage).is_constant_image)
+             return file->get_average_color((float*)data, subimage,
+diff -ru oiio-Release-2.1.16.0/src/libtexture/texoptions.mm oiio-Release-2.1.16.0_new/src/libtexture/texoptions.mm
+--- oiio-Release-2.1.16.0/src/libtexture/texoptions.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0_new/src/libtexture/texoptions.mm	2021-02-01 13:08:25.000000000 +0000
+@@ -11,7 +11,7 @@
+ #include <OpenImageIO/typedesc.h>
+ #include <OpenImageIO/ustring.h>
+ #include <OpenImageIO/varyingref.h>
+-
++#import <Foundation/Foundation.h>
+ 
+ OIIO_NAMESPACE_BEGIN
+ 
+@@ -25,17 +25,35 @@
+ static float default_fill  = 0;
+ static int default_samples = 1;
+ 
+-static const ustring wrap_type_name[] = {
+-    // MUST match the order of TextureOptions::Wrap
+-    ustring("default"),
+-    ustring("black"),
+-    ustring("clamp"),
+-    ustring("periodic"),
+-    ustring("mirror"),
+-    ustring("periodic_pow2"),
+-    ustring("periodic_sharedborder"),
+-    ustring()
+-};
++const ustring** wrap_type_name() {
++	static dispatch_once_t onceToken;
++	static const ustring* s_arr[8];
++	
++	dispatch_once(&onceToken, ^{
++		s_arr[0] = new ustring("default");
++		s_arr[1] = new ustring("black");
++		s_arr[2] = new ustring("clamp");
++		s_arr[3] = new ustring("periodic");
++		s_arr[4] = new ustring("mirror");
++		s_arr[5] = new ustring("periodic_pow2");
++		s_arr[6] = new ustring("periodic_sharedborder");
++		s_arr[7] = new ustring();
++	});
++	
++	return s_arr;
++}
++
++//static const ustring wrap_type_name[] = {
++//    // MUST match the order of TextureOptions::Wrap
++//    ustring("default"),
++//    ustring("black"),
++//    ustring("clamp"),
++//    ustring("periodic"),
++//    ustring("mirror"),
++//    ustring("periodic_pow2"),
++//    ustring("periodic_sharedborder"),
++//    ustring()
++//};
+ 
+ }  // end anonymous namespace
+ 
+@@ -128,7 +146,7 @@
+ Tex::decode_wrapmode(const char* name)
+ {
+     for (int i = 0; i < (int)Tex::Wrap::Last; ++i)
+-        if (!strcmp(name, wrap_type_name[i].c_str()))
++		if (!strcmp(name, wrap_type_name()[i]->c_str()))
+             return (Wrap)i;
+     return Tex::Wrap::Default;
+ }
+@@ -139,7 +157,7 @@
+ Tex::decode_wrapmode(ustring name)
+ {
+     for (int i = 0; i < (int)Tex::Wrap::Last; ++i)
+-        if (name == wrap_type_name[i])
++        if (name == *(wrap_type_name()[i]))
+             return (Wrap)i;
+     return Tex::Wrap::Default;
+ }
+diff -ru oiio-Release-2.1.16.0/src/libtexture/texture3d.mm oiio-Release-2.1.16.0_new/src/libtexture/texture3d.mm
+--- oiio-Release-2.1.16.0/src/libtexture/texture3d.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0_new/src/libtexture/texture3d.mm	2021-02-01 11:51:37.000000000 +0000
+@@ -25,6 +25,7 @@
+ #include "../field3d.imageio/field3d_backdoor.h"
+ #include "imagecache_pvt.h"
+ #include "texture_pvt.h"
++#import <Foundation/Foundation.h>
+ 
+ OIIO_NAMESPACE_BEGIN
+ using namespace pvt;
+@@ -32,8 +33,19 @@
+ 
+ namespace {  // anonymous
+ 
++
++ustring* s_field3d() {
++	static dispatch_once_t onceToken;
++	static ustring* s_field3d;
++	
++	dispatch_once(&onceToken, ^{
++		s_field3d = new ustring("field3d");
++	});
++	
++	return s_field3d;
++}
++
+ static EightBitConverter<float> uchar2float;
+-static ustring s_field3d("field3d");
+ 
+ // OIIO_FORCEINLINE float uchar2float (unsigned char val) {
+ //     return float(val) * (1.0f/255.0f);
+@@ -182,7 +194,7 @@
+         // See if there is a world-to-local transform stored in the cache
+         // entry. If so, use it to transform the input point.
+         si.Mlocal->multVecMatrix(P, Plocal);
+-    } else if (texturefile->fileformat() == s_field3d) {
++    } else if (texturefile->fileformat() == *s_field3d()) {
+         // Field3d is special -- it allows nonlinear or time-varying
+         // transforms procedurally, but we have to use a back door.
+         auto input                   = texturefile->open(thread_info);
+Binary files oiio-Release-2.1.16.0/src/libutil/.DS_Store and oiio-Release-2.1.16.0_new/src/libutil/.DS_Store differ
+diff -ru oiio-Release-2.1.16.0/src/libutil/CMakeLists.txt oiio-Release-2.1.16.0_new/src/libutil/CMakeLists.txt
+--- oiio-Release-2.1.16.0/src/libutil/CMakeLists.txt	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0_new/src/libutil/CMakeLists.txt	2021-02-01 18:49:03.000000000 +0000
+@@ -2,8 +2,8 @@
+                   errorhandler.cpp filesystem.cpp
+                   farmhash.cpp filter.cpp hashes.cpp paramlist.cpp
+                   plugin.cpp SHA1.cpp
+-                  strutil.cpp sysutil.cpp thread.cpp timer.cpp
+-                  typedesc.cpp ustring.cpp xxhash.cpp)
++                  strutil.mm sysutil.cpp thread.cpp timer.cpp
++                  typedesc.cpp ustring.mm xxhash.cpp)
+ 
+ add_library (OpenImageIO_Util ${libOpenImageIO_Util_srcs})
+ target_include_directories (OpenImageIO_Util
+diff -ru oiio-Release-2.1.16.0/src/libutil/strutil.mm oiio-Release-2.1.16.0_new/src/libutil/strutil.mm
+--- oiio-Release-2.1.16.0/src/libutil/strutil.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0_new/src/libutil/strutil.mm	2021-02-01 18:30:40.000000000 +0000
+@@ -14,6 +14,7 @@
+ #include <sstream>
+ #include <string>
+ #include <vector>
++#import <Foundation/Foundation.h>
+ #if defined(__APPLE__) || defined(__FreeBSD__)
+ #    include <xlocale.h>
+ #endif
+@@ -53,7 +54,18 @@
+ // On systems that support it, get a location independent locale.
+ #if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)           \
+     || defined(__FreeBSD_kernel__) || defined(__GLIBC__)
+-static locale_t c_loc = newlocale(LC_ALL_MASK, "C", nullptr);
++
++locale_t c_loc() {
++	static dispatch_once_t onceToken;
++	static locale_t locale;
++	
++	dispatch_once(&onceToken, ^{
++		locale = newlocale(LC_ALL_MASK, "C", nullptr);
++	});
++	
++	return locale;
++}
++
+ #elif defined(_WIN32)
+ static _locale_t c_loc = _create_locale(LC_ALL, "C");
+ #endif
+@@ -1278,7 +1290,7 @@
+     // Can use strtod_l on platforms that support it
+ #ifdef __APPLE__
+     // On OSX, strtod_l is for some reason drastically faster than strtof_l.
+-    return static_cast<float>(strtod_l(nptr, endptr, c_loc));
++    return static_cast<float>(strtod_l(nptr, endptr, c_loc()));
+ #elif defined(__linux__) || defined(__FreeBSD__)                               \
+     || defined(__FreeBSD_kernel__) || defined(__GLIBC__)
+     return strtof_l(nptr, endptr, c_loc);
+@@ -1317,7 +1329,7 @@
+ #if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)           \
+     || defined(__FreeBSD_kernel__) || defined(__GLIBC__)
+     // static initialization inside function is thread-safe by C++11 rules!
+-    return strtod_l(nptr, endptr, c_loc);
++    return strtod_l(nptr, endptr, c_loc());
+ #elif defined(_WIN32)
+     // Windows has _strtod_l
+     return _strtod_l(nptr, endptr, c_loc);
+diff -ru oiio-Release-2.1.16.0/src/libutil/ustring.mm oiio-Release-2.1.16.0_new/src/libutil/ustring.mm
+--- oiio-Release-2.1.16.0/src/libutil/ustring.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0_new/src/libutil/ustring.mm	2021-02-01 14:37:25.000000000 +0000
+@@ -9,6 +9,7 @@
+ #include <OpenImageIO/strutil.h>
+ #include <OpenImageIO/thread.h>
+ #include <OpenImageIO/ustring.h>
++#import <Foundation/Foundation.h>
+ 
+ OIIO_NAMESPACE_BEGIN
+ 
+@@ -200,19 +201,21 @@
+ struct UstringTable {
+     const char* lookup(string_view str, size_t hash)
+     {
+-        return whichbin(hash).lookup(str, hash);
++        return whichbin(hash)->lookup(str, hash);
+     }
+ 
+     const char* insert(string_view str, size_t hash)
+     {
+-        return whichbin(hash).insert(str, hash);
++        return whichbin(hash)->insert(str, hash);
+     }
+ 
+     size_t get_memory_usage()
+     {
+         size_t mem = 0;
+         for (auto& bin : bins)
+-            mem += bin.get_memory_usage();
++			if (bin != NULL) {
++            	mem += bin->get_memory_usage();
++			}
+         return mem;
+     }
+ 
+@@ -220,7 +223,9 @@
+     {
+         size_t num = 0;
+         for (auto& bin : bins)
+-            num += bin.get_num_entries();
++			if (bin != NULL) {
++            	num += bin->get_num_entries();
++			}
+         return num;
+     }
+ 
+@@ -229,7 +234,9 @@
+     {
+         size_t num = 0;
+         for (auto& bin : bins)
+-            num += bin.get_num_lookups();
++			if (bin != NULL) {
++            	num += bin->get_num_lookups();
++			}
+         return num;
+     }
+ #    endif
+@@ -237,17 +244,20 @@
+ private:
+     enum {
+         // NOTE: this guarentees NUM_BINS is a power of 2
+-        BIN_SHIFT = 12,
++        BIN_SHIFT = 10,
+         NUM_BINS  = 1 << BIN_SHIFT,
+         TOP_SHIFT = 8 * sizeof(size_t) - BIN_SHIFT
+     };
+ 
+     typedef TableRepMap<(1 << 20) / NUM_BINS, (16 << 20) / NUM_BINS> Bin;
+ 
+-    Bin bins[NUM_BINS];
++    Bin* bins[NUM_BINS];
+ 
+-    Bin& whichbin(size_t hash)
++    Bin* whichbin(size_t hash)
+     {
++		if (bins[(hash >> TOP_SHIFT) % NUM_BINS] == NULL) {
++			bins[(hash >> TOP_SHIFT) % NUM_BINS] = new Bin();
++		}
+         // use the top bits of the hash to pick a bin
+         // (lower bits choose position within the table)
+         return bins[(hash >> TOP_SHIFT) % NUM_BINS];
+@@ -261,13 +271,19 @@
+ 
+ namespace {  // anonymous
+ 
+-static UstringTable&
+-ustring_table()
++UstringTable* ustring_table()
+ {
+-    static OIIO_CACHE_ALIGN UstringTable table;
++	static dispatch_once_t onceToken;
++    static OIIO_CACHE_ALIGN UstringTable* table;
++	
++	dispatch_once(&onceToken, ^{
++		table = new UstringTable();
++	});
++	
+     return table;
+ }
+ 
++
+ }  // end anonymous namespace
+ 
+ 
+@@ -275,9 +291,9 @@
+ // make_unique to happen before main(), i.e. before threads are launched,
+ // in order to eliminate any possible thread collision on construction of
+ // the ustring_table statically declared within make_unique.
+-namespace pvt {
+-static ustring ustring_force_make_unique_call("");
+-}
++//namespace pvt {
++//static ustring ustring_force_make_unique_call("");
++//}
+ 
+ 
+ 
+@@ -405,7 +421,7 @@
+ const char*
+ ustring::make_unique(string_view strref)
+ {
+-    UstringTable& table(ustring_table());
++    UstringTable* table = ustring_table();
+     // Eliminate NULLs
+     if (!strref.data())
+         strref = string_view("", 0);
+@@ -415,8 +431,8 @@
+     // Check the ustring table to see if this string already exists.  If so,
+     // construct from its canonical representation.
+     // NOTE: all locking is performed internally to the table implementation
+-    const char* result = table.lookup(strref, hash);
+-    return result ? result : table.insert(strref, hash);
++    const char* result = table->lookup(strref, hash);
++    return result ? result : table->insert(strref, hash);
+ }
+ 
+ 
+@@ -444,11 +460,11 @@
+ std::string
+ ustring::getstats(bool verbose)
+ {
+-    UstringTable& table(ustring_table());
++	UstringTable* table = ustring_table();
+     std::ostringstream out;
+     out.imbue(std::locale::classic());  // Force "C" locale with '.' decimal
+-    size_t n_e = table.get_num_entries();
+-    size_t mem = table.get_memory_usage();
++    size_t n_e = table->get_num_entries();
++    size_t mem = table->get_memory_usage();
+     if (verbose) {
+         out << "ustring statistics:\n";
+ #ifdef USTRING_TRACK_NUM_LOOKUPS
+@@ -468,8 +484,8 @@
+ size_t
+ ustring::memory()
+ {
+-    UstringTable& table(ustring_table());
+-    return table.get_memory_usage();
++	UstringTable* table = ustring_table();
++    return table->get_memory_usage();
+ }
+ 
+ OIIO_NAMESPACE_END
+diff -ru oiio-Release-2.1.16.0/src/openexr.imageio/CMakeLists.txt oiio-Release-2.1.16.0_new/src/openexr.imageio/CMakeLists.txt
+--- oiio-Release-2.1.16.0/src/openexr.imageio/CMakeLists.txt	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0_new/src/openexr.imageio/CMakeLists.txt	2021-02-01 13:54:25.000000000 +0000
+@@ -2,6 +2,6 @@
+ # SPDX-License-Identifier: BSD-3-Clause
+ # https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+ 
+-add_oiio_plugin (exrinput.cpp exroutput.cpp
++add_oiio_plugin (exrinput.mm exroutput.cpp
+                  LINK_LIBRARIES ${OPENEXR_LIBRARIES})
+ 
+diff -ru oiio-Release-2.1.16.0/src/openexr.imageio/exrinput.mm oiio-Release-2.1.16.0_new/src/openexr.imageio/exrinput.mm
+--- oiio-Release-2.1.16.0/src/openexr.imageio/exrinput.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0_new/src/openexr.imageio/exrinput.mm	2021-02-01 13:17:32.000000000 +0000
+@@ -10,6 +10,7 @@
+ #include <map>
+ #include <memory>
+ #include <numeric>
++#import <Foundation/Foundation.h>
+ 
+ #include <boost/version.hpp>
+ #if BOOST_VERSION >= 106900
+@@ -347,7 +348,16 @@
+     }
+ };
+ 
+-static StringMap exr_tag_to_oiio_std;
++StringMap* exr_tag_to_oiio_std() {
++	static dispatch_once_t onceToken;
++	static StringMap* exr_tag_to_oiio_std;
++	
++	dispatch_once(&onceToken, ^{
++		exr_tag_to_oiio_std = new StringMap();
++	});
++	
++	return exr_tag_to_oiio_std;
++}
+ 
+ 
+ namespace pvt {
+@@ -651,7 +661,7 @@
+         const Imf::M33dAttribute* m33dattr;
+         const Imf::M44dAttribute* m44dattr;
+         const char* name  = hit.name();
+-        std::string oname = exr_tag_to_oiio_std[name];
++        std::string oname = (*exr_tag_to_oiio_std())[name];
+         if (oname.empty())  // Empty string means skip this attrib
+             continue;
+         //        if (oname == name)
