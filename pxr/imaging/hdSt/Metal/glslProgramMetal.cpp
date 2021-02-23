@@ -765,7 +765,14 @@ void HdStGLSLProgramMSL::DrawElementsInstancedBaseVertex(int primitiveMode,
     }
 
     const uint32_t vertsPerPrimitive = (drawingQuads && doMVAComputeGS) ? 4 : 3;
-    uint32_t numPrimitives = (indexCount / vertsPerPrimitive) * instanceCount;
+    uint32_t numPrimitives;
+    //This fixes the case for curves and lines where there are only two points in the line
+    if (primType == MTLPrimitiveTypeLine && indexCount < vertsPerPrimitive && indexCount > 0) {
+        numPrimitives = 1;
+    }
+    else {
+        numPrimitives = (indexCount / vertsPerPrimitive) * instanceCount;
+    }
     const uint32_t maxPrimitivesPerPart = doMVAComputeGS ? context->GetMaxComputeGSPartSize(numOutVertsPerInPrim, numOutPrimsPerInPrim, _gsVertOutStructSize, _gsPrimOutStructSize) : numPrimitives;
 
     int maxThreadsPerThreadgroup = 0;
