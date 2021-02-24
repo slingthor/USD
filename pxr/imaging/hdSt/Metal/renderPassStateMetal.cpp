@@ -70,6 +70,59 @@ HdStRenderPassStateMetal::~HdStRenderPassStateMetal()
 {
     /*NOTHING*/
 }
+
+// Note: The geometric shader may override the state set below if necessary,
+// including disabling h/w culling altogether.
+// Disabling h/w culling is required to handle instancing wherein
+// instanceScale/instanceTransform can flip the xform handedness.
+namespace {
+
+void
+_SetCullState(MtlfMetalContextSharedPtr context, HdCullStyle cullstyle)
+{
+    switch (cullstyle) {
+        case HdCullStyleFront:
+        case HdCullStyleFrontUnlessDoubleSided:
+            context->SetCullMode(MTLCullModeFront);
+            break;
+        case HdCullStyleBack:
+        case HdCullStyleBackUnlessDoubleSided:
+            context->SetCullMode(MTLCullModeBack);
+            break;
+        case HdCullStyleNothing:
+        case HdCullStyleDontCare:
+        default:
+            // disable culling
+            context->SetCullMode(MTLCullModeNone);
+            break;
+    }
+}
+
+void
+_SetColorMask(MtlfMetalContextSharedPtr context,
+              int drawBufferIndex,
+              HdRenderPassState::ColorMask const& mask)
+{
+    MTLColorWriteMask colorWriteMask;
+    switch (mask)
+    {
+        case HdStRenderPassState::ColorMaskNone:
+            colorWriteMask = MTLColorWriteMaskNone;
+            break;
+        case HdStRenderPassState::ColorMaskRGB:
+            colorWriteMask = MTLColorWriteMaskRed | MTLColorWriteMaskGreen
+                | MTLColorWriteMaskBlue;
+            break;
+        default:
+            colorWriteMask = MTLColorWriteMaskAll;
+            break;
+    }
+
+    context->SetColorWriteMask(colorWriteMask);
+}
+
+}
+
 void
 HdStRenderPassStateMetal::Bind()
 {
@@ -84,6 +137,8 @@ HdStRenderPassStateMetal::Bind()
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
+    _SetCullState(context, _cullStyle);
+    
     // Blending
     if (_blendEnabled) {
         context->SetAlphaBlendingEnable(true);
@@ -99,30 +154,20 @@ HdStRenderPassStateMetal::Bind()
         context->SetAlphaBlendingEnable(false);
     }
     
-    if (!_alphaToCoverageUseDefault) {
-        if (_alphaToCoverageEnabled) {
-            context->SetAlphaCoverageEnable(true, true);
-        } else {
-            context->SetAlphaCoverageEnable(false, false);
-        }
+    if (_alphaToCoverageEnabled) {
+        context->SetAlphaCoverageEnable(true, true);
+    } else {
+        context->SetAlphaCoverageEnable(false, false);
     }
     
     context->SetDepthComparisonFunction(HdStMetalConversions::GetGlDepthFunc(_depthFunc));
     context->SetDepthWriteEnable(_depthMaskEnabled);
-    
-    if (!_colorMaskUseDefault) {
-        switch(_colorMask) {
-            case HdStRenderPassState::ColorMaskNone:
-                context->SetColorWriteMask(MTLColorWriteMaskNone);
-                break;
-            case HdStRenderPassState::ColorMaskRGB:
-                context->SetColorWriteMask(
-                    MTLColorWriteMaskRed|MTLColorWriteMaskGreen|MTLColorWriteMaskBlue);
-                break;
-            case HdStRenderPassState::ColorMaskRGBA:
-                context->SetColorWriteMask(MTLColorWriteMaskAll);
-                break;
-        }
+    if (_colorMaskUseDefault) {
+        // Enable color writes for all components for all attachments.
+        _SetColorMask(context, -1, ColorMaskRGBA);
+    } else {
+        // Use the same color mask for all attachments.
+        _SetColorMask(context, -1, _colorMask);
     }
 /*
     // Apply polygon offset to whole pass.
@@ -171,12 +216,10 @@ HdStRenderPassStateMetal::Bind()
         glDisable(GL_BLEND);
     }
 
-    if (!_alphaToCoverageUseDefault) {
-        if (_alphaToCoverageEnabled) {
-            glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-        } else {
-            glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-        }
+    if (_alphaToCoverageEnabled) {
+        glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+    } else {
+        glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
     }
     glEnable(GL_PROGRAM_POINT_SIZE);
 

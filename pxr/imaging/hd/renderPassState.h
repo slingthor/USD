@@ -252,10 +252,6 @@ public:
     void SetBlendEnabled(bool enabled);
 
     HD_API
-    void SetAlphaToCoverageUseDefault(bool useDefault);
-    bool GetAlphaToCoverageUseDefault() const { return _alphaToCoverageUseDefault; }
-
-    HD_API
     void SetAlphaToCoverageEnabled(bool enabled);
     bool GetAlphaToCoverageEnabled() const { return _alphaToCoverageEnabled; }
 
@@ -314,6 +310,7 @@ protected:
     bool _depthBiasEnabled;
     float _depthBiasConstantFactor;
     float _depthBiasSlopeFactor;
+
     HdCompareFunction _depthFunc;
     bool _depthMaskEnabled;
     HdCullStyle _cullStyle;
@@ -341,7 +338,6 @@ protected:
     bool _blendEnabled;
 
     // alpha to coverage
-    bool _alphaToCoverageUseDefault;
     bool _alphaToCoverageEnabled;
 
     bool _colorMaskUseDefault;
