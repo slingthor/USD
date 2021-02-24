@@ -49,10 +49,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_DEFINE_ENV_SETTING(HDST_USE_TRANSLUCENT_MATERIAL_TAG, false,
-                      "Use translucent material tag instead of additive for"
-                      "translucent materials with no given material tag.");
-
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     (opacity)
@@ -247,12 +243,7 @@ _GetMaterialTag(
     }
 
     if (isTranslucent) {
-        // Default to our cheapest blending: unsorted additive unless env var
-        // is set
-        const bool useTranslucentMaterialTag =
-            TfGetEnvSetting(HDST_USE_TRANSLUCENT_MATERIAL_TAG);
-        return useTranslucentMaterialTag ? HdStMaterialTagTokens->translucent : 
-                                           HdStMaterialTagTokens->additive;
+        return HdStMaterialTagTokens->translucent;
     }
 
     // An empty materialTag on the HdRprimCollection level means: 'ignore all
@@ -928,11 +919,8 @@ _MakeMaterialParamsForTexture(
             // Use the type of the filePath attribute to determine
             // whether to use the Storm texture system (for
             // SdfAssetPath/std::string/ HdStTextureIdentifier) or use
-            // the HdSceneDelegate::GetTextureResource/ID (for all
-            // other types). The
-            // HdSceneDelegate::GetTextureResource/ID path will be
-            // obsoleted and probably removed at some point.
-
+            // the render buffer associated to a draw target.
+            //
             if (v.IsHolding<HdStTextureIdentifier>()) {
                 //
                 // Clients can explicitly give an HdStTextureIdentifier for
