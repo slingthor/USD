@@ -2332,7 +2332,7 @@ bool
 UsdImagingDelegate::IsAnimated(const SdfPath &usdPath) const
 {
     SdfPath cachePath = ConvertIndexPathToCachePath(id);
-    _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
+    HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
     
     if (TF_VERIFY(primInfo)) {
         return primInfo->adapter->GetVisible(
