@@ -1209,6 +1209,19 @@ UsdImagingPrimAdapter::GetModelDrawMode(UsdPrim const& prim)
     return _delegate->_GetModelDrawMode(prim);
 }
 
+bool
+UsdImagingPrimAdapter::GetIsAnimated(UsdPrim const& prim) const
+{
+    auto attrs = prim.GetAuthoredAttributes();
+    for (const auto& attr : attrs) {
+        attr.ValueMightBeTimeVarying();
+    }
+    return std::any_of(attrs.begin(), attrs.end(),
+                       [](const UsdAttribute &attr){
+        attr.ValueMightBeTimeVarying();
+    });
+}
+
 /*virtual*/ 
 VtValue 
 UsdImagingPrimAdapter::GetTopology(UsdPrim const& prim,

@@ -2327,6 +2327,22 @@ UsdImagingDelegate::IsInInvisedPaths(SdfPath const &usdPath) const
     return false;
 }
 
+
+bool
+UsdImagingDelegate::IsAnimated(const SdfPath &usdPath) const
+{
+    SdfPath cachePath = ConvertIndexPathToCachePath(id);
+    _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
+    
+    if (TF_VERIFY(primInfo)) {
+        return primInfo->adapter->GetVisible(
+            primInfo->usdPrim,
+            cachePath,
+            _time);
+    }
+    return false;
+}
+
 /*virtual*/
 bool
 UsdImagingDelegate::GetVisible(SdfPath const& id)
