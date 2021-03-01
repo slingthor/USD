@@ -1212,10 +1212,7 @@ UsdImagingPrimAdapter::GetModelDrawMode(UsdPrim const& prim)
 bool
 UsdImagingPrimAdapter::GetIsAnimated(UsdPrim const& prim) const
 {
-    auto attrs = prim.GetAuthoredAttributes();
-    for (const auto& attr : attrs) {
-        attr.ValueMightBeTimeVarying();
-    }
+    const auto &attrs = prim.GetAuthoredAttributes();
     return std::any_of(attrs.begin(), attrs.end(),
                        [](const UsdAttribute &attr) -> bool{
         return attr.ValueMightBeTimeVarying();
