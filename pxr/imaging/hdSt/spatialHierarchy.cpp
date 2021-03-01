@@ -528,7 +528,6 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     size_t drawableItemsCount = drawableItems.size();
     for (size_t idx = 0; idx < drawableItemsCount; ++idx)
     {
-        const auto &drawableItem = drawableItems[idx];
         unsigned currentDepth = root->Insert(drawableItems[idx], 0);
         depth = MAX(depth, currentDepth);
     }
