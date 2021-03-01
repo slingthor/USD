@@ -137,7 +137,8 @@ struct DrawableItem {
     
     static GfRange3f ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables,
                                              std::vector<DrawableItem*> *items,
-                                             std::vector<DrawableItem*> *visibilityOwners);
+                                             std::vector<DrawableItem*> *visibilityOwners,
+                                             bool animatedItemsOnly = false);
     
     HdStDrawItemInstance    *itemInstance;
     GfRange3f               aabb;

@@ -499,7 +499,7 @@ public:
     
     // Returns true if \p usdPath prim has any animated attribute.
     USDIMAGING_API
-    bool IsAnimated(const SdfPath &usdPath) const;
+    virtual bool GetAnimated(const SdfPath &id);
 
 private:
     // Internal friend class.

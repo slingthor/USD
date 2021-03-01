@@ -182,6 +182,12 @@ HdRprim::SetPrimId(int32_t primId)
     // Don't set DirtyPrimID here, to avoid undesired variability tracking.
 }
 
+void
+HdRprim::SetAnimated(HdSceneDelegate* delegate)
+{
+    _sharedData.animated = delegate->GetAnimated(GetId());
+}
+
 bool
 HdRprim::IsDirty(HdChangeTracker &changeTracker) const
 {

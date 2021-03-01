@@ -1217,8 +1217,8 @@ UsdImagingPrimAdapter::GetIsAnimated(UsdPrim const& prim) const
         attr.ValueMightBeTimeVarying();
     }
     return std::any_of(attrs.begin(), attrs.end(),
-                       [](const UsdAttribute &attr){
-        attr.ValueMightBeTimeVarying();
+                       [](const UsdAttribute &attr) -> bool{
+        return attr.ValueMightBeTimeVarying();
     });
 }
 

@@ -976,6 +976,7 @@ namespace {
                   != 0) {
 
                 rprim->UpdateReprSelector(sceneDelegate, &dirtyBits);
+                rprim->SetAnimated(sceneDelegate);
 
                 for (const _ReprSpec& spec : reprs) {
                     if (reprsMask & 1) {

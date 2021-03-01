@@ -387,12 +387,19 @@ void DrawableItem::ProcessInstancesVisible()
 
 GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables,
                                                 std::vector<DrawableItem*> *items,
-                                                std::vector<DrawableItem*> *visibilityOwners)
+                                                std::vector<DrawableItem*> *visibilityOwners,
+                                                bool animatedItemsOnly)
 {
     GfRange3f boundingBox;
     
     for (size_t idx = 0; idx < drawables->size(); ++idx){
         HdStDrawItemInstance* drawable = &(*drawables)[idx];
+        if(drawable->GetDrawItem()->GetAnimated() && !animatedItemsOnly) {
+            continue;
+        }
+        if(!drawable->GetDrawItem()->GetAnimated() && animatedItemsOnly) {
+            continue;
+        }
         drawable->GetDrawItem()->CalculateCullingBounds();
 
         const std::vector<GfBBox3f>* instancedCullingBounds = drawable->GetDrawItem()->GetInstanceBounds();
@@ -505,7 +512,8 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     
     GfRange3f bbox = DrawableItem::ConvertDrawablesToItems(drawables,
                                                            &(this->drawableItems),
-                                                           &drawableVisibilityOwners);
+                                                           &drawableVisibilityOwners,
+                                                           false);
     
     if (!drawableItems.size()) {
         return;
@@ -520,6 +528,7 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     size_t drawableItemsCount = drawableItems.size();
     for (size_t idx = 0; idx < drawableItemsCount; ++idx)
     {
+        const auto &drawableItem = drawableItems[idx];
         unsigned currentDepth = root->Insert(drawableItems[idx], 0);
         depth = MAX(depth, currentDepth);
     }
