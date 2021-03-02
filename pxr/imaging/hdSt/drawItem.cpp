@@ -283,9 +283,9 @@ HdStDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
 }
 
 void
-HdStDrawItem::CalculateCullingBounds() const
+HdStDrawItem::CalculateCullingBounds(bool forceReCalculate) const
 {
-    if (_instancedCullingBoundsCalculated) {
+    if (_instancedCullingBoundsCalculated && !forceReCalculate) {
        return;
     }
 
@@ -385,11 +385,21 @@ HdStDrawItem::CalculateCullingBounds() const
         }
         else {
             TF_CODING_WARNING("Only expected to find one instance level, found %d with %d instances", instancerNumLevels, numInstances);
-            _instancedCullingBounds.push_back(_BakeBoundsTransform(GetBounds()));
+            if(_instancedCullingBounds.empty()) {
+                _instancedCullingBounds.reserve(1);
+                _instancedCullingBounds.push_back(_BakeBoundsTransform(GetBounds()));
+            } else {
+                _instancedCullingBounds[0] = _BakeBoundsTransform(GetBounds());
+            }
         }
     }
     else {
-        _instancedCullingBounds.push_back(_BakeBoundsTransform(GetBounds()));
+        if(_instancedCullingBounds.empty()) {
+            _instancedCullingBounds.reserve(1);
+            _instancedCullingBounds.push_back(_BakeBoundsTransform(GetBounds()));
+        } else {
+            _instancedCullingBounds[0] = _BakeBoundsTransform(GetBounds());
+        }
     }
     
     _instancedCullingBoundsCalculated = true;

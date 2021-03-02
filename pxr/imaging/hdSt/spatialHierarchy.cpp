@@ -388,16 +388,15 @@ void DrawableItem::ProcessInstancesVisible()
 GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables,
                                                 std::vector<DrawableItem*> *items,
                                                 std::vector<DrawableItem*> *visibilityOwners,
-                                                bool animatedItemsOnly)
+                                                std::vector<HdStDrawItemInstance*> *animatedDrawables)
 {
     GfRange3f boundingBox;
     
     for (size_t idx = 0; idx < drawables->size(); ++idx){
         HdStDrawItemInstance* drawable = &(*drawables)[idx];
-        if(drawable->GetDrawItem()->GetAnimated() && !animatedItemsOnly) {
-            continue;
-        }
-        if(!drawable->GetDrawItem()->GetAnimated() && animatedItemsOnly) {
+        //this true is set so all items are calulated like dis
+        if(drawable->GetDrawItem()->GetAnimated() || true) {
+            animatedDrawables->push_back(drawable);
             continue;
         }
         drawable->GetDrawItem()->CalculateCullingBounds();
@@ -507,23 +506,17 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     }
     drawableItems.clear();
     drawableVisibilityOwners.clear();
+    animatedDrawables.clear();
     
     uint64_t buildStart = ArchGetTickTime();
     
     GfRange3f bbox = DrawableItem::ConvertDrawablesToItems(drawables,
                                                            &(this->drawableItems),
                                                            &drawableVisibilityOwners,
-                                                           false);
-    
-    if (!drawableItems.size()) {
-        return;
-    }
-
+                                                           &animatedDrawables);
     populated = true;
-
     root = new OctreeNode(0.f, 0.f, 0.f, 0.f, 0.f, 0.f);
     root->ReInit(bbox);
-    
     unsigned depth = 0;
     size_t drawableItemsCount = drawableItems.size();
     for (size_t idx = 0; idx < drawableItemsCount; ++idx)
@@ -538,8 +531,8 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     os_signpost_interval_end(cullingLog(), bvhBake, "BVH Bake");
 
     buildTimeMS = (ArchGetTickTime() - buildStart) / 1000.0f;
-    
-//    NSLog(@"Building BVH done: MaxDepth=%u, %fms, %zu items", depth, buildTimeMS, drawableItems.size());
+        
+    //    NSLog(@"Building BVH done: MaxDepth=%u, %fms, %zu items", depth, buildTimeMS, drawableItems.size());
 }
 
 void BVH::Bake()
@@ -557,15 +550,7 @@ void BVH::Bake()
 void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                          vector_float2 const &dimensions)
 {
-    if (!root) {
-        return;
-    }
-
-    os_signpost_id_t bvhCulling = os_signpost_id_generate(cullingLog());
-    os_signpost_id_t bvhCullingCull = os_signpost_id_generate(cullingLog());
-    os_signpost_id_t bvhCullingFinal = os_signpost_id_generate(cullingLog());
-    os_signpost_id_t bvhCullingBuildBuffer = os_signpost_id_generate(cullingLog());
-
+    return;
     uint64_t cullStart = ArchGetTickTime();
 
     vector_float4 clipPlanes[6] = {
@@ -600,6 +585,18 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                         viewProjMatrix.columns[2][3] + viewProjMatrix.columns[2][2],
                         viewProjMatrix.columns[3][3] + viewProjMatrix.columns[3][2]}
     };
+    
+    //should this be not root? --> make sure this is also done if we have animated drawables
+    //if (root) {
+    //    return;
+    //}
+
+    os_signpost_id_t bvhCulling = os_signpost_id_generate(cullingLog);
+    os_signpost_id_t bvhCullingCull = os_signpost_id_generate(cullingLog);
+    os_signpost_id_t bvhCullingFinal = os_signpost_id_generate(cullingLog);
+    os_signpost_id_t bvhCullingBuildBuffer = os_signpost_id_generate(cullingLog);
+
+    
     for (int i = 0; i < 6; i++)
     {
         vector_float4 t = clipPlanes[i] * clipPlanes[i];
@@ -623,6 +620,35 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
     _clipPlanes = clipPlanes;
     
     struct _Worker {
+        
+        static
+        void processAnimatedNodes(std::vector<HdStDrawItemInstance*> *animatedDrawables, size_t begin, size_t end)
+        {
+            for (size_t idx = begin; idx < end; ++idx) {
+                const auto& animatedDrawable = (*animatedDrawables)[idx];
+                const auto& drawItem = animatedDrawable->GetDrawItem();
+                drawItem->CalculateCullingBounds(true);
+                const std::vector<GfBBox3f>* instancedCullingBounds = animatedDrawable->GetDrawItem()->GetInstanceBounds();
+                size_t const numItems = instancedCullingBounds->size();
+                if(numItems) {
+                    bool anyVisible = false;
+                    for (size_t i = 0; i < numItems; ++i) {
+                        GfBBox3f const &oobb = (*instancedCullingBounds)[i];
+                        GfRange3f const &ooRange = oobb.GetRange();
+                        CullStateCache cullCache{ooRange.GetMin(), ooRange.GetMax()};
+                        if (MissingFunctions::FrustumFullyContains(cullCache, _clipPlanes) || MissingFunctions::IntersectsFrustum(cullCache, _clipPlanes)) {
+                            anyVisible = true;
+                            break;
+                        }
+                    }
+                    bool shouldBeVisible = drawItem->GetVisible() && anyVisible;
+                    if (animatedDrawable->IsVisible() != shouldBeVisible) {
+                        animatedDrawable->SetVisible(shouldBeVisible);
+                    }
+                }
+            }
+        }
+        
         static
         void processInstancesVisible(std::vector<DrawableItem*> *instancedDrawableItems, size_t begin, size_t end)
         {
@@ -691,7 +717,13 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
 
     os_signpost_interval_begin(cullingLog(), bvhCullingFinal, "Culling: BVH -- Apply");
     uint64_t cullApplyStart = ArchGetTickTime();
-
+    
+    WorkParallelForN(animatedDrawables.size(),
+                     std::bind(&_Worker::processAnimatedNodes, &animatedDrawables,
+                               std::placeholders::_1,
+                               std::placeholders::_2),
+                     grainApply);
+    
     WorkParallelForN(cullList.perItemContained.size(),
                      std::bind(&_Worker::processApplyContained, &cullList.perItemContained,
                                std::placeholders::_1,

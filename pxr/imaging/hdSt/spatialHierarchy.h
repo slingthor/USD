@@ -138,7 +138,7 @@ struct DrawableItem {
     static GfRange3f ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables,
                                              std::vector<DrawableItem*> *items,
                                              std::vector<DrawableItem*> *visibilityOwners,
-                                             bool animatedItemsOnly = false);
+                                             std::vector<HdStDrawItemInstance*> *animatedDrawables);
     
     HdStDrawItemInstance    *itemInstance;
     GfRange3f               aabb;
@@ -217,6 +217,7 @@ private:
 
     std::vector<DrawableItem*> bakedDrawableItems;
     std::vector<uint8_t> bakedVisibility;
+    std::vector<HdStDrawItemInstance*> animatedDrawables;
     CullList cullList;
     bool visibilityDirty;
 };
