@@ -395,7 +395,7 @@ GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance
     for (size_t idx = 0; idx < drawables->size(); ++idx){
         HdStDrawItemInstance* drawable = &(*drawables)[idx];
         //this true is set so all items are calulated like dis
-        if(drawable->GetDrawItem()->GetAnimated() || true) {
+        if(drawable->GetDrawItem()->GetAnimated()) {
             animatedDrawables->push_back(drawable);
             continue;
         }
@@ -550,7 +550,6 @@ void BVH::Bake()
 void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                          vector_float2 const &dimensions)
 {
-    return;
     uint64_t cullStart = ArchGetTickTime();
 
     vector_float4 clipPlanes[6] = {
