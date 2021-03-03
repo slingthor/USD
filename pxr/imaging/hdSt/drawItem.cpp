@@ -285,7 +285,7 @@ HdStDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
 void
 HdStDrawItem::CalculateCullingBounds(bool forceReCalculate) const
 {
-    if (_instancedCullingBoundsCalculated && !forceReCalculate) {
+    if (_instancedCullingBoundsCalculated) {
        return;
     }
 
