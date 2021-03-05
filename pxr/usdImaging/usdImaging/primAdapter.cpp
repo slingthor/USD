@@ -1215,7 +1215,15 @@ UsdImagingPrimAdapter::GetIsAnimated(UsdPrim const& prim) const
     const auto &attrs = prim.GetAuthoredAttributes();
     return std::any_of(attrs.begin(), attrs.end(),
                        [](const UsdAttribute &attr) -> bool{
-        return attr.ValueMightBeTimeVarying();
+        auto roleName = attr.GetRoleName();
+        bool hasAnimatedRole = roleName.IsEmpty()
+            || roleName == SdfValueRoleNames->Point
+            || roleName == SdfValueRoleNames->Vector
+            || roleName == SdfValueRoleNames->Transform;
+        if (hasAnimatedRole) {
+            return attr.ValueMightBeTimeVarying();
+        }
+        return false;
     });
 }
 
