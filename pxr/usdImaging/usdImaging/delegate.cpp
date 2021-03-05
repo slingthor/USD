@@ -2335,7 +2335,7 @@ UsdImagingDelegate::GetAnimated(const SdfPath &id)
     _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
     
     if (TF_VERIFY(primInfo)) {
-        return primInfo->adapter->GetIsAnimated(
+        return primInfo->adapter->GetAnimated(
             primInfo->usdPrim);
     }
     return false;

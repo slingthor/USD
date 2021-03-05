@@ -1210,7 +1210,7 @@ UsdImagingPrimAdapter::GetModelDrawMode(UsdPrim const& prim)
 }
 
 bool
-UsdImagingPrimAdapter::GetIsAnimated(UsdPrim const& prim) const
+UsdImagingPrimAdapter::GetAnimated(UsdPrim const& prim) const
 {
     const auto &attrs = prim.GetAuthoredAttributes();
     return std::any_of(attrs.begin(), attrs.end(),

@@ -469,7 +469,7 @@ public:
     /// Returns True if an any attribute is animated
     /// Meaning any of the prim's attributes has at least one timesample
     USDIMAGING_API
-    bool GetIsAnimated(UsdPrim const& prim) const;
+    bool GetAnimated(UsdPrim const& prim) const;
 
     /// Gets the topology object of a specific Usd prim. If the
     /// adapter is a mesh it will return an HdMeshTopology,

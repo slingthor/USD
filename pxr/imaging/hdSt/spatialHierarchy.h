@@ -148,10 +148,13 @@ struct DrawableItem {
 
 struct DrawableAnimatedItem {
     HdStDrawItemInstance    *itemInstance;
-    size_t instanceIdx;
+    size_t                  instanceIdx;
     DrawableAnimatedItem(HdStDrawItemInstance *itemInstance, size_t instanceIdx)
-                        : itemInstance(itemInstance),
-                          instanceIdx(instanceIdx){}
+: itemInstance(itemInstance)
+, instanceIdx(instanceIdx)
+{
+    //Nothing
+}
 };
 
 class OctreeNode {

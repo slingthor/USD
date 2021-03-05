@@ -47,7 +47,6 @@
 #include "pxr/base/tf/stl.h"
 #include "pxr/base/work/dispatcher.h"
 
-
 #include "pxr/base/work/loops.h"
 
 #include <boost/functional/hash.hpp>
@@ -55,7 +54,6 @@
 #include <tbb/enumerable_thread_specific.h>
 
 #include <functional>
-#include <atomic>
 
 #include <sys/time.h>
 
@@ -353,8 +351,7 @@ GfRange3f ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables,
     
     for (size_t idx = 0; idx < drawables->size(); ++idx){
         HdStDrawItemInstance* drawable = &(*drawables)[idx];
-        //this true is set so all items are calulated like dis
-        drawable->GetDrawItem()->CalculateCullingBounds();
+        drawable->GetDrawItem()->CalculateCullingBounds(true);
         const std::vector<GfBBox3f>* instancedCullingBounds = drawable->GetDrawItem()->GetInstanceBounds();
         size_t const numItems = instancedCullingBounds->size();
 
@@ -743,7 +740,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
     os_signpost_interval_begin(cullingLog(), bvhCullingFinal, "Culling: BVH -- Apply");
     uint64_t cullApplyStart = ArchGetTickTime();
     if(!bakedAnimatedVisibility.empty()) {
-        std::atomic<uint8_t*> visibilityIndex;
+        uint8_t* visibilityIndex;
         std::pair<std::vector<DrawableAnimatedItem>*, uint8_t*> animatedProcessParam;
         animatedProcessParam.first = &animatedDrawables;
         animatedProcessParam.second = &(bakedAnimatedVisibility[0]);
