@@ -7999,8 +7999,6 @@ _ValueFromClipsMightBeTimeVarying(const Usd_ClipSetRefPtr &clipSet,
             return false;
         }
         auto clip = clipSet->valueClips.front();
-        auto startTime = clip->startTime;
-        auto endTime = clip->endTime;
         auto timeSamplesForPath = clip->ListTimeSamplesForPath(attrSpecPath);
         return timeSamplesForPath.size() > 1;
     }

@@ -554,11 +554,9 @@ void BVH::Bake()
     root->WriteToList(index, &bakedDrawableItems, &bakedVisibility[0]);
 }
 
-std::mutex animatedNodeMutex;
 void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                          vector_float2 const &dimensions)
 {
-    return;
     uint64_t cullStart = ArchGetTickTime();
 
     vector_float4 clipPlanes[6] = {
@@ -593,11 +591,6 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                         viewProjMatrix.columns[2][3] + viewProjMatrix.columns[2][2],
                         viewProjMatrix.columns[3][3] + viewProjMatrix.columns[3][2]}
     };
-    
-    //should this be not root? --> make sure this is also done if we have animated drawables
-    //if (root) {
-    //    return;
-    //}
 
     os_signpost_id_t bvhCulling = os_signpost_id_generate(cullingLog);
     os_signpost_id_t bvhCullingCull = os_signpost_id_generate(cullingLog);
@@ -646,6 +639,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                 drawItem->CalculateCullingBounds(true);
                 const std::vector<GfBBox3f>* instancedCullingBounds = drawItem->GetInstanceBounds();
                 size_t const numItems = instancedCullingBounds->size();
+                //iterate all instances and set their cull result visibility
                 for (size_t i = 0; i < numItems; ++i) {
                     GfBBox3f const &oobb = (*instancedCullingBounds)[i];
                     GfRange3f const &ooRange = oobb.GetRange();
@@ -654,6 +648,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                     animatedDrawable->SetCullResultVisibilityCache(visibility, i);
                     visibility++;
                 }
+                //write the visibility for the item
                 int numVisible;
                 const bool isInstanced = numItems > 1;
                 if (isInstanced) {
@@ -665,6 +660,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                 }
 
                 bool shouldBeVisible = drawItem->GetVisible() && numVisible;
+                //take into account the authored visibility
                 if (animatedDrawable->IsVisible() != shouldBeVisible) {
                     animatedDrawable->SetVisible(shouldBeVisible);
                 }
