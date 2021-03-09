@@ -632,7 +632,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
             uint8_t* visibility = animatedProcessParam->second;
             //we only need to get the location of the first visibility index - the loop follows sequentially like it was
             //structured afterwards
-            visibility += (*animatedDrawables)[0].instanceIdx;
+            visibility += animatedDrawables->front().instanceIdx;
             for (size_t idx = begin; idx < end; ++idx) {
                 const auto& animatedDrawable = (*animatedDrawables)[idx].itemInstance;
                 const auto& drawItem = animatedDrawable->GetDrawItem();
@@ -781,8 +781,6 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
     uint64_t end = ArchGetTickTime();
     float cullBuildBufferTimeMS = (end - cullBuildBufferTimeBegin) / 1000.0f;
     lastCullTimeMS = (end - cullStart) / 1000.0f;
-
-//    NSLog(@"CullList: %.2fms   Apply: %.2fms   BuildBuffer: %.2fms   Total: %.2fms", cullListTimeMS, cullApplyTimeMS, cullBuildBufferTimeMS, lastCullTimeMS);
 }
 
 OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ)

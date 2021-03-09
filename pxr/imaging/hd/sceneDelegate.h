@@ -597,7 +597,7 @@ public:
     HD_API 
     virtual VtValue GetMaterialResource(SdfPath const &materialId);
     
-    // Returns true if \p usdPath prim has any animated attribute.
+    // Returns true if \p id's prim has any animated attribute.
     HD_API
     virtual bool GetAnimated(const SdfPath &id) { return false; }
 

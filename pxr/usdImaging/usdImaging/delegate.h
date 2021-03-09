@@ -496,8 +496,8 @@ public:
     /// Returns true if \p usdPath is included in invised path list.
     USDIMAGING_API
     bool IsInInvisedPaths(const SdfPath &usdPath) const;
-    
-    // Returns true if \p usdPath prim has any animated attribute.
+
+    // Returns true if \p id's prim has any animated attribute.
     USDIMAGING_API
     virtual bool GetAnimated(const SdfPath &id);
 
