@@ -1,6 +1,6 @@
-diff -ru oiio-Release-2.1.16.0/src/libOpenImageIO/CMakeLists.txt oiio-Release-2.1.16.0_new/src/libOpenImageIO/CMakeLists.txt
---- oiio-Release-2.1.16.0/src/libOpenImageIO/CMakeLists.txt	2020-06-01 17:32:35.000000000 +0100
-+++ oiio-Release-2.1.16.0_new/src/libOpenImageIO/CMakeLists.txt	2021-02-01 18:49:13.000000000 +0000
+diff -u -r oiio-Release-2.1.16.0_old/src/libOpenImageIO/CMakeLists.txt oiio-Release-2.1.16.0/src/libOpenImageIO/CMakeLists.txt
+--- oiio-Release-2.1.16.0_old/src/libOpenImageIO/CMakeLists.txt	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0/src/libOpenImageIO/CMakeLists.txt	2021-03-02 19:17:27.000000000 +0000
 @@ -56,8 +56,8 @@
                            imagebufalgo_xform.cpp
                            imagebufalgo_yee.cpp imagebufalgo_opencv.cpp
@@ -36,9 +36,9 @@ diff -ru oiio-Release-2.1.16.0/src/libOpenImageIO/CMakeLists.txt oiio-Release-2.
                            ${libOpenImageIO_srcs}
                            ${libOpenImageIO_hdrs}
                           )
-diff -ru oiio-Release-2.1.16.0/src/libOpenImageIO/imagebuf.mm oiio-Release-2.1.16.0_new/src/libOpenImageIO/imagebuf.mm
---- oiio-Release-2.1.16.0/src/libOpenImageIO/imagebuf.mm	2020-06-01 17:32:35.000000000 +0100
-+++ oiio-Release-2.1.16.0_new/src/libOpenImageIO/imagebuf.mm	2021-02-01 11:51:37.000000000 +0000
+diff -u -r oiio-Release-2.1.16.0_old/src/libOpenImageIO/imagebuf.mm oiio-Release-2.1.16.0/src/libOpenImageIO/imagebuf.mm
+--- oiio-Release-2.1.16.0_old/src/libOpenImageIO/imagebuf.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0/src/libOpenImageIO/imagebuf.mm	2021-03-02 19:17:27.000000000 +0000
 @@ -20,6 +20,7 @@
  #include <OpenImageIO/simd.h>
  #include <OpenImageIO/strutil.h>
@@ -113,9 +113,9 @@ diff -ru oiio-Release-2.1.16.0/src/libOpenImageIO/imagebuf.mm oiio-Release-2.1.1
                                   TypeString, &fmt);
      m_fileformat = ustring(fmt);
      m_imagecache->get_imagespec(m_name, m_spec, subimage, miplevel);
-diff -ru oiio-Release-2.1.16.0/src/libOpenImageIO/imageio.mm oiio-Release-2.1.16.0_new/src/libOpenImageIO/imageio.mm
---- oiio-Release-2.1.16.0/src/libOpenImageIO/imageio.mm	2020-06-01 17:32:35.000000000 +0100
-+++ oiio-Release-2.1.16.0_new/src/libOpenImageIO/imageio.mm	2021-02-01 16:59:38.000000000 +0000
+diff -u -r oiio-Release-2.1.16.0_old/src/libOpenImageIO/imageio.mm oiio-Release-2.1.16.0/src/libOpenImageIO/imageio.mm
+--- oiio-Release-2.1.16.0_old/src/libOpenImageIO/imageio.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0/src/libOpenImageIO/imageio.mm	2021-03-05 16:42:12.000000000 +0000
 @@ -21,6 +21,7 @@
  #include <OpenImageIO/thread.h>
  #include <OpenImageIO/timer.h>
@@ -212,9 +212,9 @@ diff -ru oiio-Release-2.1.16.0/src/libOpenImageIO/imageio.mm oiio-Release-2.1.16
          *(ustring*)val = ustring(library_list);
          return true;
      }
-diff -ru oiio-Release-2.1.16.0/src/libOpenImageIO/imageio_pvt.h.in oiio-Release-2.1.16.0_new/src/libOpenImageIO/imageio_pvt.h.in
---- oiio-Release-2.1.16.0/src/libOpenImageIO/imageio_pvt.h.in	2020-06-01 17:32:35.000000000 +0100
-+++ oiio-Release-2.1.16.0_new/src/libOpenImageIO/imageio_pvt.h.in	2021-02-01 23:25:27.000000000 +0000
+diff -u -r oiio-Release-2.1.16.0_old/src/libOpenImageIO/imageio_pvt.h.in oiio-Release-2.1.16.0/src/libOpenImageIO/imageio_pvt.h.in
+--- oiio-Release-2.1.16.0_old/src/libOpenImageIO/imageio_pvt.h.in	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0/src/libOpenImageIO/imageio_pvt.h.in	2021-03-05 16:42:34.000000000 +0000
 @@ -25,7 +25,7 @@
  extern recursive_mutex imageio_mutex;
  extern atomic_int oiio_threads;
@@ -224,11 +224,23 @@ diff -ru oiio-Release-2.1.16.0/src/libOpenImageIO/imageio_pvt.h.in oiio-Release-
  extern std::string format_list;
  extern std::string input_format_list;
  extern std::string output_format_list;
-diff -ru oiio-Release-2.1.16.0/src/libOpenImageIO/imageioplugin.cpp oiio-Release-2.1.16.0_new/src/libOpenImageIO/imageioplugin.cpp
---- oiio-Release-2.1.16.0/src/libOpenImageIO/imageioplugin.cpp	2020-06-01 17:32:35.000000000 +0100
-+++ oiio-Release-2.1.16.0_new/src/libOpenImageIO/imageioplugin.cpp	2021-02-01 16:59:38.000000000 +0000
-@@ -475,7 +475,7 @@
+@@ -34,7 +34,7 @@
+ extern int oiio_print_debug;
+ extern int oiio_log_times;
+ 
+-
++void init_plugin_searchpath();
+ // For internal use - use error() below for a nicer interface.
+ void seterror (string_view message);
+ 
+diff -u -r oiio-Release-2.1.16.0_old/src/libOpenImageIO/imageioplugin.cpp oiio-Release-2.1.16.0/src/libOpenImageIO/imageioplugin.cpp
+--- oiio-Release-2.1.16.0_old/src/libOpenImageIO/imageioplugin.cpp	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0/src/libOpenImageIO/imageioplugin.cpp	2021-03-05 16:44:00.000000000 +0000
+@@ -473,9 +473,10 @@
+         Strutil::to_lower(format);
+         OutputPluginMap::const_iterator found = output_formats.find(format);
          if (found == output_formats.end()) {
++            pvt::init_plugin_searchpath();
              catalog_all_plugins(plugin_searchpath.size()
                                      ? plugin_searchpath
 -                                    : pvt::plugin_searchpath.string());
@@ -236,18 +248,20 @@ diff -ru oiio-Release-2.1.16.0/src/libOpenImageIO/imageioplugin.cpp oiio-Release
              found = output_formats.find(format);
          }
          if (found != output_formats.end()) {
-@@ -576,7 +576,7 @@
+@@ -576,7 +577,8 @@
          InputPluginMap::const_iterator found = input_formats.find(format);
          if (found == input_formats.end()) {
              if (plugin_searchpath.empty())
 -                plugin_searchpath = pvt::plugin_searchpath;
-+                plugin_searchpath = *pvt::plugin_searchpath;
++                pvt::init_plugin_searchpath();
++                plugin_searchpath = *(pvt::plugin_searchpath);
              catalog_all_plugins(plugin_searchpath);
              found = input_formats.find(format);
          }
-diff -ru oiio-Release-2.1.16.0/src/libtexture/imagecache.mm oiio-Release-2.1.16.0_new/src/libtexture/imagecache.mm
---- oiio-Release-2.1.16.0/src/libtexture/imagecache.mm	2020-06-01 17:32:35.000000000 +0100
-+++ oiio-Release-2.1.16.0_new/src/libtexture/imagecache.mm	2021-01-30 00:44:15.000000000 +0000
+Only in oiio-Release-2.1.16.0_old/src/libtexture: .DS_Store
+diff -u -r oiio-Release-2.1.16.0_old/src/libtexture/imagecache.mm oiio-Release-2.1.16.0/src/libtexture/imagecache.mm
+--- oiio-Release-2.1.16.0_old/src/libtexture/imagecache.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0/src/libtexture/imagecache.mm	2021-03-02 19:17:27.000000000 +0000
 @@ -30,7 +30,7 @@
  
  #include "imagecache_pvt.h"
@@ -643,9 +657,9 @@ diff -ru oiio-Release-2.1.16.0/src/libtexture/imagecache.mm oiio-Release-2.1.16.
          && spec.alpha_channel >= 0) {
          if (file->subimageinfo(subimage).is_constant_image)
              return file->get_average_color((float*)data, subimage,
-diff -ru oiio-Release-2.1.16.0/src/libtexture/texoptions.mm oiio-Release-2.1.16.0_new/src/libtexture/texoptions.mm
---- oiio-Release-2.1.16.0/src/libtexture/texoptions.mm	2020-06-01 17:32:35.000000000 +0100
-+++ oiio-Release-2.1.16.0_new/src/libtexture/texoptions.mm	2021-02-01 13:08:25.000000000 +0000
+diff -u -r oiio-Release-2.1.16.0_old/src/libtexture/texoptions.mm oiio-Release-2.1.16.0/src/libtexture/texoptions.mm
+--- oiio-Release-2.1.16.0_old/src/libtexture/texoptions.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0/src/libtexture/texoptions.mm	2021-03-02 19:17:27.000000000 +0000
 @@ -11,7 +11,7 @@
  #include <OpenImageIO/typedesc.h>
  #include <OpenImageIO/ustring.h>
@@ -720,9 +734,9 @@ diff -ru oiio-Release-2.1.16.0/src/libtexture/texoptions.mm oiio-Release-2.1.16.
              return (Wrap)i;
      return Tex::Wrap::Default;
  }
-diff -ru oiio-Release-2.1.16.0/src/libtexture/texture3d.mm oiio-Release-2.1.16.0_new/src/libtexture/texture3d.mm
---- oiio-Release-2.1.16.0/src/libtexture/texture3d.mm	2020-06-01 17:32:35.000000000 +0100
-+++ oiio-Release-2.1.16.0_new/src/libtexture/texture3d.mm	2021-02-01 11:51:37.000000000 +0000
+diff -u -r oiio-Release-2.1.16.0_old/src/libtexture/texture3d.mm oiio-Release-2.1.16.0/src/libtexture/texture3d.mm
+--- oiio-Release-2.1.16.0_old/src/libtexture/texture3d.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0/src/libtexture/texture3d.mm	2021-03-02 19:17:27.000000000 +0000
 @@ -25,6 +25,7 @@
  #include "../field3d.imageio/field3d_backdoor.h"
  #include "imagecache_pvt.h"
@@ -761,10 +775,10 @@ diff -ru oiio-Release-2.1.16.0/src/libtexture/texture3d.mm oiio-Release-2.1.16.0
          // Field3d is special -- it allows nonlinear or time-varying
          // transforms procedurally, but we have to use a back door.
          auto input                   = texturefile->open(thread_info);
-Binary files oiio-Release-2.1.16.0/src/libutil/.DS_Store and oiio-Release-2.1.16.0_new/src/libutil/.DS_Store differ
-diff -ru oiio-Release-2.1.16.0/src/libutil/CMakeLists.txt oiio-Release-2.1.16.0_new/src/libutil/CMakeLists.txt
---- oiio-Release-2.1.16.0/src/libutil/CMakeLists.txt	2020-06-01 17:32:35.000000000 +0100
-+++ oiio-Release-2.1.16.0_new/src/libutil/CMakeLists.txt	2021-02-01 18:49:03.000000000 +0000
+Only in oiio-Release-2.1.16.0_old/src/libutil: .DS_Store
+diff -u -r oiio-Release-2.1.16.0_old/src/libutil/CMakeLists.txt oiio-Release-2.1.16.0/src/libutil/CMakeLists.txt
+--- oiio-Release-2.1.16.0_old/src/libutil/CMakeLists.txt	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0/src/libutil/CMakeLists.txt	2021-03-02 19:17:27.000000000 +0000
 @@ -2,8 +2,8 @@
                    errorhandler.cpp filesystem.cpp
                    farmhash.cpp filter.cpp hashes.cpp paramlist.cpp
@@ -776,9 +790,9 @@ diff -ru oiio-Release-2.1.16.0/src/libutil/CMakeLists.txt oiio-Release-2.1.16.0_
  
  add_library (OpenImageIO_Util ${libOpenImageIO_Util_srcs})
  target_include_directories (OpenImageIO_Util
-diff -ru oiio-Release-2.1.16.0/src/libutil/strutil.mm oiio-Release-2.1.16.0_new/src/libutil/strutil.mm
---- oiio-Release-2.1.16.0/src/libutil/strutil.mm	2020-06-01 17:32:35.000000000 +0100
-+++ oiio-Release-2.1.16.0_new/src/libutil/strutil.mm	2021-02-01 18:30:40.000000000 +0000
+diff -u -r oiio-Release-2.1.16.0_old/src/libutil/strutil.mm oiio-Release-2.1.16.0/src/libutil/strutil.mm
+--- oiio-Release-2.1.16.0_old/src/libutil/strutil.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0/src/libutil/strutil.mm	2021-03-02 19:17:27.000000000 +0000
 @@ -14,6 +14,7 @@
  #include <sstream>
  #include <string>
@@ -825,9 +839,9 @@ diff -ru oiio-Release-2.1.16.0/src/libutil/strutil.mm oiio-Release-2.1.16.0_new/
  #elif defined(_WIN32)
      // Windows has _strtod_l
      return _strtod_l(nptr, endptr, c_loc);
-diff -ru oiio-Release-2.1.16.0/src/libutil/ustring.mm oiio-Release-2.1.16.0_new/src/libutil/ustring.mm
---- oiio-Release-2.1.16.0/src/libutil/ustring.mm	2020-06-01 17:32:35.000000000 +0100
-+++ oiio-Release-2.1.16.0_new/src/libutil/ustring.mm	2021-02-01 14:37:25.000000000 +0000
+diff -u -r oiio-Release-2.1.16.0_old/src/libutil/ustring.mm oiio-Release-2.1.16.0/src/libutil/ustring.mm
+--- oiio-Release-2.1.16.0_old/src/libutil/ustring.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0/src/libutil/ustring.mm	2021-03-02 19:17:27.000000000 +0000
 @@ -9,6 +9,7 @@
  #include <OpenImageIO/strutil.h>
  #include <OpenImageIO/thread.h>
@@ -989,9 +1003,9 @@ diff -ru oiio-Release-2.1.16.0/src/libutil/ustring.mm oiio-Release-2.1.16.0_new/
  }
  
  OIIO_NAMESPACE_END
-diff -ru oiio-Release-2.1.16.0/src/openexr.imageio/CMakeLists.txt oiio-Release-2.1.16.0_new/src/openexr.imageio/CMakeLists.txt
---- oiio-Release-2.1.16.0/src/openexr.imageio/CMakeLists.txt	2020-06-01 17:32:35.000000000 +0100
-+++ oiio-Release-2.1.16.0_new/src/openexr.imageio/CMakeLists.txt	2021-02-01 13:54:25.000000000 +0000
+diff -u -r oiio-Release-2.1.16.0_old/src/openexr.imageio/CMakeLists.txt oiio-Release-2.1.16.0/src/openexr.imageio/CMakeLists.txt
+--- oiio-Release-2.1.16.0_old/src/openexr.imageio/CMakeLists.txt	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0/src/openexr.imageio/CMakeLists.txt	2021-03-02 19:17:27.000000000 +0000
 @@ -2,6 +2,6 @@
  # SPDX-License-Identifier: BSD-3-Clause
  # https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
@@ -1000,9 +1014,9 @@ diff -ru oiio-Release-2.1.16.0/src/openexr.imageio/CMakeLists.txt oiio-Release-2
 +add_oiio_plugin (exrinput.mm exroutput.cpp
                   LINK_LIBRARIES ${OPENEXR_LIBRARIES})
  
-diff -ru oiio-Release-2.1.16.0/src/openexr.imageio/exrinput.mm oiio-Release-2.1.16.0_new/src/openexr.imageio/exrinput.mm
---- oiio-Release-2.1.16.0/src/openexr.imageio/exrinput.mm	2020-06-01 17:32:35.000000000 +0100
-+++ oiio-Release-2.1.16.0_new/src/openexr.imageio/exrinput.mm	2021-02-01 13:17:32.000000000 +0000
+diff -u -r oiio-Release-2.1.16.0_old/src/openexr.imageio/exrinput.mm oiio-Release-2.1.16.0/src/openexr.imageio/exrinput.mm
+--- oiio-Release-2.1.16.0_old/src/openexr.imageio/exrinput.mm	2020-06-01 17:32:35.000000000 +0100
++++ oiio-Release-2.1.16.0/src/openexr.imageio/exrinput.mm	2021-03-02 19:17:27.000000000 +0000
 @@ -10,6 +10,7 @@
  #include <map>
  #include <memory>
