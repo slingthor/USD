@@ -2166,7 +2166,7 @@ def InstallOpenSubdiv(context, force, buildArgs):
                              .format(buildDirmacOS=buildDirmacOS, variant="Debug" if context.buildDebug else "Release"))
             extraArgs.append('-DCMAKE_TOOLCHAIN_FILE={srcOSDDir}/cmake/iOSToolchain.cmake'
                              .format(srcOSDDir=srcOSDDir))
-            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64')
+            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64e')
 
             os.environ['SDKROOT'] = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
 
