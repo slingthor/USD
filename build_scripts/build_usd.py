@@ -1046,13 +1046,13 @@ def InstallBoost_Helper(context, force, buildArgs):
                 'using clang-darwin : x86_64\n',
                 ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
                     .format(XCODE_ROOT=xcodeRoot),
-                ': <compileflags>"-target x86_64-apple-macos10.15 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target x86_64-apple-macos10.15 -isysroot {SDK_PATH}" address-model=64 architecture=x86_64\n'
+                ': <compileflags>"-target x86_64-apple-macos12.0 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target x86_64-apple-macos12.0 -isysroot {SDK_PATH}" address-model=64 architecture=x86_64\n'
                     .format(SDK_PATH=sdkPath),
                 ';\n\n'
                 'using clang-darwin : arm64e\n',
                 ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
                     .format(XCODE_ROOT=xcodeRoot),
-                ': <compileflags>"-target arm64e-apple-macos10.15 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target arm64e-apple-macos10.15 -isysroot {SDK_PATH}" address-model=64 architecture=arm64e\n'
+                ': <compileflags>"-target arm64e-apple-macos12.0 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target arm64e-apple-macos12.0 -isysroot {SDK_PATH}" address-model=64 architecture=arm64e\n'
                     .format(SDK_PATH=sdkPath),
                 ';\n\n'
             ]
