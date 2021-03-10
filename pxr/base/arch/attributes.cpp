@@ -187,7 +187,11 @@ static
 void
 AddImage(const struct mach_header* mh, intptr_t slide)
 {
+#ifdef __arm64e__
+    const auto entries = GetConstructorEntries(mh, slide, "__AUTH", "pxrctor");
+#else
     const auto entries = GetConstructorEntries(mh, slide, "__DATA", "pxrctor");
+#endif
 
     // Execute in priority order.
     for (size_t i = 0, n = entries.size(); i != n; ++i) {
@@ -202,7 +206,11 @@ static
 void
 RemoveImage(const struct mach_header* mh, intptr_t slide)
 {
+#ifdef __arm64e__
+    const auto entries = GetConstructorEntries(mh, slide, "__AUTH", "pxrdtor");
+#else
     const auto entries = GetConstructorEntries(mh, slide, "__DATA", "pxrdtor");
+#endif
 
     // Execute in reverse priority order.
     for (size_t i = entries.size(); i-- != 0; ) {
