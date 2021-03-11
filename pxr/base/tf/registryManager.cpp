@@ -570,8 +570,8 @@ TfRegistryManager::GetInstance()
 {
     // We don't bother with a TfSingleton here.  The real singleton
     // (Tf_RegistryManagerImpl) is behind the scenes.
-    static TfRegistryManager manager;
-    return manager;
+    static auto manager = new TfRegistryManager;
+    return *manager;
 }
 
 void 
@@ -598,22 +598,25 @@ TfRegistryManager::_UnsubscribeFrom(const type_info& ti)
     Tf_RegistryManagerImpl::GetInstance().UnsubscribeFrom(ArchGetDemangled(ti));
 }
 
-void
-Tf_RegistryInitCtor(char const *name)
+// Tell registry when this library loads/unloads.
+// static Tf_RegistryInit tf_registry_init(BOOST_PP_STRINGIZE(MFB_ALT_PACKAGE_NAME));
+// This has been moved to usd_initialize() so that we can load this lazily
+
+Tf_RegistryInit::Tf_RegistryInit(const char* name) : _name(name)
 {
     // Finished registering functions.
     if (TfSingleton<Tf_RegistryManagerImpl>::CurrentlyExists()) {
-        Tf_RegistryManagerImpl::GetInstance().ClearActiveLibrary(name);
+        Tf_RegistryManagerImpl::GetInstance().ClearActiveLibrary(_name);
     }
 }
 
-void
-Tf_RegistryInitDtor(char const *name)
+Tf_RegistryInit::~Tf_RegistryInit()
 {
     if (TfSingleton<Tf_RegistryManagerImpl>::CurrentlyExists()) {
-        Tf_RegistryManagerImpl::GetInstance().UnloadLibrary(name);
+        Tf_RegistryManagerImpl::GetInstance().UnloadLibrary(_name);
     }
 }
+
 
 void
 Tf_RegistryInit::Add(
@@ -626,5 +629,6 @@ Tf_RegistryInit::Add(
     Tf_RegistryManagerImpl::GetInstance().
             AddRegistrationFunction(libName, func, typeName);
 }
+
 
 PXR_NAMESPACE_CLOSE_SCOPE

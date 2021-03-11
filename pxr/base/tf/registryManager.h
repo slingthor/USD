@@ -120,25 +120,20 @@ private:
     TF_API void _UnsubscribeFrom(const std::type_info&);
 };
 
-TF_API void Tf_RegistryInitCtor(char const *name);
-TF_API void Tf_RegistryInitDtor(char const *name);
-
-namespace {
-struct Tf_RegistryStaticInit {
-    Tf_RegistryStaticInit() {
-        Tf_RegistryInitCtor(TF_PP_STRINGIZE(MFB_ALT_PACKAGE_NAME));
-    }
-    ~Tf_RegistryStaticInit() {
-        Tf_RegistryInitDtor(TF_PP_STRINGIZE(MFB_ALT_PACKAGE_NAME));
-    }
+struct TFAddParameters {
+    const char* libName;
+    TfRegistryManager::RegistrationFunctionType func;
+    const char *typeName;
 };
-}
 
 // Private class used to indicate the library has finished registering
 // functions, to indicate that the library is being unloaded and to
 // add functions to the registry.
 class Tf_RegistryInit {
 public:
+    TF_API Tf_RegistryInit(const char* name);
+    TF_API ~Tf_RegistryInit();
+
     TF_API static void Add(const char* libName,
                     TfRegistryManager::RegistrationFunctionType func,
                     const char* typeName);
@@ -149,6 +144,9 @@ public:
     {
         Add(libName,(TfRegistryManager::RegistrationFunctionType)func,typeName);
     }
+
+private:
+    const char* _name;
 };
 
 // The ARCH_CONSTRUCTOR priority for registering registry functions.
@@ -158,36 +156,52 @@ public:
 // Macros for adding registry functions outside class templates.
 //
 
-// Define a registry function outside of a template.  Follow the macro with
-// the body of the function inside braces.  KEY_TYPE and TAG must be types.
-#define TF_REGISTRY_DEFINE_WITH_TYPE(KEY_TYPE, TAG)                            \
-    static void _Tf_RegistryFunction(KEY_TYPE*, TAG*);                         \
-    ARCH_CONSTRUCTOR(BOOST_PP_CAT(_Tf_RegistryAdd, __LINE__),                  \
-                     TF_REGISTRY_PRIORITY, KEY_TYPE*, TAG*)                    \
-    {                                                                          \
-        Tf_RegistryInit::Add(TF_PP_STRINGIZE(MFB_ALT_PACKAGE_NAME),            \
-                             (void(*)(KEY_TYPE*, TAG*))_Tf_RegistryFunction,   \
-                             TF_PP_STRINGIZE(KEY_TYPE));                       \
-    }                                                                          \
-    _ARCH_ENSURE_PER_LIB_INIT(Tf_RegistryStaticInit, _tfRegistryInit);         \
-    static void _Tf_RegistryFunction(KEY_TYPE*, TAG*)
-    
-// Define a registry function outside of a template.  Follow the macro with
-// the body of the function inside braces.  KEY_TYPE must be a type and NAME
-// must be a valid C++ name.
-#define TF_REGISTRY_DEFINE(KEY_TYPE, NAME)                                     \
-    static void BOOST_PP_CAT(_Tf_RegistryFunction, NAME)(KEY_TYPE*, void*);    \
-    ARCH_CONSTRUCTOR(BOOST_PP_CAT(_Tf_RegistryAdd, NAME),                      \
-                     TF_REGISTRY_PRIORITY, KEY_TYPE*)                          \
-    {                                                                          \
-        Tf_RegistryInit::Add(TF_PP_STRINGIZE(MFB_ALT_PACKAGE_NAME),            \
-                             (void(*)(KEY_TYPE*, void*))                       \
-                             BOOST_PP_CAT(_Tf_RegistryFunction, NAME),         \
-                             TF_PP_STRINGIZE(KEY_TYPE));                       \
-    }                                                                          \
-    _ARCH_ENSURE_PER_LIB_INIT(Tf_RegistryStaticInit, _tfRegistryInit);         \
-    static void BOOST_PP_CAT(_Tf_RegistryFunction, NAME)(KEY_TYPE*, void*)
+// @AAPL - 10/17/2016 use attribute section to group static initializer
+#ifdef __arm64e__
+// @AAPL: rdar://59808649 (ModelI/O needs to update USD initialization code to accomodate ld64 change)
+#define AAPL_TF_REGISTRY_DEFINE(KEY_TYPE, NAME) \
+static void BOOST_PP_CAT(_Tf_RegistryFunction, NAME)(KEY_TYPE*, void*); \
+static TFAddParameters BOOST_PP_CAT(Foo, NAME) __attribute__ ((section ("__AUTH, __tf_func"), used, no_sanitize("address"))) = { TF_PP_STRINGIZE(MFB_ALT_PACKAGE_NAME), (TfRegistryManager::RegistrationFunctionType) BOOST_PP_CAT(_Tf_RegistryFunction, NAME), TF_PP_STRINGIZE(KEY_TYPE)};\
+static void BOOST_PP_CAT(_Tf_RegistryFunction, NAME)(KEY_TYPE*, void*)
+#else
+#define AAPL_TF_REGISTRY_DEFINE(KEY_TYPE, NAME) \
+static void BOOST_PP_CAT(_Tf_RegistryFunction, NAME)(KEY_TYPE*, void*); \
+    static TFAddParameters BOOST_PP_CAT(Foo, NAME) __attribute__ ((section ("__DATA, __tf_func"), used, no_sanitize("address"))) = { TF_PP_STRINGIZE(MFB_ALT_PACKAGE_NAME), (TfRegistryManager::RegistrationFunctionType) BOOST_PP_CAT(_Tf_RegistryFunction, NAME), TF_PP_STRINGIZE(KEY_TYPE)};\
+static void BOOST_PP_CAT(_Tf_RegistryFunction, NAME)(KEY_TYPE*, void*)
+#endif
+#define TF_REGISTRY_DEFINE(KEY_TYPE, FOO) AAPL_TF_REGISTRY_DEFINE(KEY_TYPE, BOOST_PP_CAT(Bar, __COUNTER__))
+//
+// Macros for adding registry functions inside class templates.
+//
 
+// Define a registry function inline in a template.  Follow the macro with
+// the body of the function inside braces.
+#define TF_REGISTRY_TEMPLATE_DEFINE(KEY_TYPE, TAG) \
+    ARCH_CONSTRUCTOR(BOOST_PP_CAT(_Tf_RegistryAdd, __LINE__), \
+                     TF_REGISTRY_PRIORITY, KEY_TYPE*, TAG*) \
+    { \
+        Tf_RegistryInit::Add(TF_PP_STRINGIZE(MFB_ALT_PACKAGE_NAME), \
+                             (void(*)(KEY_TYPE*, TAG*))_Tf_RegistryFunction, \
+                             TF_PP_STRINGIZE(KEY_TYPE)); \
+    } \
+    static ARCH_HIDDEN void _Tf_RegistryFunction(KEY_TYPE*, TAG*)
+
+// Declare a registry function in a template.
+// Use \c TF_REGISTRY_TEMPLATE_SIGNATURE to define the function out-of-line,
+// e.g. template<> void MyTemplateClass<MyType>::TF_REGISTRY_TEMPLATE_SIGNATURE(Key, Tag)
+#define TF_REGISTRY_TEMPLATE_DECLARE(KEY_TYPE, TAG) \
+    static ARCH_HIDDEN void _Tf_RegistryFunction(KEY_TYPE*, TAG*); \
+    ARCH_CONSTRUCTOR(BOOST_PP_CAT(_Tf_RegistryAdd, __LINE__), \
+                     TF_REGISTRY_PRIORITY, KEY_TYPE*, TAG*) \
+    { \
+        Tf_RegistryInit::Add(TF_PP_STRINGIZE(MFB_ALT_PACKAGE_NAME), \
+                             (void(*)(KEY_TYPE*, TAG*))_Tf_RegistryFunction, \
+                             TF_PP_STRINGIZE(KEY_TYPE)); \
+    }
+
+// Function name and signature for registry function in a template.
+#define TF_REGISTRY_TEMPLATE_SIGNATURE(KEY_TYPE, TAG) \
+    _Tf_RegistryFunction(KEY_TYPE*, TAG*)
 
 /// Define a function that is called on demand by \c TfRegistryManager.
 ///
