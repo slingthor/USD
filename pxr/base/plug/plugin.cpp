@@ -227,6 +227,9 @@ PlugPlugin::_Load()
 
     bool isLoaded = true;
 
+    // @AAPL - no Python, the TfDlOpen should not happen at all when statically bound
+#if 0
+
 #ifdef PXR_PYTHON_SUPPORT_ENABLED
     if (IsPythonModule()) {
         TRACE_FUNCTION_SCOPE("python import");
@@ -260,6 +263,9 @@ PlugPlugin::_Load()
             }
         }
     }
+
+#endif // 0
+
     // Set _isLoaded at the end to make sure that we've fully loaded since
     // other threads may ask whether or not we're loaded (e.g., in
     // _LoadWithDependents) and we don't want to tell them that we are 

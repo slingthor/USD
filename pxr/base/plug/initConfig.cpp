@@ -22,6 +22,8 @@
 // language governing permissions and limitations under the Apache License.
 //
 
+#if 0
+
 #include "pxr/pxr.h"
 #include "pxr/base/plug/info.h"
 #include "pxr/base/tf/diagnosticLite.h"
@@ -127,3 +129,5 @@ ARCH_CONSTRUCTOR(Plug_InitConfig, 2, void)
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
+
+#endif // 0
