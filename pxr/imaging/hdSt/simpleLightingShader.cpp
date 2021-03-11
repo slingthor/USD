@@ -211,36 +211,38 @@ HdStSimpleLightingShader::AddBindings(HdBindingRequestVector *customBindings)
     static std::mutex _mutex;
     std::lock_guard<std::mutex> lock(_mutex);
 
-    bool haveDomeLight = _HasDomeLight(_lightingContext);
-    if(!haveDomeLight  && _lightTextureParams.size()) {
+    bool hasDomeLight = _HasDomeLight(_lightingContext);
+    if(!_HasDomeLight(_lightingContext)) {
         _lightTextureParams.clear();
+        return;
     }
-    if (haveDomeLight && !_lightTextureParams.size()) {
-        // irradiance map
-        _lightTextureParams.push_back(
-            HdSt_MaterialParam(
-                HdSt_MaterialParam::ParamTypeTexture,
-                    _tokens->domeLightIrradiance,
-                    VtValue(GfVec4f(0.0)),
-                    TfTokenVector(),
-                    HdTextureType::Uv));
-        // prefilter map
-        _lightTextureParams.push_back(
-            HdSt_MaterialParam(
-                HdSt_MaterialParam::ParamTypeTexture,
-                    _tokens->domeLightPrefilter,
-                    VtValue(GfVec4f(0.0)),
-                    TfTokenVector(),
-                    HdTextureType::Uv));
-        // BRDF texture
-        _lightTextureParams.push_back(
+    if (_lightTextureParams.size() > 0 || !_domeLightEnvironmentTextureHandle) {
+        return;
+    }
+    // irradiance map
+    _lightTextureParams.push_back(
         HdSt_MaterialParam(
             HdSt_MaterialParam::ParamTypeTexture,
-                _tokens->domeLightBRDF,
+                _tokens->domeLightIrradiance,
                 VtValue(GfVec4f(0.0)),
                 TfTokenVector(),
                 HdTextureType::Uv));
-    }
+    // prefilter map
+    _lightTextureParams.push_back(
+        HdSt_MaterialParam(
+            HdSt_MaterialParam::ParamTypeTexture,
+                _tokens->domeLightPrefilter,
+                VtValue(GfVec4f(0.0)),
+                TfTokenVector(),
+                HdTextureType::Uv));
+    // BRDF texture
+    _lightTextureParams.push_back(
+    HdSt_MaterialParam(
+        HdSt_MaterialParam::ParamTypeTexture,
+            _tokens->domeLightBRDF,
+            VtValue(GfVec4f(0.0)),
+            TfTokenVector(),
+            HdTextureType::Uv));
 }
 
 HdSt_MaterialParamVector const& 
