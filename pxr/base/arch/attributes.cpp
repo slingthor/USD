@@ -227,12 +227,16 @@ RemoveImage(const struct mach_header* mh, intptr_t slide)
 // ARCH_CONSTRUCTOR/ARCH_DESTRUCTOR should load this library first so
 // any already-loaded images shouldn't have any constructors/destructors
 // to call.
-__attribute__((used, constructor)) \
-static void InstallDyldCallbacks()
-{
-    _dyld_register_func_for_add_image(AddImage);
-    _dyld_register_func_for_remove_image(RemoveImage);
-}
+// __attribute__((used, constructor)) \
+// static void InstallDyldCallbacks()
+// {
+//     _dyld_register_func_for_add_image(AddImage);
+//     _dyld_register_func_for_remove_image(RemoveImage);
+// }
+/* @AAPL remove static initializer which constructs USD types on image load,
+   USDKit explicitly lazy loads all symbols used in pxrctor_usdkit in USKUSDLoader.mm
+    rdar://58123099 (Remove static initializer from USDKit)
+*/
 
 } // anonymous namespace
 
