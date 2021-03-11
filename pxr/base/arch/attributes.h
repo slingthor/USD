@@ -269,7 +269,7 @@ struct Arch_ConstructorEntry {
     #   define ARCH_DESTRUCTOR(_name, _priority, ...)                                \
         static void _name(__VA_ARGS__);                                              \
         static const Arch_ConstructorEntry _ARCH_CAT_NOEXPAND(arch_dtor_, _name)     \
-            __attribute__((used, section("__DATA,pxrctor")) = {                      \
+            __attribute__((used, section("__DATA,pxrdtor")) = {                      \
             reinterpret_cast<Arch_ConstructorEntry::Type>(&_name),                   \
             0u,                                                                      \
             _priority                                                                \
