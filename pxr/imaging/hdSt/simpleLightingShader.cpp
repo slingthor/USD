@@ -215,7 +215,7 @@ HdStSimpleLightingShader::AddBindings(HdBindingRequestVector *customBindings)
     if(!haveDomeLight  && _lightTextureParams.size()) {
         _lightTextureParams.clear();
     }
-    if (haveDomeLight && !_lightTextureParams.size()) {
+    if (haveDomeLight && !_lightTextureParams.size() && _domeLightEnvironmentTextureHandle) {
         // irradiance map
         _lightTextureParams.push_back(
             HdSt_MaterialParam(
