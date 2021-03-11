@@ -335,12 +335,6 @@ void aapl_vt_castRegistry_init()
     Vt_CastRegistry::GetInstance();
 }
 
-// Force instantiation for the registry instance.
-ARCH_CONSTRUCTOR(Vt_CastRegistryInit, 255)
-{
-    Vt_CastRegistry::GetInstance();
-}
-
 bool
 VtValue::IsArrayValued() const {
     if (IsEmpty()) {
