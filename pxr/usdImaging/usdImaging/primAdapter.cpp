@@ -1212,19 +1212,30 @@ UsdImagingPrimAdapter::GetModelDrawMode(UsdPrim const& prim)
 bool
 UsdImagingPrimAdapter::GetAnimated(UsdPrim const& prim) const
 {
-    const auto &attrs = prim.GetAuthoredAttributes();
-    return std::any_of(attrs.begin(), attrs.end(),
-                       [](const UsdAttribute &attr) -> bool{
-        auto roleName = attr.GetRoleName();
-        bool hasAnimatedRole = roleName.IsEmpty()
-            || roleName == SdfValueRoleNames->Point
-            || roleName == SdfValueRoleNames->Vector
-            || roleName == SdfValueRoleNames->Transform;
-        if (hasAnimatedRole) {
-            return attr.ValueMightBeTimeVarying();
+    UsdPrim currPrim = prim;
+    bool anyAnimated = false;
+    //If any parent is animated, this one might be animated as well
+    while(currPrim.IsValid()) {
+        const auto &attrs = currPrim.GetAuthoredAttributes();
+        
+        bool subAnim = std::any_of(attrs.begin(), attrs.end(),
+                           [](const UsdAttribute &attr) -> bool{
+            auto roleName = attr.GetRoleName();
+            bool hasAnimatedRole = roleName.IsEmpty()
+                || roleName == SdfValueRoleNames->Point
+                || roleName == SdfValueRoleNames->Vector
+                || roleName == SdfValueRoleNames->Transform;
+            if (hasAnimatedRole) {
+                return attr.ValueMightBeTimeVarying();
+            }
+            return false;
+        });
+        if(subAnim) {
+            anyAnimated = true;
         }
-        return false;
-    });
+        currPrim = currPrim.GetParent();
+    }
+    return anyAnimated;
 }
 
 /*virtual*/ 
