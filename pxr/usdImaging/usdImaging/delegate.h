@@ -497,6 +497,10 @@ public:
     USDIMAGING_API
     bool IsInInvisedPaths(const SdfPath &usdPath) const;
 
+    // Returns true if \p id's prim has any animated attribute.
+    USDIMAGING_API
+    virtual bool GetAnimated(const SdfPath &id);
+
 private:
     // Internal friend class.
     class _Worker;

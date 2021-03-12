@@ -1209,6 +1209,35 @@ UsdImagingPrimAdapter::GetModelDrawMode(UsdPrim const& prim)
     return _delegate->_GetModelDrawMode(prim);
 }
 
+bool
+UsdImagingPrimAdapter::GetAnimated(UsdPrim const& prim) const
+{
+    UsdPrim currPrim = prim;
+    bool anyAnimated = false;
+    //If any parent is animated, this one might be animated as well
+    while(currPrim.IsValid()) {
+        const auto &attrs = currPrim.GetAuthoredAttributes();
+        
+        bool subAnim = std::any_of(attrs.begin(), attrs.end(),
+                           [](const UsdAttribute &attr) -> bool{
+            auto roleName = attr.GetRoleName();
+            bool hasAnimatedRole = roleName.IsEmpty()
+                || roleName == SdfValueRoleNames->Point
+                || roleName == SdfValueRoleNames->Vector
+                || roleName == SdfValueRoleNames->Transform;
+            if (hasAnimatedRole) {
+                return attr.ValueMightBeTimeVarying();
+            }
+            return false;
+        });
+        if(subAnim) {
+            anyAnimated = true;
+        }
+        currPrim = currPrim.GetParent();
+    }
+    return anyAnimated;
+}
+
 /*virtual*/ 
 VtValue 
 UsdImagingPrimAdapter::GetTopology(UsdPrim const& prim,

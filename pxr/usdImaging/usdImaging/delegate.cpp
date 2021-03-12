@@ -2329,6 +2329,20 @@ UsdImagingDelegate::IsInInvisedPaths(SdfPath const &usdPath) const
 
 /*virtual*/
 bool
+UsdImagingDelegate::GetAnimated(const SdfPath &id)
+{
+    SdfPath cachePath = ConvertIndexPathToCachePath(id);
+    _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
+    
+    if (TF_VERIFY(primInfo)) {
+        return primInfo->adapter->GetAnimated(
+            primInfo->usdPrim);
+    }
+    return false;
+}
+
+/*virtual*/
+bool
 UsdImagingDelegate::GetVisible(SdfPath const& id)
 {
     TRACE_FUNCTION();
@@ -2612,7 +2626,7 @@ UsdImagingDelegate::GetMaterialResource(SdfPath const &materialId)
     return vtMatResource;
 }
 
-VtValue 
+VtValue
 UsdImagingDelegate::GetLightParamValue(SdfPath const &id, 
                                        TfToken const &paramName)
 {
@@ -2832,6 +2846,7 @@ UsdImagingDelegate::InvokeExtComputation(SdfPath const& computationId,
         primInfo->adapter->InvokeComputation(cachePath, context);
     }
 }
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

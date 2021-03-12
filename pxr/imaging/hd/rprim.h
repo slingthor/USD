@@ -227,6 +227,10 @@ public:
     HD_API
     bool IsDirty(HdChangeTracker &changeTracker) const;
 
+    /// Returns true if the prim is animated
+    HD_API
+    void SetAnimated(HdSceneDelegate* delegate);
+
     /// Is the prim itself visible
     bool IsVisible() const { return _sharedData.visible; }
 

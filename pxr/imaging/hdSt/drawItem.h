@@ -79,7 +79,7 @@ public:
                               vector_float2 windowDimensions) const;
     
     HDST_API
-    void CalculateCullingBounds() const;
+    void CalculateCullingBounds(bool forceReCalculate=false) const;
 
     HDST_API
     int BuildInstanceBuffer(uint8_t** instanceVisibility) const;

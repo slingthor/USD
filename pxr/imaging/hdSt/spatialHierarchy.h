@@ -135,10 +135,6 @@ struct DrawableItem {
     
     void ProcessInstancesVisible();
     
-    static GfRange3f ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables,
-                                             std::vector<DrawableItem*> *items,
-                                             std::vector<DrawableItem*> *visibilityOwners);
-    
     HdStDrawItemInstance    *itemInstance;
     GfRange3f               aabb;
     GfBBox3f const&         cullingBBox;
@@ -148,6 +144,17 @@ struct DrawableItem {
     size_t numItemsInInstance;
 
     bool isInstanced;
+};
+
+struct DrawableAnimatedItem {
+    HdStDrawItemInstance    *itemInstance;
+    size_t                  instanceIdx;
+    DrawableAnimatedItem(HdStDrawItemInstance *itemInstance, size_t instanceIdx)
+: itemInstance(itemInstance)
+, instanceIdx(instanceIdx)
+{
+    //Nothing
+}
 };
 
 class OctreeNode {
@@ -216,6 +223,9 @@ private:
 
     std::vector<DrawableItem*> bakedDrawableItems;
     std::vector<uint8_t> bakedVisibility;
+    std::vector<uint8_t> bakedAnimatedVisibility;
+    size_t bakedAnimatedVisibilityItemCount;
+    std::vector<DrawableAnimatedItem> animatedDrawables;
     CullList cullList;
     bool visibilityDirty;
 };

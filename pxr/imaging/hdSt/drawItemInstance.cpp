@@ -33,6 +33,7 @@ HdStDrawItemInstance::HdStDrawItemInstance(HdStDrawItem const* drawItem)
     , _drawItem(drawItem)
     , _batchIndex(0)
     , _visible(drawItem->GetVisible())
+    , _animated(drawItem->GetAnimated())
 {
 }
 
