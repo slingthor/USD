@@ -1182,7 +1182,8 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         # https://github.com/spack/spack/issues/6000#issuecomment-358817701
         if MacOS():
             PatchFile("build/macos.inc", 
-                    [("shell clang -v ", "shell clang --version ")])
+                    [("shell clang -v ", "shell clang --version "),
+                     ("MACOSX_DEPLOYMENT_TARGET ?= 10.11", "MACOSX_DEPLOYMENT_TARGET ?= 12.0")])
         # TBB does not support out-of-source builds in a custom location.
         if iOS():
             PatchFile("build/macos.clang.inc", 
