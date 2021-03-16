@@ -484,6 +484,9 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
 
     extraArgs = copy.deepcopy(buildArgs)
 
+    sdkPath = GetCommandOutput("xcodebuild -sdk -version | grep -o -E '/.*SDKs/MacOSX12.0.Internal*'") + '.sdk'
+    extraArgs.append('-DCMAKE_OSX_SYSROOT="' + sdkPath + '" ')
+
     # TEMPORARY WORKAROUND
     if targetMacOS or targetIOS:
         extraArgs.append('-DCMAKE_IGNORE_PATH="/usr/lib;/usr/local/lib;/lib" ')
