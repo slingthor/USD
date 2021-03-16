@@ -997,7 +997,7 @@ def InstallBoost_Helper(context, force, buildArgs):
             xcodeRoot = GetCommandOutput('xcode-select --print-path').strip()
 
             if MacOS():
-                sdkPath = GetCommandOutput('xcrun --sdk macosx --show-sdk-path').strip()
+                sdkPath = GetCommandOutput('xcrun --sdk macosx.internal --show-sdk-path').strip()
             else:
                 sdkPath = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
 
@@ -1223,7 +1223,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
                 PatchFile("build/macos.clang.inc", 
                     [("LIBDL = -ldl",
                       "LIBDL = -ldl\n"
-                      "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/MacOSX.*' 2>/dev/null | head -1)"),
+                      "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/MacOSX.Internal*' 2>/dev/null | head -1)"),
                      ("-m64",
                       "-m64 -arch x86_64"),
                      ("CPLUS_FLAGS +=", "CPLUS_FLAGS += -std=c++14"), 
@@ -1748,7 +1748,7 @@ def InstallGLEW_LinuxOrMacOS(context, force, buildArgs):
                   "CFLAGS.EXTRA = -arch x86_64 -dynamic -fno-common"),
                  ("LDFLAGS.EXTRA =",
                   "LDFLAGS.EXTRA = -arch x86_64")])
-            sdkPath = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path']).strip()
+            sdkPath = subprocess.check_output(['xcrun', '--sdk', 'macosx.internal', '--show-sdk-path']).strip()
             PatchFile("config/Makefile.darwin", 
                 [("CFLAGS.EXTRA = -arch arm64e -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
                   "CFLAGS.EXTRA = -arch x86_64 -dynamic -fno-common"),
