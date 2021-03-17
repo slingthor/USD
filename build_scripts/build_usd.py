@@ -484,11 +484,11 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
 
     extraArgs = copy.deepcopy(buildArgs)
 
-    sdkPath = GetCommandOutput('xcrun --sdk macosx.internal --show-sdk-path').strip()
-    extraArgs.append('-DCMAKE_OSX_SYSROOT="' + sdkPath + '" ')
-
     # TEMPORARY WORKAROUND
     if targetMacOS or targetIOS:
+        sdkPath = GetCommandOutput('xcrun --sdk macosx.internal --show-sdk-path').strip()
+        extraArgs.append('-DCMAKE_OSX_SYSROOT="' + sdkPath + '" ')
+        
         extraArgs.append('-DCMAKE_IGNORE_PATH="/usr/lib;/usr/local/lib;/lib" ')
 
         # CMake 3.19.0 and later defaults to use Xcode's Modern Build System.
@@ -497,16 +497,16 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
         if GetCMakeVersion() >= (3, 19, 0):
             extraArgs.append('-T buildsystem=1')
 
-    if context.buildUniversal and SupportsMacOSUniversalBinaries():
-        extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
-        extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64e')
-    else:
-        extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=YES')
-        MacArch = GetCommandOutput('arch').strip()
-        if MacArch == "i386" or MacArch == "x86_64":
-            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64')
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
+            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64e')
         else:
-            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64e')
+            extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=YES')
+            MacArch = GetCommandOutput('arch').strip()
+            if MacArch == "i386" or MacArch == "x86_64":
+                extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64')
+            else:
+                extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64e')
 
     if targetIOS:
         # Add the default iOS toolchain file if one isn't aready specified
