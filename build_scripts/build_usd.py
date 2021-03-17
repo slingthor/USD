@@ -380,7 +380,7 @@ def CurrentWorkingDirectory(dir):
 def CreateUniversalBinaries(context, libNames, x86Dir, armDir):
     lipoCommands = []
     xcodeRoot = subprocess.check_output(["xcode-select", "--print-path"]).strip()
-    lipoBinary = "{XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo".format(XCODE_ROOT=xcodeRoot)
+    lipoBinary = "{XCODE_ROOT}/Toolchains/OSX12.0.xctoolchain/usr/bin/lipo".format(XCODE_ROOT=xcodeRoot)
     for libName in libNames:
         outputName = os.path.join(context.instDir, "lib", libName)
         if not os.path.islink("{x86Dir}/{libName}".format(x86Dir=x86Dir, libName=libName)):
@@ -1047,13 +1047,13 @@ def InstallBoost_Helper(context, force, buildArgs):
         if MacOS():
             newLines = [
                 'using clang-darwin : x86_64\n',
-                ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
+                ': {XCODE_ROOT}/Toolchains/OSX12.0.xctoolchain/usr/bin/clang++\n'
                     .format(XCODE_ROOT=xcodeRoot),
                 ': <compileflags>"-target x86_64-apple-macos12.0 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target x86_64-apple-macos12.0 -isysroot {SDK_PATH}" address-model=64 architecture=x86_64\n'
                     .format(SDK_PATH=sdkPath),
                 ';\n\n'
                 'using clang-darwin : arm64e\n',
-                ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
+                ': {XCODE_ROOT}/Toolchains/OSX12.0.xctoolchain/usr/bin/clang++\n'
                     .format(XCODE_ROOT=xcodeRoot),
                 ': <compileflags>"-target arm64e-apple-macos12.0 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target arm64e-apple-macos12.0 -isysroot {SDK_PATH}" address-model=64 architecture=arm64e\n'
                     .format(SDK_PATH=sdkPath),
