@@ -230,27 +230,53 @@ struct Arch_ConstructorEntry {
     unsigned int priority:8;    // Priority of function
 };
 
-// Emit a Arch_ConstructorEntry in the __Data,pxrctor section.
-#   define ARCH_CONSTRUCTOR(_name, _priority, ...)                             \
-    static void _name(__VA_ARGS__);                                            \
-    static const Arch_ConstructorEntry _ARCH_CAT_NOEXPAND(arch_ctor_, _name)   \
-        __attribute__((used, section("__DATA,pxrctor"))) = {                   \
-        reinterpret_cast<Arch_ConstructorEntry::Type>(&_name),                 \
-        0u,                                                                    \
-        _priority                                                              \
-    };                                                                         \
-    static void _name(__VA_ARGS__)
-    
-// Emit a Arch_ConstructorEntry in the __Data,pxrdtor section.
-#   define ARCH_DESTRUCTOR(_name, _priority, ...)                              \
-    static void _name(__VA_ARGS__);                                            \
-    static const Arch_ConstructorEntry _ARCH_CAT_NOEXPAND(arch_dtor_, _name)   \
-        __attribute__((used, section("__DATA,pxrdtor"))) = {                   \
-        reinterpret_cast<Arch_ConstructorEntry::Type>(&_name),                 \
-        0u,                                                                    \
-        _priority                                                              \
-    };                                                                         \
-    static void _name(__VA_ARGS__)
+// @AAPL: <rdar://problem/59794147> ARQL hangs with USDKit-25.1 builds with Azul18A236
+#ifdef __arm64e__
+    // Emit a Arch_ConstructorEntry in the __AUTH,pxrctor section.
+    #   define ARCH_CONSTRUCTOR(_name, _priority, ...)                               \
+        static void _name(__VA_ARGS__);                                              \
+        static const Arch_ConstructorEntry _ARCH_CAT_NOEXPAND(arch_ctor_, _name)     \
+            __attribute__((used, section("__AUTH,pxrctor"))) = {                     \
+            reinterpret_cast<Arch_ConstructorEntry::Type>(&_name),                   \
+            0u,                                                                      \
+            _priority                                                                \
+        };                                                                           \
+        static void _name(__VA_ARGS__)
+        
+    // Emit a Arch_ConstructorEntry in the __AUTH,pxrdtor section.
+    #   define ARCH_DESTRUCTOR(_name, _priority, ...)                                \
+        static void _name(__VA_ARGS__);                                              \
+        static const Arch_ConstructorEntry _ARCH_CAT_NOEXPAND(arch_dtor_, _name)     \
+            __attribute__((used, section("__AUTH,pxrdtor")) = {                      \
+            reinterpret_cast<Arch_ConstructorEntry::Type>(&_name),                   \
+            0u,                                                                      \
+            _priority                                                                \
+        };                                                                           \
+        static void _name(__VA_ARGS__)
+#else
+    // Emit a Arch_ConstructorEntry in the __Data,pxrctor section.
+    #   define ARCH_CONSTRUCTOR(_name, _priority, ...)                               \
+        static void _name(__VA_ARGS__);                                              \
+        static const Arch_ConstructorEntry _ARCH_CAT_NOEXPAND(arch_ctor_, _name)     \
+            __attribute__((used, section("__DATA,pxrctor"))) = {                     \
+            reinterpret_cast<Arch_ConstructorEntry::Type>(&_name),                   \
+            0u,                                                                      \
+            _priority                                                                \
+        };                                                                           \
+        static void _name(__VA_ARGS__)
+        
+    // Emit a Arch_ConstructorEntry in the __Data,pxrdtor section.
+    #   define ARCH_DESTRUCTOR(_name, _priority, ...)                                \
+        static void _name(__VA_ARGS__);                                              \
+        static const Arch_ConstructorEntry _ARCH_CAT_NOEXPAND(arch_dtor_, _name)     \
+            __attribute__((used, section("__DATA,pxrdtor")) = {                      \
+            reinterpret_cast<Arch_ConstructorEntry::Type>(&_name),                   \
+            0u,                                                                      \
+            _priority                                                                \
+        };                                                                           \
+        static void _name(__VA_ARGS__)
+#endif
+
 
 #elif defined(ARCH_COMPILER_GCC) || defined(ARCH_COMPILER_CLANG)
 

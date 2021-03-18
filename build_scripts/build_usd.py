@@ -380,7 +380,7 @@ def CurrentWorkingDirectory(dir):
 def CreateUniversalBinaries(context, libNames, x86Dir, armDir):
     lipoCommands = []
     xcodeRoot = subprocess.check_output(["xcode-select", "--print-path"]).strip()
-    lipoBinary = "{XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo".format(XCODE_ROOT=xcodeRoot)
+    lipoBinary = "{XCODE_ROOT}/Toolchains/OSX12.0.xctoolchain/usr/bin/lipo".format(XCODE_ROOT=xcodeRoot)
     for libName in libNames:
         outputName = os.path.join(context.instDir, "lib", libName)
         if not os.path.islink("{x86Dir}/{libName}".format(x86Dir=x86Dir, libName=libName)):
@@ -486,6 +486,9 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
 
     # TEMPORARY WORKAROUND
     if targetMacOS or targetIOS:
+        sdkPath = GetCommandOutput('xcrun --sdk macosx.internal --show-sdk-path').strip()
+        extraArgs.append('-DCMAKE_OSX_SYSROOT="' + sdkPath + '" ')
+        
         extraArgs.append('-DCMAKE_IGNORE_PATH="/usr/lib;/usr/local/lib;/lib" ')
 
         # CMake 3.19.0 and later defaults to use Xcode's Modern Build System.
@@ -494,16 +497,16 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
         if GetCMakeVersion() >= (3, 19, 0):
             extraArgs.append('-T buildsystem=1')
 
-    if context.buildUniversal and SupportsMacOSUniversalBinaries():
-        extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
-        extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64e')
-    else:
-        extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=YES')
-        MacArch = GetCommandOutput('arch').strip()
-        if MacArch == "i386" or MacArch == "x86_64":
-            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64')
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
+            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64e')
         else:
-            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64e')
+            extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=YES')
+            MacArch = GetCommandOutput('arch').strip()
+            if MacArch == "i386" or MacArch == "x86_64":
+                extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64')
+            else:
+                extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64e')
 
     if targetIOS:
         # Add the default iOS toolchain file if one isn't aready specified
@@ -997,7 +1000,7 @@ def InstallBoost_Helper(context, force, buildArgs):
             xcodeRoot = GetCommandOutput('xcode-select --print-path').strip()
 
             if MacOS():
-                sdkPath = GetCommandOutput('xcrun --sdk macosx --show-sdk-path').strip()
+                sdkPath = GetCommandOutput('xcrun --sdk macosx.internal --show-sdk-path').strip()
             else:
                 sdkPath = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
 
@@ -1044,13 +1047,13 @@ def InstallBoost_Helper(context, force, buildArgs):
         if MacOS():
             newLines = [
                 'using clang-darwin : x86_64\n',
-                ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
+                ': {XCODE_ROOT}/Toolchains/OSX12.0.xctoolchain/usr/bin/clang++\n'
                     .format(XCODE_ROOT=xcodeRoot),
                 ': <compileflags>"-target x86_64-apple-macos12.0 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target x86_64-apple-macos12.0 -isysroot {SDK_PATH}" address-model=64 architecture=x86_64\n'
                     .format(SDK_PATH=sdkPath),
                 ';\n\n'
                 'using clang-darwin : arm64e\n',
-                ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
+                ': {XCODE_ROOT}/Toolchains/OSX12.0.xctoolchain/usr/bin/clang++\n'
                     .format(XCODE_ROOT=xcodeRoot),
                 ': <compileflags>"-target arm64e-apple-macos12.0 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target arm64e-apple-macos12.0 -isysroot {SDK_PATH}" address-model=64 architecture=arm64e\n'
                     .format(SDK_PATH=sdkPath),
@@ -1182,7 +1185,8 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         # https://github.com/spack/spack/issues/6000#issuecomment-358817701
         if MacOS():
             PatchFile("build/macos.inc", 
-                    [("shell clang -v ", "shell clang --version ")])
+                    [("shell clang -v ", "shell clang --version "),
+                     ("MACOSX_DEPLOYMENT_TARGET ?= 10.11", "MACOSX_DEPLOYMENT_TARGET ?= 12.0")])
         # TBB does not support out-of-source builds in a custom location.
         if iOS():
             PatchFile("build/macos.clang.inc", 
@@ -1222,7 +1226,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
                 PatchFile("build/macos.clang.inc", 
                     [("LIBDL = -ldl",
                       "LIBDL = -ldl\n"
-                      "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/MacOSX.*' 2>/dev/null | head -1)"),
+                      "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/MacOSX.Internal*' 2>/dev/null | head -1)"),
                      ("-m64",
                       "-m64 -arch x86_64"),
                      ("CPLUS_FLAGS +=", "CPLUS_FLAGS += -std=c++14"), 
@@ -1747,7 +1751,7 @@ def InstallGLEW_LinuxOrMacOS(context, force, buildArgs):
                   "CFLAGS.EXTRA = -arch x86_64 -dynamic -fno-common"),
                  ("LDFLAGS.EXTRA =",
                   "LDFLAGS.EXTRA = -arch x86_64")])
-            sdkPath = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path']).strip()
+            sdkPath = subprocess.check_output(['xcrun', '--sdk', 'macosx.internal', '--show-sdk-path']).strip()
             PatchFile("config/Makefile.darwin", 
                 [("CFLAGS.EXTRA = -arch arm64e -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
                   "CFLAGS.EXTRA = -arch x86_64 -dynamic -fno-common"),

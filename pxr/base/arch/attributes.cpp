@@ -187,7 +187,11 @@ static
 void
 AddImage(const struct mach_header* mh, intptr_t slide)
 {
+#ifdef __arm64e__
+    const auto entries = GetConstructorEntries(mh, slide, "__AUTH", "pxrctor");
+#else
     const auto entries = GetConstructorEntries(mh, slide, "__DATA", "pxrctor");
+#endif
 
     // Execute in priority order.
     for (size_t i = 0, n = entries.size(); i != n; ++i) {
@@ -202,7 +206,11 @@ static
 void
 RemoveImage(const struct mach_header* mh, intptr_t slide)
 {
+#ifdef __arm64e__
+    const auto entries = GetConstructorEntries(mh, slide, "__AUTH", "pxrdtor");
+#else
     const auto entries = GetConstructorEntries(mh, slide, "__DATA", "pxrdtor");
+#endif
 
     // Execute in reverse priority order.
     for (size_t i = entries.size(); i-- != 0; ) {
@@ -219,12 +227,16 @@ RemoveImage(const struct mach_header* mh, intptr_t slide)
 // ARCH_CONSTRUCTOR/ARCH_DESTRUCTOR should load this library first so
 // any already-loaded images shouldn't have any constructors/destructors
 // to call.
-__attribute__((used, constructor)) \
-static void InstallDyldCallbacks()
-{
-    _dyld_register_func_for_add_image(AddImage);
-    _dyld_register_func_for_remove_image(RemoveImage);
-}
+// __attribute__((used, constructor)) \
+// static void InstallDyldCallbacks()
+// {
+//     _dyld_register_func_for_add_image(AddImage);
+//     _dyld_register_func_for_remove_image(RemoveImage);
+// }
+/* @AAPL remove static initializer which constructs USD types on image load,
+   USDKit explicitly lazy loads all symbols used in pxrctor_usdkit in USKUSDLoader.mm
+    rdar://58123099 (Remove static initializer from USDKit)
+*/
 
 } // anonymous namespace
 

@@ -21,13 +21,14 @@ pxr_library(plug
         plugin
         registry
         staticInterface
+        info
 
     PRIVATE_CLASSES
         debugCodes
-        info
         testPlugBase
 
     PUBLIC_HEADERS
+        info.h
         api.h
         thisPlugin.h
 

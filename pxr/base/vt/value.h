@@ -1509,7 +1509,7 @@ VtValue::IsHolding<void>() const {
     return false;
 }
 
-
+void aapl_vt_castRegistry_init();
 
 #endif // !doxygen
 
