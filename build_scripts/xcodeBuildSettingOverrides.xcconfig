@@ -1,0 +1,71 @@
+//
+//  xbsDefaultBuildSettingOverrides.xcconfig
+//
+
+// Pulls in the default settings provided by
+
+// <rdar://problem/25078754> Remove #include "/usr/local/etc/xbsDefaultBuildSettingOverrides.xcconfig" from view
+// #include "/usr/local/etc/xbsDefaultBuildSettingOverrides.xcconfig"
+#include? "<DEVELOPER_DIR>/Toolchains/OSX12.0.xctoolchain/macos_chrootshims.xcconfig"
+
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+ONLY_ACTIVE_ARCH = NO
+RETAIN_RAW_BINARIES = YES
+RUN_CLANG_STATIC_ANALYZER = $(XBS_RUN_STATIC_ANALYZER)
+SEPARATE_STRIP = YES
+
+OTHER_CFLAGS = $(inherited) -Wno-error=deprecated-declarations -Wno-error=#warnings -Wno-error=nonnull -Wno-error=objc-designated-initializers -Wno-error=deprecated-implementations -Wno-error=documentation -Wno-error=unused-command-line-argument
+OTHER_CPLUSPLUSFLAGS = $(inherited) -Wno-error=deprecated-declarations -Wno-error=#warnings -Wno-error=nonnull -Wno-error=objc-designated-initializers -Wno-error=deprecated-implementations -Wno-error=documentation -Wno-error=unused-command-line-argument
+
+// <rdar://problem/47213020> Obsolete buildTask hack for overriding VALID_ARCHS override
+VALID_ARCHS = $(inherited) $(RC_VALID_ARCHS_OVERRIDE)
+
+//<rdar://problem/13673596> OS X trains should turn off precompiled headers for Xcode projects
+GCC_PRECOMPILE_PREFIX_HEADER=NO
+
+// <rdar://problem/16625843> Remove -fmodules-validate-system-headers from NewestSyrah/.setupBuildEnvironment
+CLANG_MODULES_VALIDATE_SYSTEM_HEADERS=YES
+
+// <rdar://problem/19339659> Add TOOLCHAINS back to xcodeBuildSettingOverrides.xcconfig in Gala
+// Remove when <rdar://problem/19316172> is complete
+TOOLCHAINS = com.apple.dt.toolchain.OSX12_0
+
+// Use custom per-project module cache directory.
+CLANG_MODULE_CACHE_PATH = $(CCHROOT)/ModuleCache
+
+// <rdar://problem/34231352> LoboElk builds with MACOSX_DEPLOYMENT_TARGET = 10.13, preventing use of API introduced in 10.13.4
+CLANG_WARN_UNGUARDED_AVAILABILITY=NO
+
+// <rdar://problem/25097951> Need to disable XBS_XCODE_GENERATES_LOCROOT for Fuji
+// <rdar://problem/28438243> Need to disable XBS_XCODE_GENERATES_LOCROOT for Lobo
+IBC_FLATTEN_NIBS = NO
+STRINGS_FILE_OUTPUT_ENCODING = UTF-16
+
+// <rdar://problem/28400833> SUFujiCascade16C21: CoreMediaSwiftTools-3.12 fails to post-process: Interface Builder cannot open compiled nibs.
+IBSC_FLATTEN_NIBS = NO
+
+// <rdar://problem/31494813> macOS trains should set DONT_RUN_SWIFT_STDLIB_TOOL=YES
+DONT_RUN_SWIFT_STDLIB_TOOL = YES
+
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited) RC_HIDE_J255=1 RC_HIDE_SINOPE=1 RC_HIDE_T398=1 RC_SHOW_COFFEELAKE=1 RC_SHOW_COMETLAKE=1 RC_SHOW_ICELAKE=1 RC_SHOW_ICELAKE_SP=1 RC_SHOW_KABYLAKE=1 RC_SHOW_TIGERLAKE=1 
+INFOPLIST_PREPROCESSOR_DEFINITIONS = $(inherited) RC_HIDE_J255=1 RC_HIDE_SINOPE=1 RC_HIDE_T398=1 RC_SHOW_COFFEELAKE=1 RC_SHOW_COMETLAKE=1 RC_SHOW_ICELAKE=1 RC_SHOW_ICELAKE_SP=1 RC_SHOW_KABYLAKE=1 RC_SHOW_TIGERLAKE=1 
+CPP_OTHER_PREPROCESSOR_FLAGS = $(inherited) RC_HIDE_J255=1 RC_HIDE_SINOPE=1 RC_HIDE_T398=1 RC_SHOW_COFFEELAKE=1 RC_SHOW_COMETLAKE=1 RC_SHOW_ICELAKE=1 RC_SHOW_ICELAKE_SP=1 RC_SHOW_KABYLAKE=1 RC_SHOW_TIGERLAKE=1 
+OTHER_SWIFT_FLAGS = $(inherited) -DRC_HIDE_J255 -DRC_HIDE_SINOPE -DRC_HIDE_T398 -DRC_SHOW_COFFEELAKE -DRC_SHOW_COMETLAKE -DRC_SHOW_ICELAKE -DRC_SHOW_ICELAKE_SP -DRC_SHOW_KABYLAKE -DRC_SHOW_TIGERLAKE
+MTL_PREPROCESSOR_DEFINITIONS = $(inherited) RC_HIDE_J255=1 RC_HIDE_SINOPE=1 RC_HIDE_T398=1 RC_SHOW_COFFEELAKE=1 RC_SHOW_COMETLAKE=1 RC_SHOW_ICELAKE=1 RC_SHOW_ICELAKE_SP=1 RC_SHOW_KABYLAKE=1 RC_SHOW_TIGERLAKE=1
+OTHER_MIGFLAGS = $(inherited) -DRC_HIDE_J255=1 -DRC_HIDE_SINOPE=1 -DRC_HIDE_T398=1 -DRC_SHOW_COFFEELAKE=1 -DRC_SHOW_COMETLAKE=1 -DRC_SHOW_ICELAKE=1 -DRC_SHOW_ICELAKE_SP=1 -DRC_SHOW_KABYLAKE=1 -DRC_SHOW_TIGERLAKE=1
+COPY_HEADERS_UNIFDEF_FLAGS = $(inherited) -DRC_HIDE_J255 -DRC_HIDE_SINOPE -DRC_HIDE_T398 -DRC_SHOW_COFFEELAKE -DRC_SHOW_COMETLAKE -DRC_SHOW_ICELAKE -DRC_SHOW_ICELAKE_SP -DRC_SHOW_KABYLAKE -DRC_SHOW_TIGERLAKE
+
+RC_HIDE_J255=1
+RC_HIDE_SINOPE=1
+RC_HIDE_T398=1
+RC_SHOW_COFFEELAKE=1
+RC_SHOW_COMETLAKE=1
+RC_SHOW_ICELAKE=1
+RC_SHOW_ICELAKE_SP=1
+RC_SHOW_KABYLAKE=1
+RC_SHOW_TIGERLAKE=1
+// <rdar://problem/61227701> Add RC_HIDE suffixes to the EXCLUDED_SOURCE_FILE_NAMES build setting at the train level
+EXCLUDED_SOURCE_FILE_NAMES = $(inherited) *-J255* *-SINOPE* *-T398*
+
+// <rdar://problem/38808332> Qualify setting CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES=NO in the B&I default xcconfig
+CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = NO

@@ -55,6 +55,8 @@ else:
 # Helpers for printing output
 verbosity = 1
 
+buildScriptsDir = os.path.dirname(os.path.realpath(__file__))
+
 def Print(msg):
     if verbosity > 0:
         print(msg)
@@ -156,6 +158,39 @@ def GetMacArch():
     else:
         macArch = "arm64e"
     return macArch
+
+def GetEnv(context):
+    envToRun=os.environ.copy()
+
+    if MacOS:
+        xcodeRoot = subprocess.check_output(["xcode-select", "--print-path"]).strip()
+
+        envToRun["COMPILER_DISABLE_SWIFT"] = "1"
+        envToRun["DEVELOPER_DIR"] = "{XCODE_ROOT}".format(XCODE_ROOT=xcodeRoot)
+        envToRun["DEVELOPER_INSTALL_DIR"] = "{XCODE_ROOT}".format(XCODE_ROOT=xcodeRoot)
+        envToRun["DT_TOOLCHAIN_DIR"] = "{XCODE_ROOT}/Toolchains/OSX12.0.xctoolchain".format(XCODE_ROOT=xcodeRoot)
+        envToRun["INTERFACER_TRACE_INTERFACES"] = "YES"
+        envToRun["LD_DYLIB_CPU_SUBTYPES_MUST_MATCH"] = "1"
+        envToRun["LD_FORCE_16KB_PAGES"] = "YES"
+        envToRun["MACOSX_DEPLOYMENT_TARGET"] = "12.0"
+        envToRun["RC_DEPLOYMENT_TARGET_SETTING_NAME"] = "MACOSX_DEPLOYMENT_TARGET"
+        envToRun["RC_MACOS"] = "YES"
+        envToRun["RC_OS"] = "macos"
+        envToRun["RC_PLATFORM_INSTALL_PATH"] = "{XCODE_ROOT}".format(XCODE_ROOT=xcodeRoot)
+        envToRun["RC_PLATFORM_NAME"] = "MacOSX"
+        envToRun["RC_ReleaseStatus"] = "Development"
+        envToRun["RC_XBS"] = "YES"
+        envToRun["TOOLCHAINS"] = "com.apple.dt.toolchain.OSX12_0"
+        envToRun["XCODE_XCCONFIG_FILE"] =  os.path.join(buildScriptsDir, "xcodeBuildSettingOverrides.xcconfig")
+
+        if context.buildUniversal:
+            envToRun["RC_CFLAGS"] = "-arch x86_64 -arch arm64e -pipe"
+            envToRun["RC_ARCHS"] = "x86_64 arm64e"
+        else:
+            envToRun["RC_CFLAGS"] = "-arch " + GetMacArch() + " -pipe"
+            envToRun["RC_ARCHS"] = GetMacArch()
+
+    return envToRun
 
 def SupportsMacOSUniversalBinaries():
     MacOS_SDK = GetCommandOutput('/usr/bin/xcodebuild -version').split(' ')[1]
@@ -333,7 +368,7 @@ def GetCPUCount():
     except NotImplementedError:
         return 1
 
-def Run(cmd, logCommandOutput = True):
+def Run(cmd, logCommandOutput = True, envToRun=os.environ.copy()):
     """Run the specified command in a subprocess."""
     PrintInfo('Running "{cmd}"'.format(cmd=cmd))
 
@@ -347,7 +382,7 @@ def Run(cmd, logCommandOutput = True):
         # code will handle them.
         if logCommandOutput:
             p = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, 
-                                 stderr=subprocess.STDOUT)
+                                 stderr=subprocess.STDOUT, env=envToRun)
             while True:
                 l = p.stdout.readline().decode(GetLocale(), 'replace')
                 if l:
@@ -389,7 +424,7 @@ def CreateUniversalBinaries(context, libNames, x86Dir, armDir):
             lipoCmd = "{lipo} -create {x86Dir}/{libName} {armDir}/{libName} -output {outputName}".format(
                 lipo=lipoBinary, x86Dir=x86Dir, armDir=armDir, libName=libName, outputName=outputName)
             lipoCommands.append(lipoCmd)
-            Run(lipoCmd)
+            Run(lipoCmd, envToRun=GetEnv(context))
     for libName in libNames:
         if os.path.islink("{x86Dir}/{libName}".format(x86Dir=x86Dir, libName=libName)):
             outputName = os.path.join(context.instDir, "lib", libName)
@@ -497,6 +532,8 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
         if GetCMakeVersion() >= (3, 19, 0):
             extraArgs.append('-T buildsystem=1')
 
+        extraArgs.append('-DCMAKE_SUPPRESS_REGENERATION=YES')
+
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
             extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
             extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64e')
@@ -563,11 +600,13 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
                     osx_rpath=(osx_rpath or ""),
                     generator=(generator or ""),
                     toolset=(toolset or ""),
-                    extraArgs=(" ".join(extraArgs) if extraArgs else "")))
+                    extraArgs=(" ".join(extraArgs) if extraArgs else "")),
+                    envToRun=GetEnv(context))
 
         Run("cmake --build . --config {config} --target install -- {multiproc}"
             .format(config=config,
-                    multiproc=FormatMultiProcs(context.numJobs, generator)))
+                    multiproc=FormatMultiProcs(context.numJobs, generator)),
+                    envToRun=GetEnv(context))
 
 def GetCMakeVersion():
     """
@@ -892,7 +931,7 @@ def InstallBoost_Helper(context, force, buildArgs):
         bootstrap = "bootstrap.bat" if Windows() else "./bootstrap.sh"
         bootstrapCmd = '{bootstrap} --prefix="{instDir}"'.format(
             bootstrap=bootstrap, instDir=context.instDir)
-        Run(bootstrapCmd)
+        Run(bootstrapCmd, envToRun=GetEnv(context))
 
         # b2 supports at most -j64 and will error if given a higher value.
         num_procs = min(64, context.numJobs)
@@ -1071,7 +1110,7 @@ def InstallBoost_Helper(context, force, buildArgs):
 
         b2CmdPrimary = '{b2} {toolset} {options} install'.format(
             b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
-        Run(b2CmdPrimary)
+        Run(b2CmdPrimary, envToRun=GetEnv(context))
 
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
             b2_toolset = "toolset=clang-darwin-arm64e"
@@ -1079,7 +1118,7 @@ def InstallBoost_Helper(context, force, buildArgs):
                 
             b2CmdSecondary = '{b2} {toolset} {options} install'.format(
                 b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
-            Run(b2CmdSecondary)
+            Run(b2CmdSecondary, envToRun=GetEnv(context))
 
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
             CopyDirectory(context, os.path.join(context.instDir, "_tmp/x86_64/include/boost"), "include/boost")
@@ -1251,7 +1290,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             arch=archPrimary,
             procs=context.numJobs, 
             buildArgs=" ".join(buildArgs))
-        Run(makeTBBCmdPrimary)
+        Run(makeTBBCmdPrimary, envToRun=GetEnv(context))
         
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
             makeTBBCmdSecondary = "make -j{procs} arch={arch} {buildArgs}".format(
@@ -1259,7 +1298,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
                 procs=context.numJobs,
                 buildArgs=" ".join(buildArgs))
 
-            Run(makeTBBCmdSecondary)
+            Run(makeTBBCmdSecondary, envToRun=GetEnv(context))
 
         # Install both release and debug builds. USD requires the debug
         # libraries when building in debug mode, and installing both
@@ -1393,15 +1432,15 @@ def InstallJPEG_Lib(jpeg_url, context, force, buildArgs):
             configureCmd = './configure --prefix="{instDir}" '.format(instDir=context.instDir) + \
                 '--enable-static --enable-shared ' + \
                 '{buildArgs}'.format(buildArgs=" ".join(buildArgs))
-            Run(configureCmd)
+            Run(configureCmd, envToRun=GetEnv(context))
         else:
             configureCmd = './configure --prefix="{instDir}" '.format(instDir=context.instDir) + \
                 '--disable-static --enable-shared ' + \
                 '{buildArgs}'.format(buildArgs=" ".join(buildArgs))
-            Run(configureCmd)
+            Run(configureCmd, envToRun=GetEnv(context))
 
         makeCmd = 'make -j{procs} install'.format(procs=context.numJobs)
-        Run(makeCmd)
+        Run(makeCmd, envToRun=GetEnv(context))
 
         # Output paths that are of interest
         with open(os.path.join(context.usdInstDir, 'jpegBuild.txt'), 'wt') as file:
