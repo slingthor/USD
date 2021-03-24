@@ -318,9 +318,9 @@ HgiMetal::StartFrame(bool capture)
         if (@available(macos 10.15, ios 13.0, *)) {
 #if defined(ARCH_OS_IOS) || \
  (defined(__MAC_10_15) && __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_10_15)
-            MTLCaptureDescriptor *desc = [[MTLCaptureDescriptor alloc] init];
-            desc.captureObject = _captureScopeFullFrame;
-            desc.destination = MTLCaptureDestinationDeveloperTools;
+//            MTLCaptureDescriptor *desc = [[MTLCaptureDescriptor alloc] init];
+//            desc.captureObject = _captureScopeFullFrame;
+//            desc.destination = MTLCaptureDestinationDeveloperTools;
 //            [[MTLCaptureManager sharedCaptureManager]
 //                startCaptureWithDescriptor:desc error:nil];
 #endif
