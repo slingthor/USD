@@ -334,6 +334,8 @@ _ComputeHeader(id<MTLDevice> device)
     header  << "#include <metal_stdlib>\n"
             << "#include <simd/simd.h>\n"
             << "#include <metal_pack>\n"
+            << "#pragma clang diagnostic ignored \"-Wunused-variable\"\n"
+            << "#pragma clang diagnostic ignored \"-Wsign-compare\"\n"
             << "using namespace metal;\n";
 
     header  << "#define double float\n"

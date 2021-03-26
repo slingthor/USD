@@ -26,7 +26,6 @@
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/glApi.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hio/glslfx.h"
@@ -2248,7 +2247,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     }
     // How we emulate gl_FragCoord is different based on whether we're
     // using a pass-through vertex shader due to using compute for GS.
-    // [[position]] is very different, and we we need to standardise it here
+    // [[position]] is very different, and we need to standardise it here
     // by manually doing the division by w to normalise
     if (_buildTarget != kMSL_BuildTarget_MVA_ComputeGS) {
         fsInputCode << "    scope.gl_FragCoord = scope.gl_Position;\n";
@@ -2723,6 +2722,8 @@ HdSt_CodeGenMSL::GetComputeHeader()
     header  << "#include <metal_stdlib>\n"
             << "#include <simd/simd.h>\n"
             << "#include <metal_pack>\n"
+            << "#pragma clang diagnostic ignored \"-Wunused-variable\"\n"
+            << "#pragma clang diagnostic ignored \"-Wsign-compare\"\n"
             << "using namespace metal;\n";
     
     header  << "#define double float\n"
@@ -5592,15 +5593,6 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                     << "#endif\n";
             }
         } else if (bindingType == HdBinding::TRANSFORM_2D) {
-            // Forward declare rotation, scale, and translation
-//            accessors
-//                << "float HdGet_" << it->second.name << "_"
-//                << HdStTokens->rotation  << "();\n"
-//                << "vec2 HdGet_" << it->second.name << "_"
-//                << HdStTokens->scale  << "();\n"
-//                << "vec2 HdGet_" << it->second.name << "_"
-//                << HdStTokens->translation  << "();\n";
-
             // vec2 HdGet_name(int localIndex)
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
