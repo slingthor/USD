@@ -106,8 +106,9 @@ HdxPickTask::_InitIfNeeded(GfVec2i const& size)
 {
     if (_drawTarget) {
         if (size != _drawTarget->GetSize()) {
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
             GlfSharedGLContextScopeHolder sharedContextHolder;
-
+#endif
             _drawTarget->Bind();
             _drawTarget->SetSize(size);
             _drawTarget->Unbind();

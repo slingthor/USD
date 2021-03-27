@@ -1329,20 +1329,21 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
         _hgiDriver.driver.IsHolding<Hgi*>()) {
         hgi = _hgiDriver.driver.UncheckedGet<Hgi*>();
 
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    int32_t restoreReadFbo = 0;
-    int32_t restoreDrawFbo = 0;
-//    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &restoreReadFbo);
-//    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &restoreDrawFbo);
-#endif
-    if (_userFramebuffer.IsEmpty()) {
-        // If user supplied no framebuffer, use the currently bound
-        // framebuffer.
-        _taskController->SetPresentationOutput(
-            HgiTokens->OpenGL,
-            VtValue(static_cast<uint32_t>(restoreDrawFbo)));
-    }
+        int32_t restoreReadFbo = 0;
+        int32_t restoreDrawFbo = 0;
 
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+//      glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &restoreReadFbo);
+//      glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &restoreDrawFbo);
+
+        if (_userFramebuffer.IsEmpty()) {
+            // If user supplied no framebuffer, use the currently bound
+            // framebuffer.
+            _taskController->SetPresentationOutput(
+                HgiTokens->OpenGL,
+                VtValue(static_cast<uint32_t>(restoreDrawFbo)));
+        }
+#endif
         hgi->StartFrame();
     }
     
