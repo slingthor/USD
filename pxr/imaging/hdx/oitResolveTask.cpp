@@ -21,27 +21,19 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/garch/glApi.h"
-
 #if defined(PXR_METAL_SUPPORT_ENABLED)
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #include "pxr/imaging/mtlf/drawTarget.h"
 #endif
 
-#include "pxr/imaging/garch/resourceFactory.h"
-#include "pxr/imaging/garch/contextCaps.h"
-
 #include "pxr/imaging/hdx/oitResolveTask.h"
 #include "pxr/imaging/hdx/tokens.h"
-#include "pxr/imaging/hdx/debugCodes.h"
 #include "pxr/imaging/hdx/package.h"
 
-#include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/renderBuffer.h"
 #include "pxr/imaging/hd/renderDelegate.h"
 #include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/imaging/hd/renderPass.h"
-#include "pxr/imaging/hd/renderPassState.h"
 #include "pxr/imaging/hd/rprimCollection.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
@@ -57,7 +49,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-typedef std::vector<HdBufferSourceSharedPtr> HdBufferSourceSharedPtrVector;
+using HdBufferSourceSharedPtrVector = std::vector<HdBufferSourceSharedPtr>;
 
 
 HdxOitResolveTask::HdxOitResolveTask(
@@ -68,9 +60,7 @@ HdxOitResolveTask::HdxOitResolveTask(
 {
 }
 
-HdxOitResolveTask::~HdxOitResolveTask()
-{
-}
+HdxOitResolveTask::~HdxOitResolveTask() = default;
 
 void
 HdxOitResolveTask::Sync(
@@ -247,6 +237,7 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
         // We do not use renderDelegate->CreateRenderPassState because
         // ImageShaders always use HdSt
         _renderPassState = std::shared_ptr<HdStRenderPassState>(HdStResourceFactory::GetInstance()->NewRenderPassState());
+        _renderPassState->SetEnableDepthTest(false);
         _renderPassState->SetEnableDepthMask(false);
         _renderPassState->SetColorMasks({HdRenderPassState::ColorMaskRGBA});
         _renderPassState->SetBlendEnabled(true);
@@ -270,10 +261,6 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
         _renderPassShader = HdStResourceFactory::GetInstance()->NewRenderPassShader(
             HdxPackageOitResolveImageShader());
         _renderPassState->SetRenderPassShader(_renderPassShader);
-
-        // We want OIT to resolve into the resolved aov, not the multi sample
-        // aov. See HdxTaskController::GetRenderingTasks().
-        _renderPassState->SetUseAovMultiSample(false);
 
         _renderPass->Prepare(GetRenderTags());
     }
@@ -332,27 +319,7 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
         return;
     }
 
-    _renderPassState->Bind(); 
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext()->GetMetalContext();
-    context->SetDepthWriteEnable(false);
-#elif defined(PXR_OPENGL_SUPPORT_ENABLED)
-    bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
-    if (isOpenGL) {
-        glDisable(GL_DEPTH_TEST);
-    }
-#endif
-
     _renderPass->Execute(_renderPassState, GetRenderTags());
-
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    context->SetDepthWriteEnable(true);
-#elif defined(PXR_OPENGL_SUPPORT_ENABLED)
-    if (isOpenGL) {
-        glEnable(GL_DEPTH_TEST);
-    }
-#endif
-    _renderPassState->Unbind();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

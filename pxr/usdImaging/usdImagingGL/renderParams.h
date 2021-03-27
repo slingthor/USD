@@ -94,7 +94,6 @@ public:
     TfToken colorCorrectionMode;
     int lut3dSizeOCIO;
     unsigned long sampleCount;
-    bool skipInterop;
     
     UsdImagingGLRenderParams();
 

@@ -181,8 +181,8 @@ HdStRenderPassStateMetal::Bind()
     }
 /*
     // Apply polygon offset to whole pass.
-    if (!_depthBiasUseDefault) {
-        if (_depthBiasEnabled) {
+    if (!GetDepthBiasUseDefault()) {
+        if (GetDepthBiasEnabled()) {
             glEnable(GL_POLYGON_OFFSET_FILL);
             glPolygonOffset(_depthBiasSlopeFactor, _depthBiasConstantFactor);
         } else {
@@ -190,14 +190,23 @@ HdStRenderPassStateMetal::Bind()
         }
     }
 
+    if (GetEnableDepthTest()) {
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(HdStGLConversions::GetGlDepthFunc(_depthFunc));
+        glDepthMask(GetEnableDepthMask()); // depth writes are enabled only
+                                           // when the test is enabled.
+    } else {
+        glDisable(GL_DEPTH_TEST);
+    }
+
     // Stencil
-    if (_stencilEnabled) {
+    if (GetStencilEnabled()) {
         glEnable(GL_STENCIL_TEST);
         glStencilFunc(HdStGLConversions::GetGlStencilFunc(_stencilFunc),
-                _stencilRef, _stencilMask);
+        _stencilRef, _stencilMask);
         glStencilOp(HdStGLConversions::GetGlStencilOp(_stencilFailOp),
-                HdStGLConversions::GetGlStencilOp(_stencilZFailOp),
-                HdStGLConversions::GetGlStencilOp(_stencilZPassOp));
+        HdStGLConversions::GetGlStencilOp(_stencilZFailOp),
+        HdStGLConversions::GetGlStencilOp(_stencilZPassOp));
     } else {
         glDisable(GL_STENCIL_TEST);
     }
@@ -264,13 +273,14 @@ HdStRenderPassStateMetal::Unbind()
                              MTLBlendFactorOne, MTLBlendFactorZero);
 
     context->SetDepthWriteEnable(true);
+    context->SetDepthComparisonFunction(MTLCompareFunctionLess);
     context->SetColorWriteMask(MTLColorWriteMaskAll);
 /*
     glDisable(GL_POLYGON_OFFSET_FILL);
     glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
     glDisable(GL_PROGRAM_POINT_SIZE);
+    glEnable(GL_DEPTH_TEST);
     glDisable(GL_STENCIL_TEST);
-    glDepthFunc(GL_LESS);
     glPolygonOffset(0, 0);
     glLineWidth(1.0f);
 

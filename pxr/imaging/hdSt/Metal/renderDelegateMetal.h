@@ -89,7 +89,6 @@ private:
     HdStRenderDelegateMetal &operator =(
         const HdStRenderDelegateMetal &) = delete;
 
-    DelegateParams::RenderOutput _renderOutput;
     MTLRenderPassDescriptor *_mtlRenderPassDescriptor;
 
     dispatch_semaphore_t _inFlightSemaphore;

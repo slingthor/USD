@@ -82,22 +82,19 @@ public:
         bool enableSampleAlphaToCoverage;
         unsigned long sampleCount;
         HdStDrawMode drawMode;
-        RenderOutput renderOutput;
         
         DelegateParams(bool _flipFrontFacing,
                        bool _applyRenderState,
                        bool _enableIdRender,
                        bool _enableSampleAlphaToCoverage,
                        unsigned long _sampleCount,
-                       HdStDrawMode _drawMode,
-                       RenderOutput _renderOutput)
+                       HdStDrawMode _drawMode)
         : flipFrontFacing(_flipFrontFacing)
         , applyRenderState(_applyRenderState)
         , enableIdRender(_enableIdRender)
         , enableSampleAlphaToCoverage(_enableSampleAlphaToCoverage)
         , sampleCount(_sampleCount)
         , drawMode(_drawMode)
-        , renderOutput(_renderOutput)
         {
         }
 
@@ -166,13 +163,10 @@ public:
     virtual void CommitResources(HdChangeTracker *tracker) override;
 
     HDST_API
-    virtual TfToken GetMaterialNetworkSelector() const override;
+    virtual TfTokenVector GetMaterialRenderContexts() const override;
 
     HDST_API
     virtual TfTokenVector GetShaderSourceTypes() const override;
-
-    HDST_API
-    virtual bool IsPrimvarFilteringNeeded() const override;
 
     HDST_API
     virtual HdRenderSettingDescriptorList

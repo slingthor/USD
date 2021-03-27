@@ -213,7 +213,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 #define HD_MATERIAL_TERMINAL_TOKENS             \
     (surface)                                   \
     (displacement)                              \
-    (volume)
+    (volume)                                    \
+    (light)                                     \
+    (lightFilter)
 
 #define HD_RENDERTAG_TOKENS                     \
     (geometry)                                  \
@@ -244,6 +246,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (distantLight)                              \
     (domeLight)                                 \
     (lightFilter)                               \
+    (pluginLight)                               \
     (rectLight)                                 \
     (sphereLight)                               \
     /* Sprims ExtComputations */                \

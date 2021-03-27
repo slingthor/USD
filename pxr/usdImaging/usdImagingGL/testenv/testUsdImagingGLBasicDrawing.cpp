@@ -293,8 +293,7 @@ My_TestGLDrawing::DrawTest(bool offscreen)
     glEnable(GL_DEPTH_TEST);
 #endif
     if (useAovs) {
-        Hgi* hgi = _engine->GetHgi();
-        _engine->SetRendererAov(GetRendererAov(), hgi->GetAPIName());
+        _engine->SetRendererAov(GetRendererAov());
     }
 
     if(IsEnabledTestLighting()) {

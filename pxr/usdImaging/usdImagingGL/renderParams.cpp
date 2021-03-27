@@ -49,7 +49,6 @@ UsdImagingGLRenderParams::UsdImagingGLRenderParams() :
     enableUsdDrawModes(true),
     clearColor(0,0,0,1),
     lut3dSizeOCIO(65),
-    sampleCount(1),
-    skipInterop(false)
+    sampleCount(1)
 {
 }

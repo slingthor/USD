@@ -232,7 +232,7 @@ public:
         size_t GetNumElements() const {
             return HdGetComponentCount(_resource->GetTupleType().type);
         }
-        GLuint BindVBO() {
+        uint64_t BindVBO() {
             return _resource->GetId()->GetRawResource();
         }
 #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)

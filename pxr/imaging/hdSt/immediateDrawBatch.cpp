@@ -46,7 +46,6 @@
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/base/tf/diagnostic.h"
-#include "pxr/base/tf/iterator.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -125,7 +124,7 @@ HdSt_ImmediateDrawBatch::PrepareDraw(
 }
 
 static int
-_GetElementOffset(HdStBufferArrayRangeSharedPtr const& range)
+_GetElementOffset(HdBufferArrayRangeSharedPtr const& range)
 {
     return range? range->GetElementOffset() : 0;
 }
@@ -154,10 +153,8 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
 
     gpuProgram->SetProgram();
 
-    bool hasOverrideShader = bool(renderPassState->GetOverrideShader());
-
-    TF_FOR_ALL(it, shaders) {
-        (*it)->BindResources(*gpuProgram, binder, *renderPassState);
+    for (HdStShaderCodeSharedPtr const & shader : shaders) {
+        shader->BindResources(*gpuProgram, binder, *renderPassState);
     }
 
     HdStBufferArrayRangeSharedPtr indexBarCurrent;
@@ -178,12 +175,12 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
     geometricShader->BindResources(*gpuProgram, binder, *renderPassState);
 
     size_t numItemsDrawn = 0;
-    TF_FOR_ALL(drawItemIt, _drawItemInstances) {
-        if(!(*drawItemIt)->IsVisible()) {
+    for (HdStDrawItemInstance const * drawItemInstance : _drawItemInstances) {
+        if(!drawItemInstance->IsVisible()) {
             continue;
         }
 
-        HdStDrawItem const * drawItem = (*drawItemIt)->GetDrawItem();
+        HdStDrawItem const * drawItem = drawItemInstance->GetDrawItem();
 
         ++numItemsDrawn;
 
@@ -340,7 +337,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
         // shader buffer
         //
         HdBufferArrayRangeSharedPtr const & shaderBar_ =
-            renderPassState->GetOverrideShader() || !program.GetSurfaceShader()
+            !program.GetSurfaceShader()
                 ? HdStBufferArrayRangeSharedPtr()
                 : program.GetSurfaceShader()->GetShaderData();
         HdStBufferArrayRangeSharedPtr shaderBar =
@@ -359,7 +356,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
         //
         // shader textures
         //
-        if (!hasOverrideShader && program.GetSurfaceShader()) {
+        if (program.GetSurfaceShader()) {
             program.GetSurfaceShader()->BindResources(
                 *gpuProgram, binder, *renderPassState);
         }
@@ -476,7 +473,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
                 instanceCount);
         }
 
-//        if (!hasOverrideShader && program.GetSurfaceShader()) {
+//        if (program.GetSurfaceShader()) {
 //            program.GetSurfaceShader()->UnbindResources(binder, programId);
 //                *gpuProgram, binder, *renderPassState);
 //        }
@@ -486,8 +483,8 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
 
     HD_PERF_COUNTER_ADD(HdTokens->itemsDrawn, numItemsDrawn);
 /*
-    TF_FOR_ALL(it, shaders) {
-        (*it)->UnbindResources(*gpuProgram, binder, *renderPassState);
+    for (HdStShaderCodeSharedPtr const & shader : shaders) {
+        shader->UnbindResources(programId, binder, *renderPassState);
     }
     geometricShader->UnbindResources(*gpuProgram, binder, *renderPassState);
 

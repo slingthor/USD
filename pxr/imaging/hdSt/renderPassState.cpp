@@ -76,6 +76,7 @@ HdStRenderPassState::HdStRenderPassState(
     , _clipPlanesBufferSize(0)
     , _alphaThresholdCurrent(0)
     , _resolveMultiSampleAov(true)
+    , _useSceneMaterials(true)
 {
     _lightingShader = _fallbackLightingShader;
 }
@@ -331,9 +332,9 @@ HdStRenderPassState::SetRenderPassShader(HdStRenderPassShaderSharedPtr const &re
 }
 
 void 
-HdStRenderPassState::SetOverrideShader(HdStShaderCodeSharedPtr const &overrideShader)
+HdStRenderPassState::SetUseSceneMaterials(bool state)
 {
-    _overrideShader = overrideShader;
+    _useSceneMaterials = state;
 }
 
 HdStShaderCodeSharedPtrVector

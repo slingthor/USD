@@ -161,7 +161,12 @@ HdStRenderPassShader::UnbindResources(HdStGLSLProgram const &program,
 void
 HdStRenderPassShader::AddBufferBinding(HdBindingRequest const& req)
 {
-    _customBuffers[req.GetName()] = req;
+    auto it = _customBuffers.insert({req.GetName(), req});
+    // Entry already existed and was equal to what we want to set it.
+    if (!it.second && it.first->second == req) {
+        return;
+    }
+    it.first->second = req;
     _hashValid = false;
 }
 

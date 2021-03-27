@@ -65,13 +65,14 @@ class HdStRenderPassState;
 /// create a render setup task internally.  See the HdxRenderTask documentation
 /// for details.
 ///
-class HdxRenderSetupTask : public HdTask {
+class HdxRenderSetupTask : public HdTask
+{
 public:
     HDX_API
     HdxRenderSetupTask(HdSceneDelegate* delegate, SdfPath const& id);
 
     HDX_API
-    virtual ~HdxRenderSetupTask();
+    ~HdxRenderSetupTask() override;
 
 
     // APIs used from HdxRenderTask to manage the sync/prepare process.
@@ -87,18 +88,18 @@ public:
 
     /// Sync the render pass resources
     HDX_API
-    virtual void Sync(HdSceneDelegate* delegate,
-                      HdTaskContext* ctx,
-                      HdDirtyBits* dirtyBits) override;
+    void Sync(HdSceneDelegate* delegate,
+              HdTaskContext* ctx,
+              HdDirtyBits* dirtyBits) override;
 
     /// Prepare the tasks resources
     HDX_API
-    virtual void Prepare(HdTaskContext* ctx,
-                         HdRenderIndex* renderIndex) override;
-
+    void Prepare(HdTaskContext* ctx,
+                 HdRenderIndex* renderIndex) override;
+    
     /// Execute render pass task
     HDX_API
-    virtual void Execute(HdTaskContext* ctx) override;
+    void Execute(HdTaskContext* ctx) override;
 
 private:
     HdRenderPassStateSharedPtr _renderPassState;
@@ -112,11 +113,7 @@ private:
     GfVec4d _viewport;
     HdRenderPassAovBindingVector _aovBindings;
 
-    static HdStShaderCodeSharedPtr _overrideShader;
-
-    static void _CreateOverrideShader();
-
-    void _SetRenderpassAndOverrideShadersForStorm(
+    void _SetRenderpassShadersForStorm(
         HdxRenderTaskParams const& params,
         HdStRenderPassState *renderPassState);
 
@@ -174,6 +171,7 @@ struct HdxRenderTaskParams
         , blendConstantColor(0.0f, 0.0f, 0.0f, 0.0f)
         , blendEnable(false)
         , enableAlphaToCoverage(true)
+        , useAovMultiSample(true)
         , resolveAovMultiSample(true)
         // Camera framing and viewer state
         , viewport(0.0)
@@ -240,6 +238,10 @@ struct HdxRenderTaskParams
 
     // AlphaToCoverage
     bool enableAlphaToCoverage;
+
+    // If true (default), render into the multi-sampled AOVs (rather than
+    // the resolved AOVs).
+    bool useAovMultiSample;
 
     // If true (default), multi-sampled AOVs will be resolved at the end of a
     // render pass.

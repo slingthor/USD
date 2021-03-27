@@ -37,6 +37,7 @@
 #include "pxr/imaging/hd/bufferSpec.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/enums.h"
+#include "pxr/imaging/hd/instancer.h"
 #include "pxr/imaging/hd/resource.h"
 #include "pxr/imaging/hd/tokens.h"
 
@@ -159,6 +160,21 @@ HdSt_ResourceBinder::_Concat(const TfToken &a, const TfToken &b)
     return TfToken(a.GetString() + b.GetString());
 }
 
+static
+TfTokenVector
+_GetInstancerFilterNames(HdStDrawItem const * drawItem)
+{
+    TfTokenVector filterNames = HdInstancer::GetBuiltinPrimvarNames();;
+
+    HdStShaderCodeSharedPtr materialShader = drawItem->GetMaterialShader();
+    if (materialShader) {
+        TfTokenVector const & names = materialShader->GetPrimvarNames();
+        filterNames.insert(filterNames.end(), names.begin(), names.end());
+    }
+
+    return filterNames;
+}
+
 void
 HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
                                    HdStShaderCodeSharedPtrVector const &shaders,
@@ -257,6 +273,8 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
      // constant primvars are interleaved into single struct.
     _bindingMap[_tokens->constantPrimvars] = constantPrimvarBinding;
 
+    TfTokenVector filterNames = _GetInstancerFilterNames(drawItem);
+
     // instance primvar (per-instance)
     int instancerNumLevels = drawItem->GetInstancePrimvarNumLevels();
     metaDataOut->instancerNumLevels = instancerNumLevels;
@@ -269,6 +287,12 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
 
             TF_FOR_ALL (it, instanceBar->GetResources()) {
                 TfToken const& name = it->first;
+                // skip instance primvars that are not used in this batch.
+                if (std::find(filterNames.begin(), filterNames.end(), name)
+                                                        == filterNames.end()) {
+                    continue;
+                }
+
                 TfToken glName =  HdStGLConversions::GetGLSLIdentifier(name);
                 // non-interleaved, always create new binding.
                 HdBinding instancePrimvarBinding =
@@ -936,7 +960,9 @@ HdSt_ResourceBinder::BindInstanceBufferArray(
     if (!bar) return;
 
     TF_FOR_ALL(it, bar->GetResources()) {
-        BindBuffer(it->first, it->second, it->second->GetOffset(), level);
+        if (HasBinding(it->first, level)) {
+            BindBuffer(it->first, it->second, it->second->GetOffset(), level);
+        }
     }
 }
 
@@ -947,7 +973,9 @@ HdSt_ResourceBinder::UnbindInstanceBufferArray(
     if (!bar) return;
 
     TF_FOR_ALL(it, bar->GetResources()) {
-        UnbindBuffer(it->first, it->second, level);
+        if (HasBinding(it->first, level)) {
+            UnbindBuffer(it->first, it->second, level);
+        }
     }
 }
 

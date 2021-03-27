@@ -23,7 +23,7 @@ set(optionalLibs "")
 set(optionalIncludeDirs "")
 set(optionalPublicClasses "")
 set(optionalPrivateClasses "")
-if (${PXR_ENABLE_MATERIALX_IMAGING_SUPPORT})
+if (${PXR_ENABLE_MATERIALX_SUPPORT})
     add_definitions(-DPXR_MATERIALX_STDLIB_DIR="${MATERIALX_STDLIB_DIR}")
     add_definitions(-DPXR_MATERIALX_RESOURCE_DIR="${MATERIALX_RESOURCE_DIR}")
 
@@ -135,15 +135,16 @@ pxr_library(hdSt
         mixinShader
         package
         points
+        primUtils
         ptexTextureObject
         renderBuffer
         renderDelegate
+        renderParam
         renderPass
         renderPassShader
         renderPassState
         resourceFactory
         resourceRegistry
-        rprimUtils
         samplerObject
         samplerObjectRegistry
         shaderCode
@@ -190,7 +191,6 @@ pxr_library(hdSt
         pointsShaderKey
         quadrangulate
         spatialHierarchy
-        renderParam
         resourceBinder
         shaderKey
         subdivision

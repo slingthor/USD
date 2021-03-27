@@ -1036,7 +1036,7 @@ UsdImagingGLEngine::GetRendererAovs() const
 }
 
 bool
-UsdImagingGLEngine::SetRendererAov(TfToken const &id, TfToken const& interopDst)
+UsdImagingGLEngine::SetRendererAov(TfToken const &id)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return false;
@@ -1046,7 +1046,7 @@ UsdImagingGLEngine::SetRendererAov(TfToken const &id, TfToken const& interopDst)
 
     TF_VERIFY(_renderIndex);
     if (_renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
-        _taskController->SetRenderOutputs({id}, interopDst);
+        _taskController->SetRenderOutputs({id});
         return true;
     }
     return false;
@@ -1147,6 +1147,21 @@ UsdImagingGLEngine::SetEnablePresentation(bool enabled)
 
     if (TF_VERIFY(_taskController)) {
         _taskController->SetEnablePresentation(enabled);
+    }
+}
+
+void
+UsdImagingGLEngine::SetPresentationOutput(
+    TfToken const &api,
+    VtValue const &framebuffer)
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    if (TF_VERIFY(_taskController)) {
+        _userFramebuffer = framebuffer;
+        _taskController->SetPresentationOutput(api, framebuffer);
     }
 }
 
@@ -1314,6 +1329,20 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
         _hgiDriver.driver.IsHolding<Hgi*>()) {
         hgi = _hgiDriver.driver.UncheckedGet<Hgi*>();
 
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+    int32_t restoreReadFbo = 0;
+    int32_t restoreDrawFbo = 0;
+//    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &restoreReadFbo);
+//    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &restoreDrawFbo);
+#endif
+    if (_userFramebuffer.IsEmpty()) {
+        // If user supplied no framebuffer, use the currently bound
+        // framebuffer.
+        _taskController->SetPresentationOutput(
+            HgiTokens->OpenGL,
+            VtValue(static_cast<uint32_t>(restoreDrawFbo)));
+    }
+
         hgi->StartFrame();
     }
     
@@ -1326,11 +1355,7 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
             params.enableIdRender,
             params.enableSampleAlphaToCoverage,
             params.sampleCount,
-            params.drawMode,
-            params.skipInterop?
-                HdStRenderDelegate::DelegateParams::RenderOutput::Metal :
-                HdStRenderDelegate::DelegateParams::RenderOutput::OpenGL
-              );
+            params.drawMode);
         hdStRenderDelegate->PrepareRender(delegateParams);
     }
 
@@ -1348,6 +1373,10 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
     if (hgi) {
         hgi->EndFrame();
     }
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+//    glBindFramebuffer(GL_READ_FRAMEBUFFER, restoreReadFbo);
+//    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, restoreDrawFbo);
+#endif
 }
 
 bool 

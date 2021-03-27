@@ -72,14 +72,6 @@ public:
     HD_API
     virtual void Prepare(HdResourceRegistrySharedPtr const &resourceRegistry);
 
-    // Bind, called once per frame before drawing.
-    HD_API
-    virtual void Bind();
-
-    // Unbind, called once per frame after drawing.
-    HD_API
-    virtual void Unbind();
-
     // ---------------------------------------------------------------------- //
     /// \name Camera and framing state
     // ---------------------------------------------------------------------- //
@@ -267,9 +259,13 @@ public:
 
     HD_API
     void SetEnableDepthMask(bool state);
-
     HD_API
     bool GetEnableDepthMask();
+
+    HD_API
+    void SetEnableDepthTest(bool enabled);
+    HD_API
+    bool GetEnableDepthTest() const;
 
     HD_API
     void SetStencil(HdCompareFunction func, int ref, int mask,
@@ -282,6 +278,8 @@ public:
     HdStencilOp GetStencilDepthPassOp() const { return _stencilZPassOp; }
     HD_API
     void SetStencilEnabled(bool enabled);
+    HD_API
+    bool GetStencilEnabled() const;
     
     HD_API
     void SetLineWidth(float width);
@@ -369,9 +367,10 @@ protected:
     bool _depthBiasEnabled;
     float _depthBiasConstantFactor;
     float _depthBiasSlopeFactor;
-
     HdCompareFunction _depthFunc;
     bool _depthMaskEnabled;
+    bool _depthTestEnabled;
+
     HdCullStyle _cullStyle;
 
     // Stencil RenderPassState

@@ -57,6 +57,8 @@ pxr_library(usdImaging
         meshAdapter
         nurbsCurvesAdapter
         nurbsPatchAdapter
+        pluginLightAdapter
+        pluginLightFilterAdapter
         pointsAdapter
         pointInstancerAdapter
         primAdapter

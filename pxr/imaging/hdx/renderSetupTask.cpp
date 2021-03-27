@@ -33,8 +33,6 @@
 #include "pxr/imaging/hd/renderBuffer.h"
 
 #include "pxr/imaging/hd/camera.h"
-#include "pxr/imaging/hdSt/glslfxShader.h"
-#include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
@@ -45,22 +43,20 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdStShaderCodeSharedPtr HdxRenderSetupTask::_overrideShader;
-
 HdxRenderSetupTask::HdxRenderSetupTask(HdSceneDelegate* delegate, SdfPath const& id)
     : HdTask(id)
+    , _colorRenderPassShader(
+        HdStResourceFactory::GetInstance()->NewRenderPassShader(
+            HdxPackageRenderPassColorShader()))
+    , _idRenderPassShader(
+        HdStResourceFactory::GetInstance()->NewRenderPassShader(
+            HdxPackageRenderPassIdShader()))
     , _overrideWindowPolicy{false, CameraUtilFit}
     , _viewport(0)
 {
-    _colorRenderPassShader = HdStResourceFactory::GetInstance()->NewRenderPassShader(
-        HdxPackageRenderPassColorShader());
-    _idRenderPassShader = HdStResourceFactory::GetInstance()->NewRenderPassShader(
-        HdxPackageRenderPassIdShader());
 }
 
-HdxRenderSetupTask::~HdxRenderSetupTask()
-{
-}
+HdxRenderSetupTask::~HdxRenderSetupTask() = default;
 
 void
 HdxRenderSetupTask::Sync(HdSceneDelegate* delegate,
@@ -109,18 +105,11 @@ HdxRenderSetupTask::Execute(HdTaskContext* ctx)
 }
 
 void
-HdxRenderSetupTask::_SetRenderpassAndOverrideShadersForStorm(
+HdxRenderSetupTask::_SetRenderpassShadersForStorm(
     HdxRenderTaskParams const &params,
     HdStRenderPassState *renderPassState)
 {
-    if (params.enableSceneMaterials) {
-        renderPassState->SetOverrideShader(HdStShaderCodeSharedPtr());
-    } else {
-        if (!_overrideShader) {
-            _CreateOverrideShader();
-        }
-        renderPassState->SetOverrideShader(_overrideShader);
-    }
+    renderPassState->SetUseSceneMaterials(params.enableSceneMaterials);
     if (params.enableIdRender) {
         renderPassState->SetRenderPassShader(_idRenderPassShader);
     } else {
@@ -176,10 +165,12 @@ HdxRenderSetupTask::SyncParams(HdSceneDelegate* delegate,
 
         if (HdStRenderPassState * const hdStRenderPassState =
                     dynamic_cast<HdStRenderPassState*>(renderPassState.get())) {
+            hdStRenderPassState->SetUseAovMultiSample(
+                params.useAovMultiSample);
             hdStRenderPassState->SetResolveAovMultiSample(
                 params.resolveAovMultiSample);
             
-            _SetRenderpassAndOverrideShadersForStorm(
+            _SetRenderpassShadersForStorm(
                 params, hdStRenderPassState);
         }
     }
@@ -243,22 +234,6 @@ HdxRenderSetupTask::PrepareCamera(HdRenderIndex* renderIndex)
     }
 }
 
-void
-HdxRenderSetupTask::_CreateOverrideShader()
-{
-    static std::mutex shaderCreateLock;
-
-    if (!_overrideShader) {
-        std::lock_guard<std::mutex> lock(shaderCreateLock);
-        if (!_overrideShader) {
-            _overrideShader = HdStShaderCodeSharedPtr(new HdStGLSLFXShader(
-                HioGlslfxSharedPtr(new HioGlslfx(
-                    HdStPackageFallbackSurfaceShader()))));
-        }
-    }
-}
-
-
 HdRenderPassStateSharedPtr &
 HdxRenderSetupTask::_GetRenderPassState(HdRenderIndex* renderIndex)
 {
@@ -313,6 +288,7 @@ std::ostream& operator<<(std::ostream& out, const HdxRenderTaskParams& pv)
         << pv.blendConstantColor << " "
         << pv.blendEnable << " "
         << pv.enableAlphaToCoverage << ""
+        << pv.useAovMultiSample << ""
         << pv.resolveAovMultiSample << ""
 
         << pv.camera << " "
@@ -368,6 +344,8 @@ bool operator==(const HdxRenderTaskParams& lhs, const HdxRenderTaskParams& rhs)
            lhs.blendConstantColor       == rhs.blendConstantColor       &&
            lhs.blendEnable              == rhs.blendEnable              &&
            lhs.enableAlphaToCoverage    == rhs.enableAlphaToCoverage    &&
+           lhs.useAovMultiSample        == rhs.useAovMultiSample        &&
+           lhs.resolveAovMultiSample    == rhs.resolveAovMultiSample    &&
            
            lhs.camera                   == rhs.camera                   &&
            lhs.framing                  == rhs.framing                  &&

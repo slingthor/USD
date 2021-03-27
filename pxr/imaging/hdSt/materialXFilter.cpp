@@ -23,9 +23,9 @@
 //
 #include "pxr/imaging/hdSt/materialXFilter.h"
 #include "pxr/imaging/hdSt/materialXShaderGen.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/usd/sdr/registry.h"
-#include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hio/glslfx.h"
 
 #include "pxr/base/gf/vec2f.h"
@@ -50,6 +50,9 @@ TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     (mtlx)
 
+    // Texture Coordinate Token
+    (st)
+
     // Hd MaterialX Node Types
     (ND_standard_surface_surfaceshader)
     (ND_UsdPreviewSurface_surfaceshader)
@@ -67,7 +70,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 // Based on MaterialXViewer Material::generateShader()
 static std::string
 _GenPixelShader(mx::GenContext & mxContext, 
-                mx::TypedElementPtr const& mxElem)
+                mx::ElementPtr const& mxElem)
 {
     bool hasTransparency = mx::isTransparentSurface(mxElem, 
                                 mxContext.getShaderGenerator());
@@ -101,11 +104,13 @@ R"(
 // Use the given mxDocument to generate the corresponding glsl source code
 // Based on MaterialXViewer Viewer::loadDocument()
 std::string
-HdSt_GenMaterialXShaderCode(mx::DocumentPtr const& mxDoc,
-                            mx::FileSearchPath const& searchPath)
+HdSt_GenMaterialXShaderCode(
+    mx::DocumentPtr const& mxDoc,
+    mx::FileSearchPath const& searchPath,
+    mx::StringMap const& mxHdTextureMap)
 {
     // Initialize the Context for shaderGen. 
-    mx::GenContext mxContext = HdStMaterialXShaderGen::create();
+    mx::GenContext mxContext = HdStMaterialXShaderGen::create(mxHdTextureMap);
     mxContext.registerSourceCodeSearchPath(searchPath);
     
     // Add the Direct Light mtlx file to the mxDoc 
@@ -130,9 +135,19 @@ HdSt_GenMaterialXShaderCode(mx::DocumentPtr const& mxDoc,
         return mx::EMPTY_STRING;
     }
 
-    // Generate the PixelShader for the renderable element.
-    const mx::TypedElementPtr & materialElement = renderableElements.at(0);
-    mx::ElementPtr mxElem = mxDoc->getDescendant(materialElement->getNamePath());
+    // Extract out the Surface Shader Node for the Material Node 
+    mx::TypedElementPtr renderableElem = renderableElements.at(0);
+    mx::NodePtr node = renderableElem->asA<mx::Node>();
+    if (node && node->getType() == mx::MATERIAL_TYPE_STRING) {
+        std::unordered_set<mx::NodePtr> mxShaderNodes;
+        mxShaderNodes = mx::getShaderNodes(node, mx::SURFACE_SHADER_TYPE_STRING);
+        if (!mxShaderNodes.empty()) {
+            renderableElem = *mxShaderNodes.begin();
+        }
+    }
+    // Generate the PixelShader for the renderable element (surfaceshader).
+    const mx::ElementPtr & mxElem = mxDoc->getDescendant(
+                                            renderableElem->getNamePath());
     mx::TypedElementPtr typedElem = mxElem ? mxElem->asA<mx::TypedElement>()
                                          : nullptr;
     if (typedElem) {
@@ -199,65 +214,123 @@ _FindConnectedNode(
     return true;
 }
 
+// Get the Hydra VtValue for the given MaterialX input value
+static VtValue
+_GetHdFilterValue(std::string const& mxInputValue)
+{
+    if(mxInputValue == "closest") {
+        return VtValue(HdStTextureTokens->nearestMipmapNearest);
+    }
+    return VtValue(HdStTextureTokens->linearMipmapLinear);
+}
+
+// Get the Hydra VtValue for the given MaterialX input value
+static VtValue
+_GetHdSamplerValue(std::string const& mxInputValue)
+{
+    if (mxInputValue == "constant" || mxInputValue == "clamp") {
+        return VtValue(HdStTextureTokens->clamp);
+    }
+    if (mxInputValue == "mirror") {
+        return VtValue(HdStTextureTokens->mirror);
+    }
+    return VtValue(HdStTextureTokens->repeat);
+}
+
+// Translate the MaterialX texture node input into the Hydra equivalents
+static void
+_GetHdTextureParameters(
+    std::string const& mxInputName,
+    std::string const& mxInputValue,
+    std::map<TfToken, VtValue> * hdTextureParams)
+{
+    // MaterialX has two texture2d node types <image> and <tiledimage>
+
+    // Properties common to both <image> and <tiledimage> texture nodes:
+    if (mxInputName == "file") {
+        // Add 'st' as a parameter for texture nodes, the mesh itself will
+        // still need texture coordinate primvars to work correctly
+        (*hdTextureParams)[_tokens->st] = VtValue(_tokens->st);
+    }
+    else if (mxInputName == "filtertype") {
+        (*hdTextureParams)[HdStTextureTokens->minFilter] = 
+            _GetHdFilterValue(mxInputValue);
+        (*hdTextureParams)[HdStTextureTokens->magFilter] = 
+            VtValue(HdStTextureTokens->linear);
+    }
+
+    // Properties specific to <image> nodes:
+    else if (mxInputName == "uaddressmode") {
+        (*hdTextureParams)[HdStTextureTokens->wrapS] = 
+            _GetHdSamplerValue(mxInputValue);
+    }
+    else if (mxInputName == "vaddressmode") {
+        (*hdTextureParams)[HdStTextureTokens->wrapT] = 
+            _GetHdSamplerValue(mxInputValue);
+    }
+
+    // Properties specific to <tiledimage> nodes:
+    else if (mxInputName == "uvtiling" || mxInputName == "uvoffset" ||
+        mxInputName == "realworldimagesize" || 
+        mxInputName == "realworldtilesize") {
+        (*hdTextureParams)[HdStTextureTokens->wrapS] = 
+            VtValue(HdStTextureTokens->repeat);
+        (*hdTextureParams)[HdStTextureTokens->wrapT] = 
+            VtValue(HdStTextureTokens->repeat);
+    }
+}
+
 // Add the mxNode to the mxNodeGraph, or get the mxNode from the NodeGraph 
 static mx::NodePtr
 _AddNodeToNodeGraph(
-    std::string const& nodeName, 
-    std::string const& nodeCategory, 
-    std::string const& nodeType, 
+    std::string const& mxNodeName, 
+    std::string const& mxNodeCategory, 
+    std::string const& mxNodeType, 
     mx::NodeGraphPtr const& mxNodeGraph,
     mx::StringSet * addedNodeNames)
 {
     // Add the node to the  mxNodeGraph if needed 
-    if (addedNodeNames->find(nodeName) == addedNodeNames->end()) {
-        addedNodeNames->insert(nodeName);
-        return mxNodeGraph->addNode(nodeCategory, nodeName, nodeType);
+    if (addedNodeNames->find(mxNodeName) == addedNodeNames->end()) {
+        addedNodeNames->insert(mxNodeName);
+        return mxNodeGraph->addNode(mxNodeCategory, mxNodeName, mxNodeType);
     }
     // Otherwise get the existing node from the mxNodeGraph
-    return mxNodeGraph->getNode(nodeName);
+    return mxNodeGraph->getNode(mxNodeName);
 }
 
-// Get the MaterialX Parameter information from the mxNodeDef and hdParameter
-static void
-_GetMxParameterInfo(
-    mx::NodeDefPtr const& mxNodeDef,
+// Extract the mxInputValue from the HdParameter
+static void 
+_GetMxInputValue(
     std::pair<TfToken, VtValue> const& hdParameter,
-    std::string * mxParamName,
-    std::string * mxParamValue,
-    std::string * mxParamType,
-    bool * isParameter)     // if the hdParameter is a mxParameter or mxInput
+    std::string * mxInputValue)
 {
-    // Get the mxParamName from the HdParameter
-    *mxParamName = hdParameter.first.GetText();
-
-    // Extract out the mxParamValue from the HdParameter
     std::ostringstream valStream;
     VtValue hdParameterValue = hdParameter.second;
     if (hdParameterValue.IsHolding<bool>()) {
-        *mxParamValue = (hdParameterValue.UncheckedGet<bool>()) ? "false" 
+        *mxInputValue = (hdParameterValue.UncheckedGet<bool>()) ? "false" 
                                                                 : "true";
     }
     else if (hdParameterValue.IsHolding<int>() || 
              hdParameterValue.IsHolding<float>()) {
         valStream << hdParameterValue;
-        *mxParamValue = valStream.str();
+        *mxInputValue = valStream.str();
     }
     else if (hdParameterValue.IsHolding<GfVec2f>()) {
         const GfVec2f & value = hdParameterValue.UncheckedGet<GfVec2f>();
         valStream << value.data()[0] << ", " << value.data()[1];
-        *mxParamValue = valStream.str();
+        *mxInputValue = valStream.str();
     }
     else if (hdParameterValue.IsHolding<GfVec3f>()) {
         const GfVec3f & value = hdParameterValue.UncheckedGet<GfVec3f>();
         valStream << value.data()[0] << ", " << value.data()[1] << ", "
                   << value.data()[2];
-        *mxParamValue = valStream.str();
+        *mxInputValue = valStream.str();
     }
     else if (hdParameterValue.IsHolding<GfVec4f>()) {
         const GfVec4f & value = hdParameterValue.UncheckedGet<GfVec4f>();
         valStream << value.data()[0] << ", " << value.data()[1] << ", "
                   << value.data()[2] << ", " << value.data()[3];
-        *mxParamValue = valStream.str();
+        *mxInputValue = valStream.str();
     }
     else if (hdParameterValue.IsHolding<GfMatrix3d>()) {
         const GfMatrix3d & value = hdParameterValue.UncheckedGet<GfMatrix3d>();
@@ -267,7 +340,7 @@ _GetMxParameterInfo(
                   << value[1][2] << ",  "
                   << value[2][0] << ", " << value[2][1] << ", "
                   << value[2][2] << ",  ";
-        *mxParamValue = valStream.str();
+        *mxInputValue = valStream.str();
     }
     else if (hdParameterValue.IsHolding<GfMatrix4d>()) {
         const GfMatrix4d & value = hdParameterValue.UncheckedGet<GfMatrix4d>();
@@ -279,33 +352,68 @@ _GetMxParameterInfo(
                   << value[2][2] << ", " << value[2][3] << ",  "
                   << value[3][0] << ", " << value[3][1] << ", "
                   << value[3][2] << ", " << value[3][3] << ",  ";
-        *mxParamValue = valStream.str();
+        *mxInputValue = valStream.str();
     }
     else if (hdParameterValue.IsHolding<SdfAssetPath>()) {
-        *mxParamValue = hdParameterValue.UncheckedGet<SdfAssetPath>().GetAssetPath();
+        *mxInputValue = hdParameterValue.UncheckedGet<SdfAssetPath>().GetAssetPath();
     }
     else if (hdParameterValue.IsHolding<std::string>()) {
-        *mxParamValue = hdParameterValue.UncheckedGet<std::string>();
+        *mxInputValue = hdParameterValue.UncheckedGet<std::string>();
     }
     else {
         TF_WARN("Unsupported Parameter Type '%s'", 
                 hdParameterValue.GetTypeName().c_str());
     }
+}
 
-    // Get the mxParamType & determine if it is a mxParameter or mxInput for
-    // the given mxNodeDef
-    mx::ParameterPtr mxParam = mxNodeDef->getParameter(*mxParamName);
-    if (mxParam) {
-        *isParameter = true;
-        *mxParamType = mxParam->getType();
-        return;
-    }
+// Get the MaterialX Input information from the mxNodeDef and hdParameter
+static void
+_GetMxInputInfo(
+    std::pair<TfToken, VtValue> const& hdParameter,
+    mx::NodeDefPtr const& mxNodeDef,
+    std::string * mxInputName,
+    std::string * mxInputValue,
+    std::string * mxInputType)
+{
+    // Get the mxInputName from the HdParameter
+    *mxInputName = hdParameter.first.GetText();
 
-    mx::InputPtr mxInput = mxNodeDef->getInput(*mxParamName);
+    // Get the mxInputValue from the HdParameter
+    _GetMxInputValue(hdParameter, mxInputValue);
+
+    // Get the mxInputType for the mxNodeDef
+    mx::InputPtr mxInput = mxNodeDef->getInput(*mxInputName);
     if (mxInput) {
-        *isParameter = false;
-        *mxParamType = mxInput->getType();
-        return;
+        *mxInputType = mxInput->getType();
+    }
+}
+
+// Add the Hydra texture node parameters to the texture nodes
+static void 
+_AddHdTextureNodeParameters(
+    HdMaterialNetwork2 * hdNetwork,
+    std::set<SdfPath> const& hdTextureNodes)
+{
+    for (auto texturePath : hdTextureNodes) {
+        auto & textureNode = hdNetwork->nodes[texturePath];
+
+        // Gather the Hydra Texture Parameters
+        std::map<TfToken, VtValue> hdParameters;
+        for (auto const& currParam : textureNode.parameters) {
+        
+            // Get the MaterialX Parameter info
+            std::string mxInputValue;
+            _GetMxInputValue(currParam, &mxInputValue);
+
+            // Get the Hydra equivalents for the MX Texture node parameters
+            std::string mxInputName = currParam.first.GetText();
+            _GetHdTextureParameters(mxInputName, mxInputValue, &hdParameters);
+        }
+
+        // Add the Hydra Texture Parameters to the Texture Node
+        for (auto param : hdParameters) {
+            textureNode.parameters[param.first] = param.second;
+        }    
     }
 }
 
@@ -317,7 +425,10 @@ _AddMaterialXNode(
     SdfPath const& hdNodePath,
     mx::DocumentPtr const& mxDoc,
     mx::NodeGraphPtr const& mxNodeGraph,
-    mx::StringSet * addedNodeNames)
+    mx::StringSet * addedNodeNames,
+    std::set<SdfPath> * hdTextureNodes,
+    std::string const& connectionName,
+    mx::StringMap * mxHdTextureMap)
 {
     // Get the mxNode information
     mx::NodeDefPtr mxNodeDef = mxDoc->getNodeDef(hdNode.nodeTypeId.GetString());
@@ -325,29 +436,32 @@ _AddMaterialXNode(
         TF_WARN("NodeDef not found for Node '%s'", hdNode.nodeTypeId.GetText());
         return mx::NodePtr();
     }
-    const std::string & nodeCategory = mxNodeDef->getNodeString();
-    const std::string & nodeType = mxNodeDef->getType();
-    const std::string & nodeName = hdNodePath.GetName();
+    const std::string & mxNodeCategory = mxNodeDef->getNodeString();
+    const std::string & mxNodeType = mxNodeDef->getType();
+    const std::string & mxNodeName = hdNodePath.GetName();
 
     // Add the mxNode to the mxNodeGraph
-    mx::NodePtr mxNode = _AddNodeToNodeGraph(nodeName, nodeCategory, nodeType, 
-                                             mxNodeGraph, addedNodeNames);
+    mx::NodePtr mxNode = _AddNodeToNodeGraph(mxNodeName, mxNodeCategory, 
+                                    mxNodeType, mxNodeGraph, addedNodeNames);
 
     // For each of the HdNode parameters add the corresponding parameter/input 
     // to the mxNode
     for (auto const& currParam : hdNode.parameters) {
         
         // Get the MaterialX Parameter info
-        bool isParameter = true;   // HdParam is either a mxParameter or mxInput
-        std::string mxParamName, mxParamValue, mxParamType;
-        _GetMxParameterInfo(mxNodeDef, currParam, &mxParamName, &mxParamValue,
-                          &mxParamType, &isParameter);
+        std::string mxInputName, mxInputValue, mxInputType;
+        _GetMxInputInfo(currParam, mxNodeDef, &mxInputName,
+                        &mxInputValue, &mxInputType);
+        mxNode->setInputValue(mxInputName, mxInputValue, mxInputType);
 
-        if (isParameter){
-            mxNode->setParameterValue(mxParamName, mxParamValue, mxParamType);
-        }
-        else {
-            mxNode->setInputValue(mxParamName, mxParamValue, mxParamType);
+        // If this is a MaterialX Texture node
+        if (mxNodeCategory == "image" || mxNodeCategory == "tiledimage") {
+
+            // Save the corresponding MaterialX and Hydra names for ShaderGen
+            (*mxHdTextureMap)[hdNodePath.GetName()] = connectionName;
+
+            // Save the path to adjust the parameters after traversing the network
+            hdTextureNodes->insert(hdNodePath);
         }
     }
     return mxNode;
@@ -362,7 +476,10 @@ _GatherUpstreamNodes(
     mx::DocumentPtr const& mxDoc,
     mx::NodeGraphPtr * mxNodeGraph,
     mx::StringSet * addedNodeNames,
-    mx::NodePtr * mxUpstreamNode)
+    mx::NodePtr * mxUpstreamNode,
+    std::set<SdfPath> * hdTextureNodes,
+    std::string const& connectionName,
+    mx::StringMap * mxHdTextureMap)
 {
     // Get the connected node (hdNode) from the hdConnection
     SdfPath hdNodePath;
@@ -384,7 +501,8 @@ _GatherUpstreamNodes(
     
     // Add the node to the mxNodeGraph/mxDoc.
     mx::NodePtr mxCurrNode = _AddMaterialXNode(hdNetwork, hdNode, hdNodePath, 
-                                        mxDoc, *mxNodeGraph, addedNodeNames);
+                                mxDoc, *mxNodeGraph, addedNodeNames, 
+                                hdTextureNodes, connectionName, mxHdTextureMap);
 
     if (!mxCurrNode) {
         return;
@@ -398,7 +516,8 @@ _GatherUpstreamNodes(
 
             // Gather the nodes uptream from the mxCurrNode
             _GatherUpstreamNodes(hdNetwork, currConnection, mxDoc, mxNodeGraph,
-                                 addedNodeNames, mxUpstreamNode);
+                                 addedNodeNames, mxUpstreamNode, hdTextureNodes, 
+                                 connName.GetString(), mxHdTextureMap);
 
             // Connect mxCurrNode to the mxUpstreamNode
             mx::NodePtr mxNextNode = *mxUpstreamNode;
@@ -418,7 +537,9 @@ _CreateMtlxDocumentFromHdNetwork(
     HdMaterialNetwork2 const& hdNetwork,
     HdMaterialNode2 const& hdMaterialXNode,
     SdfPath const& materialPath,
-    mx::DocumentPtr libraries)
+    mx::DocumentPtr libraries,
+    std::set<SdfPath> * hdTextureNodes,
+    mx::StringMap * mxHdTextureMap)
 {
     // Initialize a MaterialX Document
     mx::DocumentPtr mxDoc = mx::createDocument();
@@ -427,9 +548,10 @@ _CreateMtlxDocumentFromHdNetwork(
     // Create a material that instantiates the shader
     const std::string & materialName = materialPath.GetName();
     TfToken mxType = _GetMxNodeType(hdMaterialXNode.nodeTypeId);
-    mx::MaterialPtr mxMaterial = mxDoc->addMaterial(materialName);
-    mx::ShaderRefPtr mxShaderRef = mxMaterial->addShaderRef("SR_" + materialName,
-                                                            mxType);
+    mx::NodePtr mxShaderNode = mxDoc->addNode(mxType.GetString(),
+                                              "SR_" + materialName,
+                                              "surfaceshader");
+    mx::NodePtr mxMaterial = mxDoc->addMaterialNode(materialName, mxShaderNode);
 
     // Create mxNodeGraph from the inputConnections in the HdMaterialNetwork
     mx::NodeGraphPtr mxNodeGraph;
@@ -442,7 +564,8 @@ _CreateMtlxDocumentFromHdNetwork(
             // Gather the nodes uptream from the hdMaterialXNode
             mx::NodePtr mxUpstreamNode;
             _GatherUpstreamNodes(hdNetwork, currConnection, mxDoc, &mxNodeGraph,
-                                 &addedNodeNames, &mxUpstreamNode);
+                        &addedNodeNames, &mxUpstreamNode, hdTextureNodes, 
+                        mxNodeGraphOutput, mxHdTextureMap);
 
             if (!mxUpstreamNode) {
                 continue;
@@ -455,19 +578,18 @@ _CreateMtlxDocumentFromHdNetwork(
                                                     mxUpstreamNode->getType());
             mxOutput->setConnectedNode(mxUpstreamNode);
 
-            // Bind NodeGraph Output
-            mx::BindInputPtr mxInput = mxShaderRef->addBindInput(
-                                                        mxNodeGraphOutput,
-                                                        mxOutput->getType());
+            // Connect NodeGraph Output to the ShaderNode
+            mx::InputPtr mxInput = mxShaderNode->addInput(mxNodeGraphOutput,
+                                                          mxOutput->getType());
             mxInput->setConnectedOutput(mxOutput);
         }
     }
 
-    // Bind Inputs - The StandardSurface or USDPreviewSurface inputs
+    // Add Inputs - The StandardSurface or USDPreviewSurface inputs
     for (auto currParameter : hdMaterialXNode.parameters) {
 
         const std::string & mxInputName = currParameter.first.GetString();
-        mx::BindInputPtr mxInput = mxShaderRef->addBindInput(mxInputName);
+        mx::InputPtr mxInput = mxShaderNode->addInput(mxInputName);
         
         // Convert the parameter to the appropriate MaterialX input format
         VtValue hdParamValue = currParameter.second;
@@ -499,8 +621,10 @@ _CreateMtlxDocumentFromHdNetwork(
             }
         }
         else {
-            TF_WARN("Unsupported Input Type '%s' for mxNodeType '%s'", 
-                    hdParamValue.GetTypeName().c_str(), mxType.GetText());
+            mxShaderNode->removeInput(mxInputName);
+            TF_WARN("Unsupported Input Type '%s' for mxNode '%s' of type '%s'",
+                    hdParamValue.GetTypeName().c_str(), mxInputName.c_str(), 
+                    mxType.GetText());
         }
     }
 
@@ -540,14 +664,21 @@ HdSt_ApplyMaterialXFilter(
         mx::loadLibraries(libraryFolders, searchPath, stdLibraries);
 
         // Create the MaterialX Document from the HdMaterialNetwork
+        std::set<SdfPath> hdTextureNodes;
+        mx::StringMap mxHdTextureMap; // Store Mx-Hd texture counterparts 
         mx::DocumentPtr mtlxDoc = _CreateMtlxDocumentFromHdNetwork(*hdNetwork,
                                         terminalNode,   // MaterialX HdNode
                                         materialPath,
-                                        stdLibraries);
+                                        stdLibraries,
+                                        &hdTextureNodes,
+                                        &mxHdTextureMap);
+
+        // Add Hydra parameters for each of the Texture nodes
+        _AddHdTextureNodeParameters(hdNetwork, hdTextureNodes);
 
         // Load MaterialX Document and generate the glslfxSource
         std::string glslfxSource = HdSt_GenMaterialXShaderCode(mtlxDoc, 
-                                                               searchPath);
+                                        searchPath, mxHdTextureMap);
 
         // Create a new terminal node with the new glslfxSource
         SdrShaderNodeConstPtr sdrNode = 

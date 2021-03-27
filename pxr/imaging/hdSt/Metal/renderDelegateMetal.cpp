@@ -159,8 +159,6 @@ void HdStRenderDelegateMetal::PrepareRender(
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
-    _renderOutput = params.renderOutput;
-
     context->StartFrame();
     context->StartFrameForThread();
 

@@ -65,7 +65,8 @@ public:
     void
     Prepare(HdResourceRegistrySharedPtr const &resourceRegistry) override;
 
-    /// Apply the GL states.
+    /// XXX: Bind and Unbind set./restore the following GL state.
+    /// This will be reworked to use Hgi in the near future.
     /// Following states may be changed and restored to
     /// the GL default at Unbind().
     ///   glEnable(GL_BLEND);
@@ -73,6 +74,7 @@ public:
     ///   glEnable(GL_POLYGON_OFFSET_FILL)
     ///   glEnable(GL_PROGRAM_POINT_SIZE);
     ///   glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE)
+    ///   glEnable(GL_DEPTH_TEST);
     ///   glEnable(GL_STENCIL_TEST);
     ///   glPolygonOffset()
     ///   glBlend*()
@@ -84,10 +86,9 @@ public:
     ///   glStencilFunc()
     ///   glStencilOp()
     HDST_API
-    void Bind() override;
-
+    virtual void Bind();
     HDST_API
-    void Unbind() override;
+    virtual void Unbind();
 
     /// If set to true (default) and the render pass is rendering into a
     /// multi-sampled aovs, the aovs will be resolved at the end of the render
@@ -112,11 +113,11 @@ public:
         return _renderPassShader;
     }
 
-    /// override shader
+    /// scene materials
     HDST_API
-    void SetOverrideShader(HdStShaderCodeSharedPtr const &overrideShader);
-    HdStShaderCodeSharedPtr const &GetOverrideShader() const {
-        return _overrideShader;
+    void SetUseSceneMaterials(bool state);
+    bool GetUseSceneMaterials() const {
+        return _useSceneMaterials;
     }
 
     /// returns shaders (lighting/renderpass)
@@ -157,12 +158,12 @@ protected:
     HdStRenderPassShaderSharedPtr _renderPassShader;
     HdSt_FallbackLightingShaderSharedPtr _fallbackLightingShader;
     HdStLightingShaderSharedPtr _lightingShader;
-    HdStShaderCodeSharedPtr _overrideShader;
 
     HdBufferArrayRangeSharedPtr _renderPassStateBar;
     size_t _clipPlanesBufferSize;
     float _alphaThresholdCurrent;
     bool _resolveMultiSampleAov;
+    bool _useSceneMaterials;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

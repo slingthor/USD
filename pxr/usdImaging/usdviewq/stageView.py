@@ -1044,7 +1044,7 @@ class StageView(QtOpenGL.QGLWidget):
 
     def SetRendererAov(self, aov):
         if self._renderer:
-            if self._renderer.SetRendererAov(aov, "OpenGL"):
+            if self._renderer.SetRendererAov(aov):
                 self._rendererAovName = aov
                 self.update()
                 return True

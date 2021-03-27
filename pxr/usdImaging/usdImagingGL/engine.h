@@ -376,10 +376,8 @@ public:
     TfTokenVector GetRendererAovs() const;
 
     /// Set the current renderer AOV to \p id.
-    /// Pass in interopDst = HgiTokens->OpenGL or interopDst = HgiTokens->Metal depending on host App
     USDIMAGINGGL_API
-    bool SetRendererAov(TfToken const& id,
-                        TfToken const& interopDst);
+    bool SetRendererAov(TfToken const& id);
 
     /// Returns an AOV texture handle for the given token.
     USDIMAGINGGL_API
@@ -396,13 +394,21 @@ public:
     /// Sets a renderer setting's value.
     USDIMAGINGGL_API
     void SetRendererSetting(TfToken const& settingId,
-                                    VtValue const& value);
+                            VtValue const& value);
 
     /// Enable / disable presenting the render to bound framebuffer.
     /// An application may choose to manage the AOVs that are rendered into
     /// itself and skip the engine's presentation.
     USDIMAGINGGL_API
     void SetEnablePresentation(bool enabled);
+
+    /// The destination API (e.g., OpenGL, see hgiInterop for details) and
+    /// framebuffer that the AOVs are presented into. The framebuffer
+    /// is a VtValue that encoding a framebuffer in a destination API
+    /// specific way.
+    /// E.g., a uint32_t (aka GLuint) for framebuffer object for OpenGL.
+    USDIMAGINGGL_API
+    void SetPresentationOutput(TfToken const &api, VtValue const &framebuffer);
 
     /// @}
 
@@ -573,6 +579,8 @@ protected:
     HgiUniquePtr _hgi;
     // Similar for HdDriver.
     HdDriver _hgiDriver;
+
+    VtValue _userFramebuffer;
 
     HdStResourceFactoryInterface *_resourceFactory;
     HdPluginRenderDelegateUniqueHandle _renderDelegate;

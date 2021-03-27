@@ -252,7 +252,7 @@ UsdAppUtilsFrameRecorder::Record(
     const GfFrustum frustum = gfCamera.GetFrustum();
     const GfVec3d cameraPos = frustum.GetPosition();
 
-    _imagingEngine->SetRendererAov(HdAovTokens->color, HgiTokens->Metal);
+    _imagingEngine->SetRendererAov(HdAovTokens->color);
 
     _imagingEngine->SetCameraState(
         frustum.ComputeViewMatrix(),

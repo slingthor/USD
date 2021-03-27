@@ -202,6 +202,10 @@ HdSt_ImageShaderRenderPass::_Execute(
         }
     }
 
+    // XXX: The Bind/Unbind calls below set/restore GL state.
+    // This will be reworked to use Hgi.
+    stRenderPassState->Bind();
+
     // Draw
     HdSt_DrawBatchSharedPtr const& batch = _immediateBatch;
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
@@ -235,6 +239,8 @@ HdSt_ImageShaderRenderPass::_Execute(
         gfxCmds->PopDebugGroup();
         _hgi->SubmitCmds(gfxCmds.get());
     }
+
+    stRenderPassState->Unbind();
 }
 
 void

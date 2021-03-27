@@ -26,14 +26,12 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
-#include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/bufferResource.h"
 
 #include "pxr/imaging/hgi/buffer.h"
 
 #include "pxr/base/tf/token.h"
 
-#include <cstddef>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -50,8 +48,8 @@ using HdStBufferResourceNamedList =
 
 /// \class HdStBufferResource
 ///
-/// A specific type of HdBufferResource (GPU resource) representing an 
-/// OpenGL buffer object.
+/// A specific type of HdBufferResource (GPU resource) representing
+/// an HgiBufferHandle.
 ///
 class HdStBufferResource final : public HdBufferResource
 {
@@ -64,7 +62,7 @@ public:
     HDST_API
     ~HdStBufferResource();
 
-    /// Sets the OpenGL name/identifier for this resource and its size.
+    /// Sets the HgiBufferHandle for this resource and its size.
     /// also caches the gpu address of the buffer.
     HDST_API
     void SetAllocation(HgiBufferHandle const& id, size_t size);
@@ -75,7 +73,7 @@ public:
                         HgiBufferHandle const& id2,
                         size_t size);
 
-    /// Returns the Hgi id for this GPU resource
+    /// Returns the HgiBufferHandle for this GPU resource
     HgiBufferHandle& GetId() { return _ids[_activeBuffer]; }
     
     // APPLE METAL: Multibuffering support.
@@ -116,4 +114,4 @@ private:
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // PXR_IMAGING_HD_ST_BUFFER_RESOURCE_GL_H
+#endif // PXR_IMAGING_HD_ST_BUFFER_RESOURCE_H

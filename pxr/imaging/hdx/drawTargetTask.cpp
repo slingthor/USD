@@ -33,7 +33,6 @@
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/simpleLightingShader.h"
-//#include "pxr/imaging/glf/diagnostic.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -545,9 +544,7 @@ HdxDrawTargetTask::Execute(HdTaskContext* ctx)
     for (const _RenderPassInfo &renderPassInfo : _renderPassesInfo) {
         HdStRenderPassStateSharedPtr const & renderPassState =
             renderPassInfo.renderPassState;
-        renderPassState->Bind();
         renderPassInfo.renderPass->Execute(renderPassState, GetRenderTags());
-        renderPassState->Unbind();
 
     }
 

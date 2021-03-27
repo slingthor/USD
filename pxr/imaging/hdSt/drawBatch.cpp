@@ -45,6 +45,8 @@
 
 #include "pxr/base/tf/getenv.h"
 
+#include <mutex>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
@@ -209,6 +211,23 @@ HdSt_DrawBatch::Rebuild()
     return true;
 }
 
+static
+HdStSurfaceShaderSharedPtr
+_GetFallbackSurfaceShader()
+{
+    static std::once_flag once;
+    static HdStSurfaceShaderSharedPtr fallbackSurfaceShader;
+   
+    std::call_once(once, [](){
+        HioGlslfxSharedPtr glslfx(
+            new HioGlslfx(HdStPackageFallbackSurfaceShader()));
+
+        fallbackSurfaceShader.reset(new HdStGLSLFXShader(glslfx));
+    });
+
+    return fallbackSurfaceShader;
+}
+
 HdSt_DrawBatch::_DrawingProgram &
 HdSt_DrawBatch::_GetDrawingProgram(HdStRenderPassStateSharedPtr const &state,
                                  bool indirect,
@@ -224,9 +243,9 @@ HdSt_DrawBatch::_GetDrawingProgram(HdStRenderPassStateSharedPtr const &state,
     size_t shaderHash = state->GetShaderHash();
     boost::hash_combine(shaderHash,
                         firstDrawItem->GetGeometricShader()->ComputeHash());
-    HdStShaderCodeSharedPtr overrideShader = state->GetOverrideShader();
-    HdStShaderCodeSharedPtr surfaceShader  = overrideShader ? overrideShader
-                                       : firstDrawItem->GetMaterialShader();
+    HdStShaderCodeSharedPtr surfaceShader  =
+        state->GetUseSceneMaterials() ? firstDrawItem->GetMaterialShader()
+                                      : _GetFallbackSurfaceShader();
     size_t surfaceHash = surfaceShader ? surfaceShader->ComputeHash() : 0;
     boost::hash_combine(shaderHash, surfaceHash);
     bool shaderChanged = (_shaderHash != shaderHash);
@@ -263,15 +282,7 @@ HdSt_DrawBatch::_GetDrawingProgram(HdStRenderPassStateSharedPtr const &state,
             // code is broken and needs to be fixed.  When we open up more
             // shaders for customization, we will need to check them as well.
             
-            HioGlslfxSharedPtr glslSurfaceFallback = 
-                HioGlslfxSharedPtr(
-                        new HioGlslfx(HdStPackageFallbackSurfaceShader()));
-
-            HdStShaderCodeSharedPtr fallbackSurface =
-                HdStShaderCodeSharedPtr(
-                    new HdStGLSLFXShader(glslSurfaceFallback));
-
-            _program.SetSurfaceShader(fallbackSurface);
+            _program.SetSurfaceShader(_GetFallbackSurfaceShader());
 
             bool res = _program.CompileShader(firstDrawItem, 
                                               indirect, 
