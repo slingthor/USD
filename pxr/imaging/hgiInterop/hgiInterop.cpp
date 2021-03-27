@@ -56,7 +56,7 @@ void HgiInterop::TransferToApp(
 {
     TfToken const& srcApi = srcHgi->GetAPIName();
 
-#if defined(PXR_METAL_SUPPORT_ENABLED)
+#if defined(HGIINTEROP_METAL_TO_GL_ENABLED)
     if (srcApi==HgiTokens->Metal && dstApi==HgiTokens->OpenGL) {
         // Transfer Metal textures to OpenGL application
         if (!_metalToOpenGL) {
@@ -78,7 +78,7 @@ void HgiInterop::TransferToApp(
     } else {
         TF_CODING_ERROR("Unsupported Hgi backend: %s", srcApi.GetText());
     }
-#else
+#elif defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (srcApi==HgiTokens->OpenGL && dstApi==HgiTokens->OpenGL) {
         // Transfer OpenGL textures to OpenGL application
         if (!_openGLToOpenGL) {
