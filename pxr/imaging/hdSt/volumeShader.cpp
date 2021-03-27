@@ -205,7 +205,7 @@ HdSt_VolumeShader::GetBufferSourcesForBBoxAndSampleDistance(
         sources->push_back(
             std::make_shared<HdVtBufferSource>(
                 sourceName,
-                bbox.GetInverseMatrix()));
+                VtValue(GfMatrix4f(bbox.GetInverseMatrix()))));
     }
 
     {
