@@ -42,13 +42,13 @@ using HdStGLSLProgramSharedPtr =
 /// An instance of a glsl program.
 ///
 // XXX: this design is transitional and will be revised soon.
-class HdStglslProgramGLSL: public HdStGLSLProgram
+class HdStGLSLProgramGLSL: public HdStGLSLProgram
 {
 public:
     HDST_API
-    HdStglslProgramGLSL(TfToken const &role, HdStResourceRegistry *const registry);
+    HdStGLSLProgramGLSL(TfToken const &role, HdStResourceRegistry *const registry);
     HDST_API
-    ~HdStglslProgramGLSL() override;
+    ~HdStGLSLProgramGLSL() override;
 
     /// Compile shader source of type
     HDST_API

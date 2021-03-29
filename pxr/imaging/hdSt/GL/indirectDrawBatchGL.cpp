@@ -408,7 +408,7 @@ HdSt_IndirectDrawBatchGL::_CullingProgramGL::_Link(
                       == nOutputs,
                       "Size of drawElementsOutputs element must equal nOutputs.");
         
-        glTransformFeedbackVaryings(std::dynamic_pointer_cast<HdStglslProgramGLSL>(program)->GetGLProgram(),
+        glTransformFeedbackVaryings(std::dynamic_pointer_cast<HdStGLSLProgramGLSL>(program)->GetGLProgram(),
                                     nOutputs,
                                     outputs, GL_INTERLEAVED_ATTRIBS);
     }

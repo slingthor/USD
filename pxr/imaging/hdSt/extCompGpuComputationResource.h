@@ -93,7 +93,7 @@ public:
         return _inputs;
     }
 
-    /// Gets the GPU HdStglslProgramGLSL to run to execute the computation.
+    /// Gets the GPU HdStGLSLProgramGLSL to run to execute the computation.
     /// This may have been shared with many other instances in the same
     /// registry.
     /// The program is only valid for execution after Resolve has been called.

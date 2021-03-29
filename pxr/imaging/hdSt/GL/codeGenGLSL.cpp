@@ -492,7 +492,7 @@ HdSt_CodeGenGLSL::Compile(HdStResourceRegistry *const registry)
 
     // create GLSL program.
     HdStGLSLProgramSharedPtr glslProgram(
-        new HdStglslProgramGLSL(HdTokens->drawingShader, registry));
+        new HdStGLSLProgramGLSL(HdTokens->drawingShader, registry));
 
     // initialize autogen source buckets
     _genCommon.str(""); _genVS.str(""); _genTCS.str(""); _genTES.str("");
@@ -1032,7 +1032,7 @@ HdSt_CodeGenGLSL::CompileComputeProgram(HdStResourceRegistry* const registry)
     
     // create GLSL program.
     HdStGLSLProgramSharedPtr glslProgram(
-        new HdStglslProgramGLSL(HdTokens->computeShader, registry));
+        new HdStGLSLProgramGLSL(HdTokens->computeShader, registry));
     
     // compile shaders
     {

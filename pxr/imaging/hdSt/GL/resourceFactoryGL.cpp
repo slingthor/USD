@@ -88,7 +88,7 @@ HdSt_ResourceBinder *HdStResourceFactoryGL::NewResourceBinder() const
 HdStGLSLProgram *HdStResourceFactoryGL::NewProgram(
     TfToken const &role, HdStResourceRegistry *const registry) const
 {
-    return new HdStglslProgramGLSL(role, registry);
+    return new HdStGLSLProgramGLSL(role, registry);
 }
 
 HdStRenderPassShaderSharedPtr HdStResourceFactoryGL::NewRenderPassShader() const

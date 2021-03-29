@@ -144,7 +144,7 @@ _DumpShaderSource(const char *shaderType, std::string const &shaderSource)
     std::cout << std::flush;
 }
 
-HdStglslProgramGLSL::HdStglslProgramGLSL(
+HdStGLSLProgramGLSL::HdStGLSLProgramGLSL(
     TfToken const &role,
     HdStResourceRegistry *const registry)
     : HdStGLSLProgram(role, registry), _programSize(0)
@@ -153,7 +153,7 @@ HdStglslProgramGLSL::HdStglslProgramGLSL(
     _debugID = globalDebugID++;
 }
 
-HdStglslProgramGLSL::~HdStglslProgramGLSL()
+HdStGLSLProgramGLSL::~HdStGLSLProgramGLSL()
 {
     Hgi *const hgi = _registry->GetHgi();
 
@@ -166,7 +166,7 @@ HdStglslProgramGLSL::~HdStglslProgramGLSL()
 }
 
 bool
-HdStglslProgramGLSL::CompileShader(
+HdStGLSLProgramGLSL::CompileShader(
     HgiShaderStage stage,
     std::string const &shaderSource)
 {
@@ -310,7 +310,7 @@ _DebugLinkSource(HgiShaderProgramHandle const& program)
 }
 
 bool
-HdStglslProgramGLSL::Link()
+HdStGLSLProgramGLSL::Link()
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -342,7 +342,7 @@ HdStglslProgramGLSL::Link()
 }
 
 bool
-HdStglslProgramGLSL::Validate() const
+HdStGLSLProgramGLSL::Validate() const
 {
     if (!_program || !_program->IsValid()) {
         return false;
@@ -352,7 +352,7 @@ HdStglslProgramGLSL::Validate() const
 }
 
 bool
-HdStglslProgramGLSL::GetProgramLinkStatus(std::string * reason) const
+HdStGLSLProgramGLSL::GetProgramLinkStatus(std::string * reason) const
 {
     // glew has to be initialized
     if (!glGetProgramiv) return true;
@@ -372,39 +372,39 @@ HdStglslProgramGLSL::GetProgramLinkStatus(std::string * reason) const
     return (status == GL_TRUE);
 }
 
-void HdStglslProgramGLSL::AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const
+void HdStGLSLProgramGLSL::AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const
 {
     GlfBindingMapRefPtr glfBindingMap(TfDynamic_cast<GlfBindingMapRefPtr>(bindingMap));
     
     glfBindingMap->AssignUniformBindingsToProgram(GetGLProgram());
 }
 
-void HdStglslProgramGLSL::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
+void HdStGLSLProgramGLSL::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
 {
     GlfBindingMapRefPtr glfBindingMap(TfDynamic_cast<GlfBindingMapRefPtr>(bindingMap));
     
     glfBindingMap->AssignSamplerUnitsToProgram(GetGLProgram());
 }
 
-void HdStglslProgramGLSL::AddCustomBindings(GarchBindingMapRefPtr bindingMap) const
+void HdStGLSLProgramGLSL::AddCustomBindings(GarchBindingMapRefPtr bindingMap) const
 {
     GlfBindingMapRefPtr glfBindingMap(TfDynamic_cast<GlfBindingMapRefPtr>(bindingMap));
     
     glfBindingMap->AddCustomBindings(GetGLProgram());
 }
 
-void HdStglslProgramGLSL::SetProgram(char const* const label) {
+void HdStGLSLProgramGLSL::SetProgram(char const* const label) {
     if (label) {
         GlfDebugLabelProgram(_program->GetRawResource(), label);
     }
     glUseProgram(_program->GetRawResource());
 }
 
-void HdStglslProgramGLSL::UnsetProgram() {
+void HdStGLSLProgramGLSL::UnsetProgram() {
     glUseProgram(0);
 }
 
-void HdStglslProgramGLSL::DrawElementsInstancedBaseVertex(int primitiveMode,
+void HdStGLSLProgramGLSL::DrawElementsInstancedBaseVertex(int primitiveMode,
                                                       int indexCount,
                                                       int indexType,
                                                       int firstIndex,
@@ -431,20 +431,20 @@ void HdStglslProgramGLSL::DrawElementsInstancedBaseVertex(int primitiveMode,
                                       baseVertex);
 }
 
-void HdStglslProgramGLSL::DrawArraysInstanced(int primitiveMode,
+void HdStGLSLProgramGLSL::DrawArraysInstanced(int primitiveMode,
                                           int baseVertex,
                                           int vertexCount,
                                           int instanceCount) const {
     glDrawArraysInstanced(primitiveMode, baseVertex, vertexCount, instanceCount);
 }
 
-void HdStglslProgramGLSL::DrawArrays(int primitiveMode,
+void HdStGLSLProgramGLSL::DrawArrays(int primitiveMode,
                                  int baseVertex,
                                  int vertexCount) const {
     glDrawArrays(primitiveMode, baseVertex, vertexCount);
 }
 
-std::string HdStglslProgramGLSL::GetComputeHeader() const
+std::string HdStGLSLProgramGLSL::GetComputeHeader() const
 {
     return "#version 430\n";
 }
