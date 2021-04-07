@@ -34,6 +34,7 @@
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/imaging/hio/glslfx.h"
+#include "pxr/imaging/hgi/shaderProgram.h"
 
 #include "pxr/base/arch/hash.h"
 
@@ -71,6 +72,51 @@ HdStGLSLProgram::GetComputeProgram(
 {
     return GetComputeProgram(HdStPackageComputeShader(), shaderToken,
                              resourceRegistry);
+}
+
+HdStGLSLProgramSharedPtr
+HdStGLSLProgram::GetComputeProgram(
+    const TfToken& shaderToken,
+    HdStResourceRegistry *resourceRegistry,
+    PopulateDescriptorCallback callable)
+{
+    // Find the program from registry
+    HdInstance<HdStGLSLProgramSharedPtr> programInstance =
+                resourceRegistry->RegisterGLSLProgram(
+                        HdStGLSLProgram::ComputeHash(shaderToken));
+
+    if (programInstance.IsFirstInstance()) {
+        TfToken const &shaderFileName = HdStPackageComputeShader();
+        const HioGlslfx glslfx(shaderFileName, HioGlslfxTokens->defVal);
+        std::string errorString;
+        if (!glslfx.IsValid(&errorString)){
+            TF_CODING_ERROR("Failed to parse " + shaderFileName.GetString()
+                            + ": " + errorString);
+            return HdStGLSLProgramSharedPtr();
+        }
+
+        Hgi *hgi = resourceRegistry->GetHgi();
+        HgiShaderFunctionDesc computeDesc;
+        std::string sourceCode;
+
+        callable(computeDesc);
+
+        sourceCode += glslfx.GetSource(shaderToken);
+        computeDesc.shaderCode = sourceCode.c_str();
+        HgiShaderFunctionHandle computeFn = hgi->CreateShaderFunction(computeDesc);
+        
+        // if not exists, create new one
+        HdStGLSLProgramSharedPtr newProgram(
+            HdStResourceFactory::GetInstance()->NewProgram(
+                HdTokens->computeShader, resourceRegistry));
+
+        newProgram->_programDesc.shaderFunctions.push_back(computeFn);
+        newProgram->Link();
+        
+        programInstance.SetValue(newProgram);
+    }
+
+    return programInstance.GetValue();
 }
 
 HdStGLSLProgramSharedPtr

@@ -61,10 +61,10 @@ static const _FormatDesc FORMAT_DESC[] =
     {GL_RGB,  GL_FLOAT,         GL_RGB32F      }, // Float32Vec3
     {GL_RGBA, GL_FLOAT,         GL_RGBA32F     }, // Float32Vec4
 
-    {GL_RED_INTEGER,  GL_SHORT,GL_R16I         }, // Int16
-    {GL_RG_INTEGER,   GL_SHORT,GL_RG16I        }, // Int16Vec2
-    {GL_RGB_INTEGER,  GL_SHORT,GL_RGB16I       }, // Int16Vec3
-    {GL_RGBA_INTEGER, GL_SHORT,GL_RGBA16I      }, // Int16Vec4
+    {GL_RED_INTEGER,  GL_SHORT, GL_R16I         }, // Int16
+    {GL_RG_INTEGER,   GL_SHORT, GL_RG16I        }, // Int16Vec2
+    {GL_RGB_INTEGER,  GL_SHORT, GL_RGB16I       }, // Int16Vec3
+    {GL_RGBA_INTEGER, GL_SHORT, GL_RGBA16I      }, // Int16Vec4
 
     {GL_RED_INTEGER,  GL_UNSIGNED_SHORT,GL_R16UI        }, // UInt16
     {GL_RG_INTEGER,   GL_UNSIGNED_SHORT,GL_RG16UI       }, // UInt16Vec2

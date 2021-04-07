@@ -138,6 +138,13 @@ public:
         TfToken const &shaderToken,
         HdStResourceRegistry *resourceRegistry);
 
+    typedef std::function<void(HgiShaderFunctionDesc &computeDesc)> PopulateDescriptorCallback;
+    HDST_API
+    static HdStGLSLProgramSharedPtr GetComputeProgram(
+        const TfToken& shaderToken,
+        HdStResourceRegistry *resourceRegistry,
+        PopulateDescriptorCallback callable);
+
 protected:
     HDST_API
     HdStGLSLProgram(TfToken const &role,

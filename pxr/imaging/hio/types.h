@@ -118,7 +118,7 @@ enum HioFormat
     // BPTC compressed. 4-component, 4x4 blocks, unsigned byte, sRGB.
     // Representing a float between 0 and 1.
     HioFormatBC7UNorm8Vec4srgb,
-    
+
     // S3TC/DXT compressed. 4-component, 4x4 blocks, unsigned byte
     // Representing a float between 0 and 1.
     HioFormatBC1UNorm8Vec4,

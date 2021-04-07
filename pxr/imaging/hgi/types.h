@@ -71,7 +71,7 @@ enum HgiFormat : int
     HgiFormatFloat32Vec2,
     HgiFormatFloat32Vec3,
     HgiFormatFloat32Vec4,
-    
+
     // Int16 - a 2-byte signed integer
     HgiFormatInt16,
     HgiFormatInt16Vec2,
@@ -111,7 +111,7 @@ enum HgiFormat : int
     // BPTC compressed. 4-component, 4x4 blocks, unsigned byte, sRGB.
     // Representing a float between 0 and 1.
     HgiFormatBC7UNorm8Vec4srgb,
-        
+
     // S3TC/DXT compressed. 4-component, 4x4 blocks, unsigned byte
     // Representing a float between 0 and 1.
     HgiFormatBC1UNorm8Vec4,

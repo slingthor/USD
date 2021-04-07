@@ -164,8 +164,6 @@ public:
     /// from a provided drawParameterBuffer, and indices from indexBuffer.
     /// The 'primitive type' (eg. Lines, Triangles, etc) can be acquired from
     /// the bound HgiPipeline.
-    /// `indexBufferByteOffset`: Byte offset within index buffer to start
-    ///                          reading the indices from.
     /// `drawParameterBuffer`: an array of structures:
     //     struct IndirectCommand {
     //         uint32_t indexCount;

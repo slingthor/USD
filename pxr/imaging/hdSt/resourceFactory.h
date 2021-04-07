@@ -35,6 +35,7 @@
 #include "pxr/imaging/hd/types.h"
 
 #include "pxr/imaging/hgi/texture.h"
+#include "pxr/imaging/hgi/shaderFunction.h"
 
 #include "pxr/base/tf/singleton.h"
 

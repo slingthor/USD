@@ -50,9 +50,9 @@ HgiMetalShaderFunction::HgiMetalShaderFunction(
         options.fastMathEnabled = YES;
         options.languageVersion = MTLLanguageVersion2_1;
         options.preprocessorMacros = @{
-                @"ARCH_GFX_METAL":@1,
+                @"ARCH_GFX_METAL": @1,
         };
-    
+
         NSError *error = NULL;
         std::string shaderStr = ss.str();
         id<MTLLibrary> library =
@@ -77,7 +77,7 @@ HgiMetalShaderFunction::HgiMetalShaderFunction(
                 TF_CODING_ERROR("Todo: Unsupported shader stage");
                 break;
         }
-        
+    
         // Load the function into the library
         _shaderId = [library newFunctionWithName:entryPoint];
         if (!_shaderId) {

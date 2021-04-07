@@ -159,16 +159,7 @@ HdStGLSLProgramMSL::~HdStGLSLProgramMSL()
     for(auto it = _bindingMap.begin(); it != _bindingMap.end(); ++it)
         delete (*it).second;
     _bindingMap.clear();
-    
-    if (_vertexFunction)
-        [_vertexFunction release];
-    if (_fragmentFunction)
-        [_fragmentFunction release];
-    if (_computeFunction)
-        [_computeFunction release];
-    if (_computeGeometryFunction)
-        [_computeGeometryFunction release];
-    
+        
     Hgi *const hgi = _registry->GetHgi();
 
     if (_program) {
@@ -354,15 +345,6 @@ HdStGLSLProgramMSL::CompileShader(HgiShaderStage stage,
         success = false;
     }
     
-    if (stage == HgiShaderStageVertex) {
-        _vertexFunction = function;
-    } else if (stage == HgiShaderStageFragment) {
-        _fragmentFunction = function;
-    } else if (stage == HgiShaderStageCompute) {
-        _computeFunction = function;
-    } else if (stage == HgiShaderStageGeometry) {
-        _computeGeometryFunction = function;
-    }
     [library release];
 
     [options release];
@@ -395,6 +377,21 @@ HdStGLSLProgramMSL::Link()
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
+
+    for (HgiShaderFunctionHandle fn : _programDesc.shaderFunctions) {
+        HgiShaderStage shaderStage = fn->GetDescriptor().shaderStage;
+        id<MTLFunction> function =
+            static_cast<HgiMetalShaderFunction*>(fn.Get())->GetShaderId();
+        if (shaderStage == HgiShaderStageVertex) {
+            _vertexFunction = function;
+        } else if (shaderStage == HgiShaderStageFragment) {
+            _fragmentFunction = function;
+        } else if (shaderStage == HgiShaderStageCompute) {
+            _computeFunction = function;
+        } else if (shaderStage == HgiShaderStageGeometry) {
+            _computeGeometryFunction = function;
+        }
+    }
 
     bool vertexFuncPresent = _vertexFunction != nil;
     bool fragmentFuncPresent = _fragmentFunction != nil;

@@ -350,6 +350,9 @@ _ComputeHeader(id<MTLDevice> device)
             << "#define ivec2 int2\n"
             << "#define ivec3 int3\n"
             << "#define ivec4 int4\n"
+            << "#define uvec2 uint2\n"
+            << "#define uvec3 uint3\n"
+            << "#define uvec4 uint4\n"
             << "#define bvec2 bool2\n"
             << "#define bvec3 bool3\n"
             << "#define bvec4 bool4\n"
@@ -785,6 +788,69 @@ void HgiMetalShaderGenerator::_BuildTextureShaderSections(
         structSection);
 }
 
+//Instantiate buffer shader sections based on the given descriptor
+void HgiMetalShaderGenerator::_BuildBufferShaderSections(
+    const HgiShaderFunctionDesc &descriptor)
+{
+    const std::vector<HgiShaderFunctionBufferDesc> &buffers =
+        descriptor.buffers;
+    for (size_t i = 0; i < buffers.size(); ++i) {
+        //Create the buffer shader section
+        const std::string &bufName = buffers[i].nameInShader;
+        const std::string &bufType = buffers[i].type;
+
+        const HgiShaderSectionAttributeVector attributes = {
+            HgiShaderSectionAttribute{"buffer", std::to_string(i + 1)} };
+
+        //Shader section vector on the generator
+        // owns all sections, point to it in the vector
+        HgiMetalBufferShaderSection * const section =
+            CreateShaderSection<HgiMetalBufferShaderSection>(
+                    bufName,
+                    bufType,
+                    attributes);
+    }
+}
+
+//Instantiate special keyword shader sections based on the given descriptor
+void HgiMetalShaderGenerator::_BuildKeywordInputShaderSections(
+    const HgiShaderFunctionDesc &descriptor)
+{
+    //possible metal attributes on shader inputs.
+    // Map from descriptor to Metal
+    std::unordered_map<std::string, std::string> roleIndexM {
+            {"GlobalInvocationID", "thread_position_in_grid"}
+    };
+
+    const std::vector<HgiShaderFunctionParamDesc> &inputs =
+        descriptor.stageInputs;
+    for (size_t i = 0; i < inputs.size(); ++i) {
+        const HgiShaderFunctionParamDesc &p(inputs[i]);
+        const std::string &role = p.role;
+
+        //check if has a role
+        if(!p.role.empty()) {
+            auto it = roleIndexM.find(p.role);
+            if (it != roleIndexM.end()) {
+                //Create the keyword shader section
+                const std::string &keywordName = p.nameInShader;
+
+                const HgiShaderSectionAttributeVector attributes = {
+                    HgiShaderSectionAttribute{it->second, "" }};
+
+                //Shader section vector on the generator
+                // owns all sections, point to it in the vector
+                HgiMetalKeywordInputShaderSection * const section =
+                    CreateShaderSection<HgiMetalKeywordInputShaderSection>(
+                            keywordName,
+                            p.type,
+                            attributes);
+
+            }
+        }
+    }
+}
+
 std::unique_ptr<HgiMetalShaderStageEntryPoint>
 HgiMetalShaderGenerator::_BuildShaderStageEntryPoints(
     const HgiShaderFunctionDesc &descriptor)
@@ -792,6 +858,10 @@ HgiMetalShaderGenerator::_BuildShaderStageEntryPoints(
     if(!descriptor.textures.empty()) {
         _BuildTextureShaderSections(descriptor);
     }
+    if(!descriptor.buffers.empty()) {
+        _BuildBufferShaderSections(descriptor);
+    }
+    _BuildKeywordInputShaderSections(descriptor);
 
     //Create differing shader function signature based on stage
     const ShaderStageData stageData(descriptor, this);
@@ -886,9 +956,10 @@ void HgiMetalShaderGenerator::_Execute(
     ss << "};\n\n";
 
     //write out the entry point signature
+    HgiMetalStageOutputShaderSection* const outputs =
+        _generatorShaderSections->GetOutputs();
     std::stringstream returnSS;
-    if (HgiMetalStageOutputShaderSection* const outputs =
-                        _generatorShaderSections->GetOutputs()) {
+    if (outputs) {
         const HgiMetalStructTypeDeclarationShaderSection* const decl =
             outputs->GetStructTypeDeclaration();
         decl->WriteIdentifier(returnSS);
@@ -928,11 +999,14 @@ void HgiMetalShaderGenerator::_Execute(
         }
     }
     //return the instance of the shader entrypoint output type
-    const std::string outputInstanceName =
-            _generatorShaderSections->GetOutputInstanceName();
-    if(!outputInstanceName.empty())
+    if(outputs)
     {
+        const std::string outputInstanceName =
+                _generatorShaderSections->GetOutputInstanceName();
         ss << "return " << outputInstanceName << ";\n";
+    }
+    else {
+        ss << _generatorShaderSections->GetScopeInstanceName() << ".main();\n";
     }
     ss << "}\n";
 }

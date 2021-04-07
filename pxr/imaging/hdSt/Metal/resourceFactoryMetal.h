@@ -78,7 +78,7 @@ public:
 
     HDST_API
     virtual const char* const GetComputeShaderFilename() const override {
-        return "compute.metal";
+        return "compute.glslfx";
     }
     
     HDST_API

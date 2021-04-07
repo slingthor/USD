@@ -33,7 +33,7 @@
 // compiler that HgiVulkan is compiled with.
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
-#include <OGLCompilersDLL/InitializeDll.h>
+#include <glslang/OGLCompilersDLL/InitializeDll.h>
 
 
 PXR_NAMESPACE_OPEN_SCOPE

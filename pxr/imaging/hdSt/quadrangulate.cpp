@@ -50,6 +50,14 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+namespace {
+
+enum {
+    BufferBinding_Uniforms,
+    BufferBinding_Primvar,
+    BufferBinding_Quadinfo,
+};
+
 static HgiResourceBindingsSharedPtr
 _CreateResourceBindings(
     Hgi* hgi,
@@ -62,7 +70,7 @@ _CreateResourceBindings(
 
     if (primvar) {
         HgiBufferBindDesc bufBind0;
-        bufBind0.bindingIndex = 0;
+        bufBind0.bindingIndex = BufferBinding_Primvar;
         bufBind0.resourceType = HgiBindResourceTypeStorageBuffer;
         bufBind0.stageUsage = HgiShaderStageCompute;
         bufBind0.offsets.push_back(0);
@@ -72,7 +80,7 @@ _CreateResourceBindings(
 
     if (quadrangulateTable) {
         HgiBufferBindDesc bufBind1;
-        bufBind1.bindingIndex = 1;
+        bufBind1.bindingIndex = BufferBinding_Quadinfo;
         bufBind1.resourceType = HgiBindResourceTypeStorageBuffer;
         bufBind1.stageUsage = HgiShaderStageCompute;
         bufBind1.offsets.push_back(0);
@@ -97,6 +105,8 @@ _CreatePipeline(
     return std::make_shared<HgiComputePipelineHandle>(
         hgi->CreateComputePipeline(desc));
 }
+
+} // Anonymous namespace
 
 HdSt_QuadInfoBuilderComputation::HdSt_QuadInfoBuilderComputation(
     HdSt_MeshTopology *topology, SdfPath const &id)
@@ -480,6 +490,15 @@ HdSt_QuadrangulateComputationGPU::Execute(
         return;
     }
 
+    struct Uniform {
+        int vertexOffset;
+        int quadInfoStride;
+        int quadInfoOffset;
+        int maxNumVert;
+        int primvarOffset;
+        int primvarStride;
+        int numComponents;
+    } uniform;
 
     // select shader by datatype
     TfToken shaderToken =
@@ -490,7 +509,38 @@ HdSt_QuadrangulateComputationGPU::Execute(
     HdStResourceRegistry* hdStResourceRegistry =
         static_cast<HdStResourceRegistry*>(resourceRegistry);
     HdStGLSLProgramSharedPtr computeProgram
-        = HdStGLSLProgram::GetComputeProgram(shaderToken, hdStResourceRegistry);
+        = HdStGLSLProgram::GetComputeProgram(shaderToken, hdStResourceRegistry,
+          [&](HgiShaderFunctionDesc &computeDesc) {
+            computeDesc.debugName = shaderToken.GetString();
+            computeDesc.shaderStage = HgiShaderStageCompute;
+            if (shaderToken == HdStGLSLProgramTokens->quadrangulateFloat) {
+                HgiShaderFunctionAddBuffer(&computeDesc, "primvar", HdStTokens->_float);
+            }
+            else {
+                HgiShaderFunctionAddBuffer(&computeDesc, "primvar", HdStTokens->_double);
+            }
+            HgiShaderFunctionAddBuffer(&computeDesc, "quadInfo", HdStTokens->_int);
+            
+            static std::string params[] = {
+                "vertexOffset",       // offset in aggregated buffer
+                "quadInfoStride",
+                "quadInfoOffset",
+                "maxNumVert",
+                "primvarOffset",      // interleave offset
+                "primvarStride",      // interleave stride
+                "numComponents",      // interleave datasize
+            };
+            int numParams = sizeof(params) / sizeof(params[0]);
+            assert((sizeof(Uniform) / sizeof(int)) == numParams);
+
+            for (int i = 0; i < numParams; i++) {
+                HgiShaderFunctionAddConstantParam(
+                    &computeDesc, params[i], HdStTokens->_int);
+            }
+            HgiShaderFunctionAddStageInput(
+                &computeDesc, "hd_globalInvocationID", "uvec3",
+                HgiShaderKeywordTokens->hdGlobalInvocationID);
+        });
     if (!computeProgram) return;
 
     HdStBufferArrayRangeSharedPtr range_ =
@@ -510,16 +560,6 @@ HdSt_QuadrangulateComputationGPU::Execute(
         std::static_pointer_cast<HdStBufferResource> (quadrangulateTable_);
 
     // prepare uniform buffer for GPU computation
-    struct Uniform {
-        int vertexOffset;
-        int quadInfoStride;
-        int quadInfoOffset;
-        int maxNumVert;
-        int primvarOffset;
-        int primvarStride;
-        int numComponents;
-    } uniform;
-
     int quadInfoStride = quadInfo->maxNumVert + 2;
 
     // coherent vertex offset in aggregated buffer array
@@ -586,11 +626,8 @@ HdSt_QuadrangulateComputationGPU::Execute(
     computeCmds->BindPipeline(pipeline);
 
     // Queue transfer uniform buffer
-    int slotIndex = 0;
-    if (hgi->GetAPIName() == HgiTokens->Metal) {
-        slotIndex = 2;
-    }
-    computeCmds->SetConstantValues(pipeline, slotIndex, sizeof(uniform), &uniform);
+    computeCmds->SetConstantValues(
+        pipeline, BufferBinding_Uniforms, sizeof(uniform), &uniform);
 
     // Queue compute work
     computeCmds->Dispatch(numNonQuads, 1);

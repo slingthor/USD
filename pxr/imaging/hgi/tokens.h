@@ -38,7 +38,13 @@ PXR_NAMESPACE_OPEN_SCOPE
     (Metal)           \
     (Vulkan)
 
+#define HGI_SHADER_KEYWORD_TOKENS    \
+    (hdGlobalInvocationID)
+
 TF_DECLARE_PUBLIC_TOKENS(HgiTokens, HGI_API, HGI_TOKENS);
+
+TF_DECLARE_PUBLIC_TOKENS(
+    HgiShaderKeywordTokens, HGI_API, HGI_SHADER_KEYWORD_TOKENS);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
