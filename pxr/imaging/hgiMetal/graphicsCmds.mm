@@ -446,6 +446,7 @@ HgiMetalGraphicsCmds::MemoryBarrier(HgiMemoryBarrier barrier)
 {
     TF_VERIFY(barrier==HgiMemoryBarrierAll, "Unknown barrier");
 
+#if defined(ARCH_OS_MACOS)
     MTLBarrierScope scope =
         MTLBarrierScopeBuffers |
         MTLBarrierScopeTextures |
@@ -456,7 +457,8 @@ HgiMetalGraphicsCmds::MemoryBarrier(HgiMemoryBarrier barrier)
 
     [_encoder memoryBarrierWithScope:scope
                          afterStages:srcStages
-                         beforeStages:dstStages];
+                        beforeStages:dstStages];
+#endif
 }
 
 bool
