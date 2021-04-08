@@ -1061,11 +1061,11 @@ def InstallBoost_Helper(context, force, buildArgs):
             with open(projectPath, 'a') as projectFile:
                 projectFile.writelines(newLines)
 
-        if context.buildUniversal and SupportsMacOSUniversalBinaries():
-            b2_toolset = "toolset=clang-darwin-x86_64"
-            b2_settings[0] = '--prefix="{instDir}/_tmp/x86_64"'.format(instDir=context.instDir)
-        else:
-            b2_toolset = "toolset=clang-darwin-{0}".format(GetMacArch())
+            if context.buildUniversal and SupportsMacOSUniversalBinaries():
+                b2_toolset = "toolset=clang-darwin-x86_64"
+                b2_settings[0] = '--prefix="{instDir}/_tmp/x86_64"'.format(instDir=context.instDir)
+            else:
+                b2_toolset = "toolset=clang-darwin-{0}".format(GetMacArch())
 
         b2CmdPrimary = '{b2} {toolset} {options} install'.format(
             b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
@@ -1844,11 +1844,21 @@ def InstallOpenImageIO(context, force, buildArgs):
 
         if iOS():
             PatchFile("src/libutil/sysutil.cpp", 
-                   [("if (system (newcmd.c_str()) != -1)", "if (true)")])
+                   [("if (system(newcmd.c_str()) != -1)", "if (true)")])
             PatchFile("CMakeLists.txt",
                     [("set (CMAKE_ALLOW_LOOSE_LOOP_CONSTRUCTS TRUE)",
-                        "set (CMAKE_ALLOW_LOOSE_LOOP_CONSTRUCTS TRUE)\n"
-                        "cmake_policy (SET CMP0008 NEW)")])
+                      "set  (CMAKE_ALLOW_LOOSE_LOOP_CONSTRUCTS TRUE)\n"
+                      "cmake_policy (SET CMP0008 NEW)")])
+            PatchFile("src/cmake/externalpackages.cmake",
+                    [("find_package (Git REQUIRED)",
+                      "find_host_package (Git REQUIRED)")])
+            PatchFile("src/cmake/compiler.cmake",
+                    [("# Find out if it's safe for us to use std::regex or if we need boost.regex.",
+                      "# Find out if it's safe for us to use std::regex or if we need boost.regex.\n"
+                        "if (NOT DEFINED CMAKE_TOOLCHAIN_FILE)"),
+                     ("add_definitions (-DUSE_BOOST_REGEX)",
+                      "add_definitions (-DUSE_BOOST_REGEX)\n"
+                        "endif()")])
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs

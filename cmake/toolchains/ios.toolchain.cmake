@@ -158,6 +158,7 @@ elseif (IOS_PLATFORM STREQUAL "SIMULATOR_TVOS")
 else()
   message(FATAL_ERROR "Invalid IOS_PLATFORM: ${IOS_PLATFORM}")
 endif()
+set(CMAKE_SYSTEM_PROCESSOR ${IOS_ARCH})
 message(STATUS "Configuring iOS build for platform: ${IOS_PLATFORM}, "
   "architecture(s): ${IOS_ARCH}")
 # If user did not specify the SDK root to use, then query xcodebuild for it.
