@@ -276,6 +276,7 @@ private:
     void _CreateSelectionTask();
     void _CreateColorizeSelectionTask();
     void _CreateColorCorrectionTask();
+    void _CreateVisualizeAovTask();
     void _CreatePickTask();
     void _CreatePickFromRenderBufferTask();
     void _CreateAovInputTask();
@@ -293,6 +294,7 @@ private:
     bool _SelectionEnabled() const;
     bool _ColorizeSelectionEnabled() const;
     bool _ColorCorrectionEnabled() const;
+    bool _VisualizeAovEnabled() const;
     bool _ColorizeQuantizationEnabled() const;
     bool _AovsSupported() const;
     bool _UsingAovs() const;
@@ -375,6 +377,7 @@ private:
     SdfPath _selectionTaskId;
     SdfPath _colorizeSelectionTaskId;
     SdfPath _colorCorrectionTaskId;
+    SdfPath _visualizeAovTaskId;
     SdfPath _pickTaskId;
     SdfPath _pickFromRenderBufferTaskId;
     SdfPath _presentTaskId;

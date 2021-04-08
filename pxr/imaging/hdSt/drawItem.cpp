@@ -271,7 +271,7 @@ HdStDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
 
             if (modified) {
 #if defined(PXR_METAL_SUPPORT_ENABLED)
-                id<MTLBuffer> metalBuffer_id = HgiMetalBuffer::MTLBuffer(culledInstanceIndexRes->GetId());
+                id<MTLBuffer> metalBuffer_id = HgiMetalBuffer::MTLBuffer(culledInstanceIndexRes->GetHandle());
                 
                 uint32_t start = instanceOffset * sizeof(uint32_t);
                 uint32_t length = _numVisible * sizeof(uint32_t) * instanceIndexWidth;
@@ -479,7 +479,7 @@ HdStDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
         }
 
 #if defined(ARCH_OS_MACOS)
-        id<MTLBuffer> metalBuffer_id = HgiMetalBuffer::MTLBuffer(culledInstanceIndexRes->GetId());
+        id<MTLBuffer> metalBuffer_id = HgiMetalBuffer::MTLBuffer(culledInstanceIndexRes->GetHandle());
 
         uint32_t start = instanceOffset * sizeof(uint32_t);
         uint32_t length = _numVisible * sizeof(uint32_t) * 2;

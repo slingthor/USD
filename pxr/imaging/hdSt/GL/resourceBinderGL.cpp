@@ -143,7 +143,7 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
 
     // it is possible that the buffer has not been initialized when
     // the instanceIndex is empty (e.g. FX points. see bug 120354)
-    uint64_t bufferId = buffer->GetId()->GetRawResource();
+    uint64_t bufferId = buffer->GetHandle()->GetRawResource();
     if (bufferId == 0) return;
 
     HdBinding binding = GetBinding(name, level);
@@ -263,7 +263,7 @@ HdSt_ResourceBinderGL::UnbindBuffer(TfToken const &name,
 
     // it is possible that the buffer has not been initialized when
     // the instanceIndex is empty (e.g. FX points)
-    if (!buffer->GetId()) return;
+    if (!buffer->GetHandle()) return;
 
     HdBinding binding = GetBinding(name, level);
     HdBinding::Type type = binding.GetType();
@@ -292,16 +292,18 @@ HdSt_ResourceBinderGL::UnbindBuffer(TfToken const &name,
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         break;
     case HdBinding::BINDLESS_UNIFORM:
-        if (glIsNamedBufferResidentNV(buffer->GetId()->GetRawResource())) {
-            glMakeNamedBufferNonResidentNV(buffer->GetId()->GetRawResource());
+        if (glIsNamedBufferResidentNV(buffer->GetHandle()->GetRawResource())) {
+            glMakeNamedBufferNonResidentNV(
+                buffer->GetHandle()->GetRawResource());
         }
         break;
     case HdBinding::SSBO:
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, loc, 0);
         break;
     case HdBinding::BINDLESS_SSBO_RANGE:
-        if (glIsNamedBufferResidentNV(buffer->GetId()->GetRawResource())) {
-            glMakeNamedBufferNonResidentNV(buffer->GetId()->GetRawResource());
+        if (glIsNamedBufferResidentNV(buffer->GetHandle()->GetRawResource())) {
+            glMakeNamedBufferNonResidentNV(
+                buffer->GetHandle()->GetRawResource());
         }
         break;
     case HdBinding::DISPATCH:

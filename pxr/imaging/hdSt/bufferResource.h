@@ -65,21 +65,21 @@ public:
     /// Sets the HgiBufferHandle for this resource and its size.
     /// also caches the gpu address of the buffer.
     HDST_API
-    void SetAllocation(HgiBufferHandle const& id, size_t size);
+    void SetAllocation(HgiBufferHandle const& handle, size_t size);
     
     // APPLE METAL: Multibuffering support.
-    void SetAllocations(HgiBufferHandle const& id0,
-                        HgiBufferHandle const& id1,
-                        HgiBufferHandle const& id2,
+    void SetAllocations(HgiBufferHandle const& handle0,
+                        HgiBufferHandle const& handle1,
+                        HgiBufferHandle const& handle2,
                         size_t size);
 
     /// Returns the HgiBufferHandle for this GPU resource
-    HgiBufferHandle& GetId() { return _ids[_activeBuffer]; }
+    HgiBufferHandle& GetHandle() { return _handle[_activeBuffer]; }
     
     // APPLE METAL: Multibuffering support.
     /// Returns the Metal object at the triple buffer index for this GPU resource
-    HgiBufferHandle& GetId(int32_t const index) {
-        return _ids[index];
+    HgiBufferHandle& GetHandle(int32_t const index) {
+        return _handle[index];
     }
     
     // APPLE METAL: Multibuffering support.
@@ -105,7 +105,7 @@ public:
 private:
     // APPLE METAL: Multibuffering support.
     uint64_t _gpuAddr[MULTIBUFFERING];
-    HgiBufferHandle _ids[MULTIBUFFERING];
+    HgiBufferHandle _handle[MULTIBUFFERING];
     int32_t _lastFrameModified;
     int32_t _activeBuffer;
     bool _firstFrameBeingFilled;

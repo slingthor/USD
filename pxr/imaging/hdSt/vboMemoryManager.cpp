@@ -117,7 +117,7 @@ HdStVBOMemoryManager::GetResourceAllocation(
 
     TF_FOR_ALL(resIt, bufferArray_->GetResources()) {
         HdStBufferResourceSharedPtr const & resource = resIt->second;
-        HgiBufferHandle buffer = resource->GetId();
+        HgiBufferHandle buffer = resource->GetHandle();
 
         // XXX avoid double counting of resources shared within a buffer
         uint64_t id = buffer ? buffer->GetRawResource() : 0;
@@ -339,40 +339,40 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
         size_t bufferSize = bytesPerElement * _totalCapacity;
 
         // allocate new one
-        // curId and oldId will be different when we are adopting ranges
+        // curBufs and oldBufs will be different when we are adopting ranges
         // from another buffer array.
-        HgiBufferHandle newIds[3];
-        HgiBufferHandle oldIds[3];
-        HgiBufferHandle curIds[3];
+        HgiBufferHandle newBufs[3];
+        HgiBufferHandle oldBufs[3];
+        HgiBufferHandle curBufs[3];
 
         HgiBufferDesc bufDesc;
         bufDesc.usage = HgiBufferUsageUniform;
         bufDesc.byteSize = bufferSize;
 
         for (int32_t i = 0; i < 3; i++) {
-            oldIds[i] = bres->GetId(i);
-            curIds[i] = curRes->GetId(i);
+            oldBufs[i] = bres->GetHandle(i);
+            curBufs[i] = curRes->GetHandle(i);
                         
             // Skip buffers of zero size
             if (bufferSize > 0) {
                 // Disable triple buffering
                 if (i == 0) {
-                    newIds[i] = hgi->CreateBuffer(bufDesc);
+                    newBufs[i] = hgi->CreateBuffer(bufDesc);
                 }
             }
         }
 
         // if old and new buffer exist, copy unchanged data
-        if (curIds[0] && newIds[0]) {
+        if (curBufs[0] && newBufs[0]) {
             std::vector<size_t>::iterator newOffsetIt = newOffsets.begin();
 
             // pre-pass to combine consecutive buffer range relocation
             std::unique_ptr<HdStBufferRelocator> relocators[3];
             
             for (int i = 0; i < 3; i++) {
-                int const curIndex = curIds[i] ? i : 0;
-                if (newIds[i]) {
-                    relocators[i] = std::make_unique<HdStBufferRelocator>(curIds[curIndex], newIds[i]);
+                int const curIndex = curBufs[i] ? i : 0;
+                if (newBufs[i]) {
+                    relocators[i] = std::make_unique<HdStBufferRelocator>(curBufs[curIndex], newBufs[i]);
                 }
             }
             TF_FOR_ALL (it, ranges) {
@@ -425,14 +425,14 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
         }
 
         for (int i = 0; i < 3; i++) {
-            if (oldIds[i]) {
+            if (oldBufs[i]) {
                 // delete old buffer
-                hgi->DestroyBuffer(&oldIds[i]);
+                hgi->DestroyBuffer(&oldBufs[i]);
             }
         }
 
-        // update id of buffer resource
-        bres->SetAllocations(newIds[0], newIds[1], newIds[2], bufferSize);
+        // update allocation of buffer resource
+        bres->SetAllocations(newBufs[0], newBufs[1], newBufs[2], bufferSize);
     }
 
     // update ranges
@@ -462,9 +462,9 @@ HdStVBOMemoryManager::_StripedBufferArray::_DeallocateResources()
     Hgi* hgi = _resourceRegistry->GetHgi();
     TF_FOR_ALL (it, GetResources()) {
         HdStBufferResourceSharedPtr bufferRes = it->second;
-        hgi->DestroyBuffer(&bufferRes->GetId(0));
-        hgi->DestroyBuffer(&bufferRes->GetId(1));
-        hgi->DestroyBuffer(&bufferRes->GetId(2));
+        hgi->DestroyBuffer(&bufferRes->GetHandle(0));
+        hgi->DestroyBuffer(&bufferRes->GetHandle(1));
+        hgi->DestroyBuffer(&bufferRes->GetHandle(2));
     }
 }
 
@@ -501,9 +501,10 @@ HdStVBOMemoryManager::_StripedBufferArray::GetResource() const
 
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
         // make sure this buffer array has only one resource.
-        HgiBufferHandle const& id = _resourceList.begin()->second->GetId();
+        HgiBufferHandle const& buffer =
+                _resourceList.begin()->second->GetHandle();
         TF_FOR_ALL (it, _resourceList) {
-            if (it->second->GetId() != id) {
+            if (it->second->GetHandle() != buffer) {
                 TF_CODING_ERROR("GetResource(void) called on"
                                 "HdBufferArray having multiple GPU resources");
             }
@@ -640,6 +641,7 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::Resize(int numElements)
     _numElements = numElements;
     return needsReallocation;
 }
+
 void
 HdStVBOMemoryManager::_StripedBufferArrayRange::CopyData(
     HdBufferSourceSharedPtr const &bufferSource)
@@ -652,7 +654,7 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::CopyData(
     HdStBufferResourceSharedPtr VBO =
         _stripedBufferArray->GetResource(bufferSource->GetName());
 
-    if (!TF_VERIFY((VBO && VBO->GetId()),
+    if (!TF_VERIFY((VBO && VBO->GetHandle()),
                       "VBO doesn't exist for %s",
                       bufferSource->GetName().GetText())) {
         return;
@@ -696,7 +698,7 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::CopyData(
 
     HgiBufferCpuToGpuOp blitOp;
     blitOp.cpuSourceBuffer = bufferSource->GetData();
-    blitOp.gpuDestinationBuffer = VBO->GetId();
+    blitOp.gpuDestinationBuffer = VBO->GetHandle();
     
     blitOp.sourceByteOffset = 0;
     blitOp.byteSize = srcSize;
@@ -716,7 +718,7 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::GetByteOffset(
     HdStBufferResourceSharedPtr VBO =
         _stripedBufferArray->GetResource(resourceName);
 
-    if (!VBO || (!VBO->GetId() && _numElements > 0)) {
+    if (!VBO || (!VBO->GetHandle() && _numElements > 0)) {
         TF_CODING_ERROR("VBO doesn't exist for %s", resourceName.GetText());
         return 0;
     }
@@ -735,7 +737,7 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::ReadData(TfToken const &name) co
 
     HdStBufferResourceSharedPtr VBO = _stripedBufferArray->GetResource(name);
 
-    if (!VBO || (!VBO->GetId() && _numElements > 0)) {
+    if (!VBO || (!VBO->GetHandle() && _numElements > 0)) {
         TF_CODING_ERROR("VBO doesn't exist for %s", name.GetText());
         return result;
     }

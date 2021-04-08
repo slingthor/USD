@@ -1330,7 +1330,7 @@ HdSt_IndirectDrawBatch::_GPUFrustumInstanceCulling(
             bindLoc, sizeof(Uniforms), &cullParams);
 
         cullGfxCmds->DrawIndirect(
-            cullCommandBuffer->GetId(),
+            cullCommandBuffer->GetHandle(),
             cullCommandBuffer->GetOffset(),
             _dispatchBufferCullInput->GetCount(),
             cullCommandBuffer->GetStride());
@@ -1346,7 +1346,7 @@ HdSt_IndirectDrawBatch::_GPUFrustumInstanceCulling(
             bindLoc, sizeof(Uniforms), &cullParams);
 
         cullGfxCmds->DrawIndirect(
-            cullCommandBuffer->GetId(),
+            cullCommandBuffer->GetHandle(),
             cullCommandBuffer->GetOffset(),
             _dispatchBufferCullInput->GetCount(),
             cullCommandBuffer->GetStride());

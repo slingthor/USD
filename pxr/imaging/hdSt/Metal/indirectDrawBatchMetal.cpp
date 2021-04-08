@@ -242,7 +242,7 @@ HdSt_IndirectDrawBatchMetal::_BeginGPUCountVisibleInstances(
     HgiBufferCpuToGpuOp op;
     op.cpuSourceBuffer = &count;
     op.sourceByteOffset = 0;
-    op.gpuDestinationBuffer = _resultBuffer->GetId();
+    op.gpuDestinationBuffer = _resultBuffer->GetHandle();
     op.destinationByteOffset = 0;
     op.byteSize = sizeof(count);
     blitCmds->CopyBufferCpuToGpu(op);

@@ -145,7 +145,7 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
     //NSLog(@"Binding buffer %s", name.GetText());
     // it is possible that the buffer has not been initialized when
     // the instanceIndex is empty (e.g. FX points. see bug 120354)
-    if (!buffer->GetId())
+    if (!buffer->GetHandle())
         return;
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
@@ -156,7 +156,7 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
     
     for(; it != shaderBindings.second; ++it) {
         MSL_ShaderBinding const* const shaderBinding = (*it).second;
-        id<MTLBuffer> metalBuffer = HgiMetalBuffer::MTLBuffer(buffer->GetId());
+        id<MTLBuffer> metalBuffer = HgiMetalBuffer::MTLBuffer(buffer->GetHandle());
 
         switch(shaderBinding->_type)
         {

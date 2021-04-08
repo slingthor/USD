@@ -245,6 +245,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (diskLight)                                 \
     (distantLight)                              \
     (domeLight)                                 \
+    (light)                                     \
     (lightFilter)                               \
     (pluginLight)                               \
     (rectLight)                                 \

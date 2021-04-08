@@ -114,7 +114,7 @@ HdSt_IndirectDrawBatchGL::_PrepareDraw(
 
         if (gpuCulling) {
             HgiBufferHandle const& buffer =
-                _dispatchBuffer->GetEntireResource()->GetId();
+                _dispatchBuffer->GetEntireResource()->GetHandle();
             if (caps.directStateAccessEnabled) {
                 bufferData = glMapNamedBufferEXT(
                     buffer->GetRawResource(), GL_READ_ONLY);
@@ -157,7 +157,7 @@ HdSt_IndirectDrawBatchGL::_PrepareDraw(
 
         if (gpuCulling) {
             HgiBufferHandle const& buffer =
-                _dispatchBuffer->GetEntireResource()->GetId();
+                _dispatchBuffer->GetEntireResource()->GetHandle();
             if (caps.directStateAccessEnabled) {
                 glUnmapNamedBuffer(buffer->GetRawResource());
             } else {
@@ -324,7 +324,7 @@ HdSt_IndirectDrawBatchGL::_BeginGPUCountVisibleInstances(
     HgiBufferCpuToGpuOp op;
     op.cpuSourceBuffer = &count;
     op.sourceByteOffset = 0;
-    op.gpuDestinationBuffer = _resultBuffer->GetId();
+    op.gpuDestinationBuffer = _resultBuffer->GetHandle();
     op.destinationByteOffset = 0;
     op.byteSize = sizeof(count);
     blitCmds->CopyBufferCpuToGpu(op);
@@ -353,7 +353,7 @@ HdSt_IndirectDrawBatchGL::_EndGPUCountVisibleInstances(
     copyOp.byteSize = sizeof(count);
     copyOp.cpuDestinationBuffer = &count;
     copyOp.destinationByteOffset = 0;
-    copyOp.gpuSourceBuffer = _resultBuffer->GetId();
+    copyOp.gpuSourceBuffer = _resultBuffer->GetHandle();
     copyOp.sourceByteOffset = 0;
 
     HgiBlitCmds* blitCmds = resourceRegistry->GetGlobalBlitCmds();

@@ -117,7 +117,7 @@ HdStVBOSimpleMemoryManager::GetResourceAllocation(
         HdStBufferResourceSharedPtr const & resource = resIt->second;
 
         // XXX Reallocate inserts an empty (invalid) handle for empty buffers.
-        HgiBufferHandle buffer = resource->GetId();
+        HgiBufferHandle buffer = resource->GetHandle();
         uint64_t id = buffer ? buffer->GetRawResource() : 0;
 
         // XXX avoid double counting of resources shared within a buffer
@@ -302,16 +302,16 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::Reallocate(
         // APPLE METAL: Clamp for 0-sized buffers, Metal doesn't support them.
         bufferSize = (bufferSize > 256) ? bufferSize : 256;
         
-        HgiBufferHandle newIds[HdStBufferResource::MULTIBUFFERING];
-        HgiBufferHandle oldIds[HdStBufferResource::MULTIBUFFERING];
+        HgiBufferHandle newBufs[HdStBufferResource::MULTIBUFFERING];
+        HgiBufferHandle oldBufs[HdStBufferResource::MULTIBUFFERING];
 
         HgiBufferDesc bufDesc;
         bufDesc.byteSize = bufferSize;
         bufDesc.usage = HgiBufferUsageUniform;
 
         for (int32_t i = 0; i < bufferCount; i++) {
-            oldIds[i] = bres->GetId(i);
-            newIds[i] = hgi->CreateBuffer(bufDesc);
+            oldBufs[i] = bres->GetHandle(i);
+            newBufs[i] = hgi->CreateBuffer(bufDesc);
         }
 
         // copy the range. There are three cases:
@@ -335,10 +335,10 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::Reallocate(
             HD_PERF_COUNTER_INCR(HdStPerfTokens->copyBufferGpuToGpu);
 
             for (int i = 0; i < bufferCount; i++) {
-                if (newIds[i]) {
+                if (newBufs[i]) {
                     HgiBufferGpuToGpuOp blitOp;
-                    blitOp.gpuSourceBuffer = oldIds[i];
-                    blitOp.gpuDestinationBuffer = newIds[i];
+                    blitOp.gpuSourceBuffer = oldBufs[i];
+                    blitOp.gpuDestinationBuffer = newBufs[i];
                     blitOp.byteSize = copySize;
                     blitCmds->CopyBufferGpuToGpu(blitOp);
                 }
@@ -347,12 +347,12 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::Reallocate(
 
         // delete old buffer
         for (int i = 0; i < bufferCount; i++) {
-            if (oldIds[i]) {
-                hgi->DestroyBuffer(&oldIds[i]);
+            if (oldBufs[i]) {
+                hgi->DestroyBuffer(&oldBufs[i]);
             }
         }
 
-        bres->SetAllocations(newIds[0], newIds[1], newIds[2], bufferSize);
+        bres->SetAllocations(newBufs[0], newBufs[1], newBufs[2], bufferSize);
     }
 
     blitCmds->PopDebugGroup();
@@ -376,9 +376,9 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::_DeallocateResources()
     Hgi* hgi = _resourceRegistry->GetHgi();
     TF_FOR_ALL (it, GetResources()) {
         HdStBufferResourceSharedPtr bufferRes = it->second;
-        hgi->DestroyBuffer(&bufferRes->GetId(0));
-        hgi->DestroyBuffer(&bufferRes->GetId(1));
-        hgi->DestroyBuffer(&bufferRes->GetId(2));
+        hgi->DestroyBuffer(&bufferRes->GetHandle(0));
+        hgi->DestroyBuffer(&bufferRes->GetHandle(1));
+        hgi->DestroyBuffer(&bufferRes->GetHandle(2));
     }
 }
 HdStBufferResourceSharedPtr
@@ -390,9 +390,10 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::GetResource() const
 
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
         // make sure this buffer array has only one resource.
-        HgiBufferHandle const& id = _resourceList.begin()->second->GetId();
+        HgiBufferHandle const& buffer =
+                _resourceList.begin()->second->GetHandle();
         TF_FOR_ALL (it, _resourceList) {
-            if (it->second->GetId() != id) {
+            if (it->second->GetHandle() != buffer) {
                 TF_CODING_ERROR("GetResource(void) called on"
                                 "HdBufferArray having multiple GPU resources");
             }
@@ -458,7 +459,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::CopyData(
     HdStBufferResourceSharedPtr VBO =
         _bufferArray->GetResource(bufferSource->GetName());
 
-    if (!VBO || !VBO->GetId()) {
+    if (!VBO || !VBO->GetHandle()) {
         TF_CODING_ERROR("VBO doesn't exist for %s",
                         bufferSource->GetName().GetText());
         return;
@@ -487,7 +488,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::CopyData(
 
     HgiBufferCpuToGpuOp blitOp;
     blitOp.cpuSourceBuffer = bufferSource->GetData();
-    blitOp.gpuDestinationBuffer = VBO->GetId();
+    blitOp.gpuDestinationBuffer = VBO->GetHandle();
     
     blitOp.sourceByteOffset = 0;
     blitOp.byteSize = srcSize;
@@ -507,7 +508,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::ReadData(TfToken const &nam
 
     HdStBufferResourceSharedPtr VBO = _bufferArray->GetResource(name);
 
-    if (!VBO || (!VBO->GetId() && _numElements > 0)) {
+    if (!VBO || (!VBO->GetHandle() && _numElements > 0)) {
         TF_CODING_ERROR("VBO doesn't exist for %s", name.GetText());
         return VtValue();
     }

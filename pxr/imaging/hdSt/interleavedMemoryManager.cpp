@@ -90,7 +90,7 @@ HdStInterleavedMemoryManager::GetResourceAllocation(
     TF_FOR_ALL(resIt, bufferArray_->GetResources()) {
         HdStBufferResourceSharedPtr const & resource = resIt->second;
 
-        HgiBufferHandle buffer = resource->GetId();
+        HgiBufferHandle buffer = resource->GetHandle();
 
         // XXX avoid double counting of resources shared within a buffer
         uint64_t id = buffer ? buffer->GetRawResource() : 0;
@@ -437,7 +437,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
     // all HdBufferSources are sharing same VBO
 
     // allocate new one
-    // curId and oldId will be different when we are adopting ranges
+    // curBufs and oldBufs will be different when we are adopting ranges
     // from another buffer array.
     _StripedInterleavedBufferSharedPtr curRangeOwner_ =
         std::static_pointer_cast<_StripedInterleavedBuffer>(curRangeOwner);
@@ -454,13 +454,13 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
     const int bufferCount =
         hasUnifiedMemory ? HdStBufferResource::MULTIBUFFERING:1;
 
-    HgiBufferHandle newIds[HdStBufferResource::MULTIBUFFERING];
-    HgiBufferHandle oldIds[HdStBufferResource::MULTIBUFFERING];
-    HgiBufferHandle curIds[HdStBufferResource::MULTIBUFFERING];
+    HgiBufferHandle newBufs[HdStBufferResource::MULTIBUFFERING];
+    HgiBufferHandle oldBufs[HdStBufferResource::MULTIBUFFERING];
+    HgiBufferHandle curBufs[HdStBufferResource::MULTIBUFFERING];
 
     for (int32_t i = 0; i < bufferCount; i++) {
-        oldIds[i] = oldBuffer->GetId(i);
-        curIds[i] = currentBuffer->GetId(i);
+        oldBufs[i] = oldBuffer->GetHandle(i);
+        curBufs[i] = currentBuffer->GetHandle(i);
     }
 
     // Skip buffers of zero size.
@@ -470,12 +470,12 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
         bufDesc.usage = HgiBufferUsageUniform;
 
         for (int32_t i = 0; i < bufferCount; i++) {
-            newIds[i] = hgi->CreateBuffer(bufDesc);
+            newBufs[i] = hgi->CreateBuffer(bufDesc);
         }
     }
 
     // if old and new buffer exist, copy unchanged data
-    if (curIds[0] && newIds[0]) {
+    if (curBufs[0] && newBufs[0]) {
         int index = 0;
 
         size_t rangeCount = GetRangeCount();
@@ -484,9 +484,9 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
         std::unique_ptr<HdStBufferRelocator> relocators[3];
         
         for(int i = 0; i < bufferCount; i++) {
-            int const curIndex = curIds[i] ? i : 0;
-            if (newIds[i]) {
-                relocators[i] = std::make_unique<HdStBufferRelocator>(curIds[curIndex], newIds[i]);
+            int const curIndex = curBufs[i] ? i : 0;
+            if (newBufs[i]) {
+                relocators[i] = std::make_unique<HdStBufferRelocator>(curBufs[curIndex], newBufs[i]);
             }
         }
         for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
@@ -539,15 +539,15 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
         }
     }
     for(int i = 0; i < bufferCount; i++) {
-        if (oldIds[i]) {
+        if (oldBufs[i]) {
             // delete old buffer
-            hgi->DestroyBuffer(&oldIds[i]);
+            hgi->DestroyBuffer(&oldBufs[i]);
         }
     }
 
-    // update id to all buffer resources
+    // update allocation to all buffer resources
     TF_FOR_ALL(it, GetResources()) {
-        it->second->SetAllocations(newIds[0], newIds[1], newIds[2], totalSize);
+        it->second->SetAllocations(newBufs[0], newBufs[1], newBufs[2], totalSize);
     }
 
     blitCmds->PopDebugGroup();
@@ -565,9 +565,9 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::_DeallocateResources()
     HdStBufferResourceSharedPtr resource = GetResource();
     Hgi* hgi = _resourceRegistry->GetHgi();
     if (resource) {
-        hgi->DestroyBuffer(&resource->GetId(0));
-        hgi->DestroyBuffer(&resource->GetId(1));
-        hgi->DestroyBuffer(&resource->GetId(2));
+        hgi->DestroyBuffer(&resource->GetHandle(0));
+        hgi->DestroyBuffer(&resource->GetHandle(1));
+        hgi->DestroyBuffer(&resource->GetHandle(2));
     }
 }
 
@@ -596,9 +596,10 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::GetResource() const
 
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
         // make sure this buffer array has only one resource.
-        HgiBufferHandle const& id = _resourceList.begin()->second->GetId();
+        HgiBufferHandle const& buffer =
+                _resourceList.begin()->second->GetHandle();
         TF_FOR_ALL (it, _resourceList) {
-            if (it->second->GetId() != id) {
+            if (it->second->GetHandle() != buffer) {
                 TF_CODING_ERROR("GetResource(void) called on"
                                 "HdBufferArray having multiple GL resources");
             }
@@ -781,7 +782,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBufferRange::CopyData(
     HdStBufferResourceSharedPtr VBO =
         _stripedBuffer->GetResource(bufferSource->GetName());
 
-    if (!VBO || !VBO->GetId()) {
+    if (!VBO || !VBO->GetHandle()) {
         TF_CODING_ERROR("VBO doesn't exist for %s",
                         bufferSource->GetName().GetText());
         return;
@@ -819,7 +820,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBufferRange::CopyData(
             (const unsigned char*)bufferSource->GetData();
 
         HgiBufferCpuToGpuOp blitOp;
-        blitOp.gpuDestinationBuffer = VBO->GetId();
+        blitOp.gpuDestinationBuffer = VBO->GetHandle();
         blitOp.sourceByteOffset = 0;
         blitOp.byteSize = dataSize;
 
@@ -849,7 +850,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBufferRange::ReadData(
 
     HdStBufferResourceSharedPtr VBO = _stripedBuffer->GetResource(name);
 
-    if (!VBO || !VBO->GetId()) {
+    if (!VBO || !VBO->GetHandle()) {
         TF_CODING_ERROR("VBO doesn't exist for %s", name.GetText());
         return result;
     }

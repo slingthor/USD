@@ -233,11 +233,11 @@ public:
             return HdGetComponentCount(_resource->GetTupleType().type);
         }
         uint64_t BindVBO() {
-            return _resource->GetId()->GetRawResource();
+            return _resource->GetHandle()->GetRawResource();
         }
 #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)
         id<MTLBuffer> BindMTLBuffer(OpenSubdiv::v3_4_3::Osd::MTLContext* context) {
-            return HgiMetalBuffer::MTLBuffer(_resource->GetId());
+            return HgiMetalBuffer::MTLBuffer(_resource->GetHandle());
         }
 #endif
         HdStBufferResourceSharedPtr _resource;

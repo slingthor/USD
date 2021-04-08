@@ -101,26 +101,26 @@ HdStBufferResource::~HdStBufferResource()
 }
 
 void
-HdStBufferResource::SetAllocation(HgiBufferHandle const& id, size_t size)
+HdStBufferResource::SetAllocation(HgiBufferHandle const& handle, size_t size)
 {
-    SetAllocations(id, HgiBufferHandle(), HgiBufferHandle(), size);
+    SetAllocations(handle, HgiBufferHandle(), HgiBufferHandle(), size);
 }
 
 void
-HdStBufferResource::SetAllocations(HgiBufferHandle const& id0,
-                                     HgiBufferHandle const& id1,
-                                     HgiBufferHandle const& id2,
+HdStBufferResource::SetAllocations(HgiBufferHandle const& handle0,
+                                     HgiBufferHandle const& handle1,
+                                     HgiBufferHandle const& handle2,
                                      size_t size)
 {
-    _ids[0] = id0;
-    _ids[1] = id1;
-    _ids[2] = id2;
+    _handle[0] = handle0;
+    _handle[1] = handle1;
+    _handle[2] = handle2;
 
     // APPLE METAL: Platform-specific code should be pushed down to hgi.
     // Need to pass hgi in to resolve it.
 #if defined(PXR_METAL_SUPPORT_ENABLED)
     for (int32_t i = 0; i < MULTIBUFFERING; i++) {
-        id<MTLBuffer> b = HgiMetalBuffer::MTLBuffer(_ids[i]);
+        id<MTLBuffer> b = HgiMetalBuffer::MTLBuffer(_handle[i]);
         if (b) {
             _gpuAddr[i] = (uint64_t)[b contents];
         }
@@ -134,19 +134,19 @@ HdStBufferResource::SetAllocations(HgiBufferHandle const& id0,
         _lastFrameModified = context->GetCurrentFrame();
     }
     _activeBuffer = 0;
-    id<MTLBuffer> b = HgiMetalBuffer::MTLBuffer(_ids[1]);
+    id<MTLBuffer> b = HgiMetalBuffer::MTLBuffer(_handle[1]);
     _firstFrameBeingFilled = b != nil;
 #else
-    GlfContextCaps const & caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     // note: gpu address remains valid until the buffer object is deleted,
     // or when the data store is respecified via BufferData/BufferStorage.
     // It doesn't change even when we make the buffer resident or non-resident.
     // https://www.opengl.org/registry/specs/NV/shader_buffer_load.txt
-    if (id && caps.bindlessBufferEnabled) {
+    if (handle && caps.bindlessBufferEnabled) {
         for (int32_t i = 0; i < MULTIBUFFERING; i++) {
             glGetNamedBufferParameterui64vNV(
-                ids[i]->GetRawResource(),
-                GL_BUFFER_GPU_ADDRESS_NV, (GLuint64EXT*)&_gpuAddr[i]);
+                handle[i]->GetRawResource(), GL_BUFFER_GPU_ADDRESS_NV,
+            	(GLuint64EXT*)&_gpuAddr);
         }
     } else {
         for (int32_t i = 0; i < MULTIBUFFERING; i++) {
@@ -165,7 +165,7 @@ void HdStBufferResource::CopyDataIsHappening()
 {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
-    if (_ids[1]) {
+    if (_handle[1]) {
         int64_t currentFrame = context->GetCurrentFrame();
         
         if (currentFrame != _lastFrameModified) {

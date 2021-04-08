@@ -23,6 +23,7 @@
 //
 
 #include "pxr/imaging/hgiMetal/shaderGenerator.h"
+#include "pxr/imaging/hgi/tokens.h"
 #include <unordered_map>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -819,7 +820,7 @@ void HgiMetalShaderGenerator::_BuildKeywordInputShaderSections(
     //possible metal attributes on shader inputs.
     // Map from descriptor to Metal
     std::unordered_map<std::string, std::string> roleIndexM {
-            {"GlobalInvocationID", "thread_position_in_grid"}
+       {HgiShaderKeywordTokens->hdGlobalInvocationID, "thread_position_in_grid"}
     };
 
     const std::vector<HgiShaderFunctionParamDesc> &inputs =
