@@ -625,7 +625,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                     GfBBox3f const &oobb = (*instancedCullingBounds)[i];
                     GfRange3f const &ooRange = oobb.GetRange();
                     CullStateCache cullCache{ooRange.GetMin(), ooRange.GetMax()};
-                    *visibility = MissingFunctions::FrustumFullyContains(cullCache, _clipPlanes) || MissingFunctions::IntersectsFrustum(cullCache, _clipPlanes);
+                    *visibility = MissingFunctions::IntersectsFrustum(cullCache, _clipPlanes);
                     animatedDrawable->SetCullResultVisibilityCache(visibility, i);
                     visibility++;
                 }
@@ -688,12 +688,15 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                 uint8_t *visibilityWritePtr = cullItem.visibilityWritePtr;
                 
                 while (numItems--) {
-                    GfBBox3f const &box = (*drawableItem)->cullingBBox;
+                    GfRange3f const &range = (*drawableItem)->cullingBBox.GetRange();
                     
-                    bool visible;
-                    visible = MissingFunctions::IntersectsFrustum((*drawableItem)->cullCache, _clipPlanes) &&
-                                !MissingFunctions::ShouldRejectBasedOnSize(
-                                    box.GetRange().GetMin(), box.GetRange().GetMax(), *_viewProjMatrix, *_dimensions);
+                    bool visible = !MissingFunctions::ShouldRejectBasedOnSize(
+                                        range.GetMin(), range.GetMax(), *_viewProjMatrix, *_dimensions);
+
+                    if (visible) {
+                        visible = MissingFunctions::IntersectsFrustum((*drawableItem)->cullCache, _clipPlanes);
+                    }
+
                     *visibilityWritePtr++ = visible;
                     drawableItem++;
                 }
