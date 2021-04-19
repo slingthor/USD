@@ -355,10 +355,7 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
                         
             // Skip buffers of zero size
             if (bufferSize > 0) {
-                // Disable triple buffering
-                if (i == 0) {
-                    newIds[i] = hgi->CreateBuffer(bufDesc);
-                }
+                newIds[i] = hgi->CreateBuffer(bufDesc);
             }
         }
 
