@@ -217,11 +217,11 @@ HdStDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
             static bool perInstanceCulling = false;
 
             if (!perInstanceCulling) {
+                _numVisible = _instancedCullingBounds.size();
+
                 for(auto& bounds : _instancedCullingBounds) {
-                    if (GfFrustum::IntersectsViewVolumeFloat(bounds, viewProjMatrix, windowDimensions)) {
-                        _numVisible = _instancedCullingBounds.size();
+                    if (GfFrustum::IntersectsViewVolumeFloat(bounds, viewProjMatrix, windowDimensions))
                         return true;
-                    }
                 }
                 return false;
             }
