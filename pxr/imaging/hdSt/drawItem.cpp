@@ -217,11 +217,11 @@ HdStDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
             static bool perInstanceCulling = false;
 
             if (!perInstanceCulling) {
-                _numVisible = _instancedCullingBounds.size();
-
                 for(auto& bounds : _instancedCullingBounds) {
-                    if (GfFrustum::IntersectsViewVolumeFloat(bounds, viewProjMatrix, windowDimensions))
+                    if (GfFrustum::IntersectsViewVolumeFloat(bounds, viewProjMatrix, windowDimensions)) {
+                        _numVisible = _instancedCullingBounds.size();
                         return true;
+                    }
                 }
                 return false;
             }
@@ -231,6 +231,8 @@ HdStDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
 
             uint8_t *culledInstanceIndexBuffer = const_cast<uint8_t*>(_GetBufferContents(culledInstanceIndexRes));
             uint32_t *culledInstanceBuffer = reinterpret_cast<uint32_t*>(culledInstanceIndexBuffer) + instanceOffset;
+            
+            culledInstanceIndexRes->CopyDataIsHappening();
             
             bool modified = false;
             _numVisible = 0;
@@ -435,6 +437,8 @@ HdStDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
     uint32_t *instanceBuffer = reinterpret_cast<uint32_t*>(instanceIndexBuffer) + instanceOffset;
 
     HdStBufferResourceSharedPtr const & culledInstanceIndexRes = instanceIndexRangeGL->GetResource(HdInstancerTokens->culledInstanceIndices);
+    
+    culledInstanceIndexRes->CopyDataIsHappening();
     
     uint8_t *culledInstanceIndexBuffer = const_cast<uint8_t*>(_GetBufferContents(culledInstanceIndexRes));
     uint32_t *culledInstanceBuffer = reinterpret_cast<uint32_t*>(culledInstanceIndexBuffer) + instanceOffset;
