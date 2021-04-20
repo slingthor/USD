@@ -163,9 +163,8 @@ HdStBufferResource::SetAllocations(HgiBufferHandle const& id0,
 // APPLE METAL: Multibuffering support.
 void HdStBufferResource::CopyDataIsHappening()
 {
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    
     if (_ids[1]) {
+        MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
         int64_t currentFrame = context->GetCurrentFrame();
         
         if (currentFrame != _lastFrameModified) {
