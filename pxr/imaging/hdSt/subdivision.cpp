@@ -157,10 +157,13 @@ HdSt_OsdIndexComputation::_CheckValid() const
 ///
 ///
 HdSt_OsdRefineComputationGPU::HdSt_OsdRefineComputationGPU(
-                                                    HdSt_MeshTopology *topology,
-                                                    TfToken const &name,
-                                                    HdType type)
-    : _topology(topology), _name(name)
+    HdSt_MeshTopology *topology,
+    TfToken const &name,
+    HdType type,
+    HdSt_MeshTopology::Interpolation interpolation,
+    int fvarChannel)
+    : _topology(topology), _name(name), _interpolation(interpolation),
+      _fvarChannel(fvarChannel)
 {
 }
 
@@ -189,7 +192,7 @@ HdSt_OsdRefineComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range,
     HgiMetal* hgiMetal = static_cast<HgiMetal*>(hdStResourceRegistry->GetHgi());
     hgiMetal->CommitPrimaryCommandBuffer(HgiMetal::CommitCommandBuffer_WaitUntilCompleted, true);
     
-    subdivision->RefineGPU(range, _name);
+    subdivision->RefineGPU(range, _name, _interpolation, _fvarChannel);
 
     HD_PERF_COUNTER_INCR(HdPerfTokens->subdivisionRefineGPU);
 }
@@ -197,10 +200,22 @@ HdSt_OsdRefineComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range,
 int
 HdSt_OsdRefineComputationGPU::GetNumOutputElements() const
 {
-    // returns the total number of vertices, including coarse and refined ones.
+    // returns the total number of vertices, including coarse and refined ones
     HdSt_Subdivision const *subdivision = _topology->GetSubdivision();
     if (!TF_VERIFY(subdivision)) return 0;
-    return subdivision->GetNumVertices();
+    if (_interpolation == HdSt_MeshTopology::INTERPOLATE_VERTEX) {
+        return subdivision->GetNumVertices();
+    } else if (_interpolation == HdSt_MeshTopology::INTERPOLATE_VARYING) {
+        return subdivision->GetNumVarying();
+    } else {
+        return subdivision->GetMaxNumFaceVarying();
+    }
+}
+
+HdSt_MeshTopology::Interpolation 
+HdSt_OsdRefineComputationGPU::GetInterpolation() const
+{
+    return _interpolation;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -69,6 +69,10 @@ _FormatTable[HgiFormatCount][2] =
     {HgiFormatFloat32Vec2,    VK_FORMAT_R32G32_SFLOAT},
     {HgiFormatFloat32Vec3,    VK_FORMAT_R32G32B32_SFLOAT},
     {HgiFormatFloat32Vec4,    VK_FORMAT_R32G32B32A32_SFLOAT},
+    {HgiFormatInt16,          VK_FORMAT_R16_SINT},
+    {HgiFormatInt16Vec2,      VK_FORMAT_R16G16_SINT},
+    {HgiFormatInt16Vec3,      VK_FORMAT_R16G16B16_SINT},
+    {HgiFormatInt16Vec4,      VK_FORMAT_R16G16B16A16_SINT},
     {HgiFormatUInt16,         VK_FORMAT_R16_UINT},
     {HgiFormatUInt16Vec2,     VK_FORMAT_R16G16_UINT},
     {HgiFormatUInt16Vec3,     VK_FORMAT_R16G16B16_UINT},
@@ -90,7 +94,7 @@ _FormatTable[HgiFormatCount][2] =
 // A few random format validations to make sure the table above stays in sync
 // with the HgiFormat table.
 constexpr bool _CompileTimeValidateHgiFormatTable() {
-    return (TfArraySize(_FormatTable) == HgiFormatCount &&
+    return (HgiFormatCount==34 &&
             HgiFormatUNorm8 == 0 &&
             HgiFormatFloat16Vec4 == 9 &&
             HgiFormatFloat32Vec4 == 13 &&

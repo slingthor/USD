@@ -194,7 +194,7 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
                                     bytesPerImage:0];
                 }
             } else if (desc.type == HgiTextureType1DArray) {
-                const size_t imageBytes = bytesPerRow * height;
+                const size_t imageBytes = bytesPerRow;
                 for (int slice = 0; slice < desc.layerCount; slice++) {
                     char const *sliceBase =
                         static_cast<char const*>(initialData) +
