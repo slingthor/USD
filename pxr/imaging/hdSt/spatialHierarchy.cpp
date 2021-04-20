@@ -652,12 +652,15 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                 uint8_t *visibilityWritePtr = cullItem.visibilityWritePtr;
                 
                 while (numItems--) {
-                    GfBBox3f const &box = (*drawableItem)->cullingBBox;
+                    GfRange3f const &range = (*drawableItem)->cullingBBox.GetRange();
                     
-                    bool visible;
-                    visible = MissingFunctions::IntersectsFrustum((*drawableItem)->cullCache, _clipPlanes) &&
-                                !MissingFunctions::ShouldRejectBasedOnSize(
-                                    box.GetRange().GetMin(), box.GetRange().GetMax(), *_viewProjMatrix, *_dimensions);
+                    bool visible = !MissingFunctions::ShouldRejectBasedOnSize(
+                                        range.GetMin(), range.GetMax(), *_viewProjMatrix, *_dimensions);
+
+                    if (visible) {
+                        visible = MissingFunctions::IntersectsFrustum((*drawableItem)->cullCache, _clipPlanes);
+                    }
+
                     *visibilityWritePtr++ = visible;
                     drawableItem++;
                 }

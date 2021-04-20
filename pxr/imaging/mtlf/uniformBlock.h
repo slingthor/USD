@@ -62,8 +62,11 @@ protected:
     friend class MtlfResourceFactory;
 
 private:
-    id<MTLBuffer> _buffer;
-    int _size;
+    static constexpr int32_t MULTIBUFFERING = 3;
+    
+    id<MTLBuffer> _buffers[MULTIBUFFERING];
+    int32_t _lastFrameModified;
+    int32_t _activeBuffer;
 };
 
 
