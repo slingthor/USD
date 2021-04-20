@@ -504,7 +504,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
                 ptrdiff_t writeOffset = index * _stride;
                 ptrdiff_t copySize = _stride * range->GetNumElements();
                 
-                for(int i = 0; i < 3; i++) {
+                for(int i = 0; i < bufferCount; i++) {
                     if (relocators[i]) {
                         relocators[i]->AddRange(readOffset, writeOffset, copySize);
                     }
