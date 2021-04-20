@@ -92,8 +92,6 @@ private:
     void _BeginGPUCountVisibleInstances(HdStResourceRegistrySharedPtr const &resourceRegistry);
     
     void _EndGPUCountVisibleInstances(GLsync resultSync, size_t * result);
-    
-    HdStBufferResourceSharedPtr _resultBuffer;
 };
 
 

@@ -73,7 +73,6 @@ static const GLuint64 HD_CULL_RESULT_TIMEOUT_NS = 5e9; // XXX how long to wait?
 HdSt_IndirectDrawBatchMetal::HdSt_IndirectDrawBatchMetal(
     HdStDrawItemInstance * drawItemInstance)
     : HdSt_IndirectDrawBatch(drawItemInstance)
-    , _resultBuffer(0)
 {
     _Init(drawItemInstance);
 }

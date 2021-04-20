@@ -47,6 +47,10 @@
 #include "pxr/imaging/hgi/blitCmdsOps.h"
 #include "pxr/imaging/hgi/buffer.h"
 
+// APPLE METAL: needed for triple buffering support
+#include "pxr/imaging/hgiMetal/hgi.h"
+#include "pxr/imaging/hgiMetal/capabilities.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
@@ -326,39 +330,44 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
     Hgi* hgi = _resourceRegistry->GetHgi();
     HgiBlitCmds* blitCmds = _resourceRegistry->GetGlobalBlitCmds();
     blitCmds->PushDebugGroup(__ARCH_PRETTY_FUNCTION__);
+    
+    // APPLE METAL: Multibuffering support
+    bool hasUnifiedMemory =
+        static_cast<HgiMetal*>(hgi)->GetCapabilities().unifiedMemory;
+    const int bufferCount =
+        hasUnifiedMemory ? HdStBufferResource::MULTIBUFFERING:1;
 
     // resize each BufferResource
     HdStBufferResourceNamedList const& resources = GetResources();
     for (size_t bresIdx=0; bresIdx<resources.size(); ++bresIdx) {
-        HdStBufferResourceSharedPtr const &bres = resources[bresIdx].second;
-        HdStBufferResourceSharedPtr const &curRes =
+        HdStBufferResourceSharedPtr oldBuffer = resources[bresIdx].second;
+        HdStBufferResourceSharedPtr currentBuffer =
                 curRangeOwner_->GetResources()[bresIdx].second;
 
-        int bytesPerElement = HdDataSizeOfTupleType(bres->GetTupleType());
+        int bytesPerElement = HdDataSizeOfTupleType(oldBuffer->GetTupleType());
         TF_VERIFY(bytesPerElement > 0);
         size_t bufferSize = bytesPerElement * _totalCapacity;
 
         // allocate new one
         // curBufs and oldBufs will be different when we are adopting ranges
         // from another buffer array.
-        HgiBufferHandle newBufs[3];
-        HgiBufferHandle oldBufs[3];
-        HgiBufferHandle curBufs[3];
+        HgiBufferHandle newBufs[HdStBufferResource::MULTIBUFFERING];
+        HgiBufferHandle oldBufs[HdStBufferResource::MULTIBUFFERING];
+        HgiBufferHandle curBufs[HdStBufferResource::MULTIBUFFERING];
 
-        HgiBufferDesc bufDesc;
-        bufDesc.usage = HgiBufferUsageUniform;
-        bufDesc.byteSize = bufferSize;
+        for (int32_t i = 0; i < bufferCount; i++) {
+            oldBufs[i] = oldBuffer->GetId(i);
+            curBufs[i] = currentBuffer->GetId(i);
+        }
 
-        for (int32_t i = 0; i < 3; i++) {
-            oldBufs[i] = bres->GetHandle(i);
-            curBufs[i] = curRes->GetHandle(i);
-                        
-            // Skip buffers of zero size
-            if (bufferSize > 0) {
-                // Disable triple buffering
-                if (i == 0) {
-                    newBufs[i] = hgi->CreateBuffer(bufDesc);
-                }
+        // Skip buffers of zero size.
+        if (bufferSize > 0) {
+            HgiBufferDesc bufDesc;
+            bufDesc.byteSize = bufferSize;
+            bufDesc.usage = HgiBufferUsageUniform;
+
+            for (int32_t i = 0; i < bufferCount; i++) {
+                newBufs[i] = hgi->CreateBuffer(bufDesc);
             }
         }
 
@@ -369,7 +378,7 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
             // pre-pass to combine consecutive buffer range relocation
             std::unique_ptr<HdStBufferRelocator> relocators[3];
             
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < bufferCount; i++) {
                 int const curIndex = curBufs[i] ? i : 0;
                 if (newBufs[i]) {
                     relocators[i] = std::make_unique<HdStBufferRelocator>(curBufs[curIndex], newBufs[i]);
@@ -407,7 +416,7 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
                     ptrdiff_t readOffset = oldOffset * bytesPerElement;
                     ptrdiff_t writeOffset = *newOffsetIt * bytesPerElement;
 
-                    for (int i = 0; i < 3; i++) {
+                    for (int i = 0; i < bufferCount; i++) {
                         if (relocators[i]) {
                             relocators[i]->AddRange(readOffset, writeOffset, copySize);
                         }
@@ -417,22 +426,22 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
             }
 
             // buffer copy
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < bufferCount; i++) {
                 if (relocators[i]) {
                     relocators[i]->Commit(blitCmds);
                 }
             }
         }
 
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < bufferCount; i++) {
             if (oldBufs[i]) {
                 // delete old buffer
                 hgi->DestroyBuffer(&oldBufs[i]);
             }
         }
 
-        // update allocation of buffer resource
-        bres->SetAllocations(newBufs[0], newBufs[1], newBufs[2], bufferSize);
+        // update id of buffer resource
+        oldBuffer->SetAllocations(newBufs[0], newBufs[1], newBufs[2], bufferSize);
     }
 
     // update ranges
