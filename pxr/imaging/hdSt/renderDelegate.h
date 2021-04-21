@@ -66,16 +66,6 @@ public:
     class DelegateParams {
     public:
 
-        enum RenderOutput {
-            /// Use output of the render will be blitted from Metal into the
-            /// currently bound OpenGL FBO - if OpenGL is included in the build
-            OpenGL,
-            
-            /// The output will be rendered using the application supplied
-            /// MTLRenderPassDescriptor - if Metal is included in the build
-            Metal,
-        };
-        
         bool flipFrontFacing;
         bool applyRenderState;
         bool enableIdRender;

@@ -82,10 +82,10 @@ const HioFormat FORMAT_DESC[] =
     HioFormatFloat32Vec3,   // Float32Vec3
     HioFormatFloat32Vec4,   // Float32Vec4
 
-    HioFormatInt16,        // Int16
-    HioFormatInt16Vec2,    // Int16Vec2
-    HioFormatInt16Vec3,    // Int16Vec3
-    HioFormatInt16Vec4,    // Int16Vec4
+    HioFormatInt16,         // Int16
+    HioFormatInt16Vec2,     // Int16Vec2
+    HioFormatInt16Vec3,     // Int16Vec3
+    HioFormatInt16Vec4,     // Int16Vec4
 
     HioFormatUInt16,        // UInt16
     HioFormatUInt16Vec2,    // UInt16Vec2

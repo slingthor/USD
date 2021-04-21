@@ -31,17 +31,22 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-MtlfUniformBlock::MtlfUniformBlock(char const *label) :
-    _size(0)
+MtlfUniformBlock::MtlfUniformBlock(char const *label)
+    : _lastFrameModified(0)
+    , _activeBuffer(0)
 {
-    _buffer = nil;
+    for (int32_t i = 0; i < MULTIBUFFERING; i++) {
+        _buffers[i] = nil;
+    }
 }
 
 MtlfUniformBlock::~MtlfUniformBlock()
 {
-    if (_buffer) {
-        MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(_buffer);
-        _buffer = nil;
+    for (int32_t i = 0; i < MULTIBUFFERING; i++) {
+        if (_buffers[i]) {
+            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(_buffers[i]);
+            _buffers[i] = nil;
+        }
     }
 }
 
@@ -56,30 +61,39 @@ MtlfUniformBlock::Bind(GarchBindingMapPtr const & bindingMap,
     if(!mtlfBindingIndex.isLinked)
         return; //We're trying to bind a buffer that the shader doesn't know about. We should ignore this.
 
-    MtlfMetalContext::GetMetalContext()->SetUniformBuffer(mtlfBindingIndex.index, _buffer, TfToken(identifier), (MSL_ProgramStage)mtlfBindingIndex.stage);
+    MtlfMetalContext::GetMetalContext()->SetUniformBuffer(mtlfBindingIndex.index, _buffers[_activeBuffer], TfToken(identifier), (MSL_ProgramStage)mtlfBindingIndex.stage);
 }
 
 void
 MtlfUniformBlock::Update(const void *data, int size)
 {
+    int64_t currentFrame = MtlfMetalContext::GetMetalContext()->GetCurrentFrame();
+    
+    if (currentFrame != _lastFrameModified) {
+        _activeBuffer++;
+        _activeBuffer = (_activeBuffer < MULTIBUFFERING) ? _activeBuffer : 0;
+        _lastFrameModified = currentFrame;
+    }
+    
     // Only recreate buffer if one doesn't already exist or the size has changed
-    if (!_buffer || _buffer.length != size) {
-        _buffer = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(size, MTLResourceStorageModeDefault, data);
+    if (!_buffers[_activeBuffer] || _buffers[_activeBuffer].length != size) {
+         if (_buffers[_activeBuffer]) {
+             MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(_buffers[_activeBuffer]);
+         }
+        _buffers[_activeBuffer] = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(size, MTLResourceStorageModeDefault, data);
     } else if (size > 0) {
         NSRange range = NSMakeRange(0, size);
-        memcpy(_buffer.contents, data, size);
-        id<MTLResource> resource = _buffer;
+        memcpy(_buffers[_activeBuffer].contents, data, size);
+        id<MTLResource> resource = _buffers[_activeBuffer];
         //We assume the buffer storage mode is managed for discrete GPUs
         //Apple silicon and intel based machines have shared buffers and don't need to perform didModifyRange
-        if([_buffer respondsToSelector:@selector(didModifyRange:)]){
+        if([_buffers[_activeBuffer] respondsToSelector:@selector(didModifyRange:)]){
             ARCH_PRAGMA_PUSH
             ARCH_PRAGMA_INSTANCE_METHOD_NOT_FOUND
             [resource didModifyRange:range];
             ARCH_PRAGMA_POP
         }
     }
-
-    _size = size;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
