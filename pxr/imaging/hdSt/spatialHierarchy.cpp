@@ -57,14 +57,12 @@
 
 #include <sys/time.h>
 
-#include <os/signpost.h>
 #include <queue>
 #include <stack>
 #include <algorithm>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-static os_log_t cullingLog = os_log_create("hydra.metal", "Culling");
 
 float const sizeThreshold = 1.0f;
 float const sizeThresholdSq = sizeThreshold * sizeThreshold;
@@ -343,64 +341,30 @@ namespace MissingFunctions {
     }
 };
 
-DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance,
-                           GfRange3f const &aaBoundingBox,
-                           GfBBox3f const &cullingBoundingBox,
-                           size_t instanceIndex,
-                           size_t totalInstancers)
-: itemInstance(itemInstance)
-, aabb(aaBoundingBox)
-, cullingBBox(cullingBoundingBox)
-, cullCache(cullingBoundingBox.GetRange().GetMin(), cullingBoundingBox.GetRange().GetMax())
-, instanceIdx(instanceIndex)
-, numItemsInInstance(totalInstancers)
-, isInstanced(true)
-{
-    // Nothing
-}
-
-DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance,
-                           GfRange3f const &aaBoundingBox,
-                           GfBBox3f const &cullingBoundingBox)
-: DrawableItem(itemInstance, aaBoundingBox, cullingBoundingBox, 0, 1)
-{
-    isInstanced = false;
-}
-
-void DrawableItem::ProcessInstancesVisible()
-{
-    int numVisible;
-    if (isInstanced) {
-        numVisible = itemInstance->GetDrawItem()->BuildInstanceBuffer(itemInstance->GetCullResultVisibilityCache());
-    }
-    else {
-        if (itemInstance->CullResultIsVisible())
-            numVisible = 1;
-        else
-            numVisible = 0;
-        itemInstance->GetDrawItem()->SetNumVisible(numVisible);
-    }
-
-    bool shouldBeVisible = itemInstance->GetDrawItem()->GetVisible() && numVisible;
-    if (itemInstance->IsVisible() != shouldBeVisible) {
-        itemInstance->SetVisible(shouldBeVisible);
-    }
-}
-
-GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables,
-                                                std::vector<DrawableItem*> *items,
-                                                std::vector<DrawableItem*> *visibilityOwners)
+GfRange3f ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables,
+                                  std::vector<DrawableItem*> *items,
+                                  std::vector<DrawableItem*> *visibilityOwners,
+                                  std::vector<DrawableAnimatedItem> *animatedDrawables,
+                                  size_t &bakedAnimatedVisibilityItemCount)
 {
     GfRange3f boundingBox;
     
     for (size_t idx = 0; idx < drawables->size(); ++idx){
         HdStDrawItemInstance* drawable = &(*drawables)[idx];
-        drawable->GetDrawItem()->CalculateCullingBounds();
+        drawable->GetDrawItem()->CalculateCullingBounds(true);
 
         const std::vector<GfBBox3f>* instancedCullingBounds = drawable->GetDrawItem()->GetInstanceBounds();
         size_t const numItems = instancedCullingBounds->size();
 
         drawable->SetCullResultVisibilityCacheSize(numItems);
+        
+        if(drawable->GetDrawItem()->GetAnimated()) {
+            if (numItems > 0) {
+                bakedAnimatedVisibilityItemCount += numItems;
+                animatedDrawables->emplace_back(drawable, bakedAnimatedVisibilityItemCount);
+            }
+            continue;
+        }
 
         if (numItems > 1) {
             // NOTE: create an item per instance
@@ -450,6 +414,52 @@ GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance
     return boundingBox;
 }
 
+DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance,
+                           GfRange3f const &aaBoundingBox,
+                           GfBBox3f const &cullingBoundingBox,
+                           size_t instanceIndex,
+                           size_t totalInstancers)
+: itemInstance(itemInstance)
+, aabb(aaBoundingBox)
+, cullingBBox(cullingBoundingBox)
+, cullCache(cullingBoundingBox.GetRange().GetMin(), cullingBoundingBox.GetRange().GetMax())
+, instanceIdx(instanceIndex)
+, numItemsInInstance(totalInstancers)
+, isInstanced(true)
+{
+    // Nothing
+}
+
+DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance,
+                           GfRange3f const &aaBoundingBox,
+                           GfBBox3f const &cullingBoundingBox)
+: DrawableItem(itemInstance, aaBoundingBox, cullingBoundingBox, 0, 1)
+{
+    isInstanced = false;
+}
+
+void DrawableItem::ProcessInstancesVisible()
+{
+    int numVisible;
+    if (isInstanced) {
+        numVisible = itemInstance->GetDrawItem()->BuildInstanceBuffer(itemInstance->GetCullResultVisibilityCache());
+    }
+    else {
+        if (itemInstance->CullResultIsVisible())
+            numVisible = 1;
+        else
+            numVisible = 0;
+        itemInstance->GetDrawItem()->SetNumVisible(numVisible);
+    }
+
+    bool shouldBeVisible = itemInstance->GetDrawItem()->GetVisible() && numVisible;
+    if (itemInstance->IsVisible() != shouldBeVisible) {
+        itemInstance->SetVisible(shouldBeVisible);
+    }
+}
+
+
+
 static int BVHCounterX = 0;
 
 BVH::BVH()
@@ -475,9 +485,6 @@ BVH::~BVH()
 
 void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
 {
-    os_signpost_id_t bvhGenerate = os_signpost_id_generate(cullingLog);
-    os_signpost_id_t bvhBake = os_signpost_id_generate(cullingLog);
-
     if (root) {
         delete root;
         root = NULL;
@@ -489,8 +496,6 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     if (drawables->size() <= 0) {
         return;
     }
-    
-    os_signpost_interval_begin(cullingLog, bvhGenerate, "BVH Generation");
 
     for (size_t idx = 0; idx < drawableItems.size(); ++idx) {
         delete drawableItems[idx];
@@ -498,15 +503,19 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     drawableItems.clear();
     drawableVisibilityOwners.clear();
     
+    animatedDrawables.clear();
+    bakedAnimatedVisibility.clear();
+    bakedAnimatedVisibilityItemCount = 0;
+
+    
     uint64_t buildStart = ArchGetTickTime();
     
-    GfRange3f bbox = DrawableItem::ConvertDrawablesToItems(drawables,
-                                                           &(this->drawableItems),
-                                                           &drawableVisibilityOwners);
-    
-    if (!drawableItems.size()) {
-        return;
-    }
+    GfRange3f bbox = ConvertDrawablesToItems(drawables,
+                                             &(this->drawableItems),
+                                             &drawableVisibilityOwners,
+                                             &animatedDrawables,
+                                             bakedAnimatedVisibilityItemCount);
+    bakedAnimatedVisibility.resize(bakedAnimatedVisibilityItemCount);
 
     populated = true;
 
@@ -520,11 +529,7 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
         unsigned currentDepth = root->Insert(drawableItems[idx], 0);
         depth = MAX(depth, currentDepth);
     }
-    os_signpost_interval_end(cullingLog, bvhGenerate, "BVH Generation");
-    
-    os_signpost_interval_begin(cullingLog, bvhBake, "BVH Bake");
     Bake();
-    os_signpost_interval_end(cullingLog, bvhBake, "BVH Bake");
 
     buildTimeMS = (ArchGetTickTime() - buildStart) / 1000.0f;
     
@@ -546,15 +551,6 @@ void BVH::Bake()
 void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                          vector_float2 const &dimensions)
 {
-    if (!root) {
-        return;
-    }
-
-    os_signpost_id_t bvhCulling = os_signpost_id_generate(cullingLog);
-    os_signpost_id_t bvhCullingCull = os_signpost_id_generate(cullingLog);
-    os_signpost_id_t bvhCullingFinal = os_signpost_id_generate(cullingLog);
-    os_signpost_id_t bvhCullingBuildBuffer = os_signpost_id_generate(cullingLog);
-
     uint64_t cullStart = ArchGetTickTime();
 
     vector_float4 clipPlanes[6] = {
@@ -596,11 +592,9 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
         clipPlanes[i] = clipPlanes[i] * inv;
     }
 
-    os_signpost_interval_begin(cullingLog, bvhCulling, "Culling: BVH");
-    os_signpost_interval_begin(cullingLog, bvhCullingCull, "Culling: BVH -- Culllist");
     cullList.clear();
     root->PerformCulling(viewProjMatrix, clipPlanes, dimensions, &bakedVisibility[0], cullList, false);
-    os_signpost_interval_end(cullingLog, bvhCullingCull, "Culling: BVH -- Culllist");
+
     float cullListTimeMS = (ArchGetTickTime() - cullStart) / 1000.0f;
     
     static matrix_float4x4 const *_viewProjMatrix;
@@ -612,6 +606,52 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
     _clipPlanes = clipPlanes;
     
     struct _Worker {
+        static
+        void processAnimatedNodes(std::pair<std::vector<DrawableAnimatedItem>*, uint8_t*> *animatedProcessParam, size_t begin, size_t end)
+        {
+            std::vector<DrawableAnimatedItem> *animatedDrawables = animatedProcessParam->first;
+            if(animatedDrawables->empty()) {
+                return;
+            }
+            
+            uint8_t* visibility = animatedProcessParam->second;
+            //we only need to get the location of the first visibility index - the loop follows sequentially like it was
+            //structured afterwards
+            visibility += animatedDrawables->front().instanceIdx;
+            for (size_t idx = begin; idx < end; ++idx) {
+                const auto& animatedDrawable = (*animatedDrawables)[idx].itemInstance;
+                const auto& drawItem = animatedDrawable->GetDrawItem();
+                drawItem->CalculateCullingBounds(true);
+                const std::vector<GfBBox3f>* instancedCullingBounds = drawItem->GetInstanceBounds();
+                size_t const numItems = instancedCullingBounds->size();
+                //iterate all instances and set their cull result visibility
+                for (size_t i = 0; i < numItems; ++i) {
+                    GfBBox3f const &oobb = (*instancedCullingBounds)[i];
+                    GfRange3f const &ooRange = oobb.GetRange();
+                    CullStateCache cullCache{ooRange.GetMin(), ooRange.GetMax()};
+                    *visibility = MissingFunctions::FrustumFullyContains(cullCache, _clipPlanes) || MissingFunctions::IntersectsFrustum(cullCache, _clipPlanes);
+                    animatedDrawable->SetCullResultVisibilityCache(visibility, i);
+                    visibility++;
+                }
+                //write the visibility for the item
+                int numVisible;
+                const bool isInstanced = numItems > 1;
+                if (isInstanced) {
+                    numVisible = drawItem->BuildInstanceBuffer(animatedDrawable->GetCullResultVisibilityCache());
+                }
+                else {
+                    numVisible = animatedDrawable->CullResultIsVisible();
+                    drawItem->SetNumVisible(numVisible);
+                }
+
+                bool shouldBeVisible = drawItem->GetVisible() && numVisible;
+                //take into account the authored visibility
+                if (animatedDrawable->IsVisible() != shouldBeVisible) {
+                    animatedDrawable->SetVisible(shouldBeVisible);
+                }
+            }
+        }
+        
         static
         void processInstancesVisible(std::vector<DrawableItem*> *instancedDrawableItems, size_t begin, size_t end)
         {
@@ -678,8 +718,19 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
     unsigned grainApply = 1;
     unsigned grainBuild = 2;
 
-    os_signpost_interval_begin(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
     uint64_t cullApplyStart = ArchGetTickTime();
+    if(!bakedAnimatedVisibility.empty()) {
+        uint8_t* visibilityIndex;
+        std::pair<std::vector<DrawableAnimatedItem>*, uint8_t*> animatedProcessParam;
+        animatedProcessParam.first = &animatedDrawables;
+        animatedProcessParam.second = &(bakedAnimatedVisibility[0]);
+        WorkParallelForN(animatedDrawables.size(),
+                         std::bind(&_Worker::processAnimatedNodes, &animatedProcessParam,
+                                   std::placeholders::_1,
+                                   std::placeholders::_2),
+                         grainApply * 500);
+    }
+    
 
     WorkParallelForN(cullList.perItemContained.size(),
                      std::bind(&_Worker::processApplyContained, &cullList.perItemContained,
@@ -697,18 +748,13 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                                std::placeholders::_2),
                      grainApply * 10);
 
-    os_signpost_interval_end(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
     float cullApplyTimeMS = (ArchGetTickTime() - cullApplyStart) / 1000.0f;
     
     uint64_t cullBuildBufferTimeBegin = ArchGetTickTime();
-    os_signpost_interval_begin(cullingLog, bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
     WorkParallelForN(drawableVisibilityOwners.size(),
                      std::bind(&_Worker::processInstancesVisible, &drawableVisibilityOwners,
                                std::placeholders::_1,
                                std::placeholders::_2));
-    os_signpost_interval_end(cullingLog, bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
-
-    os_signpost_interval_end(cullingLog, bvhCulling, "Culling: BVH");
 
     uint64_t end = ArchGetTickTime();
     float cullBuildBufferTimeMS = (end - cullBuildBufferTimeBegin) / 1000.0f;

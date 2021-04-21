@@ -82,6 +82,7 @@ public:
     , _batchIndex(_item._batchIndex)
     , _instanceVisibility(_item._instanceVisibility)
     , _visible(_item._visible)
+    , _animated(_item._animated)
     {}
 
     void SetCullResultVisibilityCacheSize(size_t instanceCount) const {
@@ -108,6 +109,7 @@ private:
     size_t _batchIndex;
     mutable std::vector<uint8_t*> _instanceVisibility;
     bool _visible;
+    bool _animated;
 };
 
 
