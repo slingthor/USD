@@ -58,6 +58,7 @@ struct HdRprimSharedData {
         , visible(true)
         , rprimID()
         , materialTag(HdMaterialTagTokens->defaultMaterialTag)
+        , animated(false)
     { }
 
     HdRprimSharedData(int barContainerSize,
@@ -68,6 +69,7 @@ struct HdRprimSharedData {
         , visible(visible)
         , rprimID()
         , materialTag(HdMaterialTagTokens->defaultMaterialTag)
+        , animated(false)
     { }
 
     // BufferArrayRange array
@@ -87,6 +89,9 @@ struct HdRprimSharedData {
 
     // Used to organize drawItems into collections based on material properties.
     TfToken materialTag;
+    
+    // Used to determine if RPrim should be CPU culled dynamically or not.
+    bool animated;
 };
 
 

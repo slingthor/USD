@@ -149,6 +149,17 @@ struct DrawableItem {
     bool isInstanced;
 };
 
+struct DrawableAnimatedItem {
+    HdStDrawItemInstance    *itemInstance;
+    size_t                  instanceIdx;
+    DrawableAnimatedItem(HdStDrawItemInstance *itemInstance, size_t instanceIdx)
+: itemInstance(itemInstance)
+, instanceIdx(instanceIdx)
+{
+    //Nothing
+}
+};
+
 class OctreeNode {
 public:
     OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ);
@@ -214,6 +225,9 @@ private:
 
     std::vector<DrawableItem*> bakedDrawableItems;
     std::vector<uint8_t> bakedVisibility;
+    std::vector<uint8_t> bakedAnimatedVisibility;
+    size_t bakedAnimatedVisibilityItemCount;
+    std::vector<DrawableAnimatedItem> animatedDrawables;
     CullList cullList;
     bool visibilityDirty;
 };

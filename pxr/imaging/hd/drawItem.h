@@ -177,6 +177,10 @@ public:
     HdDrawingCoord *GetDrawingCoord() {
         return &_drawingCoord;
     }
+    
+    /// Returns if any attribute on the item is animated.
+    HD_API
+    bool GetAnimated() const { return _sharedData->animated; }
 
     /// Returns the authored visibility, expressed by the delegate.
     HD_API
