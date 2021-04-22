@@ -50,7 +50,6 @@
 #include "pxr/imaging/hdx/oitBufferAccessor.h"
 
 #include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/glf/contextCaps.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
