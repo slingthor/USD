@@ -2330,6 +2330,20 @@ UsdImagingDelegate::IsInInvisedPaths(SdfPath const &usdPath) const
 
 /*virtual*/
 bool
+UsdImagingDelegate::GetAnimated(const SdfPath &id)
+{
+    SdfPath cachePath = ConvertIndexPathToCachePath(id);
+    _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
+    
+    if (TF_VERIFY(primInfo)) {
+        return primInfo->adapter->GetAnimated(
+            primInfo->usdPrim);
+    }
+    return false;
+}
+
+/*virtual*/
+bool
 UsdImagingDelegate::GetVisible(SdfPath const& id)
 {
     TRACE_FUNCTION();

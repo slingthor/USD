@@ -186,6 +186,12 @@ HdRprim::SetMaterialTag(TfToken const& materialTag)
     _sharedData.materialTag = materialTag;
 }
 
+void
+HdRprim::SetAnimated(HdSceneDelegate* delegate)
+{
+    _sharedData.animated = delegate->GetAnimated(GetId());
+}
+
 bool
 HdRprim::IsDirty(HdChangeTracker &changeTracker) const
 {

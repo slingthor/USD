@@ -7991,7 +7991,13 @@ _ValueFromClipsMightBeTimeVarying(const Usd_ClipSetRefPtr &clipSet,
     if (clipSet->valueClips.size() == 1) {
         const size_t numTimeSamples = 
             clipSet->valueClips.front()->GetNumTimeSamplesForPath(attrSpecPath);
-        return numTimeSamples > 1;
+        if (numTimeSamples < 2)
+        {
+            return false;
+        }
+        auto clip = clipSet->valueClips.front();
+        auto timeSamplesForPath = clip->ListTimeSamplesForPath(attrSpecPath);
+        return timeSamplesForPath.size() > 1;
     }
 
     // Since there are multiple clips active across all time, we can't say
