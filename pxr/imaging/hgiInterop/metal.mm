@@ -783,8 +783,13 @@ HgiInteropMetal::_BlitToOpenGL(VtValue const &framebuffer,
 
     if (!framebuffer.IsEmpty()) {
         if (framebuffer.IsHolding<uint32_t>()) {
+            // APPLE TEMP: Remove this once host applications can better control GL interop
+            int32_t fbo = framebuffer.UncheckedGet<uint32_t>();
+            if (!fbo) {
+                glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &fbo);
+            }
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER,
-                              framebuffer.UncheckedGet<uint32_t>());
+                              fbo);
         } else {
             TF_CODING_ERROR(
                 "dstFramebuffer must hold uint32_t when targeting OpenGL");
