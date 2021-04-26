@@ -2008,6 +2008,9 @@ def InstallOpenSubdiv(context, force, buildArgs):
         extraArgs += buildArgs
         sdkroot = os.environ.get('SDKROOT')
 
+        if MacOS():
+            extraArgs.append('-DBUILD_SHARED_LIBS=OFF')
+
         if iOS():
             PatchFile(srcOSDDir + "/cmake/iOSToolchain.cmake", 
                 [("set(SDKROOT $ENV{SDKROOT})",
