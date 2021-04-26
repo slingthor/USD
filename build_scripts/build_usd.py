@@ -1498,7 +1498,7 @@ BASISU_URL = "https://github.com/BinomialLLC/basis_universal/archive/master.zip"
 
 def DownloadBasisUniversalTexture(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(BASISU_URL, context, force)):
-        PatchFile("CmakeLists.txt",
+        PatchFile("CMakeLists.txt",
                 [("basisu_tool.cpp", "#basisu_tool.cpp"),
                  ("add_executable", "add_library"),
                  ("add_custom_command", "#add_custom_command"),
