@@ -529,8 +529,8 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
         # CMake 3.19.0 and later defaults to use Xcode's Modern Build System.
         # This causes the external dependencies to fail with "Multiple commands produce the same output" errors.
         # Fix: Force CMake to use the old build system.
-        if GetCMakeVersion() >= (3, 19, 0):
-            extraArgs.append('-T buildsystem=1')
+        # if GetCMakeVersion() >= (3, 19, 0):
+        #     extraArgs.append('-T buildsystem=1')
 
         extraArgs.append('-DCMAKE_SUPPRESS_REGENERATION=YES')
 
@@ -1529,6 +1529,13 @@ def InstallPNG(context, force, buildArgs):
 
         if (context.buildUniversal and SupportsMacOSUniversalBinaries()) or (GetMacArch() == "arm64e"):
             extraPNGArgs.append("-DCMAKE_C_FLAGS=\"-DPNG_ARM_NEON_OPT=0\"");
+
+        if MacOS() or iOS():
+            PatchFile("CMakeLists.txt",
+                [('add_custom_target(gensym DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/libpng.sym")',
+                  'add_custom_target(gensym DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/libpng.sym" genvers)'),
+                 ("add_custom_target(genfiles DEPENDS",
+                  "add_custom_target(genfiles DEPENDS gensym symbol-check")])
 
         if iOS():
             extraPNGArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
