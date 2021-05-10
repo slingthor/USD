@@ -162,33 +162,33 @@ def GetMacArch():
 def GetEnv(context):
     envToRun=os.environ.copy()
 
-    # if MacOS:
-    #     xcodeRoot = subprocess.check_output(["xcode-select", "--print-path"]).strip()
+    if MacOS:
+        xcodeRoot = subprocess.check_output(["xcode-select", "--print-path"]).strip()
 
-    #     envToRun["COMPILER_DISABLE_SWIFT"] = "1"
-    #     envToRun["DEVELOPER_DIR"] = "{XCODE_ROOT}".format(XCODE_ROOT=xcodeRoot)
-    #     envToRun["DEVELOPER_INSTALL_DIR"] = "{XCODE_ROOT}".format(XCODE_ROOT=xcodeRoot)
-    #     envToRun["DT_TOOLCHAIN_DIR"] = "{XCODE_ROOT}/Toolchains/OSX12.0.xctoolchain".format(XCODE_ROOT=xcodeRoot)
-    #     envToRun["INTERFACER_TRACE_INTERFACES"] = "YES"
-    #     envToRun["LD_DYLIB_CPU_SUBTYPES_MUST_MATCH"] = "1"
-    #     envToRun["LD_FORCE_16KB_PAGES"] = "YES"
-    #     envToRun["MACOSX_DEPLOYMENT_TARGET"] = "12.0"
-    #     envToRun["RC_DEPLOYMENT_TARGET_SETTING_NAME"] = "MACOSX_DEPLOYMENT_TARGET"
-    #     envToRun["RC_MACOS"] = "YES"
-    #     envToRun["RC_OS"] = "macos"
-    #     envToRun["RC_PLATFORM_INSTALL_PATH"] = "{XCODE_ROOT}".format(XCODE_ROOT=xcodeRoot)
-    #     envToRun["RC_PLATFORM_NAME"] = "MacOSX"
-    #     envToRun["RC_ReleaseStatus"] = "Development"
-    #     envToRun["RC_XBS"] = "YES"
-    #     envToRun["TOOLCHAINS"] = "com.apple.dt.toolchain.OSX12_0"
-    #     envToRun["XCODE_XCCONFIG_FILE"] =  os.path.join(buildScriptsDir, "xcodeBuildSettingOverrides.xcconfig")
+        envToRun["COMPILER_DISABLE_SWIFT"] = "1"
+        envToRun["DEVELOPER_DIR"] = "{XCODE_ROOT}".format(XCODE_ROOT=xcodeRoot)
+        envToRun["DEVELOPER_INSTALL_DIR"] = "{XCODE_ROOT}".format(XCODE_ROOT=xcodeRoot)
+        envToRun["DT_TOOLCHAIN_DIR"] = "{XCODE_ROOT}/Toolchains/OSX12.0.xctoolchain".format(XCODE_ROOT=xcodeRoot)
+        envToRun["INTERFACER_TRACE_INTERFACES"] = "YES"
+        envToRun["LD_DYLIB_CPU_SUBTYPES_MUST_MATCH"] = "1"
+        envToRun["LD_FORCE_16KB_PAGES"] = "YES"
+        envToRun["MACOSX_DEPLOYMENT_TARGET"] = "12.0"
+        envToRun["RC_DEPLOYMENT_TARGET_SETTING_NAME"] = "MACOSX_DEPLOYMENT_TARGET"
+        envToRun["RC_MACOS"] = "YES"
+        envToRun["RC_OS"] = "macos"
+        envToRun["RC_PLATFORM_INSTALL_PATH"] = "{XCODE_ROOT}".format(XCODE_ROOT=xcodeRoot)
+        envToRun["RC_PLATFORM_NAME"] = "MacOSX"
+        envToRun["RC_ReleaseStatus"] = "Development"
+        envToRun["RC_XBS"] = "YES"
+        envToRun["TOOLCHAINS"] = "com.apple.dt.toolchain.OSX12_0"
+        envToRun["XCODE_XCCONFIG_FILE"] =  os.path.join(buildScriptsDir, "xcodeBuildSettingOverrides.xcconfig")
 
-    #     if context.buildUniversal:
-    #         envToRun["RC_CFLAGS"] = "-arch x86_64 -arch arm64e -pipe"
-    #         envToRun["RC_ARCHS"] = "x86_64 arm64e"
-    #     else:
-    #         envToRun["RC_CFLAGS"] = "-arch " + GetMacArch() + " -pipe"
-    #         envToRun["RC_ARCHS"] = GetMacArch()
+        if context.buildUniversal:
+            envToRun["RC_CFLAGS"] = "-arch x86_64 -arch arm64e -pipe"
+            envToRun["RC_ARCHS"] = "x86_64 arm64e"
+        else:
+            envToRun["RC_CFLAGS"] = "-arch " + GetMacArch() + " -pipe"
+            envToRun["RC_ARCHS"] = GetMacArch()
 
     return envToRun
 
@@ -520,9 +520,9 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
     extraArgs = copy.deepcopy(buildArgs)
 
     # TEMPORARY WORKAROUND
-    if targetMacOS or targetIOS:
-        # sdkPath = GetCommandOutput('xcrun --sdk macosx.internal --show-sdk-path').strip()
-        # extraArgs.append('-DCMAKE_OSX_SYSROOT="' + sdkPath + '" ')
+    if targetMacOS:
+        sdkPath = GetCommandOutput('xcrun --sdk macosx.internal --show-sdk-path').strip()
+        extraArgs.append('-DCMAKE_OSX_SYSROOT="' + sdkPath + '" ')
         
         extraArgs.append('-DCMAKE_IGNORE_PATH="/usr/lib;/usr/local/lib;/lib" ')
 
@@ -1038,10 +1038,10 @@ def InstallBoost_Helper(context, force, buildArgs):
         if MacOS() or iOS():
             xcodeRoot = GetCommandOutput('xcode-select --print-path').strip()
 
-            # if MacOS():
-            #     # sdkPath = GetCommandOutput('xcrun --sdk macosx.internal --show-sdk-path').strip()
-            # else:
-            sdkPath = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
+            if MacOS():
+                sdkPath = GetCommandOutput('xcrun --sdk macosx.internal --show-sdk-path').strip()
+            else:
+                sdkPath = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
 
         if context.static_dependencies_macOS:
             b2_settings.append("link=static")
