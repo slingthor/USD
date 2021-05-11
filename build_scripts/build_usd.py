@@ -494,8 +494,8 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
         # CMake 3.19.0 and later defaults to use Xcode's Modern Build System.
         # This causes the external dependencies to fail with "Multiple commands produce the same output" errors.
         # Fix: Force CMake to use the old build system.
-        if GetCMakeVersion() >= (3, 19, 0):
-            extraArgs.append('-T buildsystem=1')
+        # if GetCMakeVersion() >= (3, 19, 0):
+        #     extraArgs.append('-T buildsystem=1')
 
     if targetMacOS:
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
@@ -1470,11 +1470,11 @@ def InstallPNG(context, force, buildArgs):
             extraPNGArgs.append("-DCMAKE_C_FLAGS=\"-DPNG_ARM_NEON_OPT=0\"");
 
         if MacOS() or iOS():
-             PatchFile("CMakeLists.txt",
-                 [('add_custom_target(gensym DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/libpng.sym")',
-                   'add_custom_target(gensym DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/libpng.sym" genvers)'),
-                  ("add_custom_target(genfiles DEPENDS",
-                   "add_custom_target(genfiles DEPENDS gensym symbol-check")])
+            PatchFile("CMakeLists.txt",
+                [('add_custom_target(gensym DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/libpng.sym")',
+                  'add_custom_target(gensym DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/libpng.sym" genvers)'),
+                 ("add_custom_target(genfiles DEPENDS",
+                  "add_custom_target(genfiles DEPENDS gensym symbol-check")])
 
         if iOS():
             extraPNGArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
@@ -1508,7 +1508,7 @@ BASISU_URL = "https://github.com/BinomialLLC/basis_universal/archive/master.zip"
 
 def DownloadBasisUniversalTexture(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(BASISU_URL, context, force)):
-        PatchFile("CmakeLists.txt",
+        PatchFile("CMakeLists.txt",
                 [("basisu_tool.cpp", "#basisu_tool.cpp"),
                  ("add_executable", "add_library"),
                  ("add_custom_command", "#add_custom_command"),
@@ -1989,6 +1989,9 @@ def InstallOpenSubdiv(context, force, buildArgs):
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
         sdkroot = os.environ.get('SDKROOT')
+
+        if MacOS():
+            extraArgs.append('-DBUILD_SHARED_LIBS=OFF')
 
         if iOS():
             PatchFile(srcOSDDir + "/cmake/iOSToolchain.cmake", 
