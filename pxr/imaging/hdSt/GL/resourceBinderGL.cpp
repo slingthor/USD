@@ -474,7 +474,7 @@ HdSt_ResourceBinderGL::IntrospectBindings(HdStGLSLProgramSharedPtr programResour
             } else if (type == HdBinding::TEXTURE_PTEX_TEXEL) {
                 textureName = "sampler2darray_" + name;
             } else if (type == HdBinding::TEXTURE_PTEX_LAYOUT) {
-                textureName = "isampler1darray_" + name;
+                textureName = "usampler1darray_" + name;
             } else if (type == HdBinding::TEXTURE_UDIM_ARRAY) {
                 textureName = "sampler2dArray_" + name;
             } else if (type == HdBinding::TEXTURE_UDIM_LAYOUT) {

@@ -33,7 +33,7 @@ _GetMacroBlob()
     // Allows metal and GL to both handle out function params.
     // On the metal side, the ref(space,type) parameter defines
     // if items are in device or thread domain.
-    const static std::string header = \
+    const static std::string header =
         "#define REF(space,type) inout type\n" \
         "#define HD_NEEDS_FORWARD_DECL";
     return header;
@@ -79,7 +79,7 @@ void
 HgiGLShaderGenerator::_WriteBuffers(
     const HgiShaderFunctionBufferDescVector &buffers)
 {
-    //Extract texture descriptors and add appropriate texture sections
+    //Extract buffer descriptors and add appropriate buffer sections
     for(size_t i=0; i<buffers.size(); i++) {
         const HgiShaderFunctionBufferDesc &bufferDescription = buffers[i];
         const HgiShaderSectionAttributeVector attrs = {
@@ -125,12 +125,12 @@ HgiGLShaderGenerator::_WriteInOuts(
         "gl_FragDepth"
     };
     const static std::map<std::string, std::string> takenInParams {
-        { "hdPosition", "gl_Position" },
+        { HgiShaderKeywordTokens->hdPosition, "gl_Postiion"},
         { HgiShaderKeywordTokens->hdGlobalInvocationID, "gl_GlobalInvocationID"}
     };
 
-    bool in_qualifier = qualifier == "in";
-    bool out_qualifier = qualifier == "out";
+    const bool in_qualifier = qualifier == "in";
+    const bool out_qualifier = qualifier == "out";
     for(const HgiShaderFunctionParamDesc &param : parameters) {
         //Skip writing out taken parameter names
         const std::string &paramName = param.nameInShader;

@@ -154,7 +154,7 @@ _Uniquify(const T &objects,
 // and testUsdImagingGLTextureWrapStormTextureSystem produced
 // wrong and non-deterministic results.
 //
-static const bool _isGlfBaseTextureDataThreadSafe = true;
+static const bool _isGlfBaseTextureDataThreadSafe = false;
 
 std::set<HdStTextureObjectSharedPtr>
 HdSt_TextureObjectRegistry::Commit()

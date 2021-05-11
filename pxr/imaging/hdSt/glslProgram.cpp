@@ -76,51 +76,6 @@ HdStGLSLProgram::GetComputeProgram(
 
 HdStGLSLProgramSharedPtr
 HdStGLSLProgram::GetComputeProgram(
-    const TfToken& shaderToken,
-    HdStResourceRegistry *resourceRegistry,
-    PopulateDescriptorCallback callable)
-{
-    // Find the program from registry
-    HdInstance<HdStGLSLProgramSharedPtr> programInstance =
-                resourceRegistry->RegisterGLSLProgram(
-                        HdStGLSLProgram::ComputeHash(shaderToken));
-
-    if (programInstance.IsFirstInstance()) {
-        TfToken const &shaderFileName = HdStPackageComputeShader();
-        const HioGlslfx glslfx(shaderFileName, HioGlslfxTokens->defVal);
-        std::string errorString;
-        if (!glslfx.IsValid(&errorString)){
-            TF_CODING_ERROR("Failed to parse " + shaderFileName.GetString()
-                            + ": " + errorString);
-            return HdStGLSLProgramSharedPtr();
-        }
-
-        Hgi *hgi = resourceRegistry->GetHgi();
-        HgiShaderFunctionDesc computeDesc;
-        std::string sourceCode;
-
-        callable(computeDesc);
-
-        sourceCode += glslfx.GetSource(shaderToken);
-        computeDesc.shaderCode = sourceCode.c_str();
-        HgiShaderFunctionHandle computeFn = hgi->CreateShaderFunction(computeDesc);
-        
-        // if not exists, create new one
-        HdStGLSLProgramSharedPtr newProgram(
-            HdStResourceFactory::GetInstance()->NewProgram(
-                HdTokens->computeShader, resourceRegistry));
-
-        newProgram->_programDesc.shaderFunctions.push_back(computeFn);
-        newProgram->Link();
-        
-        programInstance.SetValue(newProgram);
-    }
-
-    return programInstance.GetValue();
-}
-
-HdStGLSLProgramSharedPtr
-HdStGLSLProgram::GetComputeProgram(
     TfToken const &shaderFileName,
     TfToken const &shaderToken,
     HdStResourceRegistry *resourceRegistry)
@@ -155,6 +110,59 @@ HdStGLSLProgram::GetComputeProgram(
             TF_CODING_ERROR("Fail to link " + shaderToken.GetString());
             return HdStGLSLProgramSharedPtr();
         }
+        programInstance.SetValue(newProgram);
+    }
+
+    return programInstance.GetValue();
+}
+
+HdStGLSLProgramSharedPtr
+HdStGLSLProgram::GetComputeProgram(
+    TfToken const &shaderToken,
+    HdStResourceRegistry *resourceRegistry,
+    PopulateDescriptorCallback callable)
+{
+    // Find the program from registry
+    HdInstance<HdStGLSLProgramSharedPtr> programInstance =
+                resourceRegistry->RegisterGLSLProgram(
+                        HdStGLSLProgram::ComputeHash(shaderToken));
+
+    if (programInstance.IsFirstInstance()) {
+        TfToken const &shaderFileName = HdStPackageComputeShader();
+        const HioGlslfx glslfx(shaderFileName, HioGlslfxTokens->defVal);
+        std::string errorString;
+        if (!glslfx.IsValid(&errorString)){
+            TF_CODING_ERROR("Failed to parse " + shaderFileName.GetString()
+                            + ": " + errorString);
+            return HdStGLSLProgramSharedPtr();
+        }
+
+        Hgi *hgi = resourceRegistry->GetHgi();
+        HgiShaderFunctionDesc computeDesc;
+        // APPLE TEMP
+        std::string sourceCode;
+//        std::string sourceCode("#version 430\n" \
+//            "layout(local_size_x=1, local_size_y=1, local_size_z=1) in;\n");
+
+        callable(computeDesc);
+
+        sourceCode += glslfx.GetSource(shaderToken);
+        computeDesc.shaderCode = sourceCode.c_str();
+
+        HgiShaderFunctionHandle computeFn =
+            hgi->CreateShaderFunction(computeDesc);
+        
+        // if not exists, create new one
+        HdStGLSLProgramSharedPtr newProgram(
+            HdStResourceFactory::GetInstance()->NewProgram(
+                HdTokens->computeShader, resourceRegistry));
+
+        newProgram->_programDesc.shaderFunctions.push_back(computeFn);
+        if (!newProgram->Link()) {
+            TF_CODING_ERROR("Fail to link " + shaderToken.GetString());
+            return HdStGLSLProgramSharedPtr();
+        }
+
         programInstance.SetValue(newProgram);
     }
 

@@ -129,21 +129,25 @@ public:
 
     /// Convenience method to get a shared compute shader program
     HDST_API
-    static HdStGLSLProgramSharedPtr GetComputeProgram(TfToken const &shaderToken,
+    static HdStGLSLProgramSharedPtr GetComputeProgram(
+        TfToken const &shaderToken,
         HdStResourceRegistry *resourceRegistry);
-    
+
     HDST_API
     static HdStGLSLProgramSharedPtr GetComputeProgram(
         TfToken const &shaderFileName,
         TfToken const &shaderToken,
         HdStResourceRegistry *resourceRegistry);
 
-    typedef std::function<void(HgiShaderFunctionDesc &computeDesc)> PopulateDescriptorCallback;
+    using PopulateDescriptorCallback =
+        std::function<void(HgiShaderFunctionDesc &computeDesc)>;
+
     HDST_API
     static HdStGLSLProgramSharedPtr GetComputeProgram(
-        const TfToken& shaderToken,
+        TfToken const &shaderToken,
         HdStResourceRegistry *resourceRegistry,
-        PopulateDescriptorCallback callable);
+        PopulateDescriptorCallback populateDescriptor);
+
 
 protected:
     HDST_API

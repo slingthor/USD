@@ -58,7 +58,7 @@ enum {
     BufferBinding_Adjacency,
 };
 
-static HgiResourceBindingsSharedPtr
+HgiResourceBindingsSharedPtr
 _CreateResourceBindings(
     Hgi* hgi,
     HgiBufferHandle const& points,
@@ -103,7 +103,7 @@ _CreateResourceBindings(
         hgi->CreateResourceBindings(resourceDesc));
 }
 
-static HgiComputePipelineSharedPtr
+HgiComputePipelineSharedPtr
 _CreatePipeline(
     Hgi* hgi,
     uint32_t constantValuesSize,
@@ -147,7 +147,7 @@ HdSt_SmoothNormalsComputationGPU::Execute(
         return;
 
     TF_VERIFY(_adjacency);
-    HdBufferArrayRangeSharedPtr const &adjacencyRange_ = 
+    HdBufferArrayRangeSharedPtr const &adjacencyRange_ =
         _adjacency->GetAdjacencyRange();
     TF_VERIFY(adjacencyRange_);
 
@@ -187,7 +187,7 @@ HdSt_SmoothNormalsComputationGPU::Execute(
           [&](HgiShaderFunctionDesc &computeDesc) {
             computeDesc.debugName = shaderToken.GetString();
             computeDesc.shaderStage = HgiShaderStageCompute;
-            
+
             TfToken srcType;
             TfToken dstType;
             if (_srcDataType == HdTypeFloatVec3) {
@@ -195,7 +195,7 @@ HdSt_SmoothNormalsComputationGPU::Execute(
             } else {
                 srcType = HdStTokens->_double;
             }
-    
+
             if (_dstDataType == HdTypeFloatVec3) {
                 dstType = HdStTokens->_float;
             } else if (_dstDataType == HdTypeDoubleVec3) {
@@ -206,8 +206,8 @@ HdSt_SmoothNormalsComputationGPU::Execute(
             HgiShaderFunctionAddBuffer(&computeDesc, "points", srcType);
             HgiShaderFunctionAddBuffer(&computeDesc, "normals", dstType);
             HgiShaderFunctionAddBuffer(&computeDesc, "entry", HdStTokens->_int);
-            
-            static std::string params[] = {
+
+            static const std::string params[] = {
                 "vertexOffset",       // offset in aggregated buffer
                 "adjacencyOffset",    // offset in aggregated buffer
                 "pointsOffset",       // interleave offset
@@ -215,14 +215,14 @@ HdSt_SmoothNormalsComputationGPU::Execute(
                 "normalsOffset",      // interleave offset
                 "normalsStride",      // interleave stride
             };
-            int numParams = sizeof(params) / sizeof(params[0]);
-            assert((sizeof(Uniform) / sizeof(int)) == numParams);
-            for (int i = 0; i < numParams; i++) {
+            static_assert((sizeof(Uniform) / sizeof(int)) ==
+                          (sizeof(params) / sizeof(params[0])), "");
+            for (std::string const & param : params) {
                 HgiShaderFunctionAddConstantParam(
-                    &computeDesc, params[i], HdStTokens->_int);
+                    &computeDesc, param, HdStTokens->_int);
             }
             HgiShaderFunctionAddStageInput(
-                &computeDesc, "hd_globalInvocationID", "uvec3",
+                &computeDesc, "hd_GlobalInvocationID", "uvec3",
                 HgiShaderKeywordTokens->hdGlobalInvocationID);
         });
 

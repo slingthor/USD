@@ -1,22 +1,21 @@
-set(DIRS
-    hf
-    hio
-    garch
-    cameraUtil
-    pxOsd
-    glf
-    hgi
-    hgiGL
-    hgiMetal
-    hgiVulkan
-    hgiInterop
-    mtlf
-    hd
-    hdSt
-    hdx
-    plugin
-)
+add_subdirectory(hf)
+add_subdirectory(hio)
+add_subdirectory(garch)
+add_subdirectory(cameraUtil)
+add_subdirectory(pxOsd)
+add_subdirectory(glf)
+add_subdirectory(hgi)
+add_subdirectory(hgiGL)
+add_subdirectory(hgiMetal)
+add_subdirectory(hgiVulkan)
+add_subdirectory(hgiInterop)
+add_subdirectory(mtlf)
+add_subdirectory(hd)
 
-foreach(d ${DIRS})
-    add_subdirectory(${d})
-endforeach()
+if (${PXR_ENABLE_MATERIALX_SUPPORT})
+    add_subdirectory(hdMtlx)
+endif()
+
+add_subdirectory(hdSt)
+add_subdirectory(hdx)
+add_subdirectory(plugin)

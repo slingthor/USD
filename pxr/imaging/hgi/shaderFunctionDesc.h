@@ -161,6 +161,8 @@ bool operator!=(
 ///   The ascii shader code used to compile the shader.</li>
 /// <li>textures:
 ///   List of texture descriptions to be passed into a shader.</li>
+/// <li>buffers:
+///   List of buffer descriptions to be passed into a shader.</li>
 /// <li>constantParams:
 ///   List of descriptions of constant params passed into a shader.</li>
 /// <li>stageInputs:
@@ -205,7 +207,7 @@ HgiShaderFunctionAddTexture(
     uint32_t dimensions = 2,
     const HgiFormat &format = HgiFormatFloat32Vec4);
 
-/// Adds texture descriptor to given shader function descriptor.
+/// Adds buffer descriptor to given shader function descriptor.
 HGI_API
 void
 HgiShaderFunctionAddBuffer(

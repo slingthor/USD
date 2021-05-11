@@ -79,9 +79,6 @@ pxr_library(usdImaging
         unitTestHelper.h
         version.h
 
-    PRIVATE_CLASSES
-        textureUtils
-
     RESOURCE_FILES
         plugInfo.json
 )

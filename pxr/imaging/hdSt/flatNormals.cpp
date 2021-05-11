@@ -58,7 +58,7 @@ enum {
     BufferBinding_PrimitiveParam
 };
 
-static HgiResourceBindingsSharedPtr
+HgiResourceBindingsSharedPtr
 _CreateResourceBindings(
     Hgi* hgi,
     HgiBufferHandle const& points,
@@ -114,7 +114,7 @@ _CreateResourceBindings(
         hgi->CreateResourceBindings(resourceDesc));
 }
 
-static HgiComputePipelineSharedPtr
+HgiComputePipelineSharedPtr
 _CreatePipeline(
     Hgi* hgi,
     uint32_t constantValuesSize,
@@ -213,7 +213,6 @@ HdSt_FlatNormalsComputationGPU::Execute(
         }
     }
     if (!TF_VERIFY(!shaderToken.IsEmpty())) return;
-    
     struct Uniform {
         int vertexOffset;
         int elementOffset;
@@ -235,7 +234,7 @@ HdSt_FlatNormalsComputationGPU::Execute(
           [&](HgiShaderFunctionDesc &computeDesc) {
             computeDesc.debugName = shaderToken.GetString();
             computeDesc.shaderStage = HgiShaderStageCompute;
-            
+
             TfToken srcType;
             TfToken dstType;
             if (_srcDataType == HdTypeFloatVec3) {
@@ -243,7 +242,7 @@ HdSt_FlatNormalsComputationGPU::Execute(
             } else {
                 srcType = HdStTokens->_double;
             }
-    
+
             if (_dstDataType == HdTypeFloatVec3) {
                 dstType = HdStTokens->_float;
             } else if (_dstDataType == HdTypeDoubleVec3) {
@@ -257,8 +256,8 @@ HdSt_FlatNormalsComputationGPU::Execute(
                 &computeDesc, "indices", HdStTokens->_int);
             HgiShaderFunctionAddBuffer(
                 &computeDesc, "primitiveParam", HdStTokens->_int);
-            
-            static std::string params[] = {
+
+            static const std::string params[] = {
                 "vertexOffset",       // offset in aggregated buffer
                 "elementOffset",      // offset in aggregated buffer
                 "topologyOffset",     // offset in aggregated buffer
@@ -271,14 +270,14 @@ HdSt_FlatNormalsComputationGPU::Execute(
                 "pParamOffset",       // interleave offset
                 "pParamStride"        // interleave stride
             };
-            int numParams = sizeof(params) / sizeof(params[0]);
-            assert((sizeof(Uniform) / sizeof(int)) == numParams);
-            for (int i = 0; i < numParams; i++) {
+            static_assert((sizeof(Uniform) / sizeof(int)) ==
+                          (sizeof(params) / sizeof(params[0])), "");
+            for (std::string const & param : params) {
                 HgiShaderFunctionAddConstantParam(
-                    &computeDesc, params[i], HdStTokens->_int);
+                    &computeDesc, param, HdStTokens->_int);
             }
             HgiShaderFunctionAddStageInput(
-                &computeDesc, "hd_globalInvocationID", "uvec3",
+                &computeDesc, "hd_GlobalInvocationID", "uvec3",
                 HgiShaderKeywordTokens->hdGlobalInvocationID);
         });
     if (!computeProgram) return;
@@ -321,7 +320,7 @@ HdSt_FlatNormalsComputationGPU::Execute(
     uniform.pParamStride = primitiveParam->GetStride() / pParamComponentSize;
 
     Hgi* hgi = hdStResourceRegistry->GetHgi();
-    
+
     // Generate hash for resource bindings and pipeline.
     // XXX Needs fingerprint hash to avoid collisions
     uint64_t rbHash = (uint64_t) TfHash::Combine(

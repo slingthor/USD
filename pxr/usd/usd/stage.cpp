@@ -90,10 +90,11 @@
 #include "pxr/base/tf/span.h"
 #include "pxr/base/tf/stl.h"
 #include "pxr/base/tf/stringUtils.h"
-#include "pxr/base/work/arenaDispatcher.h"
+#include "pxr/base/work/dispatcher.h"
 #include "pxr/base/work/loops.h"
 #include "pxr/base/work/utils.h"
 #include "pxr/base/work/threadLimits.h"
+#include "pxr/base/work/withScopedParallelism.h"
 
 #include <boost/optional.hpp>
 #include <boost/iterator/transform_iterator.hpp>
@@ -504,7 +505,6 @@ UsdStage::~UsdStage()
         free(const_cast<char*>(_mallocTagID));
     }
 
-    DeleteTheArenaManager();
     ResetTBBTaskSchedInit();
 }
 
@@ -515,37 +515,44 @@ UsdStage::_Close()
 
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-    WorkArenaDispatcher wd;
+    WorkWithScopedParallelism([this]() {
 
-    // Stop listening for notices.
-    wd.Run([this]() {
-            for (auto &p: _layersAndNoticeKeys)
-                TfNotice::Revoke(p.second);
-        });
+            // Destroy prim structure.
+            vector<SdfPath> primsToDestroy;
+            {
+                // Scope the dispatcher so that its dtor Wait()s for work to
+                // complete before primsToDestroy is destroyed, since tasks we
+                // schedule in the dispatcher access it.
+                WorkDispatcher wd;
 
-    // Destroy prim structure.
-    vector<SdfPath> primsToDestroy;
-    if (_pseudoRoot) {
-        // Instancing prototypes are not children of the pseudo-root so
-        // we need to explicitly destroy those subtrees.
-        primsToDestroy = _instanceCache->GetAllPrototypes();
-        wd.Run([this, &primsToDestroy]() {
-                primsToDestroy.push_back(SdfPath::AbsoluteRootPath());
-                _DestroyPrimsInParallel(primsToDestroy);
-                _pseudoRoot = nullptr;
-                WorkMoveDestroyAsync(primsToDestroy);
-            });
-    }
+                // Stop listening for notices.
+                wd.Run([this]() {
+                        for (auto &p: _layersAndNoticeKeys)
+                            TfNotice::Revoke(p.second);
+                    });
+                
+                if (_pseudoRoot) {
+                    // Instancing prototypes are not children of the pseudo-root
+                    // so we need to explicitly destroy those subtrees.
+                    primsToDestroy = _instanceCache->GetAllPrototypes();
+                    wd.Run([this, &primsToDestroy]() {
+                            primsToDestroy.push_back(
+                                SdfPath::AbsoluteRootPath());
+                            _DestroyPrimsInParallel(primsToDestroy);
+                            _pseudoRoot = nullptr;
+                            WorkMoveDestroyAsync(primsToDestroy);
+                        });
+                }
     
-    // Clear members.
-    wd.Run([this]() { _cache.reset(); });
-    wd.Run([this]() { _clipCache.reset(); });
-    wd.Run([this]() { _instanceCache.reset(); });
-    wd.Run([this]() { _sessionLayer.Reset(); });
-    wd.Run([this]() { _rootLayer.Reset(); });
-    _editTarget = UsdEditTarget();
-
-    wd.Wait();
+                // Clear members.
+                wd.Run([this]() { _cache.reset(); });
+                wd.Run([this]() { _clipCache.reset(); });
+                wd.Run([this]() { _instanceCache.reset(); });
+                wd.Run([this]() { _sessionLayer.Reset(); });
+                wd.Run([this]() { _rootLayer.Reset(); });
+                _editTarget = UsdEditTarget();
+            }
+        });
 
     WorkSwapDestroyAsync(_primMap);
     // XXX: Do not do this async, since python might shut down concurrently with
@@ -2912,29 +2919,31 @@ UsdStage::_ComposeSubtreesInParallel(
     TRACE_FUNCTION();
 
     // Begin a subtree composition in parallel.
-    _primMapMutex = boost::in_place();
-    _dispatcher = boost::in_place();
-    // We populate the clip cache concurrently during composition, so we need to
-    // enable concurrent population here.
-    Usd_ClipCache::ConcurrentPopulationContext
-        clipConcurrentPopContext(*_clipCache);
-    try {
-        for (size_t i = 0; i != prims.size(); ++i) {
-            Usd_PrimDataPtr p = prims[i];
-            _dispatcher->Run(
-                &UsdStage::_ComposeSubtreeImpl, this, p, p->GetParent(),
-                &_populationMask,
-                primIndexPaths ? (*primIndexPaths)[i] : p->GetPath());
-        }
-    }
-    catch (...) {
-        _dispatcher = boost::none;
-        _primMapMutex = boost::none;
-        throw;
-    }
-
-    _dispatcher = boost::none;
-    _primMapMutex = boost::none;
+    WorkWithScopedParallelism([this, &prims, &primIndexPaths]() {
+            _primMapMutex = boost::in_place();
+            _dispatcher = boost::in_place();
+            // We populate the clip cache concurrently during composition, so we
+            // need to enable concurrent population here.
+            Usd_ClipCache::ConcurrentPopulationContext
+                clipConcurrentPopContext(*_clipCache);
+            try {
+                for (size_t i = 0; i != prims.size(); ++i) {
+                    Usd_PrimDataPtr p = prims[i];
+                    _dispatcher->Run(
+                        &UsdStage::_ComposeSubtreeImpl, this, p, p->GetParent(),
+                        &_populationMask,
+                        primIndexPaths ? (*primIndexPaths)[i] : p->GetPath());
+                }
+            }
+            catch (...) {
+                _dispatcher = boost::none;
+                _primMapMutex = boost::none;
+                throw;
+            }
+            
+            _dispatcher = boost::none;
+            _primMapMutex = boost::none;
+        });
 }
 
 void
@@ -3060,21 +3069,22 @@ UsdStage::_DestroyPrimsInParallel(const vector<SdfPath>& paths)
 
     TF_AXIOM(!_dispatcher && !_primMapMutex);
 
-    _primMapMutex = boost::in_place();
-    _dispatcher = boost::in_place();
-
-    for (const auto& path : paths) {
-        Usd_PrimDataPtr prim = _GetPrimDataAtPath(path);
-        // We *expect* every prim in paths to be valid as we iterate, but at
-        // one time had issues with deactivated prototype prims, so we preserve
-        // a guard for resiliency.  See testUsdBug141491.py
-        if (TF_VERIFY(prim)) {
-            _dispatcher->Run(&UsdStage::_DestroyPrim, this, prim);
-        }
-    }
-
-    _dispatcher = boost::none;
-    _primMapMutex = boost::none;
+    WorkWithScopedParallelism([&]() {
+            _primMapMutex = boost::in_place();
+            _dispatcher = boost::in_place();
+            for (const auto& path : paths) {
+                Usd_PrimDataPtr prim = _GetPrimDataAtPath(path);
+                // We *expect* every prim in paths to be valid as we iterate,
+                // but at one time had issues with deactivated prototype prims,
+                // so we preserve a guard for resiliency.  See
+                // testUsdBug141491.py
+                if (TF_VERIFY(prim)) {
+                    _dispatcher->Run(&UsdStage::_DestroyPrim, this, prim);
+                }
+            }
+            _dispatcher = boost::none;
+            _primMapMutex = boost::none;
+        });
 }
 
 void
@@ -6327,15 +6337,10 @@ static bool
 _GetPrimSpecifierImpl(Usd_PrimDataConstPtr primData,
                       bool useFallbacks, Composer *composer)
 {
-    // Handle the pseudo root as a special case.
-    if (primData->GetPath().IsAbsoluteRootPath()) {
-        return false;
-    }
-
-    // Instance prototype prims are always defined -- see Usd_PrimData for
-    // details. Since the fallback for specifier is 'over', we have to
-    // handle these prims specially here.
-    if (primData->IsPrototype()) {
+    // The pseudo-root and instance prototype prims are always defined -- see
+    // Usd_PrimData for details. Since the fallback for specifier is 'over', we
+    // have to handle these prims specially here.
+    if (primData->GetPath().IsAbsoluteRootPath() || primData->IsPrototype()) {
         composer->ConsumeExplicitValue(SdfSpecifierDef);
         return true;
     }
@@ -7123,8 +7128,7 @@ public:
     {
         const SdfPath specPath =
             info._primPathInLayerStack.AppendProperty(attr.GetName());
-        const SdfLayerRefPtr& layer = 
-            info._layerStack->GetLayers()[info._layerIndex];
+        const SdfLayerHandle& layer = info._layer;
         const double localTime =
             info._layerToStageOffset.GetInverse() * time.GetValue();
 
@@ -7246,8 +7250,7 @@ UsdStage::_GetLayerWithStrongestValue(
         
         if (resolveInfo._source == UsdResolveInfoSourceTimeSamples ||
             resolveInfo._source == UsdResolveInfoSourceDefault) {
-            resultLayer = 
-                resolveInfo._layerStack->GetLayers()[resolveInfo._layerIndex];
+            resultLayer = resolveInfo._layer;
         }
         else if (resolveInfo._source == UsdResolveInfoSourceValueClips) {
             const Usd_ClipSetRefPtr& clipSet = extraResolveInfo.clipSet;
@@ -7435,7 +7438,7 @@ struct UsdStage::_ResolveInfoResolver
 
         if (_resolveInfo->_source != UsdResolveInfoSourceNone) {
             _resolveInfo->_layerStack = nodeLayers;
-            _resolveInfo->_layerIndex = layerStackPosition;
+            _resolveInfo->_layer = layer;
             _resolveInfo->_primPathInLayerStack = node.GetPath();
             _resolveInfo->_layerToStageOffset = layerToStageOffset;
             _resolveInfo->_node = node;
@@ -7619,8 +7622,7 @@ UsdStage::_GetValueFromResolveInfoImpl(const UsdResolveInfo &info,
     else if (info._source == UsdResolveInfoSourceDefault) {
         const SdfPath specPath =
             info._primPathInLayerStack.AppendProperty(attr.GetName());
-        const SdfLayerHandle& layer = 
-            info._layerStack->GetLayers()[info._layerIndex];
+        const SdfLayerHandle& layer = info._layer;
 
         TF_DEBUG(USD_VALUE_RESOLUTION).Msg(
             "RESOLVE: reading field %s:%s from @%s@, with t = %.3f"
@@ -7761,8 +7763,7 @@ UsdStage::_GetTimeSamplesInIntervalFromResolveInfo(
     if (info._source == UsdResolveInfoSourceTimeSamples) {
         const SdfPath specPath =
             info._primPathInLayerStack.AppendProperty(attr.GetName());
-        const SdfLayerRefPtr& layer = 
-            info._layerStack->GetLayers()[info._layerIndex];
+        const SdfLayerHandle& layer = info._layer;
 
         const std::set<double> samples =
             layer->ListTimeSamplesForPath(specPath);
@@ -7835,8 +7836,7 @@ UsdStage::_GetNumTimeSamplesFromResolveInfo(const UsdResolveInfo &info,
     if (info._source == UsdResolveInfoSourceTimeSamples) {
         const SdfPath specPath =
             info._primPathInLayerStack.AppendProperty(attr.GetName());
-        const SdfLayerRefPtr& layer = 
-            info._layerStack->GetLayers()[info._layerIndex];
+        const SdfLayerHandle& layer = info._layer;
 
         return layer->GetNumTimeSamplesForPath(specPath);
     } 
@@ -7916,8 +7916,7 @@ UsdStage::_GetBracketingTimeSamplesFromResolveInfo(const UsdResolveInfo &info,
     if (info._source == UsdResolveInfoSourceTimeSamples) {
         const SdfPath specPath =
             info._primPathInLayerStack.AppendProperty(attr.GetName());
-        const SdfLayerRefPtr& layer = 
-            info._layerStack->GetLayers()[info._layerIndex];
+        const SdfLayerHandle& layer = info._layer;
         const double layerTime =
             info._layerToStageOffset.GetInverse() * desiredTime;
         

@@ -86,6 +86,11 @@ public:
     virtual HdBufferSourceSharedPtr CreateIndexComputation(
         HdSt_MeshTopology *topology,
         HdBufferSourceSharedPtr const &osdTopology) = 0;
+    
+    virtual HdBufferSourceSharedPtr CreateFvarIndexComputation(
+        HdSt_MeshTopology *topology,
+        HdBufferSourceSharedPtr const &osdTopology,
+        int channel) = 0;
 
     virtual HdBufferSourceSharedPtr CreateRefineComputation(
         HdSt_MeshTopology *topology,
@@ -253,7 +258,7 @@ public:
             return _resource->GetHandle()->GetRawResource();
         }
 #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)
-        id<MTLBuffer> BindMTLBuffer(OpenSubdiv::v3_4_3::Osd::MTLContext* context) {
+        id<MTLBuffer> BindMTLBuffer(OpenSubdiv::v3_4_4::Osd::MTLContext* context) {
             return HgiMetalBuffer::MTLBuffer(_resource->GetHandle());
         }
 #endif

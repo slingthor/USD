@@ -47,6 +47,12 @@ void ResetTBBTaskSchedInit();
 ///
 WORK_API unsigned WorkGetConcurrencyLimit();
 
+/// Return true if WorkGetPhysicalConcurrencyLimit() returns a number greater
+/// than 1 and PXR_WORK_THREAD_LIMIT was not set in an attempt to limit the
+/// process to a single thread, false otherwise.
+///
+WORK_API bool WorkHasConcurrency();
+
 /// Return the number of physical execution cores available to the program.
 /// This is either the number of physical cores on the machine or the number of
 /// cores specified by the process's affinity mask, whichever is smaller.

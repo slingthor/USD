@@ -130,6 +130,7 @@ HdxRenderSetupTask::SyncParams(HdSceneDelegate* delegate,
     renderPassState->SetPointColor(params.pointColor);
     renderPassState->SetPointSize(params.pointSize);
     renderPassState->SetLightingEnabled(params.enableLighting);
+    renderPassState->SetClippingEnabled(params.enableClipping);
     renderPassState->SetAlphaThreshold(params.alphaThreshold);
     renderPassState->SetCullStyle(params.cullStyle);
 

@@ -291,7 +291,7 @@ HdStPtexTextureObject::_Commit()
         texDesc.type = HgiTextureType1DArray;
         texDesc.dimensions = GfVec3i(_layoutDimensions[0], 1, 1);
         texDesc.layerCount = _layoutDimensions[1];
-        texDesc.format = HgiFormatInt16Vec2;
+        texDesc.format = HgiFormatUInt16Vec2;
         texDesc.mipLevels = 1;
         texDesc.initialData = _layoutData.get();
         texDesc.pixelsByteSize = _layoutDataSize;

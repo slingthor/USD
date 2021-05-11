@@ -34,9 +34,13 @@
 
 #include "pxr/base/gf/bbox3f.h"
 #include "pxr/base/gf/bbox3d.h"
+#include "pxr/base/vt/array.h"
+#include "pxr/base/vt/types.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+using TopologyToPrimvarVector = 
+    std::vector<std::pair<VtIntArray, std::vector<TfToken>>>; 
 
 // HdRprimSharedData is an assortment of data being shared across HdReprs,
 // owned by HdRprim. HdDrawItem holds a const pointer to HdRprimSharedData.
@@ -89,9 +93,15 @@ struct HdRprimSharedData {
 
     // Used to organize drawItems into collections based on material properties.
     TfToken materialTag;
-    
-    // Used to determine if RPrim should be CPU culled dynamically or not.
+	
+	// Used to determine if RPrim should be CPU culled dynamically or not.
     bool animated;
+
+    // Data structure containing the face-varying topologies of an rprim (mesh
+    // only) and each of the topology's associated face-varying primvar names.
+    // Used in drawing to determine which primvar uses which face-varying
+    // channel.
+    TopologyToPrimvarVector fvarTopologyToPrimvarVector;
 };
 
 

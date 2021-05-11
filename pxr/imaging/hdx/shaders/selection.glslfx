@@ -453,14 +453,13 @@ vec4 ComputeSelectionOffset()
 // selected.
 
 int GetElementID(); // generated via codeGen
-int GetAuthoredEdgeId(int); // generated via codeGen
 int GetPrimitiveEdgeId(); // defined in edgeId.glslfx, or generated via codeGen
 int GetPointId(); // defined in pointId.glslfx
 
 bool IsSelected()
 {
     SelectionResult res = GetNetSelectionResult(
-        GetElementID(), GetAuthoredEdgeId(GetPrimitiveEdgeId()), GetPointId());
+        GetElementID(), GetPrimitiveEdgeId(), GetPointId());
 
    return res.primOrInstanceSel || res.subprimSel.elementSelected;
 }
@@ -505,7 +504,6 @@ vec4 GetSubprimSelectionColor(int mode, SubprimSelectionResult res)
 // Fwd declare necessary methods to determine the subprim id of a fragment.
 #if !defined(ARCH_GFX_METAL)
 int GetElementID(); // generated via codeGen
-int GetAuthoredEdgeId(int); // generated via codeGen
 int GetPrimitiveEdgeId(); // defined in edgeId.glslfx, or generated via codeGen
 int GetPointId(); // defined in pointId.glslfx
 #endif
@@ -517,7 +515,7 @@ vec4 ApplySelectionColor(vec4 color)
 {
 #if defined(HD_HAS_hdxSelectionBuffer)
     int elementId = GetElementID();
-    int edgeId    = GetAuthoredEdgeId(GetPrimitiveEdgeId());
+    int edgeId    = GetPrimitiveEdgeId();
     int pointId   = GetPointId();
 
     const int numSelectionModes = GetNumSelectionHighlightModes();

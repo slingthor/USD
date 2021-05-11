@@ -203,7 +203,6 @@ UsdImagingAdapterRegistry::HasAdapter(TfToken const& adapterKey)
     if (adapterKey == UsdImagingAdapterKeyTokens->instanceAdapterKey) {
         return true;
     }
-
     return _typeMap.find(adapterKey) != _typeMap.end();
 }
 
@@ -211,57 +210,57 @@ UsdImagingPrimAdapterSharedPtr
 UsdImagingAdapterRegistry::ConstructAdapter(TfToken const& adapterKey)
 {
     static UsdImagingPrimAdapterSharedPtr NULL_ADAPTER;
-    
+
     // Check if the key refers to any special built-in adapter types.
     if (adapterKey == UsdImagingAdapterKeyTokens->instanceAdapterKey) {
         return UsdImagingPrimAdapterSharedPtr(
-                                              new UsdImagingInstanceAdapter);
+            new UsdImagingInstanceAdapter);
     }
-    
+
     // Lookup the plug-in type name based on the prim type.
     _TypeMap::const_iterator typeIt = _typeMap.find(adapterKey);
-    
+
     if (typeIt == _typeMap.end()) {
         // Unknown prim type.
         TF_DEBUG(USDIMAGING_PLUGINS).Msg("[PluginLoad] Unknown prim "
-                                         "type '%s'\n",
-                                         adapterKey.GetText());
+                "type '%s'\n",
+                adapterKey.GetText());
         return NULL_ADAPTER;
     }
-    
+
     PlugRegistry& plugReg = PlugRegistry::GetInstance();
     PlugPluginPtr plugin = plugReg.GetPluginForType(typeIt->second);
     if (!plugin || !plugin->Load()) {
         TF_CODING_ERROR("[PluginLoad] PlugPlugin could not be loaded for "
-                        "TfType '%s'\n",
-                        typeIt->second.GetTypeName().c_str());
+                "TfType '%s'\n",
+                typeIt->second.GetTypeName().c_str());
         return NULL_ADAPTER;
     }
-    
+
     UsdImagingPrimAdapterFactoryBase* factory =
-    typeIt->second.GetFactory<UsdImagingPrimAdapterFactoryBase>();
+        typeIt->second.GetFactory<UsdImagingPrimAdapterFactoryBase>();
     if (!factory) {
         TF_CODING_ERROR("[PluginLoad] Cannot manufacture type '%s' "
-                        "for Usd prim type '%s'\n",
-                        typeIt->second.GetTypeName().c_str(),
-                        typeIt->first.GetText());
-        
+                "for Usd prim type '%s'\n",
+                typeIt->second.GetTypeName().c_str(),
+                typeIt->first.GetText());
+
         return NULL_ADAPTER;
     }
-    
+
     UsdImagingPrimAdapterSharedPtr instance = factory->New();
     if (!instance) {
         TF_CODING_ERROR("[PluginLoad] Failed to instantiate type '%s' "
-                        "for Usd prim type '%s'\n",
-                        typeIt->second.GetTypeName().c_str(),
-                        typeIt->first.GetText());
+                "for Usd prim type '%s'\n",
+                typeIt->second.GetTypeName().c_str(),
+                typeIt->first.GetText());
         return NULL_ADAPTER;
     }
-    
+
     TF_DEBUG(USDIMAGING_PLUGINS).Msg("[PluginLoad] Loaded plugin '%s' > '%s'\n",
-                                     adapterKey.GetText(),
-                                     typeIt->second.GetTypeName().c_str());
-    
+                adapterKey.GetText(),
+                typeIt->second.GetTypeName().c_str());
+
     return instance;
 }
 
