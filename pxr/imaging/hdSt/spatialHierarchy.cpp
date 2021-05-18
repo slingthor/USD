@@ -348,6 +348,8 @@ GfRange3f ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables,
 {
     GfRange3f boundingBox;
     
+    bakedAnimatedVisibilityItemCount = 0;
+    
     for (size_t idx = 0; idx < drawables->size(); ++idx){
         HdStDrawItemInstance* drawable = &(*drawables)[idx];
         drawable->GetDrawItem()->CalculateCullingBounds(true);
@@ -358,8 +360,8 @@ GfRange3f ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables,
         
         if(drawable->GetDrawItem()->GetAnimated()) {
             if (numItems > 0) {
-                bakedAnimatedVisibilityItemCount += numItems;
                 animatedDrawables->emplace_back(drawable, bakedAnimatedVisibilityItemCount);
+                bakedAnimatedVisibilityItemCount += numItems;
             }
             continue;
         }
@@ -605,6 +607,9 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
         static
         void processAnimatedNodes(std::pair<std::vector<DrawableAnimatedItem>*, uint8_t*> *animatedProcessParam, size_t begin, size_t end)
         {
+            if (!animatedProcessParam) {
+                return;
+            }
             std::vector<DrawableAnimatedItem> *animatedDrawables = animatedProcessParam->first;
             if(animatedDrawables->empty()) {
                 return;
