@@ -86,7 +86,13 @@ public:
     
     // APPLE METAL: Multibuffering support.
     HDST_API
-    virtual void CopyDataIsHappening();
+    void CopyDataIsHappening();
+    
+    // APPLE METAL: Multibuffering support.
+    HDST_API
+    bool IsFirstFrame() const {
+        return _firstFrameBeingFilled;
+    }
     
     // APPLE METAL: Multibuffering support.
     HDST_API
@@ -97,6 +103,7 @@ public:
                                int numElements);
 
     /// Returns the gpu address (if available. otherwise returns 0).
+    HDST_API
     uint64_t GetGPUAddress() const {
         return _gpuAddr[_activeBuffer];
     }

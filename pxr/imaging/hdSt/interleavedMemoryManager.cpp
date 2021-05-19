@@ -813,24 +813,43 @@ HdStInterleavedMemoryManager::_StripedInterleavedBufferRange::CopyData(
         VBO->CopyDataIsHappening();
 
         int vboStride = VBO->GetStride();
-        size_t vboOffset = VBO->GetOffset() + vboStride * _index;
         int dataSize = HdDataSizeOfTupleType(VBO->GetTupleType());
-        const unsigned char *data =
-            (const unsigned char*)bufferSource->GetData();
 
         HgiBufferCpuToGpuOp blitOp;
-        blitOp.gpuDestinationBuffer = VBO->GetId();
         blitOp.sourceByteOffset = 0;
         blitOp.byteSize = dataSize;
+        
+        // APPLE METAL: If this is triple buffered then it is necessary to copy
+        // the source into all three buffers on the first frame.
+        if (VBO->IsFirstFrame() && VBO->GetId(1)) {
+            for (int32_t bufferIdx = 0; bufferIdx < HdStBufferResource::MULTIBUFFERING; ++bufferIdx) {
+                size_t vboOffset = VBO->GetOffset() + vboStride * _index;
+                data = (const unsigned char*)bufferSource->GetData();
+                blitOp.gpuDestinationBuffer = VBO->GetId(bufferIdx);
 
-        for (size_t i = 0; i < _numElements; ++i) {
-            blitOp.cpuSourceBuffer = data;
-            
-            blitOp.destinationByteOffset = vboOffset;
-            _stripedBuffer->GetManager()->StageBufferCopy(blitOp);
+                for (size_t i = 0; i < _numElements; ++i) {
+                    blitOp.cpuSourceBuffer = data;
+                    blitOp.destinationByteOffset = vboOffset;
 
-            vboOffset += vboStride;
-            data += dataSize;
+                    _stripedBuffer->GetManager()->StageBufferCopy(blitOp);
+                    
+                    vboOffset += vboStride;
+                    data += dataSize;
+                }
+            }
+        } else {
+            size_t vboOffset = VBO->GetOffset() + vboStride * _index;
+            blitOp.gpuDestinationBuffer = VBO->GetId();
+
+            for (size_t i = 0; i < _numElements; ++i) {
+                blitOp.cpuSourceBuffer = data;
+                blitOp.destinationByteOffset = vboOffset;
+
+                _stripedBuffer->GetManager()->StageBufferCopy(blitOp);
+                
+                vboOffset += vboStride;
+                data += dataSize;
+            }
         }
     }
     HD_PERF_COUNTER_ADD(HdStPerfTokens->copyBufferCpuToGpu,
