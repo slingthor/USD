@@ -334,8 +334,8 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
     // APPLE METAL: Multibuffering support
     bool hasUnifiedMemory =
         static_cast<HgiMetal*>(hgi)->GetCapabilities().unifiedMemory;
-    const int bufferCount =
-        hasUnifiedMemory ? HdStBufferResource::MULTIBUFFERING:1;
+    const int bufferCount = HdStBufferResource::MULTIBUFFERING;
+    //    hasUnifiedMemory ? HdStBufferResource::MULTIBUFFERING:1;
 
     // resize each BufferResource
     HdStBufferResourceNamedList const& resources = GetResources();
