@@ -1865,7 +1865,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                                 << vsMI_EP_FuncDef.str()
                                 << "    uint _gsVertexID = _vertexID;\n";
             if (quadIndexRemap) {
-                vsEntryPointCode << "    uint quadRemap[] = { 3, 0, 2, 2, 0, 1 };\n"
+                vsEntryPointCode << "    uint quadRemap[] = { 3, 0, 2, 1, 2, 0 };\n"
                                  << "    uint _index = drawArgs->batchIndexOffset + (_vertexID / 6) * 4 + quadRemap[_vertexID % 6];\n"
                                  << "    uint _primitiveID = (drawArgs->batchIndexOffset + (_vertexID / 6)) % drawArgs->primitiveCount;\n";
             }
