@@ -196,6 +196,11 @@ Sdf_ComputeAnonLayerIdentifier(
     const SdfLayer* layer)
 {
     TF_VERIFY(layer);
+    // @AAPL rdar://75419435 ([USD - ModelIO] ASAN signal_SIGABRT | ArchVStringPrintf; TfStringPrintf; Sdf_ComputeAnonLayerIdentifier)
+    if (ARCH_UNLIKELY(identifierTemplate.find("%n") != std::string::npos)) {
+        TF_RUNTIME_ERROR("Anon layer contains invalid character sequence '%%n': %s", identifierTemplate.c_str());
+        return identifierTemplate;
+    }
     return TfStringPrintf(identifierTemplate.c_str(), layer);
 }
 
