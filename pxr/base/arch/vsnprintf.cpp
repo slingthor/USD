@@ -53,7 +53,8 @@ ArchVStringPrintf(const char *fmt, va_list ap)
     size_t needed = ArchVsnprintf(buf, sizeof(buf), fmt, ap) + 1;
     string s(needed <= sizeof(buf) ? buf : string());
 
-    if (s.empty()) {
+    // @AAPL rdar://75265779 ([USD - ModelIO] Heap_buffer_overflow | com.apple.ModelIO: std::__1::basic_string<char, std::__1::char_traits<char>, ArchVStringPrintf; TfStringPrintf; Sdf_ComputeAnonLayerIdentifier)
+    if (s.empty() && needed > 0) {
         char* tmp = new char[needed];
         ArchVsnprintf(tmp, needed, fmt, apcopy);
         s = string(tmp);
