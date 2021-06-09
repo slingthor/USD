@@ -616,14 +616,12 @@ public:
 
     inline Field const &
     GetField(FieldIndex i) const {
-#ifdef PXR_PREFER_SAFETY_OVER_SPEED
-        if (ARCH_LIKELY(i.value < _fields.size())) {
-            return _fields[i.value];
+        // @AAPL: rdar://68179391 ([Azul]TALOS-2020-1105: Pixar OpenUSD Binary File Format Index Type Values Information Leak Vulnerability)
+        if (ARCH_UNLIKELY(_fields.size() <= i.value)) {
+            TF_RUNTIME_ERROR("Failed to get field for index %u", i.value);
+            return _GetEmptyField();
         }
-        return _GetEmptyField();
-#else
         return _fields[i.value];
-#endif
     }
 
     inline vector<Field> const & GetFields() const { return _fields; }
@@ -638,14 +636,12 @@ public:
 
     inline SdfPath const &
     GetPath(PathIndex i) const {
-#ifdef PXR_PREFER_SAFETY_OVER_SPEED
-        if (ARCH_LIKELY(i.value < _paths.size())) {
-            return _paths[i.value];
+        // @AAPL: rdar://68179391 ([Azul]TALOS-2020-1105: Pixar OpenUSD Binary File Format Index Type Values Information Leak Vulnerability)
+        if (ARCH_UNLIKELY(_paths.size() <= i.value)) {
+            TF_RUNTIME_ERROR("Failed to get path for index %u", i.value);
+            return SdfPath::EmptyPath();
         }
-        return SdfPath::EmptyPath();
-#else
         return _paths[i.value];
-#endif
     }
 
     inline vector<SdfPath> const &GetPaths() const { return _paths; }
@@ -665,30 +661,34 @@ public:
         { vector<FieldIndex> tmp; tmp.swap(_fieldSets); outFieldSets.swap(tmp); }
     }
 
+    // @AAPL rdar://75419933 ([USD - ModelIO] EXC_BAD_ACCESS | SdfSpec::GetSchema() const spec.cpp:62 -- SdfSpec::GetInfo)
+    inline bool
+    HasToken(TokenIndex i) const {
+        return i.value < _tokens.size();
+    }
+
     inline TfToken const &
     GetToken(TokenIndex i) const {
-#ifdef PXR_PREFER_SAFETY_OVER_SPEED
-        if (ARCH_LIKELY(i.value < _tokens.size())) {
-            return _tokens[i.value];
+        // @AAPL: rdar://68179391 ([Azul]TALOS-2020-1105: Pixar OpenUSD Binary File Format Index Type Values Information Leak Vulnerability)
+        // @AAPL rdar://75419933 ([USD - ModelIO] EXC_BAD_ACCESS | SdfSpec::GetSchema() const spec.cpp:62 -- SdfSpec::GetInfo)
+        if (ARCH_UNLIKELY(!HasToken(i))) {
+            TF_RUNTIME_ERROR("Failed to get token for index %u", i.value);
+            return _GetEmptyToken();
         }
-        return _GetEmptyToken();
-#else
         return _tokens[i.value];
-#endif
     }
 
     inline vector<TfToken> const &GetTokens() const { return _tokens; }
     
     inline std::string const &
     GetString(StringIndex i) const {
-#ifdef PXR_PREFER_SAFETY_OVER_SPEED
-        if (ARCH_LIKELY(i.value < _strings.size())) {
-            return GetToken(_strings[i.value]).GetString();
+        // @AAPL: rdar://68179391 ([Azul]TALOS-2020-1105: Pixar OpenUSD Binary File Format Index Type Values Information Leak Vulnerability)
+        // @AAPL rdar://75419933 ([USD - ModelIO] EXC_BAD_ACCESS | SdfSpec::GetSchema() const spec.cpp:62 -- SdfSpec::GetInfo)
+        if (ARCH_UNLIKELY(_strings.size() <= i.value || !HasToken(_strings[i.value]))) {
+            TF_RUNTIME_ERROR("Failed to get string for index %u", i.value);
+            return _GetEmptyString();
         }
-        return _GetEmptyString();
-#else
         return GetToken(_strings[i.value]).GetString();
-#endif
     }
     inline vector<TokenIndex> const &GetStrings() const { return _strings; }
 
@@ -857,12 +857,9 @@ private:
 
     static bool _IsKnownSection(char const *name);
 
-#ifdef PXR_PREFER_SAFETY_OVER_SPEED
-    // Helpers for error cases.
     Field const &_GetEmptyField() const;
     std::string const &_GetEmptyString() const;
     TfToken const &_GetEmptyToken() const;
-#endif // PXR_PREFER_SAFETY_OVER_SPEED
 
     struct _PackingContext;
 
