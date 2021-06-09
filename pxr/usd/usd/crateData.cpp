@@ -868,6 +868,7 @@ private:
         unordered_map<
             FieldSetIndex, SharedFieldValuePairVector, _Hasher> liveFieldSets;
 
+        bool foundFieldsError = false;
         for (auto fsBegin = fieldSets.begin(),
                  fsEnd = find(fsBegin, fieldSets.end(), FieldIndex());
              fsBegin != fieldSets.end();
@@ -880,7 +881,7 @@ private:
                 liveFieldSets[FieldSetIndex(fsBegin-fieldSets.begin())];
 
             dispatcher.Run(
-                [this, fsBegin, fsEnd, &fields, &fieldValuePairs]() mutable {
+                [this, fsBegin, fsEnd, &fields, &fieldValuePairs, &foundFieldsError]() mutable {
                     // XXX Won't need first two tags when bug #132031 is
                     // addressed
                     TfAutoMallocTag2 tag("Usd", "Usd_CrateDataImpl::Open");
@@ -888,31 +889,67 @@ private:
                     auto &pairs = fieldValuePairs.GetMutable();
                     pairs.resize(fsEnd-fsBegin);
                     for (size_t i = 0; fsBegin != fsEnd; ++fsBegin, ++i) {
+                        // @AAPL: rdar://71389293 ([JazzSecGoldenGateD] ZDI-CAN-12185: USD Usd_CrateDataImpl::_PopulateFromCrateFile - OOB read)
+                        if (ARCH_UNLIKELY(fsBegin->value >= fields.size())) {
+                            foundFieldsError = true;
+                            break;
+                        }
                         auto const &field = fields[fsBegin->value];
+                        // @AAPL rdar://75419933 ([USD - ModelIO] EXC_BAD_ACCESS | SdfSpec::GetSchema() const spec.cpp:62 -- SdfSpec::GetInfo)
+                        if (ARCH_UNLIKELY(!_crateFile->HasToken(field.tokenIndex))) {
+                            foundFieldsError = true;
+                            break;
+                        }
                         pairs[i].first = _crateFile->GetToken(field.tokenIndex);
                         pairs[i].second = _UnpackForField(field.valueRep);
                     }
                 });
+            // @AAPL: rdar://71389293 ([JazzSecGoldenGateD] ZDI-CAN-12185: USD Usd_CrateDataImpl::_PopulateFromCrateFile - OOB read)
+            if (ARCH_UNLIKELY(foundFieldsError)) {
+                dispatcher.Cancel();
+                break;
+            }
+            if (fsEnd == fieldSets.end()) {
+                break;
+            }
         }
 
         dispatcher.Wait();
 
+        // @AAPL: rdar://71389293 ([JazzSecGoldenGateD] ZDI-CAN-12185: USD Usd_CrateDataImpl::_PopulateFromCrateFile - OOB read)
+        if (ARCH_UNLIKELY(foundFieldsError)) {
+            TF_RUNTIME_ERROR("CrateFile specs are corrupted, contain field data out of bounds");
+            return false;
+        }
+
+        // @AAPL rdar://75389612 ([USD - ModelIO] ASAN EXC_BAD_ACCESS | internal::parallel_for_body::operator; internal::parallel_for_body::operator; internal::parallel_for_body::operator)
+        std::atomic<bool> fieldSetDataIsValid {true};
         dispatcher.Run(
-            [this, &specs, &specDataPtrs, &liveFieldSets]() {
+            [this, &specs, &specDataPtrs, &liveFieldSets, &fieldSetDataIsValid]() {
                 tbb::parallel_for(
                     static_cast<size_t>(0), static_cast<size_t>(specs.size()),
-                    [this, &specs, &specDataPtrs, &liveFieldSets]
+                    [this, &specs, &specDataPtrs, &liveFieldSets, &fieldSetDataIsValid]
                     (size_t specIdx) {
                         auto const &s = specs[specIdx];
                         auto *specData = specDataPtrs[specIdx];
                         _flatTypes[specIdx].type = s.specType;
-                        specData->fields =
-                            liveFieldSets.find(s.fieldSetIndex)->second;
+                        // @AAPL rdar://75389612 ([USD - ModelIO] ASAN EXC_BAD_ACCESS | internal::parallel_for_body::operator; internal::parallel_for_body::operator; internal::parallel_for_body::operator)
+                        auto entry = liveFieldSets.find(s.fieldSetIndex);
+                        if (entry != liveFieldSets.end()) {
+                            specData->fields = entry->second;
+                        } else {
+                            fieldSetDataIsValid = false;
+                        }
                     });
             });
 
         dispatcher.Wait();
 
+        // @AAPL rdar://75389612 ([USD - ModelIO] ASAN EXC_BAD_ACCESS | internal::parallel_for_body::operator; internal::parallel_for_body::operator; internal::parallel_for_body::operator)
+        if (!fieldSetDataIsValid.load()) {
+            TF_RUNTIME_ERROR("CrateFile specs are corrupted, contains invalid field data.");
+            return false;
+        }
         return true;
     }
 
