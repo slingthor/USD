@@ -779,6 +779,17 @@ private:
         vector<CrateFile::Field> fields;
         vector<Usd_CrateFile::FieldIndex> fieldSets;
         _crateFile->RemoveStructuralData(specs, fields, fieldSets);
+
+        // @AAPL: rdar://68296052 ([JazzSecGoldenGate] Pixar OpenUSD Binary File Format Specs Memory corruption (TALOS-2020-1125))
+        // Detect if any specs have pathIndices out of of bounds
+        if (any_of(
+            specs.begin(), specs.end(),
+            [this](CrateFile::Spec const &spec) {
+                return spec.pathIndex.value >= _crateFile->GetPaths().size();
+        })) {
+            TF_RUNTIME_ERROR("CrateFile specs are corrupted, contain pathIndices out of bounds");
+            return false;
+        }
         
         // Remove any target specs, we do not store target specs in Usd, but old
         // files could contain them.
