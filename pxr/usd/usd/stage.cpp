@@ -2603,7 +2603,13 @@ UsdStage::_ComposeChildren(Usd_PrimDataPtr prim,
                 TF_RUNTIME_ERROR("Unable to instantiate prim with empty path.");
                 return;
             }
-            tail = _InstantiatePrim(parentPath.AppendChild(*curName));
+            // @AAPL rdar://75532433 (ZDI-CAN-13394: Apple macOS ModelIO USD Parsing Use-After-Free Remote Code Execution Vulnerability)
+            auto newPrimPath = parentPath.AppendChild(*curName);
+            if (newPrimPath.IsEmpty()) {
+                TF_RUNTIME_ERROR("Unable to instantiate prim with invalid path.");
+                return;
+            }
+            tail = _InstantiatePrim(newPrimPath);
             if (recurse) {
                 _ComposeChildSubtree(tail, prim, mask);
             }
@@ -6386,7 +6392,8 @@ _GetPrimSpecifierImpl(Usd_PrimDataConstPtr primData,
     SdfSpecifier curSpecifier = SdfSpecifierOver;
 
     Usd_Resolver::Position specPos;
-
+    // @AAPL rdar://75389676 ([USD - ModelIO] ASAN EXC_BAD_ACCESS | UsdStage::_GetSpecifier; UsdStage::_GetSpecifier; UsdStage::_GetSpecifier)
+    bool initializedSpecPos = false;
     const PcpPrimIndex &primIndex = primData->GetPrimIndex();
     for (Usd_Resolver res(&primIndex); res.IsValid(); res.NextLayer()) {
         // Get specifier and its strength from this prim.
@@ -6394,6 +6401,7 @@ _GetPrimSpecifierImpl(Usd_PrimDataConstPtr primData,
         if (res.GetLayer()->HasField(
                 res.GetLocalPath(), SdfFieldKeys->Specifier, &curSpecifier)) {
             specPos = res.GetPosition();
+            initializedSpecPos = true;
 
             if (SdfIsDefiningSpecifier(curSpecifier)) {
                 // Compute strength.
@@ -6437,6 +6445,12 @@ _GetPrimSpecifierImpl(Usd_PrimDataConstPtr primData,
             if (strength == _SpecifierStrengthDefining)
                 break;
         }
+    }
+
+    // @AAPL rdar://75389676 ([USD - ModelIO] ASAN EXC_BAD_ACCESS | UsdStage::_GetSpecifier; UsdStage::_GetSpecifier; UsdStage::_GetSpecifier)
+    if (!initializedSpecPos) {
+        TF_RUNTIME_ERROR("Failed to get valid specPos for %s", primData->GetPath().GetText());
+        return false;
     }
 
     // Verify we found *something*.  We should never have PrimData without at

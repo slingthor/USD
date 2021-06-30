@@ -174,12 +174,25 @@ template <class Int>
 constexpr size_t
 _GetEncodedBufferSize(size_t numInts)
 {
+    // @AAPL rdar://75598197 ([USD - Modelkit] signal_SIGABRT |std::__1::vector<Usd_CrateFile::FieldIndex, std::__1::allocator<Usd_CrateFile::FieldIndex> >::__append)
+    if (numInts == 0) {
+        return 0;
+    }
+
+    const auto maxIntValue = std::numeric_limits<Int>::max();
+
+    if (numInts > (maxIntValue / sizeof(Int))) { /* Integer overflow */ return 0; }
+    const auto maxIntBytes = numInts * sizeof(Int);
+
+    if (numInts > ((maxIntValue - 7) / 2)) { /* Integer overflow */ return 0; }
+    const auto numCodesBytes = (numInts * 2 + 7) / 8;
+
+    if (maxIntBytes > maxIntValue - numCodesBytes) { /* Integer overflow */ return 0; }
+    if (sizeof(Int) > maxIntValue - numCodesBytes - maxIntBytes) { /* Integer overflow */ return 0; }
+    constexpr auto commonValue = sizeof(Int);
+
     // Calculate encoded integer size.
-    return numInts ?
-        /* commonValue */ (sizeof(Int)) +
-        /* numCodesBytes */ ((numInts * 2 + 7) / 8) +
-        /* maxIntBytes */ (numInts * sizeof(Int))
-        : 0;
+    return commonValue + numCodesBytes + maxIntBytes;
 }
 
 template <class Int>

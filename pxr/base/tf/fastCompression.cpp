@@ -106,6 +106,12 @@ TfFastCompression::DecompressFromBuffer(
     char const *compressed, char *output,
     size_t compressedSize, size_t maxOutputSize)
 {
+    // @AAPL rdar://70634705 (ZDI-CAN-12188: Apple macOS ModelIO USD Parsing Out-Of-Bounds Write Remote Code Execution Vulnerability)
+    if (compressedSize == 0 || maxOutputSize == 0) {
+        TF_RUNTIME_ERROR("Failed to decompress 0 data.");
+        return 0;
+    }
+
     // Check first byte for # chunks.
     int nChunks = *compressed++;
     if (nChunks == 0) {
@@ -120,11 +126,18 @@ TfFastCompression::DecompressFromBuffer(
         return nDecompressed;
     } else {
         // Do each chunk.
+        size_t totalRead = 0;
         size_t totalDecompressed = 0;
         for (int i = 0; i != nChunks; ++i) {
             int32_t chunkSize = 0;
             memcpy(&chunkSize, compressed, sizeof(chunkSize));
             compressed += sizeof(chunkSize);
+            // @AAPL rdar://74281474 (ZDI-CAN-13235: Apple macOS ModelIO USD Parsing Out-Of-Bounds Read Information Disclosure Vulnerability)
+            totalRead += chunkSize + sizeof(chunkSize);
+            if (totalRead > compressedSize) {
+                TF_RUNTIME_ERROR("Failed to decompress data. Chunk too large.");
+                return 0;
+            }
             int nDecompressed = LZ4_decompress_safe(
                 compressed, output, chunkSize,
                 std::min<size_t>(LZ4_MAX_INPUT_SIZE, maxOutputSize));
