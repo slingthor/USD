@@ -321,7 +321,8 @@ private:
     uint8  m_remainder;          // length of unhashed data stashed in m_data
 };
 
-#define ALLOW_UNALIGNED_READS 1
+// @AAPL rdar://75709501 ([USD - Modelkit] UBSAN | hash.cpp:414:14)
+#define ALLOW_UNALIGNED_READS 0
 
 //
 // short hash ... it could be used on any message, 

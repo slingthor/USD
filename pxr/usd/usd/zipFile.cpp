@@ -73,12 +73,22 @@ struct _InputStream {
     {
         static_assert(_IsBitwiseReadWrite<T>::value, 
                       "Cannot memcpy to non-trivially-copyable type");
+        // @AAPL rdar://76470262 ([ModelIO] zipFile.cpp Read and Advance do not check buffer bounds, may copy OOB memory)
+        if (ARCH_UNLIKELY(sizeof(T) > RemainingSize() || RemainingSize() > _size)) {
+            TF_RUNTIME_ERROR("Failed to read from zip input stream. Corrupt data.");
+            return;
+        }
         memcpy(reinterpret_cast<char*>(dest), _cur, sizeof(T));
         _cur += sizeof(T);
     }
 
     inline void Read(void* dest, size_t nBytes)
     {
+        // @AAPL rdar://76470262 ([ModelIO] zipFile.cpp Read and Advance do not check buffer bounds, may copy OOB memory)
+        if (ARCH_UNLIKELY(nBytes > RemainingSize() || RemainingSize() > _size)) {
+            TF_RUNTIME_ERROR("Failed to read from zip input stream. Corrupt data.");
+            return;
+        }
         memcpy(dest, _cur, nBytes);
         _cur += nBytes;
     }
