@@ -181,6 +181,7 @@ def GetEnv(context):
         envToRun["RC_ReleaseStatus"] = "Development"
         envToRun["RC_XBS"] = "YES"
         envToRun["TOOLCHAINS"] = "com.apple.dt.toolchain.OSX12_0"
+        envToRun["SYMROOT"]= "${SYMROOT}"
         envToRun["XCODE_XCCONFIG_FILE"] =  os.path.join(buildScriptsDir, "xcodeBuildSettingOverrides.xcconfig")
 
         if context.buildUniversal:

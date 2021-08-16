@@ -1241,8 +1241,30 @@ void MtlfMetalContext::SetRenderEncoderState()
         threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_FILL_MODE;
     }
 
+    if (!wq->currentArgumentEncoder)
+    {
+        MTLArgumentDescriptor *argumentDesc = [[MTLArgumentDescriptor alloc] init];
+        argumentDesc.dataType = MTLDataTypePointer;
+        argumentDesc.access = MTLArgumentAccessReadOnly;
+        wq->currentArgumentEncoder = [currentDevice newArgumentEncoderWithArguments:@[argumentDesc]];
+        [argumentDesc release];
+    }
+
     // Any buffers modified
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_BUFFER) {
+        if (wq->currentArgumentBuffer) {
+            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(wq->currentArgumentBuffer);
+        }
+        
+        NSUInteger argumentBufferSize = (threadState.boundBuffers.size() + 1) * sizeof(void*);
+        for(auto buffer : threadState.boundBuffers)
+        {
+            NSUInteger sizeRequired = (buffer->index + 1) * sizeof(void*);
+            argumentBufferSize = (argumentBufferSize < sizeRequired) ? sizeRequired : argumentBufferSize;
+        }
+
+        wq->currentArgumentBuffer = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(argumentBufferSize);
+        [wq->currentRenderEncoder setFragmentBuffer:wq->currentArgumentBuffer offset:0 atIndex:0];
         
         for(auto buffer : threadState.boundBuffers)
         {
@@ -1258,7 +1280,12 @@ void MtlfMetalContext::SetRenderEncoderState()
                     [wq->currentRenderEncoder setVertexBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
                 }
                 else if(buffer->stage == kMSL_ProgramStage_Fragment) {
-                    [wq->currentRenderEncoder setFragmentBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
+                    //[wq->currentArgumentEncoder setBuffer:buffer->buffer offset:0 atIndex:buffer->index * sizeof(void*)];
+                    
+                    
+                    [wq->currentArgumentEncoder setArgumentBuffer:wq->currentArgumentBuffer offset:buffer->index * sizeof(void*)];
+                    [wq->currentArgumentEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:0];
+                    [wq->currentRenderEncoder useResource:buffer->buffer usage:MTLResourceUsageRead];
                 }
                 else{
                     if(threadState.enableComputeGS) {

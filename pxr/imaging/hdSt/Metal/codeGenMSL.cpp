@@ -1984,7 +1984,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     }
     
     ////////////////////////////////// Fragment Shader //////////////////////////////
-    std::stringstream   fsCode, fsFuncDef, fsInputCode, fsOutputCode, fsOutputStruct, fsTexturingStruct, fsUniformStruct, fsInterpolationCode;
+    std::stringstream   fsCode, fsFuncDef, fsInputCode, fsOutputCode, fsOutputStruct, fsTexturingStruct, fsUniformStruct, fsBuffersStruct, fsInterpolationCode;
     int                 fsUniformStructSize(0);
     
     fsInterpolationCode << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
@@ -1993,7 +1993,18 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                         << "vec2 Interpolate_CenterPerspective(vec2 in1, vec2 in2, vec2 in3, vec2 bary) { return in1 * (1 - (bary.x + bary.y)) + in2 * bary.x + in3 * bary.y; }\n"
                         << "vec3 Interpolate_CenterPerspective(vec3 in1, vec3 in2, vec3 in3, vec2 bary) { return in1 * (1 - (bary.x + bary.y)) + in2 * bary.x + in3 * bary.y; }\n"
                         << "vec4 Interpolate_CenterPerspective(vec4 in1, vec4 in2, vec4 in3, vec2 bary) { return in1 * (1 - (bary.x + bary.y)) + in2 * bary.x + in3 * bary.y; }\n\n";
-    
+    {
+        TfToken argumentBufferToken("bindings");
+        MSL_ShaderBinding const * const argumentBufferBinding =
+            MSL_FindBinding(mslProgram->GetBindingMap(),
+                argumentBufferToken, kMSL_BindingType_UniformBuffer,
+                kMSL_ProgramStage_Fragment);
+
+        int argumentBufferSlot = (argumentBufferBinding) ? argumentBufferBinding->_index : 0;
+            
+        fsFuncDef << "\n    , const device MSLFsBuffers& bindings[[buffer(" << argumentBufferSlot << ")]]";
+    }
+
     if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
         fsFuncDef   << "\n    , const device MSLGsVertOutStruct* gsVertOutBuffer[[buffer(" << gsVertOutputSlot << ")]]"
                     << "\n    , const device MSLGsPrimOutStruct* gsPrimOutBuffer[[buffer(" << gsPrimOutputSlot << ")]]";
@@ -2008,18 +2019,24 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     fsUniformStruct << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                     << "// MSL FS Uniform Struct ///////////////////////////////////////////////////////////////////////////////////////////\n\n"
                     << "struct MSLFsUniforms {\n";
-    
-    int fsCurrentSamplerSlot(0), fsCurrentTextureSlot(0);
+
+    fsBuffersStruct << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                    << "// MSL FS Buffers Struct ///////////////////////////////////////////////////////////////////////////////////////////\n\n"
+                    << "struct MSLFsBuffers {\n";
+
+    int fsCurrentSamplerSlot(0), fsCurrentTextureSlot(0), fsNextBindingSlot(0);
     TF_FOR_ALL(it, _mslPSInputParams) {
         std::string name(it->name.GetString()), accessor(it->accessorStr.GetString()),
                     dataType(it->dataType.GetString());
         std::stringstream attribute;
         
-        if (it->usage & HdSt_CodeGenMSL::TParam::VertexShaderOnly)
+        if (it->usage & HdSt_CodeGenMSL::TParam::VertexShaderOnly) {
             continue;
+        }
         
-        bool                isPtr(false), isScopeMember(true);
+        bool                isPtr(false), isScopeMember(true), scopeDereferenced(false);
         std::stringstream   sourcePrefix, destPrefix, sourcePostfix;
+        
         if((it->usage & HdSt_CodeGenMSL::TParam::maskShaderUsage) == HdSt_CodeGenMSL::TParam::Sampler) {
             //This parameter is a sampler
             
@@ -2047,9 +2064,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 if(name.at(0) == '*') {
                     name = name.substr(1, name.length() - 1);
                     isPtr = true;
+                } else {
+                    scopeDereferenced = true;
                 }
-                else
-                    sourcePrefix << "*";
                 
                 //Uniform Blocks need a different name as a binding to stay matching with Hydra
                 std::string bindingName = name;
@@ -2098,12 +2115,33 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 bool isAtomicType = it->dataType.GetString().find("atomic") != std::string::npos;
                 bool isShaderWritable = (it->usage & HdSt_CodeGenMSL::TParam::Usage::Writable);
                 
-                fsFuncDef << "\n    , " << ((isAtomicType || isShaderWritable) ? "" : "const ") << "device "
-                          << ((it->usage & TParam::Usage::ProgramScope) ?
+#if 0
+                std::stringstream fsBuffer;
+                fsBuffer << ((isAtomicType || isShaderWritable) ? "" : "const ") << "device "
+                         << ((it->usage & TParam::Usage::ProgramScope) ?
                             "ProgramScope_Frag::" : "")
-                          << _GetPackedType(it->dataType, true)
-                          << "* " << name << "[[buffer("
-                          << assignedSlot << ")]]";
+                         << _GetPackedType(it->dataType, true)
+                         << "* " << name;
+
+                fsBuffersStructEntries.insert({assignedSlot, fsBuffer.str()});
+#else
+                for (int i = fsNextBindingSlot; i < assignedSlot; ++i) {
+                    // Output a dummy entry to get the arrangement of the struct to match.
+                    fsBuffersStruct << ((i == 0) ? "    " : ";\n    ");
+                    fsBuffersStruct << "const device void* dummy" << i;
+                }
+                
+                fsBuffersStruct << ((assignedSlot == 0) ? "    " : ";\n    ");
+                fsBuffersStruct << ((isAtomicType || isShaderWritable) ? "" : "const ") << "device "
+                                << ((it->usage & TParam::Usage::ProgramScope) ?
+                                    "ProgramScope_Frag::" : "")
+                                << _GetPackedType(it->dataType, true)
+                                << "* " << name;
+                
+                fsNextBindingSlot = assignedSlot + 1;
+#endif
+                
+                sourcePrefix << "bindings.";
             }
             //else
                 // This parameter is a built-in variable and we won't add it to
@@ -2121,12 +2159,14 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                     name = name.substr(0, bracketPos);
                 
                 //"name" contains the variable name while "accessor" contains the structure name in this case.
+                sourcePrefix << "bindings.";
                 sourcePrefix << accessor << "->";
                 accessor = name;
             }
             else if(it->usage & HdSt_CodeGenMSL::TParam::Uniform) {
                 //This parameter is a uniform
                 
+                sourcePrefix << "bindings.";
                 sourcePrefix << "fsUniforms->";
                 
                 fsUniformStruct << "    " << dataType << " " << name << ";\n";
@@ -2241,10 +2281,32 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
             }
         }
         
-        if(isScopeMember) {
-            fsInputCode << "    scope." << destPrefix.str() << (accessor.empty() ? name : accessor) << " = " << sourcePrefix.str() << name << ";\n";
+        if (isScopeMember) {
+            fsInputCode << "    scope." << destPrefix.str()
+                        << (accessor.empty() ? name : accessor)
+                        << " = " << (scopeDereferenced ? "*" : "")
+                        << sourcePrefix.str()
+                        << name << ";\n";
         }
     }
+#if 0
+    {
+        // Create the MSLFsBuffers code with the sorted list of buffers.
+        int nextIndex = 0;
+
+        for (const auto& bufferEntry : fsBuffersStructEntries) {
+            for (int i = nextIndex; i < bufferEntry.first; ++i) {
+                // Output a dummy entry to get the arrangement of the struct to match.
+                fsBuffersStruct << ((i == 0) ? "    " : ";\n    ");
+                fsBuffersStruct << "const device void* dummy" << i;
+            }
+            
+            fsBuffersStruct << ((bufferEntry.first == 0) ? "    " : ";\n    ");
+            fsBuffersStruct << bufferEntry.second;
+            nextIndex = bufferEntry.first + 1;
+        }
+    }
+#endif
     // How we emulate gl_FragCoord is different based on whether we're
     // using a pass-through vertex shader due to using compute for GS.
     // [[position]] is very different, and we we need to standardise it here
@@ -2256,11 +2318,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
         fsInputCode << "    vec2 xy = scope.gl_Position.xy / scope.gl_Position.w;\n";
         //fsInputCode << "    xy.y *= -1.0;\n";
         fsInputCode << "    xy += 1.0;\n";
-        fsInputCode << "    scope.gl_FragCoord.xy = xy * 0.5 * vec2(fragExtras->renderTargetWidth, fragExtras->renderTargetHeight);\n";
+        fsInputCode << "    scope.gl_FragCoord.xy = xy * 0.5 * vec2(bindings.fragExtras->renderTargetWidth, bindings.fragExtras->renderTargetHeight);\n";
     }
     fsTexturingStruct << "};\n\n";
     fsUniformStruct << "};\n\n";
     fsFuncDef << ")\n{\n";
+    fsBuffersStruct << ";\n};\n\n";
     
     //Round up size of uniform buffer to next 16 byte boundary.
     fsUniformStructSize = ((fsUniformStructSize + 15) / 16) * 16;
@@ -2298,6 +2361,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     
     fsCode  << fragExtrasStruct.str()
             << (usesTexturingStruct ? fsTexturingStruct.str() : "");
+
+    fsCode  << fsBuffersStruct.str();
     
     fsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
             << "// MSL Vertex Output Struct ////////////////////////////////////////////////////////////////////////////////////////\n\n"

@@ -133,6 +133,8 @@ struct MetalWorkQueue {
     id<MTLBlitCommandEncoder>    currentBlitEncoder;
     id<MTLRenderCommandEncoder>  currentRenderEncoder;
     id<MTLComputeCommandEncoder> currentComputeEncoder;
+    id<MTLArgumentEncoder>       currentArgumentEncoder;
+    id<MTLBuffer>                currentArgumentBuffer;
     MTLRenderPassDescriptor      *currentRenderPassDescriptor;
     bool encoderInUse;
     bool encoderEnded;
