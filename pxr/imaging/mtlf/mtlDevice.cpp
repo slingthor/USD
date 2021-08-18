@@ -1256,7 +1256,7 @@ void MtlfMetalContext::SetRenderEncoderState()
             MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(wq->currentArgumentBuffer);
         }
         
-        NSUInteger argumentBufferSize = (threadState.boundBuffers.size() + 1) * sizeof(void*);
+        NSUInteger argumentBufferSize = (threadState.boundBuffers.size() + 3) * sizeof(void*);
         for(auto buffer : threadState.boundBuffers)
         {
             NSUInteger sizeRequired = (buffer->index + 1) * sizeof(void*);
@@ -1280,9 +1280,11 @@ void MtlfMetalContext::SetRenderEncoderState()
                     [wq->currentRenderEncoder setVertexBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
                 }
                 else if(buffer->stage == kMSL_ProgramStage_Fragment) {
-                    //[wq->currentArgumentEncoder setBuffer:buffer->buffer offset:0 atIndex:buffer->index * sizeof(void*)];
-                    
-                    
+                    // fragExtras is a special case, since it has to be set from glslProgramMetal.cpp:855
+                    if (buffer->name == "fragExtras") {
+                        [wq->currentRenderEncoder setFragmentBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
+                    }
+
                     [wq->currentArgumentEncoder setArgumentBuffer:wq->currentArgumentBuffer offset:buffer->index * sizeof(void*)];
                     [wq->currentArgumentEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:0];
                     [wq->currentRenderEncoder useResource:buffer->buffer usage:MTLResourceUsageRead];
@@ -1299,6 +1301,12 @@ void MtlfMetalContext::SetRenderEncoderState()
                 }
                 buffer->modified = false;
             }
+        }
+        
+        if ([wq->currentArgumentBuffer
+                 respondsToSelector:@selector(didModifyRange:)]) {
+            NSRange range = NSMakeRange(0, argumentBufferSize);
+            [wq->currentArgumentBuffer didModifyRange:range];
         }
         
         threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_VERTEX_BUFFER;

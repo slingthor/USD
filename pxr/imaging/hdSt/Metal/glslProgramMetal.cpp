@@ -851,14 +851,14 @@ void HdStGLSLProgramMSL::DrawElementsInstancedBaseVertex(int primitiveMode,
                 }
             }
         }
-        
-        //Setup Frag Extras on the render context
+
+        // Setup fragExtras on the render context
         struct { float _renderTargetWidth, _renderTargetHeight; }
         fragExtraArgs = { renderTargetWidth, renderTargetHeight };
         [renderEncoder setFragmentBytes:(const void*)&fragExtraArgs
                                  length:sizeof(fragExtraArgs)
                                 atIndex:_fragExtrasSlot];
-        
+
         if(doMVAComputeGS) {
             if (useDispatchThreads) {
                 [computeEncoder dispatchThreads:MTLSizeMake(numPrimitivesInPart, 1, 1)

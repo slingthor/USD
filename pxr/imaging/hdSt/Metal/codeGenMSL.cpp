@@ -2001,7 +2001,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 kMSL_ProgramStage_Fragment);
 
         int argumentBufferSlot = (argumentBufferBinding) ? argumentBufferBinding->_index : 0;
-            
+
         fsFuncDef << "\n    , const device MSLFsBuffers& bindings[[buffer(" << argumentBufferSlot << ")]]";
     }
 
@@ -2024,7 +2024,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                     << "// MSL FS Buffers Struct ///////////////////////////////////////////////////////////////////////////////////////////\n\n"
                     << "struct MSLFsBuffers {\n";
 
-    int fsCurrentSamplerSlot(0), fsCurrentTextureSlot(0), fsNextBindingSlot(0);
+    int fsCurrentSamplerSlot(0), fsCurrentTextureSlot(0);
+    std::multimap<int, std::string> fsBuffersStructEntries;
+
     TF_FOR_ALL(it, _mslPSInputParams) {
         std::string name(it->name.GetString()), accessor(it->accessorStr.GetString()),
                     dataType(it->dataType.GetString());
@@ -2087,16 +2089,16 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                     currentUniformBufferSlot++;
                 }
                 else if(bindingName == "fragExtras") {
-                    fragExtrasSlot = assignedSlot;
+                    fragExtrasSlot = 1;
                     isScopeMember = false;
-                    currentUniformBufferSlot++;
                     
-                    mslProgram->AddBinding(bindingName, assignedSlot,
+                    mslProgram->AddBinding(bindingName, fragExtrasSlot,
                         it->binding, kMSL_BindingType_FragExtras,
                         kMSL_ProgramStage_Fragment);
                 }
                 else {
-                    //Attempt to find the same buffer in the VS inputs. If found, assign this buffer to the same slot.
+                    // Attempt to find the same buffer in the VS inputs.
+                    // If found, assign this buffer to the same slot.
                     TfToken bindingNameToken(bindingName);
                     MSL_ShaderBinding const * const binding =
                         MSL_FindBinding(mslProgram->GetBindingMap(),
@@ -2115,33 +2117,29 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 bool isAtomicType = it->dataType.GetString().find("atomic") != std::string::npos;
                 bool isShaderWritable = (it->usage & HdSt_CodeGenMSL::TParam::Usage::Writable);
                 
-#if 0
-                std::stringstream fsBuffer;
-                fsBuffer << ((isAtomicType || isShaderWritable) ? "" : "const ") << "device "
-                         << ((it->usage & TParam::Usage::ProgramScope) ?
-                            "ProgramScope_Frag::" : "")
-                         << _GetPackedType(it->dataType, true)
-                         << "* " << name;
+                // The buffers can arrive out-of-order so we put them in a multimap
+                // and output the sorted list into the MSLFsBuffers structure at
+                // the end.
+                if (name != "fragExtras") {
+                    std::stringstream fsBuffer;
+                    fsBuffer << ((isAtomicType || isShaderWritable) ? "" : "const ") << "device "
+                            << ((it->usage & TParam::Usage::ProgramScope) ?
+                                "ProgramScope_Frag::" : "")
+                            << _GetPackedType(it->dataType, true)
+                            << "* " << name;
 
-                fsBuffersStructEntries.insert({assignedSlot, fsBuffer.str()});
-#else
-                for (int i = fsNextBindingSlot; i < assignedSlot; ++i) {
-                    // Output a dummy entry to get the arrangement of the struct to match.
-                    fsBuffersStruct << ((i == 0) ? "    " : ";\n    ");
-                    fsBuffersStruct << "const device void* dummy" << i;
+                    fsBuffersStructEntries.insert({assignedSlot, fsBuffer.str()});
+                
+                    sourcePrefix << "bindings.";
+                } else {
+                    fsFuncDef << "\n    , "
+                            << ((isAtomicType || isShaderWritable) ? "" : "const ") << "device "
+                            << ((it->usage & TParam::Usage::ProgramScope) ?
+                                "ProgramScope_Frag::" : "")
+                            << _GetPackedType(it->dataType, true)
+                            << "* " << name << "[[buffer("
+                            << fragExtrasSlot << ")]]";
                 }
-                
-                fsBuffersStruct << ((assignedSlot == 0) ? "    " : ";\n    ");
-                fsBuffersStruct << ((isAtomicType || isShaderWritable) ? "" : "const ") << "device "
-                                << ((it->usage & TParam::Usage::ProgramScope) ?
-                                    "ProgramScope_Frag::" : "")
-                                << _GetPackedType(it->dataType, true)
-                                << "* " << name;
-                
-                fsNextBindingSlot = assignedSlot + 1;
-#endif
-                
-                sourcePrefix << "bindings.";
             }
             //else
                 // This parameter is a built-in variable and we won't add it to
@@ -2289,13 +2287,13 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                         << name << ";\n";
         }
     }
-#if 0
+
     {
         // Create the MSLFsBuffers code with the sorted list of buffers.
-        int nextIndex = 0;
+        int fsNextBindingSlot(0);
 
         for (const auto& bufferEntry : fsBuffersStructEntries) {
-            for (int i = nextIndex; i < bufferEntry.first; ++i) {
+            for (int i = fsNextBindingSlot; i < bufferEntry.first; ++i) {
                 // Output a dummy entry to get the arrangement of the struct to match.
                 fsBuffersStruct << ((i == 0) ? "    " : ";\n    ");
                 fsBuffersStruct << "const device void* dummy" << i;
@@ -2303,10 +2301,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
             
             fsBuffersStruct << ((bufferEntry.first == 0) ? "    " : ";\n    ");
             fsBuffersStruct << bufferEntry.second;
-            nextIndex = bufferEntry.first + 1;
+            fsNextBindingSlot = bufferEntry.first + 1;
         }
     }
-#endif
+
     // How we emulate gl_FragCoord is different based on whether we're
     // using a pass-through vertex shader due to using compute for GS.
     // [[position]] is very different, and we we need to standardise it here
@@ -2318,7 +2316,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
         fsInputCode << "    vec2 xy = scope.gl_Position.xy / scope.gl_Position.w;\n";
         //fsInputCode << "    xy.y *= -1.0;\n";
         fsInputCode << "    xy += 1.0;\n";
-        fsInputCode << "    scope.gl_FragCoord.xy = xy * 0.5 * vec2(bindings.fragExtras->renderTargetWidth, bindings.fragExtras->renderTargetHeight);\n";
+        fsInputCode << "    scope.gl_FragCoord.xy = xy * 0.5 * vec2(fragExtras->renderTargetWidth, fragExtras->renderTargetHeight);\n";
     }
     fsTexturingStruct << "};\n\n";
     fsUniformStruct << "};\n\n";
