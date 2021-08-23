@@ -521,7 +521,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
     extraArgs = copy.deepcopy(buildArgs)
 
     # TEMPORARY WORKAROUND
-    if targetMacOS or targetIOS:
+    if targetMacOS:
         sdkPath = GetCommandOutput('xcrun --sdk macosx.internal --show-sdk-path').strip()
         extraArgs.append('-DCMAKE_OSX_SYSROOT="' + sdkPath + '" ')
         
@@ -538,7 +538,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
             extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
             extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64e')
-        else:
+        elif not iOS():
             extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=YES')
             MacArch = GetCommandOutput('arch').strip()
             if MacArch == "i386" or MacArch == "x86_64":
@@ -1284,6 +1284,9 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             archPrimary = "arm64e"
             archSecondary = "intel64"
 
+        if iOS:
+            archPrimary = "arm64"
+
         if context.static_dependencies_macOS:
             buildArgs.append('extra_inc=big_iron.inc ')
 
@@ -1361,9 +1364,11 @@ def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(jpeg_url, context, force)):
         extraJPEGArgs = buildArgs;
 
+        if context.static_dependencies_macOS:
+            extraJPEGArgs.append("-DENABLE_STATIC=TRUE")
+
         if MacOS():
             extraJPEGArgs.append("-DWITH_SIMD=FALSE")
-            extraJPEGArgs.append("-DENABLE_STATIC=TRUE")
 
         if iOS():
             extraJPEGArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
@@ -1990,7 +1995,7 @@ def InstallOpenImageIO(context, force, buildArgs):
     patch_path = os.path.join(dir_path, "patches/oiio.diff")
 
     with CurrentWorkingDirectory(DownloadURL(OIIO_URL, context, force)):
-        if MacOS():
+        if MacOS() or iOS():
             Run("mv src/libutil/strutil.cpp src/libutil/strutil.mm")
             Run("mv src/libutil/ustring.cpp src/libutil/ustring.mm")
             Run("mv src/libtexture/texture3d.cpp src/libtexture/texture3d.mm")
