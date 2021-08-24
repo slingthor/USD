@@ -1114,8 +1114,10 @@ void MtlfMetalContext::SetRenderPipelineState()
         }
 
         NSError *error = NULL;
-        pipelineState = [currentDevice newRenderPipelineStateWithDescriptor:renderPipelineStateDescriptor error:&error];
-        [renderPipelineStateDescriptor release];
+        if (renderPipelineStateDescriptor) {
+            pipelineState = [currentDevice newRenderPipelineStateWithDescriptor:renderPipelineStateDescriptor error:&error];
+            [renderPipelineStateDescriptor release];
+        }
 
         if (!pipelineState) {
             _pipelineMutex.unlock();
