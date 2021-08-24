@@ -222,6 +222,7 @@ private:
         tbb::enumerable_thread_specific<_ContextStack>;
     _PerThreadContextStack _threadContextStack;
 
+    // APPLE METAL: DO NOT MERGE BACK
     static SandboxingFn _sandboxingCallback;
 };
 
