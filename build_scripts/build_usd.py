@@ -1285,7 +1285,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             archSecondary = "intel64"
 
         if iOS:
-            archPrimary = "arm64"
+            archPrimary = "arm64e"
 
         if context.static_dependencies_macOS:
             buildArgs.append('extra_inc=big_iron.inc ')
