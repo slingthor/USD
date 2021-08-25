@@ -53,6 +53,10 @@ _IsFileRelative(const std::string& path) {
 
 static TfStaticData<std::vector<std::string>> _SearchPath;
 
+// APPLE METAL: DO NOT MERGE BACK
+ArDefaultResolver::SandboxingFn ArDefaultResolver::_sandboxingCallback;
+// APPLE METAL: DO NOT MERGE BACK
+
 struct ArDefaultResolver::_Cache
 {
     using _PathToResolvedPathMap = 
@@ -153,7 +157,10 @@ ArDefaultResolver::ComputeRepositoryPath(const std::string& path)
 static std::string
 _Resolve(
     const std::string& anchorPath,
-    const std::string& path)
+    const std::string& path,
+// APPLE METAL: DO NOT MERGE BACK
+    ArDefaultResolver::SandboxingFn sandboxingCallback)
+// APPLE METAL: DO NOT MERGE BACK
 {
     std::string resolvedPath = path;
     if (!anchorPath.empty()) {
@@ -167,7 +174,16 @@ _Resolve(
         // and fix up all the callers to accommodate this.
         resolvedPath = TfStringCatPaths(anchorPath, path);
     }
-    return TfPathExists(resolvedPath) ? resolvedPath : std::string();
+
+    // USD METAL: Call out to the sandboxing to extend.
+    bool pathCanBeAccessed = TfPathExists(resolvedPath);
+
+    if (sandboxingCallback && pathCanBeAccessed) {
+        pathCanBeAccessed = sandboxingCallback(resolvedPath.c_str());
+    }
+
+    return pathCanBeAccessed ? resolvedPath : std::string();
+    // APPLE METAL: DO NOT MERGE BACK
 }
 
 std::string
@@ -180,7 +196,8 @@ ArDefaultResolver::_ResolveNoCache(const std::string& path)
     if (IsRelativePath(path)) {
         // First try to resolve relative paths against the current
         // working directory.
-        std::string resolvedPath = _Resolve(ArchGetCwd(), path);
+        // APPLE METAL: DO NOT MERGE BACK
+        std::string resolvedPath = _Resolve(ArchGetCwd(), path, _sandboxingCallback);
         if (!resolvedPath.empty()) {
             return resolvedPath;
         }
@@ -193,7 +210,8 @@ ArDefaultResolver::_ResolveNoCache(const std::string& path)
             for (const ArDefaultResolverContext* ctx : contexts) {
                 if (ctx) {
                     for (const auto& searchPath : ctx->GetSearchPath()) {
-                        resolvedPath = _Resolve(searchPath, path);
+                        // APPLE METAL: DO NOT MERGE BACK
+                        resolvedPath = _Resolve(searchPath, path, _sandboxingCallback);
                         if (!resolvedPath.empty()) {
                             return resolvedPath;
                         }
@@ -205,7 +223,8 @@ ArDefaultResolver::_ResolveNoCache(const std::string& path)
         return std::string();
     }
 
-    return _Resolve(std::string(), path);
+    // APPLE METAL: DO NOT MERGE BACK
+    return _Resolve(std::string(), path, _sandboxingCallback);
 }
 
 std::string
@@ -405,6 +424,14 @@ ArDefaultResolver::UnbindContext(
         contextStack.pop_back();
     }
 }
+
+// APPLE METAL: DO NOT MERGE BACK
+void
+ArDefaultResolver::SetSandboxingCallback(SandboxingFn callback)
+{
+    _sandboxingCallback = callback;
+}
+// END APPLE METAL
 
 const ArDefaultResolverContext* 
 ArDefaultResolver::_GetCurrentContext()

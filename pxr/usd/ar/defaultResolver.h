@@ -34,6 +34,7 @@
 
 #include <tbb/enumerable_thread_specific.h>
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -195,6 +196,12 @@ public:
         const ArResolverContext& context,
         VtValue* bindingData) override;
 
+    // APPLE METAL: DO NOT MERGE BACK
+    typedef std::function<bool(const char* path)> SandboxingFn;
+    AR_API
+    static void SetSandboxingCallback(SandboxingFn callback);
+    // END APPLE METAL
+
 private:
     struct _Cache;
     using _PerThreadCache = ArThreadLocalScopedCache<_Cache>;
@@ -216,6 +223,8 @@ private:
         tbb::enumerable_thread_specific<_ContextStack>;
     _PerThreadContextStack _threadContextStack;
 
+    // APPLE METAL: DO NOT MERGE BACK
+    static SandboxingFn _sandboxingCallback;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
