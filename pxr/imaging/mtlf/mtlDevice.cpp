@@ -1022,7 +1022,7 @@ void MtlfMetalContext::SetRenderPipelineState()
     _pipelineMutex.lock();
     auto pipelineStateIt = renderPipelineStateMap.find(wq->currentRenderPipelineDescriptorHash);
     
-    id<MTLRenderPipelineState> pipelineState;
+    id<MTLRenderPipelineState> pipelineState = nil;
 
     if (pipelineStateIt != renderPipelineStateMap.end()) {
         pipelineState = pipelineStateIt->second;
@@ -1254,10 +1254,6 @@ void MtlfMetalContext::SetRenderEncoderState()
 
     // Any buffers modified
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_BUFFER) {
-        if (wq->currentArgumentBuffer) {
-            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(wq->currentArgumentBuffer);
-        }
-        
         NSUInteger argumentBufferSize = (threadState.boundBuffers.size() + 3) * sizeof(void*);
         for(auto buffer : threadState.boundBuffers)
         {
@@ -1265,9 +1261,14 @@ void MtlfMetalContext::SetRenderEncoderState()
             argumentBufferSize = (argumentBufferSize < sizeRequired) ? sizeRequired : argumentBufferSize;
         }
 
+        if (wq->currentArgumentBuffer) {
+            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(wq->currentArgumentBuffer);
+            wq->currentArgumentBuffer = nil;
+        }
+
         wq->currentArgumentBuffer = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(argumentBufferSize);
         [wq->currentRenderEncoder setFragmentBuffer:wq->currentArgumentBuffer offset:0 atIndex:0];
-        
+
         for(auto buffer : threadState.boundBuffers)
         {
             // Only output if this buffer was modified
@@ -1280,18 +1281,7 @@ void MtlfMetalContext::SetRenderEncoderState()
                         immutableBufferMask |= (1 << buffer->index);
                     }
                     [wq->currentRenderEncoder setVertexBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
-                }
-                else if(buffer->stage == kMSL_ProgramStage_Fragment) {
-                    // fragExtras is a special case, since it has to be set from glslProgramMetal.cpp:855
-                    if (buffer->name == "fragExtras") {
-                        [wq->currentRenderEncoder setFragmentBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
-                    } else {
-                        [wq->currentArgumentEncoder setArgumentBuffer:wq->currentArgumentBuffer offset:buffer->index * sizeof(void*)];
-                        [wq->currentArgumentEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:0];
-                        [wq->currentRenderEncoder useResource:buffer->buffer usage:(MTLResourceUsageRead | MTLResourceUsageWrite)];
-                    }
-                }
-                else{
+                } else if(buffer->stage == kMSL_ProgramStage_Compute) {
                     if(threadState.enableComputeGS) {
                         [computeEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
 
@@ -1303,14 +1293,26 @@ void MtlfMetalContext::SetRenderEncoderState()
                 }
                 buffer->modified = false;
             }
+
+            if(buffer->stage == kMSL_ProgramStage_Fragment) {
+                // fragExtras is a special case, since it has to be set from glslProgramMetal.cpp:855
+                if (buffer->name == "fragExtras" && buffer->modified) {
+                    [wq->currentRenderEncoder setFragmentBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
+                } else {
+                    [wq->currentArgumentEncoder setArgumentBuffer:wq->currentArgumentBuffer offset:buffer->index * sizeof(void*)];
+                    [wq->currentArgumentEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:0];
+                    [wq->currentRenderEncoder useResource:buffer->buffer usage:(MTLResourceUsageRead)];
+                }
+                buffer->modified = false;
+            }
         }
         
         if ([wq->currentArgumentBuffer
-                 respondsToSelector:@selector(didModifyRange:)]) {
+                respondsToSelector:@selector(didModifyRange:)]) {
             NSRange range = NSMakeRange(0, argumentBufferSize);
             [wq->currentArgumentBuffer didModifyRange:range];
         }
-        
+
         threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
     }
     
