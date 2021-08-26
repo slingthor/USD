@@ -1285,11 +1285,11 @@ void MtlfMetalContext::SetRenderEncoderState()
                     // fragExtras is a special case, since it has to be set from glslProgramMetal.cpp:855
                     if (buffer->name == "fragExtras") {
                         [wq->currentRenderEncoder setFragmentBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
+                    } else {
+                        [wq->currentArgumentEncoder setArgumentBuffer:wq->currentArgumentBuffer offset:buffer->index * sizeof(void*)];
+                        [wq->currentArgumentEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:0];
+                        [wq->currentRenderEncoder useResource:buffer->buffer usage:(MTLResourceUsageRead | MTLResourceUsageWrite)];
                     }
-
-                    [wq->currentArgumentEncoder setArgumentBuffer:wq->currentArgumentBuffer offset:buffer->index * sizeof(void*)];
-                    [wq->currentArgumentEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:0];
-                    [wq->currentRenderEncoder useResource:buffer->buffer usage:MTLResourceUsageRead];
                 }
                 else{
                     if(threadState.enableComputeGS) {
