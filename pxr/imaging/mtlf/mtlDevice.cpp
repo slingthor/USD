@@ -1301,7 +1301,7 @@ void MtlfMetalContext::SetRenderEncoderState()
                 } else {
                     [wq->currentArgumentEncoder setArgumentBuffer:wq->currentArgumentBuffer offset:buffer->index * sizeof(void*)];
                     [wq->currentArgumentEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:0];
-                    [wq->currentRenderEncoder useResource:buffer->buffer usage:(MTLResourceUsageRead)];
+                    [wq->currentRenderEncoder useResource:buffer->buffer usage:(MTLResourceUsageRead | MTLResourceUsageWrite)];
                 }
                 buffer->modified = false;
             }
