@@ -34,6 +34,7 @@
 
 #include <tbb/enumerable_thread_specific.h>
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
