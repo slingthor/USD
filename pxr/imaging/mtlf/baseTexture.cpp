@@ -49,16 +49,33 @@ static MTLPixelFormat GetMetalFormat(HioFormat hioFormat, size_t *outPixelByteSi
     *outPixelByteSize = *numChannels * HioGetDataSizeOfType(type);
     
     static MTLPixelFormat mtlFormats[][4] = {
+        // HioTypeUnsignedByte
         { MTLPixelFormatR8Unorm, MTLPixelFormatRG8Unorm,
           MTLPixelFormatRGBA8Unorm, MTLPixelFormatRGBA8Unorm },
-        { MTLPixelFormatR16Float, MTLPixelFormatRG16Float,
-          MTLPixelFormatRGBA16Float, MTLPixelFormatRGBA16Float },
-        { MTLPixelFormatR32Float, MTLPixelFormatRG32Float,
-          MTLPixelFormatRGBA32Float, MTLPixelFormatRGBA32Float },
+        // HioTypeUnsignedByteSRGB
+        { MTLPixelFormatR8Unorm_sRGB, MTLPixelFormatRG8Unorm_sRGB,
+          MTLPixelFormatRGBA8Unorm_sRGB, MTLPixelFormatRGBA8Unorm_sRGB },
+        // HioTypeSignedByte
+        { MTLPixelFormatR8Snorm, MTLPixelFormatRG8Snorm,
+          MTLPixelFormatRGBA8Snorm, MTLPixelFormatRGBA8Snorm },
+        // HioTypeUnsignedShort
         { MTLPixelFormatR16Uint, MTLPixelFormatRG16Uint,
           MTLPixelFormatRGBA16Uint, MTLPixelFormatRGBA16Uint },
+        // HioTypeSignedShort
+        { MTLPixelFormatR16Sint, MTLPixelFormatRG16Sint,
+          MTLPixelFormatRGBA16Sint, MTLPixelFormatRGBA16Sint },
+        // HioTypeUnsignedInt
+        { MTLPixelFormatR32Uint, MTLPixelFormatRG32Uint,
+          MTLPixelFormatRGBA32Uint, MTLPixelFormatRGBA32Uint },
+        // HioTypeInt
         { MTLPixelFormatR32Sint, MTLPixelFormatRG32Sint,
           MTLPixelFormatRGBA32Sint, MTLPixelFormatRGBA32Sint },
+        // HioTypeHalfFloat,
+        { MTLPixelFormatR16Float, MTLPixelFormatRG16Float,
+          MTLPixelFormatRGBA16Float, MTLPixelFormatRGBA16Float },
+        // HioTypeFloat,
+        { MTLPixelFormatR32Float, MTLPixelFormatRG32Float,
+          MTLPixelFormatRGBA32Float, MTLPixelFormatRGBA32Float }
     };
     
     return mtlFormats[type][*numChannels];
