@@ -137,6 +137,8 @@ HdStRenderPassStateMetal::Bind()
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
+    context->SetPolygonFillMode(MTLTriangleFillModeFill);
+    
     _SetCullState(context, _cullStyle);
     
     // Blending
