@@ -1254,7 +1254,7 @@ void MtlfMetalContext::SetRenderEncoderState()
 
     // Any buffers modified
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_BUFFER) {
-        NSUInteger argumentBufferSize = (threadState.boundBuffers.size() + 3) * sizeof(void*);
+        NSUInteger argumentBufferSize = (threadState.boundBuffers.size() * 2) * sizeof(void*);
         for(auto buffer : threadState.boundBuffers)
         {
             NSUInteger sizeRequired = (buffer->index + 1) * sizeof(void*);
