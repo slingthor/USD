@@ -509,7 +509,7 @@ perturbFragmentNormal(vec3 P, vec3 N)
     // Calculation of TBN matrix based on "Surface Gradient Based Bump Mapping"
     // (2019)
     vec3 Nt = normalize(HdGet_normal().xyz);
-    vec2 st = HdGetCoord_normal().st;
+    vec2 st = HdGetCoord_normal().xy;
 
     // Get screen space derivatives of position
     vec3 dPdx = dFdx(P);
