@@ -702,6 +702,16 @@ HdSt_CodeGenGLSL::Compile(HdStResourceRegistry *const registry)
         if (bindingType != HdBinding::PRIMVAR_REDIRECT) {
             _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
         }
+
+        // For any texture shader parameter we also emit the texture
+        // coordinates associated with it
+        if (bindingType == HdBinding::TEXTURE_2D ||
+            bindingType == HdBinding::BINDLESS_TEXTURE_2D ||
+            bindingType == HdBinding::TEXTURE_UDIM_ARRAY ||
+            bindingType == HdBinding::BINDLESS_TEXTURE_UDIM_ARRAY) {
+            _genCommon
+                << "#define HD_HAS_COORD_" << it->second.name << " 1\n";
+        }
     }
     
     // mixin shaders
@@ -1530,6 +1540,29 @@ static void _EmitTextureAccessors(
             << "vec" << dim << " HdGet_" << inPrimvars[0] << "(int localIndex);\n"
             << "#endif\n";
     }
+
+    // Create accessor for texture coordinates based on texture param name
+    // vec2 HdGetCoord_name(int localIndex)
+    accessors
+        << "vec" << dim << " HdGetCoord_" << name << "(int localIndex) {\n"
+        << "  return \n";
+    if (!inPrimvars.empty()) {
+        accessors
+            << "#if defined(HD_HAS_" << inPrimvars[0] <<")\n"
+            << "  HdGet_" << inPrimvars[0] << "(localIndex).xy\n"
+            << "#else\n"
+            << "  vec" << dim << "(0.0)\n"
+            << "#endif\n";
+    } else {
+        accessors
+            << "  vec" << dim << "(0.0)\n";
+    }
+    accessors << ";}\n";
+    
+    // vec2 HdGetCoord_name()
+    accessors
+        << "vec" << dim << " HdGetCoord_" << name << "() {"
+        << "  return HdGetCoord_" << name << "(0); }\n";
 
     // vec4 HdGet_name(int localIndex)
     accessors
