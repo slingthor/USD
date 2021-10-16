@@ -168,7 +168,7 @@ def GetEnv(context):
         envToRun["COMPILER_DISABLE_SWIFT"] = "1"
         envToRun["DEVELOPER_DIR"] = "{XCODE_ROOT}".format(XCODE_ROOT=xcodeRoot)
         envToRun["DEVELOPER_INSTALL_DIR"] = "{XCODE_ROOT}".format(XCODE_ROOT=xcodeRoot)
-        envToRun["DT_TOOLCHAIN_DIR"] = "{XCODE_ROOT}/Toolchains/OSX12.0.xctoolchain".format(XCODE_ROOT=xcodeRoot)
+        envToRun["DT_TOOLCHAIN_DIR"] = "{XCODE_ROOT}/Toolchains/OSX13.0.xctoolchain".format(XCODE_ROOT=xcodeRoot)
         envToRun["INTERFACER_TRACE_INTERFACES"] = "YES"
         envToRun["LD_DYLIB_CPU_SUBTYPES_MUST_MATCH"] = "1"
         envToRun["LD_FORCE_16KB_PAGES"] = "YES"
@@ -180,7 +180,7 @@ def GetEnv(context):
         envToRun["RC_PLATFORM_NAME"] = "MacOSX"
         envToRun["RC_ReleaseStatus"] = "Development"
         envToRun["RC_XBS"] = "YES"
-        envToRun["TOOLCHAINS"] = "com.apple.dt.toolchain.OSX12_0"
+        envToRun["TOOLCHAINS"] = "com.apple.dt.toolchain.OSX13_0"
         envToRun["SYMROOT"]= "${SYMROOT}"
         envToRun["XCODE_XCCONFIG_FILE"] =  os.path.join(buildScriptsDir, "xcodeBuildSettingOverrides.xcconfig")
 
@@ -416,7 +416,7 @@ def CurrentWorkingDirectory(dir):
 def CreateUniversalBinaries(context, libNames, x86Dir, armDir):
     lipoCommands = []
     xcodeRoot = subprocess.check_output(["xcode-select", "--print-path"]).strip()
-    lipoBinary = "{XCODE_ROOT}/Toolchains/OSX12.0.xctoolchain/usr/bin/lipo".format(XCODE_ROOT=xcodeRoot)
+    lipoBinary = "{XCODE_ROOT}/Toolchains/OSX13.0.xctoolchain/usr/bin/lipo".format(XCODE_ROOT=xcodeRoot)
     for libName in libNames:
         outputName = os.path.join(context.instDir, "lib", libName)
         if not os.path.islink("{x86Dir}/{libName}".format(x86Dir=x86Dir, libName=libName)):
@@ -1087,13 +1087,13 @@ def InstallBoost_Helper(context, force, buildArgs):
         if MacOS():
             newLines = [
                 'using clang-darwin : x86_64\n',
-                ': {XCODE_ROOT}/Toolchains/OSX12.0.xctoolchain/usr/bin/clang++\n'
+                ': {XCODE_ROOT}/Toolchains/OSX13.0.xctoolchain/usr/bin/clang++\n'
                     .format(XCODE_ROOT=xcodeRoot),
                 ': <compileflags>"-target x86_64-apple-macos12.0 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target x86_64-apple-macos12.0 -isysroot {SDK_PATH}" address-model=64 architecture=x86_64\n'
                     .format(SDK_PATH=sdkPath),
                 ';\n\n'
                 'using clang-darwin : arm64e\n',
-                ': {XCODE_ROOT}/Toolchains/OSX12.0.xctoolchain/usr/bin/clang++\n'
+                ': {XCODE_ROOT}/Toolchains/OSX13.0.xctoolchain/usr/bin/clang++\n'
                     .format(XCODE_ROOT=xcodeRoot),
                 ': <compileflags>"-target arm64e-apple-macos12.0 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target arm64e-apple-macos12.0 -isysroot {SDK_PATH}" address-model=64 architecture=arm64e\n'
                     .format(SDK_PATH=sdkPath),

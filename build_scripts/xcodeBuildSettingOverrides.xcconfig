@@ -6,7 +6,7 @@
 
 // <rdar://problem/25078754> Remove #include "/usr/local/etc/xbsDefaultBuildSettingOverrides.xcconfig" from view
 // #include "/usr/local/etc/xbsDefaultBuildSettingOverrides.xcconfig"
-#include? "<DEVELOPER_DIR>/Toolchains/OSX12.0.xctoolchain/macos_chrootshims.xcconfig"
+#include? "<DEVELOPER_DIR>/Toolchains/OSX13.0.xctoolchain/macos_chrootshims.xcconfig"
 
 GCC_GENERATE_DEBUGGING_SYMBOLS = YES
 DEPLOYMENT_POSTPROCESSING = NO
@@ -31,7 +31,7 @@ CLANG_MODULES_VALIDATE_SYSTEM_HEADERS=YES
 
 // <rdar://problem/19339659> Add TOOLCHAINS back to xcodeBuildSettingOverrides.xcconfig in Gala
 // Remove when <rdar://problem/19316172> is complete
-TOOLCHAINS = com.apple.dt.toolchain.OSX12_0
+TOOLCHAINS = com.apple.dt.toolchain.OSX13_0
 
 // Use custom per-project module cache directory.
 CLANG_MODULE_CACHE_PATH = $(CCHROOT)/ModuleCache
