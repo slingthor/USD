@@ -534,6 +534,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
         #     extraArgs.append('-T buildsystem=1')
 
         extraArgs.append('-DCMAKE_SUPPRESS_REGENERATION=YES')
+        extraArgs.append('-DCMAKE_XCODE_BUILD_SYSTEM=12')
 
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
             extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
