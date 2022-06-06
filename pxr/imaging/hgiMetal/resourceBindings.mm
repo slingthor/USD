@@ -168,7 +168,8 @@ HgiMetalResourceBindings::BindResources(
         NSUInteger offset = bufDesc.offsets.front();
 
         if ((bufDesc.stageUsage & HgiShaderStageVertex) ||
-            (bufDesc.stageUsage & HgiShaderStagePostTessellationVertex)) {
+            (bufDesc.stageUsage & HgiShaderStagePostTessellationVertex) ||
+            (bufDesc.stageUsage & HgiShaderStagePostTessellationControl)) {
             NSUInteger argBufferOffset = HgiMetalArgumentOffsetBufferVS
                                        + bufDesc.bindingIndex * sizeof(void*);
             [argEncoderBuffer setArgumentBuffer:argBuffer

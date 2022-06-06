@@ -81,6 +81,8 @@ TF_DEFINE_PRIVATE_TOKENS(
 TF_DEFINE_ENV_SETTING(HDST_ENABLE_PIPELINE_DRAW_BATCH_GPU_FRUSTUM_CULLING,false,
                       "Enable pipeline draw batching GPU frustum culling");
 
+using PrimitiveType = HdSt_GeometricShader::PrimitiveType;
+
 HdSt_PipelineDrawBatch::HdSt_PipelineDrawBatch(
     HdStDrawItemInstance * drawItemInstance,
     bool const allowGpuFrustumCulling)
@@ -1217,6 +1219,8 @@ _GetDrawPipeline(
                                                   state.geometricShader);
 
         pipeDesc.shaderProgram = state.glslProgram->GetProgram();
+        pipeDesc.tessellationState.spacing =
+                         state.geometricShader->GetTessellationSpacing();
         pipeDesc.vertexBuffers = _GetVertexBuffersForDrawing(state);
 
         Hgi* hgi = resourceRegistry->GetHgi();
@@ -1228,6 +1232,10 @@ _GetDrawPipeline(
 
     return pipelineInstance.GetValue();
 }
+
+////////////////////////////////////////////////////////////
+// GPU Drawing
+////////////////////////////////////////////////////////////
 
 void
 HdSt_PipelineDrawBatch::ExecuteDraw(
@@ -1270,18 +1278,35 @@ HdSt_PipelineDrawBatch::ExecuteDraw(
             renderPassState,
             resourceRegistry,
             state);
-    
-    HgiGraphicsPipelineHandle psoHandle = *pso.get();
-    gfxCmds->BindPipeline(psoHandle);
 
     HgiResourceBindingsDesc bindingsDesc;
     state.GetBindingsForDrawing(&bindingsDesc);
-
     HgiResourceBindingsHandle resourceBindings =
             hgi->CreateResourceBindings(bindingsDesc);
+    HgiGraphicsPipelineHandle psoHandle = *pso.get();
+    bool usedPTCS = false;
+    if (gfxCmds->BindTessControlPipeline(psoHandle)) {
+        gfxCmds->BindResources(resourceBindings);
+
+        _BindVertexBuffersForDrawing(gfxCmds, state);
+        if (drawIndirect) {
+            _ExecuteDrawIndirect(gfxCmds, _dispatchBuffer, state.indexBar);
+        } else {
+            _ExecuteDrawImmediate(gfxCmds, _dispatchBuffer, state.indexBar);
+        }
+        usedPTCS = true;
+    }
+    _BindVertexBuffersForDrawing(gfxCmds, state);
+    gfxCmds->BindPipeline(psoHandle);
+    if (usedPTCS) {
+        HdStBufferResourceSharedPtr indexBuffer =
+            state.indexBar->GetResource(HdTokens->tessFactors);
+        gfxCmds->SetTessFactorBuffer(psoHandle, indexBuffer->GetHandle(),
+             indexBuffer->GetOffset(), indexBuffer->GetStride());
+    }
     gfxCmds->BindResources(resourceBindings);
 
-    _BindVertexBuffersForDrawing(gfxCmds, state);
+
 
     if (drawIndirect) {
         _ExecuteDrawIndirect(gfxCmds, _dispatchBuffer, state.indexBar);
