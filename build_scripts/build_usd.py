@@ -43,6 +43,7 @@ import sys
 import sysconfig
 import tarfile
 import zipfile
+import apple_utils
 
 if sys.version_info.major >= 3:
     from urllib.request import urlopen
@@ -90,8 +91,6 @@ def Linux():
     return platform.system() == "Linux"
 def MacOS():
     return platform.system() == "Darwin"
-def Arm():
-    return platform.processor() == "arm"
 
 def Python3():
     return sys.version_info.major == 3
@@ -887,9 +886,10 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         AppendCXX11ABIArg("CXXFLAGS", context, buildArgs)
 
         # Ensure that the tbb build system picks the proper architecture.
-        if MacOS() and Arm():
-            buildArgs.append("arch=arm64")
-
+        if MacOS():
+            if apple_utils.GetMacArch() != "x86_64":
+                buildArgs.append("arch=arm64")
+              
         # TBB does not support out-of-source builds in a custom location.
         Run('make -j{procs} {buildArgs}'
             .format(procs=context.numJobs, 
@@ -983,13 +983,12 @@ TIFF = Dependency("TIFF", InstallTIFF, "include/tiff.h")
 PNG_URL = "https://github.com/glennrp/libpng/archive/refs/tags/v1.6.29.tar.gz"
 
 def InstallPNG(context, force, buildArgs):
-    macArgs = []
-    if MacOS() and Arm():
-        # ensure libpng's build doesn't erroneously activate inappropriate
-        # Neon extensions
-        macArgs = ["-DPNG_HARDWARE_OPTIMIZATIONS=OFF", 
-                   "-DPNG_ARM_NEON=off"] # case is significant
     with CurrentWorkingDirectory(DownloadURL(PNG_URL, context, force)):
+        macArgs = []
+        if MacOS() and apple_utils.GetMacArch() != "x86_64":
+            # Ensure libpng's build doesn't erroneously activate inappropriate
+            # Neon extensions
+            macArgs = ["-DCMAKE_C_FLAGS=\"-DPNG_ARM_NEON_OPT=0\""]
         RunCMake(context, force, buildArgs + macArgs)
 
 PNG = Dependency("PNG", InstallPNG, "include/png.h")
@@ -1080,7 +1079,11 @@ BLOSC_URL = "https://github.com/Blosc/c-blosc/archive/v1.20.1.zip"
 
 def InstallBLOSC(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(BLOSC_URL, context, force)):
-        RunCMake(context, force, buildArgs)
+        macArgs = []
+        if MacOS() and apple_utils.GetMacArch() != "x86_64":
+            # Need to disable SSE for macOS ARM targets.
+            macArgs = ["-DDEACTIVATE_SSE2=ON"]
+        RunCMake(context, force, buildArgs + macArgs)
 
 BLOSC = Dependency("Blosc", InstallBLOSC, "include/blosc.h")
 
@@ -1187,6 +1190,21 @@ def InstallOpenColorIO(context, force, buildArgs):
                       [("IMPORTED_LOCATION_RELEASE", 
                         "IMPORTED_LOCATION_RELWITHDEBINFO")])
 
+        if MacOS():
+            arch = apple_utils.GetMacArch()
+
+            PatchFile("CMakeLists.txt",
+                    [('CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}',
+                    'CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}\n' +
+                    '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
+                    ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch)),
+                    ('CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}',
+                    'CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}\n' +
+                    '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
+                    ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch)),
+                    ('set(CMAKE_OSX_ARCHITECTURES x86_64 CACHE STRING',
+                     'set(CMAKE_OSX_ARCHITECTURES "{arch}" CACHE STRING'.format(arch=arch))])
+            
         # The OCIO build treats all warnings as errors but several come up
         # on various platforms, including:
         # - On gcc6, v1.1.0 emits many -Wdeprecated-declaration warnings for
@@ -1204,6 +1222,16 @@ def InstallOpenColorIO(context, force, buildArgs):
             pass
         else:
             extraArgs.append('-DCMAKE_CXX_FLAGS=-w')
+		
+        if MacOS():
+            #if using version 2 of OCIO we patch a different config path as it resides elsewere
+            PatchFile("src/core/Config.cpp",
+                       [("cacheidnocontext_ = cacheidnocontext_;", 
+                         "cacheidnocontext_ = rhs.cacheidnocontext_;")])
+
+            extraArgs.append('-DCMAKE_CXX_FLAGS="-Wno-unused-function -Wno-unused-const-variable -Wno-unused-private-field"')
+            if (apple_utils.GetMacArch() != "x86_64"):
+                extraArgs.append('-DOCIO_USE_SSE=OFF')
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
@@ -1321,6 +1349,7 @@ def GetPySideInstructions():
                 'update your PYTHONPATH to indicate where it is '
                 'located.')
 
+
 PYSIDE = PythonDependency("PySide", GetPySideInstructions,
                           moduleNames=["PySide", "PySide2", "PySide6"])
 
@@ -1345,6 +1374,10 @@ ALEMBIC_URL = "https://github.com/alembic/alembic/archive/1.7.10.zip"
 
 def InstallAlembic(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(ALEMBIC_URL, context, force)):
+        if MacOS():
+            PatchFile("CMakeLists.txt", 
+                      [("ADD_DEFINITIONS(-Wall -Werror -Wextra -Wno-unused-parameter)",
+                        "ADD_DEFINITIONS(-Wall -Wextra -Wno-unused-parameter)")])
         cmakeOptions = ['-DUSE_BINARIES=OFF', '-DUSE_TESTS=OFF']
         if context.enableHDF5:
             # HDF5 requires the H5_BUILT_AS_DYNAMIC_LIB macro be defined if
@@ -1398,10 +1431,10 @@ MATERIALX = Dependency("MaterialX", InstallMaterialX, "include/MaterialXCore/Lib
 
 ############################################################
 # Embree
-# For MacOS we use version 3.7.0 to include a fix from Intel
-# to build on Catalina.
+# For MacOS we use version 3.13.3 to include a fix from Intel
+# to build on Apple Silicon.
 if MacOS():
-    EMBREE_URL = "https://github.com/embree/embree/archive/v3.7.0.tar.gz"
+    EMBREE_URL = "https://github.com/embree/embree/archive/v3.13.3.tar.gz"
 else:
     EMBREE_URL = "https://github.com/embree/embree/archive/v3.2.2.tar.gz"
 
@@ -1712,6 +1745,10 @@ group.add_argument("--generator", type=str,
 group.add_argument("--toolset", type=str,
                    help=("CMake toolset to use when building libraries with "
                          "cmake"))
+if MacOS():
+    codesignDefault = False if apple_utils.GetMacArch() == "x64_64" else True
+    group.add_argument("--codesign", dest="macos_codesign", default=codesignDefault,
+                       help=("Use codesigning for macOS builds (defaults to enabled on Apple Silicon)"))
 
 if Linux():
     group.add_argument("--use-cxx11-abi", type=int, choices=[0, 1],
@@ -1962,6 +1999,8 @@ class InstallContext:
         self.useCXX11ABI = \
             (args.use_cxx11_abi if hasattr(args, "use_cxx11_abi") else None)
         self.safetyFirst = args.safety_first
+        self.macOSCodesign = \
+            (args.macos_codesign if hasattr(args, "macos_codesign") else False)
 
         # Dependencies that are forced to be built
         self.forceBuildAll = args.force_all
@@ -2277,6 +2316,7 @@ summaryMsg = summaryMsg.format(
                   else "Release w/ Debug Info" if context.buildRelWithDebug
                   else ""),
     buildImaging=("On" if context.buildImaging else "Off"),
+    macOSCodesign=("On" if context.macOSCodesign else "Off"),
     enablePtex=("On" if context.enablePtex else "Off"),
     enableOpenVDB=("On" if context.enableOpenVDB else "Off"),
     buildOIIO=("On" if context.buildOIIO else "Off"),
@@ -2355,6 +2395,10 @@ if Windows():
         os.path.join(context.instDir, "bin"),
         os.path.join(context.instDir, "lib")
     ])
+
+if MacOS():
+    if context.macOSCodesign:
+        apple_utils.Codesign(context.usdInstDir, verbosity > 1)
 
 Print("""
 Success! To use USD, please ensure that you have:""")
