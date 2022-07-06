@@ -26,6 +26,7 @@ from __future__ import print_function
 import argparse
 import codecs
 import contextlib
+import copy
 import ctypes
 import datetime
 import distutils
@@ -43,6 +44,7 @@ import sys
 import sysconfig
 import tarfile
 import zipfile
+import apple_utils
 
 if sys.version_info.major >= 3:
     from urllib.request import urlopen
@@ -90,8 +92,6 @@ def Linux():
     return platform.system() == "Linux"
 def MacOS():
     return platform.system() == "Darwin"
-def Arm():
-    return platform.processor() == "arm"
 
 def Python3():
     return sys.version_info.major == 3
@@ -247,7 +247,7 @@ def GetCPUCount():
     except NotImplementedError:
         return 1
 
-def Run(cmd, logCommandOutput = True):
+def Run(cmd, logCommandOutput = True, envOverride = None):
     """Run the specified command in a subprocess."""
     PrintInfo('Running "{cmd}"'.format(cmd=cmd))
 
@@ -261,7 +261,7 @@ def Run(cmd, logCommandOutput = True):
         # code will handle them.
         if logCommandOutput:
             p = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, 
-                                 stderr=subprocess.STDOUT)
+                                 stderr=subprocess.STDOUT, env=envOverride)
             while True:
                 l = p.stdout.readline().decode(GetLocale(), 'replace')
                 if l:
@@ -270,7 +270,7 @@ def Run(cmd, logCommandOutput = True):
                 elif p.poll() is not None:
                     break
         else:
-            p = subprocess.Popen(shlex.split(cmd))
+            p = subprocess.Popen(shlex.split(cmd), env=envOverride)
             p.wait()
 
     if p.returncode != 0:
@@ -355,7 +355,7 @@ def FormatMultiProcs(numJobs, generator):
 
     return "{tag}{procs}".format(tag=tag, procs=numJobs)
 
-def RunCMake(context, force, extraArgs = None):
+def RunCMake(context, force, extraArgs = None, envOverride = None, targetArch = None):
     """Invoke CMake to configure, build, and install a library whose 
     source code is located in the current working directory."""
     # Create a directory for out-of-source builds in the build directory
@@ -398,6 +398,18 @@ def RunCMake(context, force, extraArgs = None):
     if MacOS():
         osx_rpath = "-DCMAKE_MACOSX_RPATH=ON"
 
+        # For macOS cross compilation, set the Xcode architecture flags.
+        # If a target has been passed in then use it instead.
+        if targetArch == None:
+            targetArch = apple_utils.GetMacTargetArch(context)
+
+        if context.targetNative or targetArch == apple_utils.GetMacArch():
+            extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=YES')
+        else:
+            extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
+
+        extraArgs.append('-DCMAKE_OSX_ARCHITECTURES={0}'.format(targetArch))
+
     # We use -DCMAKE_BUILD_TYPE for single-configuration generators 
     # (Ninja, make), and --config for multi-configuration generators 
     # (Visual Studio); technically we don't need BOTH at the same
@@ -430,10 +442,12 @@ def RunCMake(context, force, extraArgs = None):
                     osx_rpath=(osx_rpath or ""),
                     generator=(generator or ""),
                     toolset=(toolset or ""),
-                    extraArgs=(" ".join(extraArgs) if extraArgs else "")))
+                    extraArgs=(" ".join(extraArgs) if extraArgs else "")),
+                    envOverride=envOverride)
         Run("cmake --build . --config {config} --target install -- {multiproc}"
             .format(config=config,
-                    multiproc=FormatMultiProcs(context.numJobs, generator)))
+                    multiproc=FormatMultiProcs(context.numJobs, generator)),
+                    envOverride=envOverride)
 
 def GetCMakeVersion():
     """
@@ -713,8 +727,31 @@ def InstallBoost_Helper(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(BOOST_URL, context, force, 
                                              dontExtract=dontExtract)):
         bootstrap = "bootstrap.bat" if Windows() else "./bootstrap.sh"
-        Run('{bootstrap} --prefix="{instDir}"'
-            .format(bootstrap=bootstrap, instDir=context.instDir))
+
+        # For cross-compilation on macOS we need to specify the architecture
+        # for both the bootstrap and the b2 phase of building boost.
+        bootstrapCmd = '{bootstrap} --prefix="{instDir}"'.format(
+            bootstrap=bootstrap, instDir=context.instDir)
+
+        macOSArchitecture = ""
+        macOSArch = ""
+
+        if MacOS():
+            if context.targetX86:
+                macOSArchitecture = "architecture=x86"
+                macOSArch = "-arch x86_64"
+            elif context.targetARM64:
+                macOSArchitecture = "architecture=arm"
+                macOSArch = "-arch arm64"
+            elif context.targetUniversal:
+                macOSArchitecture = "architecture=combined"
+                macOSArch="-arch arm64 -arch x86_64"
+
+            if macOSArch:
+                bootstrapCmd += " cxxflags=\"{0}\" cflags=\"{0}\" linkflags=\"{0}\"".format(macOSArch)
+            bootstrapCmd += " --with-toolset=clang"
+
+        Run(bootstrapCmd)
 
         # b2 supports at most -j64 and will error if given a higher value.
         num_procs = min(64, context.numJobs)
@@ -818,6 +855,15 @@ def InstallBoost_Helper(context, force, buildArgs):
             # libraries includes @rpath
             b2_settings.append("toolset=clang")
 
+            # Specify target for macOS cross-compilation.
+            if macOSArchitecture:
+                b2_settings.append(macOSArchitecture)
+
+            if macOSArch:
+                b2_settings.append("cxxflags=\"{0}\"".format(macOSArch))
+                b2_settings.append("cflags=\"{0}\"".format(macOSArch))
+                b2_settings.append("linkflags=\"{0}\"".format(macOSArch))
+
         if context.buildDebug:
             b2_settings.append("--debug-configuration")
 
@@ -853,19 +899,16 @@ BOOST = Dependency("boost", InstallBoost, BOOST_VERSION_FILE)
 if Windows():
     TBB_URL = "https://github.com/oneapi-src/oneTBB/releases/download/2019_U6/tbb2019_20190410oss_win.zip"
     TBB_ROOT_DIR_NAME = "tbb2019_20190410oss"
-elif MacOS() and not Arm():
-    # On MacOS Intel systems we experience various crashes in tests during
-    # teardown starting with 2018 Update 2. Until we figure that out, we use
-    # 2018 Update 1 on this platform.
-    TBB_URL = "https://github.com/oneapi-src/oneTBB/archive/refs/tags/2018_U1.tar.gz"
 else:
     TBB_URL = "https://github.com/oneapi-src/oneTBB/archive/refs/tags/2019_U6.tar.gz"
 
 def InstallTBB(context, force, buildArgs):
     if Windows():
         InstallTBB_Windows(context, force, buildArgs)
-    elif Linux() or MacOS():
-        InstallTBB_LinuxOrMacOS(context, force, buildArgs)
+    elif MacOS():
+        InstallTBB_MacOS(context, force, buildArgs)
+    else:
+        InstallTBB_Linux(context, force, buildArgs)
 
 def InstallTBB_Windows(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(TBB_URL, context, force, 
@@ -882,16 +925,99 @@ def InstallTBB_Windows(context, force, buildArgs):
         CopyDirectory(context, "include\\serial", "include\\serial")
         CopyDirectory(context, "include\\tbb", "include\\tbb")
 
-def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
+def InstallTBB_MacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(TBB_URL, context, force)):
         # Append extra argument controlling libstdc++ ABI if specified.
         AppendCXX11ABIArg("CXXFLAGS", context, buildArgs)
 
         # Ensure that the tbb build system picks the proper architecture.
-        if MacOS() and Arm():
-            buildArgs.append("arch=arm64")
+        PatchFile("build/macos.clang.inc", 
+                [("-m64",
+                  "-m64 -arch x86_64")])
+        secondaryArch = None
 
-        # TBB does not support out-of-source builds in a custom location.
+        if context.targetNative:
+            primaryArch = apple_utils.GetMacArch()
+        else:
+            if context.targetX86:
+                primaryArch = "x86_64"
+            if context.targetARM64:
+                primaryArch = apple_utils.GetMacArmArch()
+            if context.targetUniversal:
+                primaryArch = apple_utils.GetMacArch()
+                if (primaryArch == "x86_64"):
+                    secondaryArch = apple_utils.GetMacArmArch()
+                else:
+                    secondaryArch = "intel64"
+
+        if (primaryArch == "x86_64"):
+            primaryArch = "intel64"
+
+        makeTBBCmdPrimary = 'make -j{procs} arch={arch} {buildArgs}'.format(
+            arch=primaryArch,
+            procs=context.numJobs,
+            buildArgs=" ".join(buildArgs))
+
+        Run(makeTBBCmdPrimary)
+
+        makeTBBCmdSecondary = None
+        if secondaryArch:
+            makeTBBCmdSecondary = 'make -j{procs} arch={arch} {buildArgs}'.format(
+                arch=secondaryArch,
+                procs=context.numJobs,
+                buildArgs=" ".join(buildArgs))
+            Run(makeTBBCmdSecondary)               
+
+        # Install both release and debug builds. USD requires the debug
+        # libraries when building in debug mode, and installing both
+        # makes it easier for users to install dependencies in some
+        # location that can be shared by both release and debug USD
+        # builds. Plus, the TBB build system builds both versions anyway.
+        if context.targetUniversal:
+            x86Files = glob.glob(os.getcwd() + "/build/*intel64*_release/libtbb*.*")
+            armFiles = glob.glob(os.getcwd() + "/build/*arm64*_release/libtbb*.*")
+            libNames = [os.path.basename(x) for x in x86Files]
+            x86Dir = os.path.dirname(x86Files[0])
+            armDir = os.path.dirname(armFiles[0])
+
+            lipoCommandsRelease = apple_utils.CreateUniversalBinaries(context, libNames, x86Dir, armDir)
+
+            x86Files = glob.glob(os.getcwd() + "/build/*intel64*_debug/libtbb*.*")
+            armFiles = glob.glob(os.getcwd() + "/build/*arm64*_debug/libtbb*.*")
+            lipoCommandsDebug = None
+            if x86Files and armFiles:
+                libNames = [os.path.basename(x) for x in x86Files]
+                x86Dir = os.path.dirname(x86Files[0])
+                armDir = os.path.dirname(armFiles[0])
+
+                lipoCommandsDebug = apple_utils.CreateUniversalBinaries(context, libNames, x86Dir, armDir)
+        else:
+            CopyFiles(context, "build/*_release/libtbb*.*", "lib")
+            try:
+                CopyFiles(context, "build/*_debug/libtbb*.*", "lib")
+            except:
+                PrintWarning("TBB debug libraries are not available on this platform.")
+
+        # Output paths that are of interest
+        with open(os.path.join(context.usdInstDir, 'tbbBuild.txt'), 'wt') as file:
+            file.write('ARCHIVE:' + TBB_URL.split("/")[-1] + '\n')
+            file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
+            file.write('MAKEPRIMARY:' + makeTBBCmdPrimary + '\n')
+
+            if context.targetUniversal:
+                file.write('MAKESECONDARY:' + makeTBBCmdSecondary + '\n')
+                file.write('LIPO_RELEASE:' + ','.join(lipoCommandsRelease) + '\n')
+                if lipoCommandsDebug:
+                    file.write('LIPO_DEBUG:' + ','.join(lipoCommandsDebug) + '\n')
+
+        CopyDirectory(context, "include/serial", "include/serial")
+        CopyDirectory(context, "include/tbb", "include/tbb")
+
+def InstallTBB_Linux(context, force, buildArgs):
+    with CurrentWorkingDirectory(DownloadURL(TBB_URL, context, force)):
+        # Append extra argument controlling libstdc++ ABI if specified.
+        AppendCXX11ABIArg("CXXFLAGS", context, buildArgs)
+
         Run('make -j{procs} {buildArgs}'
             .format(procs=context.numJobs, 
                     buildArgs=" ".join(buildArgs)))
@@ -921,18 +1047,26 @@ TBB = Dependency("TBB", InstallTBB, "include/tbb/tbb.h")
 
 if Windows():
     JPEG_URL = "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/1.5.1.zip"
+elif MacOS():
+    JPEG_URL = "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/2.0.1.zip"
 else:
     JPEG_URL = "https://www.ijg.org/files/jpegsrc.v9b.tar.gz"
 
 def InstallJPEG(context, force, buildArgs):
-    if Windows():
+    if Windows() or MacOS():
         InstallJPEG_Turbo(context, force, buildArgs)
     else:
         InstallJPEG_Lib(context, force, buildArgs)
 
 def InstallJPEG_Turbo(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(JPEG_URL, context, force)):
-        RunCMake(context, force, buildArgs)
+        extraJPEGArgs = buildArgs
+        if MacOS():
+            extraJPEGArgs.append("-DWITH_SIMD=FALSE")
+
+        RunCMake(context, force, extraJPEGArgs)
+        return os.getcwd()
+
 
 def InstallJPEG_Lib(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(JPEG_URL, context, force)):
@@ -984,13 +1118,18 @@ TIFF = Dependency("TIFF", InstallTIFF, "include/tiff.h")
 PNG_URL = "https://github.com/glennrp/libpng/archive/refs/tags/v1.6.29.tar.gz"
 
 def InstallPNG(context, force, buildArgs):
-    macArgs = []
-    if MacOS() and Arm():
-        # ensure libpng's build doesn't erroneously activate inappropriate
-        # Neon extensions
-        macArgs = ["-DPNG_HARDWARE_OPTIMIZATIONS=OFF", 
-                   "-DPNG_ARM_NEON=off"] # case is significant
     with CurrentWorkingDirectory(DownloadURL(PNG_URL, context, force)):
+        macArgs = []
+        if MacOS() and not apple_utils.IsMacTargetIntel(context):
+            # Ensure libpng's build doesn't erroneously activate inappropriate
+            # Neon extensions
+            macArgs = ["-DCMAKE_C_FLAGS=\"-DPNG_ARM_NEON_OPT=0\""]
+
+            if context.targetUniversal:
+                PatchFile("scripts/genout.cmake.in",
+                [("CMAKE_OSX_ARCHITECTURES",
+                  "CMAKE_OSX_INTERNAL_ARCHITECTURES")])
+
         RunCMake(context, force, buildArgs + macArgs)
 
 PNG = Dependency("PNG", InstallPNG, "include/png.h")
@@ -1092,7 +1231,7 @@ BLOSC_URL = "https://github.com/Blosc/c-blosc/archive/v1.20.1.zip"
 def InstallBLOSC(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(BLOSC_URL, context, force)):
         macArgs = []
-        if MacOS() and Arm():
+        if MacOS() and apple_utils.GetMacTargetArch(context) != "x86_64":
             # Need to disable SSE for macOS ARM targets.
             macArgs = ["-DDEACTIVATE_SSE2=ON"]
         RunCMake(context, force, buildArgs + macArgs)
@@ -1135,7 +1274,8 @@ OPENVDB = Dependency("OpenVDB", InstallOpenVDB, "include/openvdb/openvdb.h")
 ############################################################
 # OpenImageIO
 
-OIIO_URL = "https://github.com/OpenImageIO/oiio/archive/Release-2.1.16.0.zip"
+# OIIO 2.3.15 adds fixes for Apple Silicon cross compilation.
+OIIO_URL = "https://github.com/OpenImageIO/oiio/archive/refs/tags/v2.3.15.0.zip"
 
 def InstallOpenImageIO(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(OIIO_URL, context, force)):
@@ -1202,23 +1342,21 @@ def InstallOpenColorIO(context, force, buildArgs):
                       [("IMPORTED_LOCATION_RELEASE", 
                         "IMPORTED_LOCATION_RELWITHDEBINFO")])
 
-        # When building for Apple Silicon we need to make sure that
-        # the correct build architecture is specified for OCIO and
-        # and for TinyXML and YAML.
-        if MacOS() and Arm():
-            arch = 'arm64'
+        if MacOS():
+            targetArch = apple_utils.GetMacTargetArch(context)
+
             PatchFile("CMakeLists.txt",
                     [('CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}',
-                    'CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}\n' +
-                    '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
-                    ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch)),
-                    ('CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}',
-                    'CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}\n' +
-                    '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
-                    ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch)),
-                    ('set(CMAKE_OSX_ARCHITECTURES x86_64 CACHE STRING',
-                     'set(CMAKE_OSX_ARCHITECTURES "{arch}" CACHE STRING'.format(arch=arch))])
-
+                      'CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}\n' +
+                      '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
+                      ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=targetArch)),
+                     ('CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}',
+                      'CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}\n' +
+                      '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
+                      ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=targetArch)),
+                     ('set(CMAKE_OSX_ARCHITECTURES x86_64 CACHE STRING',
+                      'set(CMAKE_OSX_ARCHITECTURES "{arch}" CACHE STRING'.format(arch=targetArch))])
+            
         # The OCIO build treats all warnings as errors but several come up
         # on various platforms, including:
         # - On gcc6, v1.1.0 emits many -Wdeprecated-declaration warnings for
@@ -1236,9 +1374,16 @@ def InstallOpenColorIO(context, force, buildArgs):
             pass
         else:
             extraArgs.append('-DCMAKE_CXX_FLAGS=-w')
+		
+        if MacOS():
+            #if using version 2 of OCIO we patch a different config path as it resides elsewere
+            PatchFile("src/core/Config.cpp",
+                       [("cacheidnocontext_ = cacheidnocontext_;", 
+                         "cacheidnocontext_ = rhs.cacheidnocontext_;")])
 
-        if MacOS() and Arm():
-            extraArgs.append('-DOCIO_USE_SSE=OFF')
+            extraArgs.append('-DCMAKE_CXX_FLAGS="-Wno-unused-function -Wno-unused-const-variable -Wno-unused-private-field"')
+            if not apple_utils.IsMacTargetIntel(context):
+                extraArgs.append('-DOCIO_USE_SSE=OFF')
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
@@ -1254,7 +1399,8 @@ OPENCOLORIO = Dependency("OpenColorIO", InstallOpenColorIO,
 OPENSUBDIV_URL = "https://github.com/PixarAnimationStudios/OpenSubdiv/archive/v3_4_4.zip"
 
 def InstallOpenSubdiv(context, force, buildArgs):
-    with CurrentWorkingDirectory(DownloadURL(OPENSUBDIV_URL, context, force)):
+    srcOSDDir = DownloadURL(OPENSUBDIV_URL, context, force)
+    with CurrentWorkingDirectory(srcOSDDir):
         extraArgs = [
             '-DNO_EXAMPLES=ON',
             '-DNO_TUTORIALS=ON',
@@ -1298,11 +1444,38 @@ def InstallOpenSubdiv(context, force, buildArgs):
         # just 1 job for now. See:
         # https://github.com/PixarAnimationStudios/OpenSubdiv/issues/1194
         oldNumJobs = context.numJobs
+        extraEnv = os.environ.copy()
         if MacOS():
             context.numJobs = 1
 
+            if apple_utils.GetMacTargetArch(context) != apple_utils.GetMacArch():
+                # For macOS cross-compilation it is necessary to build stringify
+                # on the host architecture.  This is then passed into the second
+                # phase of building OSD with the STRINGIFY_LOCATION parameter.
+                stringifyDir = srcOSDDir + "_stringify"
+                if os.path.isdir(stringifyDir):
+                    shutil.rmtree(stringifyDir)
+                shutil.copytree(srcOSDDir, stringifyDir)
+
+                stringifyContext = copy.copy(context)
+                stringifyContext.targetArch = apple_utils.GetMacArch()
+
+                with CurrentWorkingDirectory(stringifyDir):
+                    RunCMake(stringifyContext, force, extraArgs)
+
+                buildStringifyDir = os.path.join(stringifyContext.buildDir, os.path.split(srcOSDDir)[1] + "_stringify")
+
+                extraArgs.append('-DSTRINGIFY_LOCATION={buildStringifyDir}/bin/stringify'
+                                .format(buildStringifyDir=buildStringifyDir))
+
+                extraEnv["OSD_CMAKE_CROSSCOMPILE"] = "1"
+
+                # Patch CMakeLists.txt to enable cross-compiling and pick up the stringify location.
+                PatchFile("CMakeLists.txt", 
+                        [("set_property(GLOBAL PROPERTY USE_FOLDERS ON)",
+                          "set_property(GLOBAL PROPERTY USE_FOLDERS ON)\nif(DEFINED ENV{OSD_CMAKE_CROSSCOMPILE})\nset(CMAKE_CROSSCOMPILING 1)\nendif()")])
         try:
-            RunCMake(context, force, extraArgs)
+            RunCMake(context, force, extraArgs, extraEnv)
         finally:
             context.cmakeGenerator = oldGenerator
             context.numJobs = oldNumJobs
@@ -1356,6 +1529,7 @@ def GetPySideInstructions():
                 'update your PYTHONPATH to indicate where it is '
                 'located.')
 
+
 PYSIDE = PythonDependency("PySide", GetPySideInstructions,
                           moduleNames=["PySide", "PySide2", "PySide6"])
 
@@ -1366,6 +1540,9 @@ HDF5_URL = "https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.0
 
 def InstallHDF5(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(HDF5_URL, context, force)):
+        if MacOS():
+            PatchFile("config/cmake_ext_mod/ConfigureChecks.cmake", 
+                    [("if (ARCH_LENGTH GREATER 1)", "if (FALSE)")])
         RunCMake(context, force,
                  ['-DBUILD_TESTING=OFF',
                   '-DHDF5_BUILD_TOOLS=OFF',
@@ -1376,10 +1553,14 @@ HDF5 = Dependency("HDF5", InstallHDF5, "include/hdf5.h")
 ############################################################
 # Alembic
 
-ALEMBIC_URL = "https://github.com/alembic/alembic/archive/1.7.10.zip"
+ALEMBIC_URL = "https://github.com/alembic/alembic/archive/1.8.3.zip"
 
 def InstallAlembic(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(ALEMBIC_URL, context, force)):
+        if MacOS():
+            PatchFile("CMakeLists.txt", 
+                      [("ADD_DEFINITIONS(-Wall -Werror -Wextra -Wno-unused-parameter)",
+                        "ADD_DEFINITIONS(-Wall -Wextra -Wno-unused-parameter)")])
         cmakeOptions = ['-DUSE_BINARIES=OFF', '-DUSE_TESTS=OFF']
         if context.enableHDF5:
             # HDF5 requires the H5_BUILT_AS_DYNAMIC_LIB macro be defined if
@@ -1444,6 +1625,10 @@ def InstallEmbree(context, force, buildArgs):
             '-DEMBREE_ISPC_SUPPORT=OFF'
         ]
 
+        if MacOS() and context.targetUniversal:
+            extraArgs += [
+                '-DEMBREE_MAX_ISA=NEON',
+                '-DEMBREE_ISA_NEON=ON']
         # By default Embree fails to build on Visual Studio 2015 due
         # to an internal compiler issue that is worked around via the
         # following flag. For more details see:
@@ -1725,6 +1910,15 @@ group.add_argument("--build-variant", default=BUILD_RELEASE,
                    help=("Build variant for USD and 3rd-party dependencies. "
                          "(default: {})".format(BUILD_RELEASE)))
 
+TARGET_NATIVE = "native"
+TARGET_X86 = "x86_64"
+TARGET_ARM64 = "arm64"
+TARGET_UNIVERSAL = "universal"
+group.add_argument("--build-target", default=TARGET_NATIVE,
+                   choices=[TARGET_NATIVE, TARGET_X86, TARGET_ARM64, TARGET_UNIVERSAL],
+                   help=("Build target for macOS cross compilation. "
+                         "(default: {})".format(TARGET_NATIVE)))
+
 group.add_argument("--build-args", type=str, nargs="*", default=[],
                    help=("Custom arguments to pass to build system when "
                          "building libraries (see docs above)"))
@@ -1743,6 +1937,10 @@ group.add_argument("--generator", type=str,
 group.add_argument("--toolset", type=str,
                    help=("CMake toolset to use when building libraries with "
                          "cmake"))
+if MacOS():
+    codesignDefault = False if apple_utils.GetMacArch() == "x64_64" else True
+    group.add_argument("--codesign", dest="macos_codesign", default=codesignDefault,
+                       help=("Use codesigning for macOS builds (defaults to enabled on Apple Silicon)"))
 
 if Linux():
     group.add_argument("--use-cxx11-abi", type=int, choices=[0, 1],
@@ -1989,10 +2187,21 @@ class InstallContext:
         self.buildShared = (args.build_type == SHARED_LIBS)
         self.buildMonolithic = (args.build_type == MONOLITHIC_LIB)
 
-        # Build options
+        # Build target options, for macOS
+        self.targetNative = (args.build_target == TARGET_NATIVE)
+        self.targetX86 = (args.build_target == TARGET_X86)
+        self.targetARM64 = (args.build_target == TARGET_ARM64)
+        if apple_utils.SupportsMacOSUniversalBinaries():
+            self.targetUniversal = (args.build_target == TARGET_UNIVERSAL)
+        else:
+            self.targetUniversal = False
+            if MacOS():
+                raise ValueError("Universal binaries only supported in macOS 11.0 and later.")
         self.useCXX11ABI = \
             (args.use_cxx11_abi if hasattr(args, "use_cxx11_abi") else None)
         self.safetyFirst = args.safety_first
+        self.macOSCodesign = \
+            (args.macos_codesign if hasattr(args, "macos_codesign") else False)
 
         # Dependencies that are forced to be built
         self.forceBuildAll = args.force_all
@@ -2248,6 +2457,7 @@ if context.useCXX11ABI is not None:
 
 summaryMsg += """\
     Variant                     {buildVariant}
+    Target                      {buildTarget}
     Imaging                     {buildImaging}
       Ptex support:             {enablePtex}
       OpenVDB support:          {enableOpenVDB}
@@ -2307,7 +2517,13 @@ summaryMsg = summaryMsg.format(
                   else "Debug" if context.buildDebug
                   else "Release w/ Debug Info" if context.buildRelWithDebug
                   else ""),
+    buildTarget=("Native" if context.targetNative
+                  else "x86_64" if context.targetX86
+                  else "ARM64" if context.targetARM64
+                  else "Universal" if context.targetUniversal
+                  else ""),
     buildImaging=("On" if context.buildImaging else "Off"),
+    macOSCodesign=("On" if context.macOSCodesign else "Off"),
     enablePtex=("On" if context.enablePtex else "Off"),
     enableOpenVDB=("On" if context.enableOpenVDB else "Off"),
     buildOIIO=("On" if context.buildOIIO else "Off"),
@@ -2386,6 +2602,10 @@ if Windows():
         os.path.join(context.instDir, "bin"),
         os.path.join(context.instDir, "lib")
     ])
+
+if MacOS():
+    if context.macOSCodesign:
+        apple_utils.Codesign(context.usdInstDir, verbosity > 1)
 
 Print("""
 Success! To use USD, please ensure that you have:""")
