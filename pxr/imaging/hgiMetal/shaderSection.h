@@ -166,7 +166,10 @@ public:
     bool VisitScopeConstructorInstantiation(std::ostream &ss) override;
     HGIMETAL_API
     bool VisitScopeMemberDeclarations(std::ostream &ss) override;
-
+    
+    HGIMETAL_API
+    bool VisitEntryPointParameterDeclarations(std::ostream &ss) override;
+    
 private:
     HgiMetalSamplerShaderSection() = delete;
     HgiMetalSamplerShaderSection & operator=(
@@ -216,6 +219,9 @@ public:
     bool VisitScopeMemberDeclarations(std::ostream &ss) override;
     HGIMETAL_API
     bool VisitScopeFunctionDefinitions(std::ostream &ss) override;
+    
+    HGIMETAL_API
+    bool VisitEntryPointParameterDeclarations(std::ostream &ss) override;
 
 private:
     HgiMetalTextureShaderSection() = delete;

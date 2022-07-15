@@ -106,6 +106,10 @@ HgiMetalResourceBindings::BindResources(
                                           offset:offsetTexture];
             [argEncoderTexture setTexture:metalTexture
                                   atIndex:0];
+            
+            [renderEncoder setFragmentTexture:metalTexture atIndex: 20 + texDesc.bindingIndex];
+            [renderEncoder setFragmentSamplerState:metalSampler atIndex:15 + texDesc.bindingIndex];
+             
         }
         if (metalTexture) {
             if (metalSampler) {

@@ -193,10 +193,6 @@ bool
 HgiMetalSamplerShaderSection::VisitScopeConstructorInstantiation(
     std::ostream &ss)
 {
-    if (!_parentScopeIdentifier.empty()) {
-        ss << _parentScopeIdentifier << "->";
-    }
-
     WriteIdentifier(ss);
     return true;
 }
@@ -206,6 +202,15 @@ HgiMetalSamplerShaderSection::VisitScopeMemberDeclarations(std::ostream &ss)
 {
     WriteDeclaration(ss);
     ss << std::endl;
+    return true;
+}
+
+bool
+HgiMetalSamplerShaderSection::VisitEntryPointParameterDeclarations(
+    std::ostream &ss)
+{
+    WriteParameter(ss);
+    ss << "[[sampler(" << (stoi(GetAttributes()[0].index) + 15) << ")]]";
     return true;
 }
 
@@ -346,10 +351,6 @@ bool
 HgiMetalTextureShaderSection::VisitScopeConstructorInstantiation(
     std::ostream &ss)
 {
-    if (!_parentScopeIdentifier.empty()) {
-        ss << _parentScopeIdentifier << "->";
-    }
-
     WriteIdentifier(ss);
     return true;
 }
@@ -628,6 +629,15 @@ HgiMetalTextureShaderSection::VisitScopeFunctionDefinitions(std::ostream &ss)
            << "}\n";
     }
 
+    return true;
+}
+
+bool
+HgiMetalTextureShaderSection::VisitEntryPointParameterDeclarations(
+    std::ostream &ss)
+{
+    WriteParameter(ss);
+    ss << "[[texture(" << (stoi(GetAttributes()[0].index) + 20) << ")]]";
     return true;
 }
 
