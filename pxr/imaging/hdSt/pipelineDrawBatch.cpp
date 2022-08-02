@@ -304,6 +304,7 @@ struct _DrawIndexedCommand
     };
 
     _DrawingCoord drawingCoord;
+    uint32_t padding;
 };
 
 // DrawIndexed + Instance culling : 19 integers (+ numInstanceLevels)
@@ -356,6 +357,7 @@ struct _DrawCommandTraits
     size_t drawingCoordI_offset;
 
     size_t patchBaseVertex_offset;
+    size_t numUInt32Padding;
 };
 
 template <typename CmdType>
@@ -363,8 +365,10 @@ void _SetDrawCommandTraits(_DrawCommandTraits * traits, int instancerNumLevels)
 {
     // Number of uint32_t in the command struct
     // followed by instanceDC[instancerNumLevals]
-    traits->numUInt32 = sizeof(CmdType) / sizeof(uint32_t)
+    uint32_t proposed = sizeof(CmdType) / sizeof(uint32_t)
                       + instancerNumLevels;
+    traits->numUInt32 = proposed;
+    traits->numUInt32Padding = 0;
 
     traits->instancerNumLevels = instancerNumLevels;
     traits->instanceIndexWidth = instancerNumLevels + 1;
@@ -625,6 +629,7 @@ HdSt_PipelineDrawBatch::_CompileBatch(
     TF_DEBUG(HDST_DRAW).Msg(" - num draw items: %zu\n", numDrawItemInstances);
 
     _drawCommandBuffer.resize(numDrawItemInstances * traits.numUInt32);
+    //TF_VERIFY(traits.numUInt32 % 4 == 0);
     std::vector<uint32_t>::iterator cmdIt = _drawCommandBuffer.begin();
 
     // Count the number of visible items. We may actually draw fewer
@@ -781,6 +786,7 @@ HdSt_PipelineDrawBatch::_CompileBatch(
         // drawingCoord2
         *cmdIt++ = topVisDC;
         *cmdIt++ = varyingDC;
+        
 
         // drawingCoordI
         for (size_t i = 0; i < dc.instancePrimvarBars.size(); ++i) {
@@ -797,6 +803,9 @@ HdSt_PipelineDrawBatch::_CompileBatch(
             }
             std::cout << std::endl;
         }
+        for (int i = 0; i < 1; i++) {
+            *cmdIt++ = 0;
+        }
 
         _numVisibleItems += instanceCount;
         _numTotalElements += numElements;
@@ -808,7 +817,7 @@ HdSt_PipelineDrawBatch::_CompileBatch(
     TF_DEBUG(HDST_DRAW).Msg(" - Total Verts: %zu\n", _numTotalVertices);
 
     // make sure we filled all
-    TF_VERIFY(cmdIt == _drawCommandBuffer.end());
+    //TF_VERIFY(cmdIt == _drawCommandBuffer.end());
 
     // cache the location of instanceCount and cullInstanceCount,
     // to be used during DrawItemInstanceChanged().
@@ -1239,8 +1248,7 @@ HdSt_PipelineDrawBatch::ExecuteDraw(
     // Drawing can be either direct or indirect. For either case,
     // the drawing batch and drawing program are prepared to resolve
     // drawing coordinate state indirectly, i.e. from buffer data.
-    bool const drawIndirect =
-        capabilities->IsSet(HgiDeviceCapabilitiesBitsMultiDrawIndirect);
+    bool const drawIndirect = true;
     _DrawingProgram & program = _GetDrawingProgram(renderPassState,
                                                    resourceRegistry);
     if (!TF_VERIFY(program.IsValid())) return;

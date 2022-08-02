@@ -116,7 +116,7 @@ HgiMetalResourceBindings::BindResources(
             else {
                 usageFlags = MTLResourceUsageRead;
             }
-            if (!texDesc.readOnly) {
+            if (true) {
                 usageFlags = usageFlags | MTLResourceUsageWrite;
             }
             [renderEncoder useResource:metalTexture

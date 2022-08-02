@@ -704,9 +704,7 @@ HgiMetalGraphicsCmds::DrawIndexedIndirect(
 
     _SyncArgumentBuffer();
     static const uint32_t _drawCallsPerThread = 256;
-    const uint32_t numEncoders = std::min(
-                                 std::max(drawCount / _drawCallsPerThread, 1U),
-                                 _maxNumEncoders);
+    const uint32_t numEncoders = 1;
     const uint32_t normalCount = drawCount / numEncoders;
     const uint32_t finalCount = normalCount
                               + (drawCount - normalCount * numEncoders);
