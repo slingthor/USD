@@ -395,9 +395,7 @@ def RunCMake(context, force, extraArgs = None, envOverride = None, targetArch = 
 
     # On MacOS, enable the use of @rpath for relocatable builds.
     osx_rpath = None
-    if MacOS():
-        osx_rpath = "-DCMAKE_MACOSX_RPATH=ON"
-
+    if MacOS() and not context.targetIos:
         # For macOS cross compilation, set the Xcode architecture flags.
         # If a target has been passed in then use it instead.
         if targetArch == None:
@@ -409,6 +407,39 @@ def RunCMake(context, force, extraArgs = None, envOverride = None, targetArch = 
             extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
 
         extraArgs.append('-DCMAKE_OSX_ARCHITECTURES={0}'.format(targetArch))
+    if MacOS() or context.targetIos:
+        osx_rpath = "-DCMAKE_MACOSX_RPATH=ON"
+    if context.targetIos:
+        # Add the default iOS toolchain file if one isn't aready specified
+        if not any("-DCMAKE_TOOLCHAIN_FILE=" in s for s in extraArgs):
+            extraArgs.append(
+                '-DCMAKE_TOOLCHAIN_FILE={usdSrcDir}/cmake/toolchains/ios.toolchain.cmake '
+                .format(usdSrcDir=context.usdSrcDir))
+            extraArgs.append("-DPLATFORM=OS64 ")
+            extraArgs.append("-DENABLE_BITCODE=False ")
+
+        CODE_SIGN_ID = apple_utils.GetCodeSignID()
+        DEVELOPMENT_TEAM = apple_utils.GetDevelopmentTeamID()
+        # Edge case for iOS
+        if CODE_SIGN_ID == "-":
+            CODE_SIGN_ID = ""
+        frameWorkRoot = apple_utils.GetFrameworkRoot()
+        pyVers = ".".join(platform.python_version().split()[0:1])
+        extraArgs.append(
+            '-DIOS_PLATFORM=OS '
+            '-DENABLE_VISIBILITY=1 '
+            '-DAPPLEIOS=1 '
+            '-DENABLE_ARC=0 '
+            '-DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="{codesignid}" '
+            '-DCMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM={developmentTeam} '
+            '-DPYTHON_INCLUDE_DIR={framework}/include/python{version}  '
+            '-DPYTHON_LIBRARY={framework}/lib '
+            '-DPYTHON_EXECUTABLE:FILEPATH={executable} '.format(
+                codesignid=CODE_SIGN_ID,
+                developmentTeam=DEVELOPMENT_TEAM,
+                version=pyVers,
+                framework=frameWorkRoot,
+                executable=sys.executable))
 
     # We use -DCMAKE_BUILD_TYPE for single-configuration generators 
     # (Ninja, make), and --config for multi-configuration generators 
@@ -685,6 +716,11 @@ ZLIB_URL = "https://github.com/madler/zlib/archive/v1.2.11.zip"
 
 def InstallZlib(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(ZLIB_URL, context, force)):
+        if context.targetIos:
+            # Replace test executables with static libraries to avoid issues with code signing.
+            PatchFile("CMakeLists.txt",
+                [("add_executable(example test/example.c)", "add_library(example STATIC test/example.c)"),
+                 ("add_executable(minigzip test/minigzip.c)", "add_library(minigzip STATIC test/minigzip.c)")])
         RunCMake(context, force, buildArgs)
 
 ZLIB = Dependency("zlib", InstallZlib, "include/zlib.h")
@@ -701,9 +737,9 @@ elif Linux():
     BOOST_URL = "https://boostorg.jfrog.io/artifactory/main/release/1.70.0/source/boost_1_70_0.tar.gz"
     BOOST_VERSION_FILE = "include/boost/version.hpp"
 elif Windows():
-    # The default installation of boost on Windows puts headers in a versioned 
-    # subdirectory, which we have to account for here. In theory, specifying 
-    # "layout=system" would make the Windows install match Linux/MacOS, but that 
+    # The default installation of boost on Windows puts headers in a versioned
+    # subdirectory, which we have to account for here. In theory, specifying
+    # "layout=system" would make the Windows install match Linux/MacOS, but that
     # causes problems for other dependencies that look for boost.
     #
     # boost 1.70 is required for Visual Studio 2019. For simplicity, we use
@@ -724,10 +760,11 @@ def InstallBoost_Helper(context, force, buildArgs):
         "*/libs/wave/test/testwave/testfiles/utf8-test-*"
     ]
 
-    with CurrentWorkingDirectory(DownloadURL(BOOST_URL, context, force, 
+    with CurrentWorkingDirectory(DownloadURL(BOOST_URL, context, force,
                                              dontExtract=dontExtract)):
         bootstrap = "bootstrap.bat" if Windows() else "./bootstrap.sh"
-
+        if context.targetIos:
+            os.environ['SDKROOT'] = GetCommandOutput('xcrun --sdk macosx --show-sdk-path').strip()
         # For cross-compilation on macOS we need to specify the architecture
         # for both the bootstrap and the b2 phase of building boost.
         bootstrapCmd = '{bootstrap} --prefix="{instDir}"'.format(
@@ -740,7 +777,7 @@ def InstallBoost_Helper(context, force, buildArgs):
             if context.targetX86:
                 macOSArchitecture = "architecture=x86"
                 macOSArch = "-arch x86_64"
-            elif context.targetARM64:
+            elif context.targetARM64 or context.targetIos:
                 macOSArchitecture = "architecture=arm"
                 macOSArch = "-arch arm64"
             elif context.targetUniversal:
@@ -770,14 +807,15 @@ def InstallBoost_Helper(context, force, buildArgs):
             '--build-dir="{buildDir}"'.format(buildDir=context.buildDir),
             '-j{procs}'.format(procs=num_procs),
             'address-model=64',
-            'link=shared',
-            'runtime-link=shared',
             'threading=multi', 
             'variant={variant}'.format(variant=boostBuildVariant),
             '--with-atomic',
             '--with-program_options',
             '--with-regex'
         ]
+        if not context.targetIos:
+            b2_settings.append('link=shared')
+            b2_settings.append('runtime-link=shared')
 
         if context.buildPython:
             b2_settings.append("--with-python")
@@ -853,7 +891,37 @@ def InstallBoost_Helper(context, force, buildArgs):
         if MacOS():
             # Must specify toolset=clang to ensure install_name for boost
             # libraries includes @rpath
-            b2_settings.append("toolset=clang")
+            if context.targetIos:
+                sdkPath = ''
+                xcodeRoot = GetCommandOutput('xcode-select --print-path').strip()
+                if not context.targetIos:
+                    sdkPath = GetCommandOutput('xcrun --sdk macosx --show-sdk-path').strip()
+                else:
+                    sdkPath = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
+                b2_settings.append("toolset=darwin-iphone")
+                b2_settings.append("target-os=iphone")
+                b2_settings.append("define=_LITTLE_ENDIAN")
+                b2_settings.append("link=static")
+                iOSVersion = GetCommandOutput('xcodebuild -sdk ' + sdkPath + ' -version  SDKVersion').strip()
+                newLines = [
+                'using darwin : iphone\n',
+                ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++'
+                    .format(XCODE_ROOT=xcodeRoot),
+                ' -arch arm64 -mios-version-min=10.0 -fembed-bitcode -Wno-unused-local-typedef -Wno-nullability-completeness -DBOOST_AC_USE_PTHREADS -DBOOST_SP_USE_PTHREADS -g -DNDEBUG\n',
+                ': <striper> <root>{XCODE_ROOT}/Platforms/iPhoneOS.platform/Developer\n'
+                    .format(XCODE_ROOT=xcodeRoot),
+                ': <architecture>arm <target-os>iphone <address-model>64\n',
+                ';'
+                ]
+                projectPath = 'user-config.jam'
+                b2_settings.append("--user-config=user-config.jam")
+                if os.path.exists(projectPath):
+                    os.remove(projectPath)
+                with open(projectPath, 'w') as projectFile:
+                    projectFile.write('\n')
+                    projectFile.writelines(newLines)
+            else:
+                b2_settings.append("toolset=clang")
 
             # Specify target for macOS cross-compilation.
             if macOSArchitecture:
@@ -935,6 +1003,7 @@ def InstallTBB_MacOS(context, force, buildArgs):
                 [("-m64",
                   "-m64 -arch x86_64")])
         secondaryArch = None
+        primaryArch = None
 
         if context.targetNative:
             primaryArch = apple_utils.GetMacArch()
@@ -950,8 +1019,11 @@ def InstallTBB_MacOS(context, force, buildArgs):
                 else:
                     secondaryArch = "intel64"
 
-        if (primaryArch == "x86_64"):
+        if (primaryArch is not None and primaryArch == "x86_64"):
             primaryArch = "intel64"
+
+        if context.targetIos:
+            primaryArch = "arm64"
 
         makeTBBCmdPrimary = 'make -j{procs} arch={arch} {buildArgs}'.format(
             arch=primaryArch,
@@ -1063,6 +1135,41 @@ def InstallJPEG_Turbo(context, force, buildArgs):
         extraJPEGArgs = buildArgs
         if MacOS():
             extraJPEGArgs.append("-DWITH_SIMD=FALSE")
+        if context.targetIOS:
+            extraJPEGArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64')
+            extraJPEGArgs.append("-DENABLE_STATIC=TRUE")
+
+            # Replace test and utility executables with static libraries to avoid issues with code signing.
+            PatchFile("CMakeLists.txt",
+                      [("add_executable(tjunittest tjunittest.c tjutil.c md5/md5.c md5/md5hl.c)",
+                        "add_library(tjunittest STATIC tjunittest.c tjutil.c md5/md5.c md5/md5hl.c)"),
+                       ("add_executable(tjbench tjbench.c tjutil.c)",
+                        "add_library(tjbench STATIC tjbench.c tjutil.c)"),
+                       ("add_executable(tjexample tjexample.c)",
+                        "add_library(tjexample STATIC tjexample.c)"),
+                       ("add_executable(tjunittest-static tjunittest.c tjutil.c md5/md5.c",
+                        "add_library(tjunittest-static STATIC tjunittest.c tjutil.c md5/md5.c"),
+                       ("add_executable(tjbench-static tjbench.c tjutil.c)",
+                        "add_library(tjbench-static STATIC tjbench.c tjutil.c)"),
+                       ("add_executable(cjpeg-static cjpeg.c cdjpeg.c rdgif.c rdppm.c rdswitch.c",
+                        "add_library(cjpeg-static STATIC cjpeg.c cdjpeg.c rdgif.c rdppm.c rdswitch.c"),
+                       ("add_executable(djpeg-static djpeg.c cdjpeg.c rdcolmap.c rdswitch.c wrgif.c",
+                        "add_library(djpeg-static STATIC djpeg.c cdjpeg.c rdcolmap.c rdswitch.c wrgif.c"),
+                       ("add_executable(jpegtran-static jpegtran.c cdjpeg.c rdswitch.c transupp.c)",
+                        "add_library(jpegtran-static STATIC jpegtran.c cdjpeg.c rdswitch.c transupp.c)"),
+                       ("add_executable(rdjpgcom rdjpgcom.c)", "add_library(rdjpgcom STATIC rdjpgcom.c)"),
+                       ("add_executable(wrjpgcom wrjpgcom.c)", "add_library(wrjpgcom STATIC wrjpgcom.c)"),
+                       ("add_subdirectory(md5)", "# add_subdirectory(md5)")])
+
+            PatchFile("sharedlib/CMakeLists.txt",
+                      [("add_executable(cjpeg ../cjpeg.c ../cdjpeg.c ../rdgif.c ../rdppm.c",
+                        "add_library(cjpeg STATIC ../cjpeg.c ../cdjpeg.c ../rdgif.c ../rdppm.c"),
+                       ("add_executable(djpeg ../djpeg.c ../cdjpeg.c ../rdcolmap.c ../rdswitch.c",
+                        "add_library(djpeg STATIC ../djpeg.c ../cdjpeg.c ../rdcolmap.c ../rdswitch.c"),
+                       ("add_executable(jpegtran ../jpegtran.c ../cdjpeg.c ../rdswitch.c ../transupp.c)",
+                        "add_library(jpegtran STATIC ../jpegtran.c ../cdjpeg.c ../rdswitch.c ../transupp.c)"),
+                       ("add_executable(jcstest ../jcstest.c)",
+                        "add_library(jcstest STATIC ../jcstest.c)")])
 
         RunCMake(context, force, extraJPEGArgs)
         return os.getcwd()
@@ -1099,6 +1206,11 @@ def InstallTIFF(context, force, buildArgs):
                    [("add_subdirectory(tools)", "# add_subdirectory(tools)"),
                     ("add_subdirectory(test)", "# add_subdirectory(test)")])
 
+        if context.targetIOS:
+            # Skip contrib to avoid issues with code signing.
+            PatchFile("CMakeLists.txt",
+                    [("add_subdirectory(contrib)", "# add_subdirectory(contrib)")])
+
         # The libTIFF CMakeScript says the ld-version-script 
         # functionality is only for compilers using GNU ld on 
         # ELF systems or systems which provide an emulation; therefore
@@ -1120,6 +1232,27 @@ PNG_URL = "https://github.com/glennrp/libpng/archive/refs/tags/v1.6.29.tar.gz"
 def InstallPNG(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PNG_URL, context, force)):
         macArgs = []
+
+        if MacOS():
+            PatchFile("CMakeLists.txt",
+                      [('add_custom_target(gensym DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/libpng.sym")',
+                        'add_custom_target(gensym DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/libpng.sym" genvers)'),
+                       ("add_custom_target(genfiles DEPENDS",
+                        "add_custom_target(genfiles DEPENDS gensym symbol-check")])
+        if context.targetIOS:
+            macArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
+            macArgs.append('-DPNG_ARM_NEON=off');
+
+            # Skip tests to avoid issues with code signing.
+            # Replace utility executables with static libraries to avoid issues with code signing.
+            PatchFile("CMakeLists.txt",
+                [("option(PNG_TESTS  \"Build libpng tests\" ON)",
+                  "option(PNG_TESTS  \"Build libpng tests\" OFF)"),
+                 ("add_executable(pngfix ${pngfix_sources})",
+                  "add_library(pngfix STATIC ${pngfix_sources})"),
+                 ("add_executable(png-fix-itxt ${png_fix_itxt_sources})",
+                  "add_library(png-fix-itxt STATIC ${png_fix_itxt_sources})")])
+
         if MacOS() and not apple_utils.IsMacTargetIntel(context):
             # Ensure libpng's build doesn't erroneously activate inappropriate
             # Neon extensions
@@ -1208,6 +1341,11 @@ def InstallPtex_Windows(context, force, buildArgs):
 
 def InstallPtex_LinuxOrMacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PTEX_URL, context, force)):
+        if context.targetIOS:
+            # Skip utils and tests to avoid issues with code signing.
+            PatchFile("CMakeLists.txt",
+                [("add_subdirectory(src/utils)", "# add_subdirectory(src/utils)"),
+                 ("add_subdirectory(src/tests)", "# add_subdirectory(src/tests)")])
         cmakeOptions = [
             '-DPTEX_BUILD_STATIC_LIBS=OFF',
             # We must tell the Ptex build system what version we're building
@@ -1448,7 +1586,7 @@ def InstallOpenSubdiv(context, force, buildArgs):
         if MacOS():
             context.numJobs = 1
 
-            if apple_utils.GetMacTargetArch(context) != apple_utils.GetMacArch():
+            if apple_utils.GetMacTargetArch(context) != apple_utils.GetMacArch() and not contenxt.targetIOS:
                 # For macOS cross-compilation it is necessary to build stringify
                 # on the host architecture.  This is then passed into the second
                 # phase of building OSD with the STRINGIFY_LOCATION parameter.
@@ -1474,6 +1612,38 @@ def InstallOpenSubdiv(context, force, buildArgs):
                 PatchFile("CMakeLists.txt", 
                         [("set_property(GLOBAL PROPERTY USE_FOLDERS ON)",
                           "set_property(GLOBAL PROPERTY USE_FOLDERS ON)\nif(DEFINED ENV{OSD_CMAKE_CROSSCOMPILE})\nset(CMAKE_CROSSCOMPILING 1)\nendif()")])
+            elif context.targetIos:
+                PatchFile(srcOSDDir + "/cmake/iOSToolchain.cmake",
+                          [("set(SDKROOT $ENV{SDKROOT})",
+                            "set(CMAKE_TRY_COMPILE_TARGET_TYPE \"STATIC_LIBRARY\")\n"
+                            "set(SDKROOT $ENV{SDKROOT})")])
+
+                # We build for macOS in order to leverage the STRINGIFY binary built
+                srcOSDmacOSDir = srcOSDDir + "_macOS"
+                if os.path.isdir(srcOSDmacOSDir):
+                    shutil.rmtree(srcOSDmacOSDir)
+                shutil.copytree(srcOSDDir, srcOSDmacOSDir)
+
+                # Install macOS dependencies into a temporary directory, to avoid iOS space polution
+                tempContext = copy.copy(context)
+                tempContext.instDir = tempContext.instDir + "/macOS"
+                try:
+                    with CurrentWorkingDirectory(srcOSDmacOSDir):
+                        RunCMake(tempContext, force, extraArgs, True)
+                except Exception as ex:
+                    print(ex)
+                shutil.rmtree(tempContext.instDir)
+
+                buildDirmacOS = os.path.join(context.buildDir, os.path.split(srcOSDmacOSDir)[1])
+
+                extraArgs.append('-DNO_CLEW=ON')
+                extraArgs.append('-DNO_OPENGL=ON')
+                extraArgs.append('-DSTRINGIFY_LOCATION={buildDirmacOS}/bin/{variant}/stringify'
+                                 .format(buildDirmacOS=buildDirmacOS,
+                                         variant="Debug" if context.buildDebug else "Release"))
+                extraArgs.append('-DCMAKE_TOOLCHAIN_FILE={srcOSDDir}/cmake/iOSToolchain.cmake -DPLATFORM=OS64'
+                                 .format(srcOSDDir=srcOSDDir))
+                extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64')
         try:
             RunCMake(context, force, extraArgs, extraEnv)
         finally:
@@ -1914,8 +2084,9 @@ TARGET_NATIVE = "native"
 TARGET_X86 = "x86_64"
 TARGET_ARM64 = "arm64"
 TARGET_UNIVERSAL = "universal"
+TARGET_IOS = "ios"
 group.add_argument("--build-target", default=TARGET_NATIVE,
-                   choices=[TARGET_NATIVE, TARGET_X86, TARGET_ARM64, TARGET_UNIVERSAL],
+                   choices=[TARGET_NATIVE, TARGET_X86, TARGET_ARM64, TARGET_UNIVERSAL, TARGET_IOS],
                    help=("Build target for macOS cross compilation. "
                          "(default: {})".format(TARGET_NATIVE)))
 
@@ -2149,6 +2320,10 @@ class InstallContext:
 
         # CMake generator and toolset
         self.cmakeGenerator = args.generator
+        if args.build_target == TARGET_IOS:
+            self.cmakeGenerator = "Xcode"
+            if args.generator != "Xcode":
+                print("Automatically switched to Xcode as generator as building for iOS")
         self.cmakeToolset = args.toolset
 
         # Number of jobs
@@ -2191,6 +2366,7 @@ class InstallContext:
         self.targetNative = (args.build_target == TARGET_NATIVE)
         self.targetX86 = (args.build_target == TARGET_X86)
         self.targetARM64 = (args.build_target == TARGET_ARM64)
+        self.targetIos = (args.build_target == TARGET_IOS)
         if apple_utils.SupportsMacOSUniversalBinaries():
             self.targetUniversal = (args.build_target == TARGET_UNIVERSAL)
         else:

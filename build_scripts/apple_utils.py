@@ -5,6 +5,7 @@ import os
 import platform
 import shlex
 import subprocess
+import re
 
 def MacOS():
     return platform.system() == "Darwin"
@@ -13,14 +14,52 @@ def GetLocale():
     return sys.stdout.encoding or locale.getdefaultlocale()[1] or "UTF-8"
 
 def GetCommandOutput(command):
-    """Executes the specified command and returns output or None."""
+    """Executes the specified command and returns output or None.
+    If command contains pipes (i.e '|'s), creates a subprocess for
+    each pipe in command, returning the output from the last subcommand
+    or None if any of the subcommands result in a CalledProcessError"""
+
+    result = None
+
+    args = shlex.split(command)
+    commands = []
+    cmd_args = []
+    while args:
+        arg = args.pop(0)
+        if arg == '|':
+            commands.append((cmd_args))
+            cmd_args = []
+        else:
+            cmd_args.append(arg)
+    commands.append((cmd_args))
+
+    pipes = []
+    while len(commands) > 1:
+        # We have some pipes
+        command = commands.pop(0)
+        stdin = pipes[-1].stdout if pipes else None
+        try:
+            pipe = subprocess.Popen(command, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            pipes.append(pipe)
+        except subprocess.CalledProcessError:
+            return None
+
+    # The last command actually returns a result
+    command = commands[0]
     try:
-        return subprocess.check_output(
-            shlex.split(command), 
-            stderr=subprocess.STDOUT).decode(GetLocale(), 'replace').strip()
+        stdin = pipes[-1].stdout if pipes else None
+        result = subprocess.check_output(
+            command,
+            stdin = stdin,
+            stderr=subprocess.STDOUT).decode('utf-8').strip()
     except subprocess.CalledProcessError:
         pass
-    return None
+
+    # clean-up
+    for pipe in pipes:
+        pipe.wait()
+
+    return result
 
 def GetMacArmArch():
     return os.environ.get('MACOS_ARM_ARCHITECTURE') or "arm64"
@@ -37,6 +76,8 @@ def GetMacTargetArch(context):
     if context.targetNative:
         macTargets = GetMacArch()
     else:
+        if context.targetIos:
+            macTargets = "arm64"
         if context.targetX86:
             macTargets = "x86_64"
         if context.targetARM64:
@@ -58,6 +99,23 @@ def SupportsMacOSUniversalBinaries():
 
 devout = open(os.devnull, 'w')
 
+def GetFrameworkRoot():
+    pathWithFramework = next(path for path in sys.path if "Python.framework" in path)
+    splitPath = pathWithFramework.split('/')
+    index = 0
+    for p in range(0, len(splitPath)):
+        if splitPath[index] == "Python.framework":
+            break
+        index = index+1
+    if index == len(splitPath):
+        raise Exception("Could not find Python framework")
+    #This should get Python.framework/Version/3.x
+    frameworkSplitPath = splitPath[0:index+3]
+    frameworkPath = "/".join(frameworkSplitPath)
+    return frameworkPath
+
+
+
 def ExtractFilesRecursive(path, cond):
     files = []
     for r, d, f in os.walk(path):
@@ -66,18 +124,44 @@ def ExtractFilesRecursive(path, cond):
                 files.append(os.path.join(r, file))
     return files
 
-def CodesignFiles(files):
-    SDKVersion  = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
+def _GetCodeSignStringFromTerminal():
     codeSignIDs = subprocess.check_output(['security', 'find-identity', '-vp', 'codesigning'])
+    return codeSignIDs
 
+def GetCodeSignID():
+    codeSignIDs = _GetCodeSignStringFromTerminal()
     codeSignID = "-"
     if os.environ.get('CODE_SIGN_ID'):
         codeSignID = os.environ.get('CODE_SIGN_ID')
-    elif float(SDKVersion) >= 11.0 and codeSignIDs.find(b'Apple Development') != -1:
-        codeSignID = "Apple Development"
-    elif codeSignIDs.find(b'Mac Developer') != -1:
-        codeSignID = "Mac Developer"
-        
+    else:
+        try:
+            codeSignID = codeSignIDs.decode("utf-8").split()[1]
+        except:
+            raise Exception("Unable to parse codesign ID")
+    return codeSignID
+
+def GetCodeSignIDHash():
+    codeSignIDs = _GetCodeSignStringFromTerminal()
+    try:
+        return re.findall(r'\(.*?\)', codeSignIDs.decode("utf-8"))[0][1:-1]
+    except:
+        raise Exception("Unable to parse codesign ID hash")
+
+def GetDevelopmentTeamID():
+    if os.environ.get("DEVELOPMENT_TEAM"):
+        return os.environ.get("DEVELOPMENT_TEAM")
+    codesignID = GetCodeSignIDHash()
+    x509subject = GetCommandOutput('security find-certificate -c {} -p | openssl x509 -subject | head -1'.format(codesignID)).strip()
+    # Extract the Organizational Unit (OU field) from the cert
+    try:
+        team = [elm for elm in x509subject.split('/') if elm.startswith('OU')][0].split('=')[1]
+        if team is not None and team != "":
+            return team
+    except Exception as ex:
+        raise Exception("No development team found with exception " + ex)
+
+def CodesignFiles(files):
+    codeSignID = GetCodeSignID()
     for f in files:
         subprocess.call(['codesign', '-f', '-s', '{codesignid}'
               .format(codesignid=codeSignID), f],
