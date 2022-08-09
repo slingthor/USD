@@ -26,11 +26,16 @@
 #include "pxr/imaging/garch/glDebugWindow.h"
 #include "pxr/imaging/garch/glPlatformDebugWindowDarwin.h"
 
+#if defined(ARCH_OS_MACOS)
 #import <Cocoa/Cocoa.h>
 #import <OpenGL/OpenGL.h>
 #import <OpenGL/gl.h>
+#endif
+
+#if defined(ARCH_OS_MACOS)
 
 PXR_NAMESPACE_USING_DIRECTIVE
+
 
 static int
 Garch_GetModifierKeys(NSUInteger flags)
@@ -239,3 +244,5 @@ Garch_GLPlatformDebugWindow::ExitApp()
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
+
+#endif

@@ -22,15 +22,16 @@
 // language governing permissions and limitations under the Apache License.
 //
 #import <Foundation/Foundation.h>
-#import <AppKit/NSOpenGL.h>
 
 #include "pxr/pxr.h"
 #include "glPlatformContextDarwin.h"
 
-#ifdef ARCH_OS_IOS
-typedef EAGLContext NSGLContext;
-#else
+#ifdef ARCH_OS_MACOS
+#import <AppKit/NSOpenGL.h>
 typedef NSOpenGLContext NSGLContext;
+#else
+#import <UIKit/UIKit.h>
+typedef EAGLContext NSGLContext;
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -101,7 +102,11 @@ GarchNSGLContextState::MakeCurrent()
 void
 GarchNSGLContextState::DoneCurrent()
 {
+#if defined(ARCH_OS_IOS)
+    [EAGLContext setCurrentContext:nil];
+#else
     [NSGLContext clearCurrentContext];
+#endif
 }
 
 GarchGLPlatformContextState
@@ -113,6 +118,7 @@ GarchGetNullGLPlatformContextState()
 void *
 GarchSelectCoreProfileMacVisual()
 {
+#if defined(ARCH_OS_MACOS)
     NSOpenGLPixelFormatAttribute attribs[10];
     int c = 0;
 
@@ -122,6 +128,9 @@ GarchSelectCoreProfileMacVisual()
     attribs[c++] = 0;
 
     return [[NSOpenGLPixelFormat alloc] initWithAttributes:attribs];
+#else // ARCH_OS_MACOS
+    return NULL;
+#endif
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

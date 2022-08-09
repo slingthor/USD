@@ -355,7 +355,8 @@ def FormatMultiProcs(numJobs, generator):
 
     return "{tag}{procs}".format(tag=tag, procs=numJobs)
 
-def RunCMake(context, force, extraArgs = None, envOverride = None, targetArch = None):
+#TODO Thor - modify hostplatform into something smarter
+def RunCMake(context, force, extraArgs = None, envOverride = None, targetArch = None, hostPlatform = False):
     """Invoke CMake to configure, build, and install a library whose 
     source code is located in the current working directory."""
     # Create a directory for out-of-source builds in the build directory
@@ -395,7 +396,7 @@ def RunCMake(context, force, extraArgs = None, envOverride = None, targetArch = 
 
     # On MacOS, enable the use of @rpath for relocatable builds.
     osx_rpath = None
-    if MacOS() and not context.targetIos:
+    if MacOS() or hostPlatform:
         # For macOS cross compilation, set the Xcode architecture flags.
         # If a target has been passed in then use it instead.
         if targetArch == None:
@@ -407,9 +408,9 @@ def RunCMake(context, force, extraArgs = None, envOverride = None, targetArch = 
             extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
 
         extraArgs.append('-DCMAKE_OSX_ARCHITECTURES={0}'.format(targetArch))
-    if MacOS() or context.targetIos:
+    if MacOS():
         osx_rpath = "-DCMAKE_MACOSX_RPATH=ON"
-    if context.targetIos:
+    if context.targetIos and not hostPlatform:
         # Add the default iOS toolchain file if one isn't aready specified
         if not any("-DCMAKE_TOOLCHAIN_FILE=" in s for s in extraArgs):
             extraArgs.append(
@@ -430,6 +431,7 @@ def RunCMake(context, force, extraArgs = None, envOverride = None, targetArch = 
             '-DENABLE_VISIBILITY=1 '
             '-DAPPLEIOS=1 '
             '-DENABLE_ARC=0 '
+            '-DIOS_DEPLOYMENT_TARGET=14.0 '
             '-DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="{codesignid}" '
             '-DCMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM={developmentTeam} '
             '-DPYTHON_INCLUDE_DIR={framework}/include/python{version}  '
@@ -1569,6 +1571,9 @@ def InstallOpenSubdiv(context, force, buildArgs):
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
+        sdkroot = None
+        if MacOS():
+            sdkroot = os.environ.get('SDKROOT')
 
         # OpenSubdiv seems to error when building on windows w/ Ninja...
         # ...so just use the default generator (ie, Visual Studio on Windows)
@@ -1586,7 +1591,7 @@ def InstallOpenSubdiv(context, force, buildArgs):
         if MacOS():
             context.numJobs = 1
 
-            if apple_utils.GetMacTargetArch(context) != apple_utils.GetMacArch() and not contenxt.targetIOS:
+            if apple_utils.GetMacTargetArch(context) != apple_utils.GetMacArch() and not context.targetIOS:
                 # For macOS cross-compilation it is necessary to build stringify
                 # on the host architecture.  This is then passed into the second
                 # phase of building OSD with the STRINGIFY_LOCATION parameter.
@@ -1627,11 +1632,8 @@ def InstallOpenSubdiv(context, force, buildArgs):
                 # Install macOS dependencies into a temporary directory, to avoid iOS space polution
                 tempContext = copy.copy(context)
                 tempContext.instDir = tempContext.instDir + "/macOS"
-                try:
-                    with CurrentWorkingDirectory(srcOSDmacOSDir):
-                        RunCMake(tempContext, force, extraArgs, True)
-                except Exception as ex:
-                    print(ex)
+                with CurrentWorkingDirectory(srcOSDmacOSDir):
+                    RunCMake(tempContext, force, extraArgs, hostPlatform=True)
                 shutil.rmtree(tempContext.instDir)
 
                 buildDirmacOS = os.path.join(context.buildDir, os.path.split(srcOSDmacOSDir)[1])
@@ -1644,11 +1646,17 @@ def InstallOpenSubdiv(context, force, buildArgs):
                 extraArgs.append('-DCMAKE_TOOLCHAIN_FILE={srcOSDDir}/cmake/iOSToolchain.cmake -DPLATFORM=OS64'
                                  .format(srcOSDDir=srcOSDDir))
                 extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64')
+                os.environ['SDKROOT'] = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
+                extraEnv = os.environ.copy()
         try:
             RunCMake(context, force, extraArgs, extraEnv)
         finally:
             context.cmakeGenerator = oldGenerator
             context.numJobs = oldNumJobs
+        if sdkroot is None:
+            os.unsetenv('SDKROOT')
+        else:
+            os.environ['SDKROOT'] = sdkroot
 
 OPENSUBDIV = Dependency("OpenSubdiv", InstallOpenSubdiv, 
                         "include/opensubdiv/version.h")
@@ -1933,6 +1941,9 @@ def InstallUSD(context, force, buildArgs):
 
         else:
             extraArgs.append('-DPXR_BUILD_IMAGING=OFF')
+
+        if context.targetIos:
+            extraArgs.append('-DPXR_ENABLE_GL_SUPPORT=OFF')
 
         if context.buildUsdImaging:
             extraArgs.append('-DPXR_BUILD_USD_IMAGING=ON')
@@ -2750,16 +2761,17 @@ for dir in [context.usdInstDir, context.instDir, context.srcDir,
                    .format(dir=dir))
         sys.exit(1)
 
-try:
+#try:
     # Download and install 3rd-party dependencies, followed by USD.
+if True:
     for dep in dependenciesToBuild + [USD]:
         PrintStatus("Installing {dep}...".format(dep=dep.name))
         dep.installer(context, 
                       buildArgs=context.GetBuildArguments(dep),
                       force=context.ForceBuildDependency(dep))
-except Exception as e:
-    PrintError(str(e))
-    sys.exit(1)
+#except Exception as e:
+#    PrintError(str(e))
+#    sys.exit(1)
 
 # Done. Print out a final status message.
 requiredInPythonPath = set([

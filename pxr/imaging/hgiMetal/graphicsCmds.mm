@@ -407,14 +407,17 @@ void
 HgiMetalGraphicsCmds::_SyncArgumentBuffer()
 {
     if (_argumentBuffer) {
+#if defined(ARCH_OS_MACOS)
         if (_argumentBuffer.storageMode != MTLStorageModeShared &&
             [_argumentBuffer respondsToSelector:@selector(didModifyRange:)]) {
-
+            
             ARCH_PRAGMA_PUSH
             ARCH_PRAGMA_INSTANCE_METHOD_NOT_FOUND
+            //TODO potentially find an alternative for iOS
             [_argumentBuffer didModifyRange:{0, _argumentBuffer.length}];
             ARCH_PRAGMA_POP
         }
+#endif
         _argumentBuffer = nil;
     }
 }
@@ -817,6 +820,8 @@ HgiMetalGraphicsCmds::MemoryBarrier(HgiMemoryBarrier barrier)
     
     // Apple Silicon only support memory barriers between vertex stages after
     // macOS 12.3.
+//TODO find solution for iOS
+#if defined(ARCH_OS_MACOS)
     if (@available(macOS 12.3, *)) {
         MTLBarrierScope scope = MTLBarrierScopeBuffers;
         MTLRenderStages srcStages = MTLRenderStageVertex;
@@ -828,6 +833,7 @@ HgiMetalGraphicsCmds::MemoryBarrier(HgiMemoryBarrier barrier)
                                beforeStages:dstStages];
         }
     }
+#endif
 }
 
 static

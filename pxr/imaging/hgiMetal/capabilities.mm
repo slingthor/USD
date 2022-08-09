@@ -51,8 +51,9 @@ HgiMetalCapabilities::HgiMetalCapabilities(id<MTLDevice> device)
         // supportsShaderBarycentricCoordinates so check both flags.
         barycentrics = [device supportsShaderBarycentricCoordinates]
                     || [device areBarycentricCoordsSupported];
-        
+#if defined(ARCH_OS_MACOS)
         hasAppleSilicon = [device hasUnifiedMemory] && ![device isLowPower];
+#endif
     }
 
     _SetFlag(HgiDeviceCapabilitiesBitsUnifiedMemory, unifiedMemory);
@@ -81,9 +82,11 @@ HgiMetalCapabilities::HgiMetalCapabilities(id<MTLDevice> device)
     _SetFlag(HgiDeviceCapabilitiesBitsBasePrimitiveOffset,
              requiresBasePrimitiveOffset);
 
+#if defined(ARCH_OS_MACOS)
     if (!unifiedMemory) {
         defaultStorageMode = MTLResourceStorageModeManaged;
     }
+#endif
 
     _maxUniformBlockSize          = 64 * 1024;
     _maxShaderStorageBlockSize    = 1 * 1024 * 1024 * 1024;
