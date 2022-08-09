@@ -431,7 +431,7 @@ def RunCMake(context, force, extraArgs = None, envOverride = None, targetArch = 
             '-DENABLE_VISIBILITY=1 '
             '-DAPPLEIOS=1 '
             '-DENABLE_ARC=0 '
-            '-DIOS_DEPLOYMENT_TARGET=14.0 '
+            '-DDEPLOYMENT_TARGET=14.0 '
             '-DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="{codesignid}" '
             '-DCMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM={developmentTeam} '
             '-DPYTHON_INCLUDE_DIR={framework}/include/python{version}  '
@@ -997,9 +997,12 @@ def InstallTBB_Windows(context, force, buildArgs):
 
 def InstallTBB_MacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(TBB_URL, context, force)):
+
+        if context.targetIos:
+            buildArgs.append('compiler=clang target=ios arch=arm64 extra_inc=big_iron.inc')
+
         # Append extra argument controlling libstdc++ ABI if specified.
         AppendCXX11ABIArg("CXXFLAGS", context, buildArgs)
-
         # Ensure that the tbb build system picks the proper architecture.
         PatchFile("build/macos.clang.inc", 
                 [("-m64",
