@@ -32,10 +32,9 @@
 #import <OpenGL/gl.h>
 #endif
 
-#if defined(ARCH_OS_MACOS)
-
 PXR_NAMESPACE_USING_DIRECTIVE
 
+#if defined(ARCH_OS_MACOS)
 
 static int
 Garch_GetModifierKeys(NSUInteger flags)
@@ -243,6 +242,30 @@ Garch_GLPlatformDebugWindow::ExitApp()
     [NSApp stop:nil];
 }
 
+#else
+
+        PXR_NAMESPACE_OPEN_SCOPE
+
+Garch_GLPlatformDebugWindow::Garch_GLPlatformDebugWindow(GarchGLDebugWindow *w)
+{
+
+}
+
+void Garch_GLPlatformDebugWindow::Init(const char *title, int width, int height, int nSamples)
+{
+
+}
+
+void
+Garch_GLPlatformDebugWindow::Run()
+{
+}
+
+void
+Garch_GLPlatformDebugWindow::ExitApp()
+{
+}
+#endif
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif
