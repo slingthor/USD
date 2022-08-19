@@ -38,10 +38,6 @@
 #include "pxr/imaging/hd/instancer.h"
 #include "pxr/imaging/hd/tokens.h"
 
-#include "pxr/imaging/hgiGL/buffer.h"
-#include "pxr/imaging/hgiGL/texture.h"
-#include "pxr/imaging/hgiGL/sampler.h"
-#include "pxr/imaging/hgiGL/shaderProgram.h"
 
 #include "pxr/imaging/hgi/resourceBindings.h"
 
@@ -1168,128 +1164,6 @@ HdSt_ResourceBinder::BindBuffer(TfToken const &name,
                               int numElements) const
 {
     HD_TRACE_FUNCTION();
-
-    // it is possible that the buffer has not been initialized when
-    // the instanceIndex is empty (e.g. FX points. see bug 120354)
-    if (!buffer->GetHandle()) return;
-
-    HdBinding binding = GetBinding(name, level);
-    HdBinding::Type type = binding.GetType();
-    int loc              = binding.GetLocation();
-
-    HdTupleType tupleType = buffer->GetTupleType();
-
-    void const* offsetPtr =
-        reinterpret_cast<const void*>(
-            static_cast<intptr_t>(offset));
-    switch(type) {
-    case HdBinding::VERTEX_ATTR:
-        glBindBuffer(GL_ARRAY_BUFFER, buffer->GetHandle()->GetRawResource());
-        glVertexAttribPointer(loc,
-                  _GetNumComponents(tupleType.type),
-                  HdStGLConversions::GetGLAttribType(tupleType.type),
-                  _ShouldBeNormalized(tupleType.type),
-                              buffer->GetStride(),
-                              offsetPtr);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-        glEnableVertexAttribArray(loc);
-        break;
-    case HdBinding::DRAW_INDEX:
-        glBindBuffer(GL_ARRAY_BUFFER, buffer->GetHandle()->GetRawResource());
-        glVertexAttribIPointer(loc,
-                               HdGetComponentCount(tupleType.type),
-                               GL_INT,
-                               buffer->GetStride(),
-                               offsetPtr);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glEnableVertexAttribArray(loc);
-        break;
-    case HdBinding::DRAW_INDEX_INSTANCE:
-        glBindBuffer(GL_ARRAY_BUFFER, buffer->GetHandle()->GetRawResource());
-        glVertexAttribIPointer(loc,
-                               HdGetComponentCount(tupleType.type),
-                               GL_INT,
-                               buffer->GetStride(),
-                               offsetPtr);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-        // set the divisor to uint-max so that the same base value is used
-        // for all instances.
-        glVertexAttribDivisor(loc,
-                              std::numeric_limits<GLint>::max());
-        glEnableVertexAttribArray(loc);
-        break;
-    case HdBinding::DRAW_INDEX_INSTANCE_ARRAY:
-        glBindBuffer(GL_ARRAY_BUFFER, buffer->GetHandle()->GetRawResource());
-        // instancerNumLevels is represented by the tuple size.
-        // We unroll this to an array of int[1] attributes.
-        for (size_t i = 0; i < buffer->GetTupleType().count; ++i) {
-            offsetPtr = reinterpret_cast<const void*>(offset + i*sizeof(int));
-            glVertexAttribIPointer(loc, 1, GL_INT, buffer->GetStride(),
-                                   offsetPtr);
-            // set the divisor to uint-max so that the same base value is used
-            // for all instances.
-            glVertexAttribDivisor(loc, std::numeric_limits<GLint>::max());
-            glEnableVertexAttribArray(loc);
-            ++loc;
-        }
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        break;
-    case HdBinding::INDEX_ATTR:
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
-                     buffer->GetHandle()->GetRawResource());
-        break;
-    case HdBinding::BINDLESS_UNIFORM:
-        // at least in nvidia driver 346.59, this query call doesn't show
-        // any pipeline stall.
-        if (!glIsNamedBufferResidentNV(buffer->GetHandle()->GetRawResource())) {
-            glMakeNamedBufferResidentNV(
-                buffer->GetHandle()->GetRawResource(), GL_READ_WRITE);
-        }
-        {
-            HgiGLBuffer * bufferGL =
-                static_cast<HgiGLBuffer*>(buffer->GetHandle().Get());
-            glUniformui64NV(loc, bufferGL->GetBindlessGPUAddress());
-        }
-        break;
-    case HdBinding::SSBO:
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, loc,
-                         buffer->GetHandle()->GetRawResource());
-        break;
-    case HdBinding::BINDLESS_SSBO_RANGE:
-        // at least in nvidia driver 346.59, this query call doesn't show
-        // any pipeline stall.
-        if (!glIsNamedBufferResidentNV(buffer->GetHandle()->GetRawResource())) {
-            glMakeNamedBufferResidentNV(
-                buffer->GetHandle()->GetRawResource(), GL_READ_WRITE);
-        }
-        {
-            HgiGLBuffer * bufferGL =
-                static_cast<HgiGLBuffer*>(buffer->GetHandle().Get());
-            glUniformui64NV(loc, bufferGL->GetBindlessGPUAddress()+offset);
-        }
-        break;
-    case HdBinding::DISPATCH:
-        glBindBuffer(GL_DRAW_INDIRECT_BUFFER,
-                     buffer->GetHandle()->GetRawResource());
-        break;
-    case HdBinding::UBO:
-    case HdBinding::UNIFORM:
-        glBindBufferRange(GL_UNIFORM_BUFFER, loc,
-                          buffer->GetHandle()->GetRawResource(),
-                          offset,
-                          buffer->GetStride() * numElements);
-        break;
-    case HdBinding::TEXTURE_2D:
-    case HdBinding::TEXTURE_FIELD:
-        // nothing
-        break;
-    default:
-        TF_CODING_ERROR("binding type %d not found for %s",
-                        type, name.GetText());
-        break;
-    }
 }
 
 void
@@ -1298,68 +1172,6 @@ HdSt_ResourceBinder::UnbindBuffer(TfToken const &name,
                                 int level) const
 {
     HD_TRACE_FUNCTION();
-
-    // it is possible that the buffer has not been initialized when
-    // the instanceIndex is empty (e.g. FX points)
-    if (!buffer->GetHandle()) return;
-
-    HdBinding binding = GetBinding(name, level);
-    HdBinding::Type type = binding.GetType();
-    int loc = binding.GetLocation();
-
-    switch(type) {
-    case HdBinding::VERTEX_ATTR:
-        glDisableVertexAttribArray(loc);
-        break;
-    case HdBinding::DRAW_INDEX:
-        glDisableVertexAttribArray(loc);
-        break;
-    case HdBinding::DRAW_INDEX_INSTANCE:
-        glDisableVertexAttribArray(loc);
-        glVertexAttribDivisor(loc, 0);
-        break;
-    case HdBinding::DRAW_INDEX_INSTANCE_ARRAY:
-        // instancerNumLevels is represented by the tuple size.
-        for (size_t i = 0; i < buffer->GetTupleType().count; ++i) {
-            glDisableVertexAttribArray(loc);
-            glVertexAttribDivisor(loc, 0);
-            ++loc;
-        }
-        break;
-    case HdBinding::INDEX_ATTR:
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-        break;
-    case HdBinding::BINDLESS_UNIFORM:
-        if (glIsNamedBufferResidentNV(buffer->GetHandle()->GetRawResource())) {
-            glMakeNamedBufferNonResidentNV(
-                buffer->GetHandle()->GetRawResource());
-        }
-        break;
-    case HdBinding::SSBO:
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, loc, 0);
-        break;
-    case HdBinding::BINDLESS_SSBO_RANGE:
-        if (glIsNamedBufferResidentNV(buffer->GetHandle()->GetRawResource())) {
-            glMakeNamedBufferNonResidentNV(
-                buffer->GetHandle()->GetRawResource());
-        }
-        break;
-    case HdBinding::DISPATCH:
-        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
-        break;
-    case HdBinding::UBO:
-    case HdBinding::UNIFORM:
-        glBindBufferBase(GL_UNIFORM_BUFFER, loc, 0);
-        break;
-    case HdBinding::TEXTURE_2D:
-    case HdBinding::TEXTURE_FIELD:
-        // nothing
-        break;
-    default:
-        TF_CODING_ERROR("binding type %d not found for %s",
-                        type, name.GetText());
-        break;
-    }
 }
 
 void
@@ -1515,85 +1327,29 @@ void
 HdSt_ResourceBinder::BindUniformi(TfToken const &name,
                                 int count, const int *value) const
 {
-    HdBinding uniformLocation = GetBinding(name);
-    if (uniformLocation.GetLocation() == HdBinding::NOT_EXIST) return;
 
-    TF_VERIFY(uniformLocation.IsValid());
-    TF_VERIFY(uniformLocation.GetType() == HdBinding::UNIFORM);
-
-    if (count == 1) {
-        glUniform1iv(uniformLocation.GetLocation(), 1, value);
-    } else if (count == 2) {
-        glUniform2iv(uniformLocation.GetLocation(), 1, value);
-    } else if (count == 3) {
-        glUniform3iv(uniformLocation.GetLocation(), 1, value);
-    } else if (count == 4) {
-        glUniform4iv(uniformLocation.GetLocation(), 1, value);
-    } else {
-        TF_CODING_ERROR("Invalid count %d.\n", count);
-    }
+    
 }
 
 void
 HdSt_ResourceBinder::BindUniformArrayi(TfToken const &name,
                                  int count, const int *value) const
 {
-    HdBinding uniformLocation = GetBinding(name);
-    if (uniformLocation.GetLocation() == HdBinding::NOT_EXIST) return;
 
-    TF_VERIFY(uniformLocation.IsValid());
-    TF_VERIFY(uniformLocation.GetType() == HdBinding::UNIFORM_ARRAY);
-
-    glUniform1iv(uniformLocation.GetLocation(), count, value);
 }
 
 void
 HdSt_ResourceBinder::BindUniformui(TfToken const &name,
                                 int count, const unsigned int *value) const
 {
-    HdBinding uniformLocation = GetBinding(name);
-    if (uniformLocation.GetLocation() == HdBinding::NOT_EXIST) return;
 
-    TF_VERIFY(uniformLocation.IsValid());
-    TF_VERIFY(uniformLocation.GetType() == HdBinding::UNIFORM);
-
-    if (count == 1) {
-        glUniform1uiv(uniformLocation.GetLocation(), 1, value);
-    } else if (count == 2) {
-        glUniform2uiv(uniformLocation.GetLocation(), 1, value);
-    } else if (count == 3) {
-        glUniform3uiv(uniformLocation.GetLocation(), 1, value);
-    } else if (count == 4) {
-        glUniform4uiv(uniformLocation.GetLocation(), 1, value);
-    } else {
-        TF_CODING_ERROR("Invalid count %d.", count);
-    }
 }
 
 void
 HdSt_ResourceBinder::BindUniformf(TfToken const &name,
                                 int count, const float *value) const
 {
-    HdBinding uniformLocation = GetBinding(name);
-    if (uniformLocation.GetLocation() == HdBinding::NOT_EXIST) return;
-
-    if (!TF_VERIFY(uniformLocation.IsValid())) return;
-    if (!TF_VERIFY(uniformLocation.GetType() == HdBinding::UNIFORM)) return;
-    GLint location = uniformLocation.GetLocation();
-
-    if (count == 1) {
-        glUniform1fv(location, 1, value);
-    } else if (count == 2) {
-        glUniform2fv(location, 1, value);
-    } else if (count == 3) {
-        glUniform3fv(location, 1, value);
-    } else if (count == 4) {
-        glUniform4fv(location, 1, value);
-    } else if (count == 16) {
-        glUniformMatrix4fv(location, 1, /*transpose=*/false, value);
-    } else {
-        TF_CODING_ERROR("Invalid count %d.", count);
-    }
+ 
 }
 
 HdSt_ResourceBinder::MetaData::ID
@@ -1741,19 +1497,7 @@ HdSt_ResourceBinder::GetSamplerBindlessHandle(
         HgiSamplerHandle const &samplerHandle,
         HgiTextureHandle const &textureHandle)
 {
-    HgiGLSampler * const glSampler =
-        const_cast<HgiGLSampler*>(
-        dynamic_cast<const HgiGLSampler*>(samplerHandle.Get()));
 
-    HgiGLTexture * const glTexture =
-        const_cast<HgiGLTexture*>(
-        dynamic_cast<const HgiGLTexture*>(textureHandle.Get()));
-
-    if (!glSampler || !glTexture) {
-        return 0;
-    }
-
-    return glSampler->GetBindlessHandle(textureHandle);
 }
 
 /* static */
@@ -1761,15 +1505,7 @@ uint64_t
 HdSt_ResourceBinder::GetTextureBindlessHandle(
         HgiTextureHandle const &textureHandle)
 {
-    HgiGLTexture * const glTexture =
-        const_cast<HgiGLTexture*>(
-        dynamic_cast<const HgiGLTexture*>(textureHandle.Get()));
 
-    if (!glTexture) {
-        return 0;
-    }
-
-    return glTexture->GetBindlessHandle();
 }
 
 static
@@ -1820,40 +1556,7 @@ HdSt_ResourceBinder::BindTexture(
         HgiTextureHandle const &textureHandle,
         const bool bind) const
 {
-    const HdBinding binding = GetBinding(name);
-    if (_IsBindless(binding)) {
-        return;
-    }
 
-    const int samplerUnit = binding.GetTextureUnit();
-
-    glActiveTexture(GL_TEXTURE0 + samplerUnit);
-
-    const HgiTexture * const tex = textureHandle.Get();
-    const HgiGLTexture * const glTex =
-        dynamic_cast<const HgiGLTexture*>(tex);
-
-    if (tex && !glTex) {
-        TF_CODING_ERROR("Resource binder only supports OpenGL");
-    }
-
-    const GLuint texName =
-        (bind && glTex) ? glTex->GetTextureId() : 0;
-    glBindTexture(_GetTextureTarget(binding), texName);
-
-    const HgiSampler * const sampler = samplerHandle.Get();
-    const HgiGLSampler * const glSampler =
-        dynamic_cast<const HgiGLSampler*>(sampler);
-
-    if (sampler && !glSampler) {
-        TF_CODING_ERROR("Resource binder only supports OpenGL");
-    }
-
-    const GLuint samplerName =
-        (bind && glSampler) ? glSampler->GetSamplerId() : 0;
-    glBindSampler(samplerUnit, samplerName);
-
-    glActiveTexture(GL_TEXTURE0);
 }
 
 void
@@ -1864,33 +1567,7 @@ HdSt_ResourceBinder::BindTextureWithLayout(
         HgiTextureHandle const &layoutTexture,
         const bool bind) const
 {
-    const HdBinding texelBinding = GetBinding(name);
-    if (_IsBindless(texelBinding)) {
-        return;
-    }
 
-    const int texelSamplerUnit = texelBinding.GetTextureUnit();
-
-    glActiveTexture(GL_TEXTURE0 + texelSamplerUnit);
-    glBindTexture(_GetTextureTarget(texelBinding),
-              (bind && texelTexture) ? texelTexture->GetRawResource() : 0);
-
-    const HgiGLSampler * const glSampler =
-        bind ? dynamic_cast<HgiGLSampler*>(texelSampler.Get()) : nullptr;
-
-    if (glSampler) {
-        glBindSampler(texelSamplerUnit, (GLuint)glSampler->GetSamplerId());
-    } else {
-        glBindSampler(texelSamplerUnit, 0);
-    }
-
-    const HdBinding layoutBinding = GetBinding(_ConcatLayout(name));
-    const int layoutSamplerUnit = layoutBinding.GetTextureUnit();
-
-    glActiveTexture(GL_TEXTURE0 + layoutSamplerUnit);
-    glBindTexture(_GetTextureTarget(layoutBinding),
-              (bind && layoutTexture) ? layoutTexture->GetRawResource() : 0);
-    glActiveTexture(GL_TEXTURE0);
 }
 
 

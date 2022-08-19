@@ -111,12 +111,11 @@ HgiMetalResourceBindings::BindResources(
             if (metalSampler) {
                 [renderEncoder useResource:metalTexture
                     usage:MTLResourceUsageSample|
-                          MTLResourceUsageRead|
-                          MTLResourceUsageWrite];
+                          MTLResourceUsageRead];
             }
             else {
                 [renderEncoder useResource:metalTexture
-                    usage:MTLResourceUsageRead|MTLResourceUsageWrite];
+                    usage:MTLResourceUsageRead];
             }
         }
     }

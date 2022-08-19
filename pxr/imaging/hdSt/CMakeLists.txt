@@ -13,6 +13,11 @@ set(optionalLibs "")
 set(optionalIncludeDirs "")
 set(optionalPublicClasses "")
 set(optionalPrivateClasses "")
+
+if (NOT (APPLEIOS))
+    list(APPEND optionalLibs hgiGL)
+endif()
+
 if (${PXR_ENABLE_MATERIALX_SUPPORT})
     list(APPEND optionalLibs
         MaterialXGenShader
@@ -40,7 +45,6 @@ pxr_library(hdSt
         glf
         hd
         hdsi
-        hgiGL
         hgiInterop
         sdr
         tf

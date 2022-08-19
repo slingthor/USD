@@ -402,7 +402,7 @@ def RunCMake(context, force, extraArgs = None, envOverride = None, targetArch = 
         if targetArch == None:
             targetArch = apple_utils.GetMacTargetArch(context)
 
-        if context.targetNative or targetArch == apple_utils.GetMacArch():
+        if context.targetNative or targetArch == apple_utils.GetMacArch() and not context.targetIos:
             extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=YES')
         else:
             extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
@@ -410,14 +410,21 @@ def RunCMake(context, force, extraArgs = None, envOverride = None, targetArch = 
         extraArgs.append('-DCMAKE_OSX_ARCHITECTURES={0}'.format(targetArch))
     if MacOS():
         osx_rpath = "-DCMAKE_MACOSX_RPATH=ON"
+
+    if MacOS() or context.targetIos:
+        extraArgs.append('-DCMAKE_IGNORE_PATH="/usr/lib;/usr/local/lib;/lib" ')
     if context.targetIos and not hostPlatform:
+        sdkPath = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
+        extraArgs.append('-DCMAKE_OSX_SYSROOT="' + sdkPath + '" ')
         # Add the default iOS toolchain file if one isn't aready specified
         if not any("-DCMAKE_TOOLCHAIN_FILE=" in s for s in extraArgs):
             extraArgs.append(
                 '-DCMAKE_TOOLCHAIN_FILE={usdSrcDir}/cmake/toolchains/ios.toolchain.cmake '
                 .format(usdSrcDir=context.usdSrcDir))
-            extraArgs.append("-DPLATFORM=OS64 ")
-            extraArgs.append("-DENABLE_BITCODE=False ")
+            extraArgs.append("-DPLATFORM=\'OS64\' ")
+            extraArgs.append("-DENABLE_BITCODE=False")
+            extraArgs.append("-DENABLE_VISIBILITY=True")
+            extraArgs.append("-DNAMED_LANGUAGE_SUPPORT=False")
 
         CODE_SIGN_ID = apple_utils.GetCodeSignID()
         DEVELOPMENT_TEAM = apple_utils.GetDevelopmentTeamID()
@@ -427,11 +434,12 @@ def RunCMake(context, force, extraArgs = None, envOverride = None, targetArch = 
         frameWorkRoot = apple_utils.GetFrameworkRoot()
         pyVers = ".".join(platform.python_version().split()[0:1])
         extraArgs.append(
-            '-DIOS_PLATFORM=OS '
+            '-DENABLE_BITCODE=False '
+            '-DNAMED_LANGUAGE_SUPPORT=False '
             '-DENABLE_VISIBILITY=1 '
             '-DAPPLEIOS=1 '
             '-DENABLE_ARC=0 '
-            '-DDEPLOYMENT_TARGET=14.0 '
+            '-DDEPLOYMENT_TARGET=16.0 '
             '-DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="{codesignid}" '
             '-DCMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM={developmentTeam} '
             '-DPYTHON_INCLUDE_DIR={framework}/include/python{version}  '
@@ -904,7 +912,7 @@ def InstallBoost_Helper(context, force, buildArgs):
                 b2_settings.append("target-os=iphone")
                 b2_settings.append("define=_LITTLE_ENDIAN")
                 b2_settings.append("link=static")
-                iOSVersion = GetCommandOutput('xcodebuild -sdk ' + sdkPath + ' -version  SDKVersion').strip()
+                iOSVersion = 16.0
                 newLines = [
                 'using darwin : iphone\n',
                 ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++'
@@ -917,6 +925,8 @@ def InstallBoost_Helper(context, force, buildArgs):
                 ]
                 projectPath = 'user-config.jam'
                 b2_settings.append("--user-config=user-config.jam")
+                b2_settings.append("macosx-version=iphone-{IOS_SDK_VERSION}".format(
+                    IOS_SDK_VERSION=iOSVersion))
                 if os.path.exists(projectPath):
                     os.remove(projectPath)
                 with open(projectPath, 'w') as projectFile:
@@ -930,9 +940,19 @@ def InstallBoost_Helper(context, force, buildArgs):
                 b2_settings.append(macOSArchitecture)
 
             if macOSArch:
-                b2_settings.append("cxxflags=\"{0}\"".format(macOSArch))
+                cxxFlags = ""
+                linkFlags = ""
+                if context.targetIos:
+                    cxxFlags = "{0} -std=c++14 -stdlib=libc++".format(macOSArch)
+                    linkFlags = "{0} -stdlib=libc++".format(macOSArch)
+                else:
+                    cxxFlags = "{0}".format(macOSArch)
+                    linkFlags = "{0}".format(macOSArch)
+
+
+                b2_settings.append("cxxflags=\"{0}\"".format(cxxFlags))
                 b2_settings.append("cflags=\"{0}\"".format(macOSArch))
-                b2_settings.append("linkflags=\"{0}\"".format(macOSArch))
+                b2_settings.append("linkflags=\"{0}\"".format(linkFlags))
 
         if context.buildDebug:
             b2_settings.append("--debug-configuration")
@@ -1029,6 +1049,7 @@ def InstallTBB_MacOS(context, force, buildArgs):
 
         if context.targetIos:
             primaryArch = "arm64"
+            buildArgs.append('compiler=clang target=ios arch=arm64 extra_inc=big_iron.inc ')
 
         makeTBBCmdPrimary = 'make -j{procs} arch={arch} {buildArgs}'.format(
             arch=primaryArch,
@@ -1140,7 +1161,7 @@ def InstallJPEG_Turbo(context, force, buildArgs):
         extraJPEGArgs = buildArgs
         if MacOS():
             extraJPEGArgs.append("-DWITH_SIMD=FALSE")
-        if context.targetIOS:
+        if context.targetIos:
             extraJPEGArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64')
             extraJPEGArgs.append("-DENABLE_STATIC=TRUE")
 
@@ -1211,7 +1232,7 @@ def InstallTIFF(context, force, buildArgs):
                    [("add_subdirectory(tools)", "# add_subdirectory(tools)"),
                     ("add_subdirectory(test)", "# add_subdirectory(test)")])
 
-        if context.targetIOS:
+        if context.targetIos:
             # Skip contrib to avoid issues with code signing.
             PatchFile("CMakeLists.txt",
                     [("add_subdirectory(contrib)", "# add_subdirectory(contrib)")])
@@ -1244,7 +1265,7 @@ def InstallPNG(context, force, buildArgs):
                         'add_custom_target(gensym DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/libpng.sym" genvers)'),
                        ("add_custom_target(genfiles DEPENDS",
                         "add_custom_target(genfiles DEPENDS gensym symbol-check")])
-        if context.targetIOS:
+        if context.targetIos:
             macArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
             macArgs.append('-DPNG_ARM_NEON=off');
 
@@ -1285,13 +1306,152 @@ if Windows():
 else:
     OPENEXR_URL = "https://github.com/AcademySoftwareFoundation/openexr/archive/refs/tags/v2.4.3.zip"
 
-def InstallOpenEXR(context, force, buildArgs):
-    with CurrentWorkingDirectory(DownloadURL(OPENEXR_URL, context, force)):
-        RunCMake(context, force, 
-                 ['-DPYILMBASE_ENABLE=OFF',
-                  '-DOPENEXR_VIEWERS_ENABLE=OFF',
-                  '-DBUILD_TESTING=OFF'] + buildArgs)
+def updateOpenEXRIOS(context, srcDir):
+    # IlmBase
+    destDir = srcDir + "/IlmBase/Half"
 
+    f = context.usdSrcDir + "/third_party/IlmBase/eLut.h"
+    PrintCommandOutput("Copying {file} to {destDir}\n"
+                           .format(file=f, destDir=destDir))
+    shutil.copy(f, destDir)
+
+    f = context.usdSrcDir + "/third_party/IlmBase/toFloat.h"
+    PrintCommandOutput("Copying {file} to {destDir}\n"
+                           .format(file=f, destDir=destDir))
+    shutil.copy(f, destDir)
+
+    PatchFile(destDir + "/CMakeLists.txt",
+              [("eLut >",
+                "cp ${CMAKE_CURRENT_SOURCE_DIR}/eLut.h"),
+               ("toFloat >",
+                "cp ${CMAKE_CURRENT_SOURCE_DIR}/toFloat.h")])
+
+    # OpenEXR
+    destDir = srcDir + "/OpenEXR/IlmImf"
+
+    f = context.usdSrcDir + "/third_party/OpenEXR/b44ExpLogTable.h"
+    PrintCommandOutput("Copying {file} to {destDir}\n"
+                           .format(file=f, destDir=destDir))
+    shutil.copy(f, destDir)
+
+    f = context.usdSrcDir + "/third_party/OpenEXR/dwaLookups.h"
+    PrintCommandOutput("Copying {file} to {destDir}\n"
+                           .format(file=f, destDir=destDir))
+    shutil.copy(f, destDir)
+
+    PatchFile(destDir + "/CMakeLists.txt",
+              [("${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/b44ExpLogTable >",
+                "cp ${CMAKE_CURRENT_SOURCE_DIR}/b44ExpLogTable.h"),
+               ("${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/dwaLookups >",
+                "cp ${CMAKE_CURRENT_SOURCE_DIR}/dwaLookups.h")])
+
+def InstallOpenEXR(context, force, buildArgs):
+    srcDir = DownloadURL(OPENEXR_URL, context, force)
+    with CurrentWorkingDirectory(srcDir):
+        if MacOS():
+            PatchFile(srcDir + "/OpenEXR/CMakeLists.txt",
+                [("SET (OPENEXR_LIBSUFFIX \"\")",
+                  "SET (OPENEXR_LIBSUFFIX \"\")\n"
+                  "FILE ( APPEND ${CMAKE_CURRENT_BINARY_DIR}/config/OpenEXRConfig.h \"\n"
+                  "#undef OPENEXR_IMF_HAVE_GCC_INLINE_ASM_AVX\n"
+                  "#ifndef __aarch64__\n"
+                  "#define OPENEXR_IMF_HAVE_GCC_INLINE_ASM_AVX 1\n"
+                  "#endif\n\")\n")])
+
+        extraEnv = None
+        extraArgs = []
+        sdkroot = None
+
+        if context.targetIos:
+            sdkroot = os.environ.get('SDKROOT')
+            srcDir = os.getcwd()
+            updateOpenEXRIOS(context, srcDir)
+            # Skip utils, examples, and tests to avoid issues with code signing.
+            # Replace utility executables with static libraries to avoid issues with code signing.
+            PatchFile(srcDir + "/IlmBase/CMakeLists.txt",
+                      [("ADD_SUBDIRECTORY ( HalfTest )", "# ADD_SUBDIRECTORY ( HalfTest )"),
+                       ("ADD_SUBDIRECTORY ( IexTest )", "# ADD_SUBDIRECTORY ( IexTest )"),
+                       ("ADD_SUBDIRECTORY ( ImathTest )", "# ADD_SUBDIRECTORY ( ImathTest )")])
+
+            PatchFile(srcDir + "/IlmBase/Half/CMakeLists.txt",
+                      [("add_executable(eLut eLut.cpp)",
+                        "ADD_LIBRARY (eLut STATIC eLut.cpp )"),
+                       ("add_executable(toFloat toFloat.cpp)",
+                        "ADD_LIBRARY (toFloat STATIC toFloat.cpp )"),
+                       ("$<TARGET_FILE:toFloat> ARGS >",
+                        "cp ${CMAKE_CURRENT_SOURCE_DIR}/toFloat.h"),
+                       ("$<TARGET_FILE:eLut> ARGS >",
+                        "cp ${CMAKE_CURRENT_SOURCE_DIR}/eLut.h")
+                       ])
+
+            PatchFile(srcDir + "/OpenEXR/CMakeLists.txt",
+                      [("ADD_SUBDIRECTORY ( IlmImfExamples )", "# ADD_SUBDIRECTORY ( IlmImfExamples )"),
+                       ("ADD_SUBDIRECTORY ( IlmImfTest )", "# ADD_SUBDIRECTORY ( IlmImfTest )"),
+                       ("ADD_SUBDIRECTORY ( IlmImfUtilTest )", "# ADD_SUBDIRECTORY ( IlmImfUtilTest )"),
+                       ("ADD_SUBDIRECTORY ( IlmImfFuzzTest )", "# ADD_SUBDIRECTORY ( IlmImfFuzzTest )"),
+                       ("ADD_SUBDIRECTORY ( exrheader )", "# ADD_SUBDIRECTORY ( exrheader )"),
+                       ("ADD_SUBDIRECTORY ( exrmaketiled )", "# ADD_SUBDIRECTORY ( exrmaketiled )"),
+                       ("ADD_SUBDIRECTORY ( exrstdattr )", "# ADD_SUBDIRECTORY ( exrstdattr )"),
+                       ("ADD_SUBDIRECTORY ( exrmakepreview )", "# ADD_SUBDIRECTORY ( exrmakepreview )"),
+                       ("ADD_SUBDIRECTORY ( exrenvmap )", "# ADD_SUBDIRECTORY ( exrenvmap )"),
+                       ("ADD_SUBDIRECTORY ( exrmultiview )", "# ADD_SUBDIRECTORY ( exrmultiview )"),
+                       ("ADD_SUBDIRECTORY ( exrmultipart )", "# ADD_SUBDIRECTORY ( exrmultipart )")])
+
+            PatchFile(srcDir + "/OpenEXR/exrheader/CMakeLists.txt",
+                      [("add_executable(exrheader",
+                        "ADD_LIBRARY ( exrheader STATIC")])
+            PatchFile(srcDir + "/OpenEXR/exrmaketiled/CMakeLists.txt",
+                      [("add_executable(exrmaketiled",
+                        "ADD_LIBRARY ( exrmaketiled STATIC")])
+            PatchFile(srcDir + "/OpenEXR/exrstdattr/CMakeLists.txt",
+                      [("add_executable(exrstdattr",
+                        "ADD_LIBRARY ( exrstdattr STATIC")])
+            PatchFile(srcDir + "/OpenEXR/exrenvmap/CMakeLists.txt",
+                      [("add_executable( exrenvmap",
+                        "ADD_LIBRARY ( exrenvmap STATIC")])
+            PatchFile(srcDir + "/OpenEXR/exrmultiview/CMakeLists.txt",
+                      [("add_executable(exrmultiview",
+                        "ADD_LIBRARY ( exrmultiview STATIC")])
+            PatchFile(srcDir + "/OpenEXR/exrmultipart/CMakeLists.txt",
+                      [("add_executable(exrmultipart",
+                        "ADD_LIBRARY ( exrmultipart STATIC")])
+            PatchFile(srcDir + "/OpenEXR/exrmakepreview/CMakeLists.txt",
+                      [("add_executable(exrmakepreview",
+                        "ADD_LIBRARY ( exrmakepreview STATIC")])
+            PatchFile(srcDir + "/OpenEXR/exr2aces/CMakeLists.txt",
+                      [("add_executable(exr2aces",
+                        "ADD_LIBRARY ( exr2aces STATIC")])
+            PatchFile(srcDir + "/OpenEXR/IlmImfExamples/CMakeLists.txt",
+                      [("add_executable(IlmImfExamples",
+                        "ADD_LIBRARY ( IlmImfExamples STATIC")])
+            PatchFile(srcDir + "/OpenEXR/exrmaketiled/CMakeLists.txt",
+                      [("add_executable(exrmaketiled ",
+                        "ADD_LIBRARY ( exrmaketiled STATIC")])
+            PatchFile(srcDir + "/OpenEXR/IlmImf/CMakeLists.txt",
+                      [("add_executable(dwaLookups",
+                        "ADD_LIBRARY ( dwaLookups STATIC"),
+                       ("add_executable(b44ExpLogTable",
+                        "ADD_LIBRARY ( b44ExpLogTable STATIC"),
+                       ("add_executable(toFloat",
+                        "ADD_LIBRARY ( toFloat STATIC"),
+                       ("$<TARGET_FILE:b44ExpLogTable> >",
+                        "cp ${CMAKE_CURRENT_SOURCE_DIR}/b44ExpLogTable.h"),
+                       ("$<TARGET_FILE:dwaLookups> >",
+                        "cp ${CMAKE_CURRENT_SOURCE_DIR}/dwaLookups.h")
+                       ])
+            extraArgs.append('-DOPENEXR_BUILD_PYTHON_LIBS=OFF ')
+            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64' )
+            extraArgs.append('-DCMAKE_SYSTEM_NAME=iOS ')
+
+            os.environ['SDKROOT'] = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
+
+        RunCMake(context, force,
+                 ['-DOPENEXR_VIEWERS_ENABLE=OFF',
+                  '-DBUILD_TESTING=OFF'] + buildArgs, extraEnv)
+        if sdkroot is None:
+            os.unsetenv('SDKROOT')
+        else:
+            os.environ['SDKROOT'] = sdkroot
 OPENEXR = Dependency("OpenEXR", InstallOpenEXR, "include/OpenEXR/ImfVersion.h")
 
 ############################################################
@@ -1377,6 +1537,13 @@ def InstallBLOSC(context, force, buildArgs):
         if MacOS() and apple_utils.GetMacTargetArch(context) != "x86_64":
             # Need to disable SSE for macOS ARM targets.
             macArgs = ["-DDEACTIVATE_SSE2=ON"]
+        if context.targetIos:
+            PatchFile("tests/fuzz/CMakeLists.txt",
+                      [(("add_executable(${target} ${source} ${FUZZER_SRC})"),
+                       ("add_library(${target} ${source} ${FUZZER_SRC})"))])
+            macArgs.append('-DBUILD_TESTS=OFF ')
+            macArgs.append('-DBUILD_SHARED=OFF ')
+            macArgs.append('-DBUILD_BENCHMARKS=OFF ')
         RunCMake(context, force, buildArgs + macArgs)
 
 BLOSC = Dependency("Blosc", InstallBLOSC, "include/blosc.h")
@@ -1394,10 +1561,22 @@ def InstallOpenVDB(context, force, buildArgs):
             '-DOPENVDB_BUILD_UNITTESTS=OFF'
         ]
 
+        if context.targetIos:
+            extraArgs.append('Boost_USE_STATIC_LIBS=ON')
+            PatchFile("openvdb/cmd/CMakeLists.txt",
+                      [(("Boost_USE_STATIC_LIBS OFF"),
+                       ("Boost_USE_STATIC_LIBS ON"))])
+            PatchFile("openvdb/CMakeLists.txt",
+                      [(("if(OPENVDB_CORE_SHARED AND NOT Boost_USE_STATIC_LIBS)"),
+                        ("if(OPENVDB_CORE_SHARED)"))])
+            PatchFile("openvdb/CMakeLists.txt",
+                      [(("  set(Boost_USE_STATIC_LIBS OFF)"),
+                        ("  set(Boost_USE_STATIC_LIBS ON)"))])
+
         # Make sure to use boost installed by the build script and not any
         # system installed boost
-        extraArgs.append('-DBoost_NO_BOOST_CMAKE=On')
-        extraArgs.append('-DBoost_NO_SYSTEM_PATHS=True')
+        #extraArgs.append('-DBoost_NO_BOOST_CMAKE=On')
+        #extraArgs.append('-DBoost_NO_SYSTEM_PATHS=True')
 
         extraArgs.append('-DBLOSC_ROOT="{instDir}"'
                          .format(instDir=context.instDir))
@@ -1405,6 +1584,9 @@ def InstallOpenVDB(context, force, buildArgs):
                          .format(instDir=context.instDir))
         # OpenVDB needs Half type from IlmBase
         extraArgs.append('-DILMBASE_ROOT="{instDir}"'
+                         .format(instDir=context.instDir))
+
+        extraArgs.append('-DBOOST_ROOT="{instDir}"'
                          .format(instDir=context.instDir))
 
         # Add on any user-specified extra arguments.
@@ -1431,6 +1613,23 @@ def InstallOpenImageIO(context, force, buildArgs):
                      '-DOIIO_BUILD_TESTS=OFF',
                      '-DUSE_PYTHON=OFF',
                      '-DSTOP_ON_WARNING=OFF']
+        if context.targetIos:
+            PatchFile("src/libutil/sysutil.cpp",
+                   [("if (system(newcmd.c_str()) != -1)", "if (true)")])
+            PatchFile("CMakeLists.txt",
+                    [("set (CMAKE_ALLOW_LOOSE_LOOP_CONSTRUCTS TRUE)",
+                      "set  (CMAKE_ALLOW_LOOSE_LOOP_CONSTRUCTS TRUE)\n"
+                      "cmake_policy (SET CMP0008 NEW)")])
+            PatchFile("src/cmake/externalpackages.cmake",
+                    [("find_package (Git REQUIRED)",
+                      "find_host_package (Git REQUIRED)")])
+            PatchFile("src/cmake/compiler.cmake",
+                    [("# Find out if it's safe for us to use std::regex or if we need boost.regex.",
+                      "# Find out if it's safe for us to use std::regex or if we need boost.regex.\n"
+                        "if (NOT DEFINED CMAKE_TOOLCHAIN_FILE)"),
+                     ("add_definitions (-DUSE_BOOST_REGEX)",
+                      "add_definitions (-DUSE_BOOST_REGEX)\n"
+                        "endif()")])
 
         # OIIO's FindOpenEXR module circumvents CMake's normal library 
         # search order, which causes versions of OpenEXR installed in
@@ -1591,6 +1790,7 @@ def InstallOpenSubdiv(context, force, buildArgs):
         # https://github.com/PixarAnimationStudios/OpenSubdiv/issues/1194
         oldNumJobs = context.numJobs
         extraEnv = os.environ.copy()
+        buildDirmacOS = ""
         if MacOS():
             context.numJobs = 1
 
@@ -1624,7 +1824,16 @@ def InstallOpenSubdiv(context, force, buildArgs):
                 PatchFile(srcOSDDir + "/cmake/iOSToolchain.cmake",
                           [("set(SDKROOT $ENV{SDKROOT})",
                             "set(CMAKE_TRY_COMPILE_TARGET_TYPE \"STATIC_LIBRARY\")\n"
-                            "set(SDKROOT $ENV{SDKROOT})")])
+                            "set(SDKROOT $ENV{SDKROOT})"),
+                           ("set(CMAKE_SYSTEM_PROCESSOR arm)",
+                            "set(CMAKE_SYSTEM_PROCESSOR arm64)\n"
+                            "set(NAMED_LANGUAGE_SUPPORT OFF)\n"
+                            "set(PLATFORM \"OS64\")\n"
+                            "set(ENABLE_BITCODE OFF)"),
+                           ])
+                PatchFile(srcOSDDir + "/opensubdiv/CMakeLists.txt",
+                          [("if (BUILD_SHARED_LIBS AND NOT WIN32 AND NOT IOS)",
+                            "if (BUILD_SHARED_LIBS AND NOT WIN32)")])
 
                 # We build for macOS in order to leverage the STRINGIFY binary built
                 srcOSDmacOSDir = srcOSDDir + "_macOS"
@@ -1646,7 +1855,7 @@ def InstallOpenSubdiv(context, force, buildArgs):
                 extraArgs.append('-DSTRINGIFY_LOCATION={buildDirmacOS}/bin/{variant}/stringify'
                                  .format(buildDirmacOS=buildDirmacOS,
                                          variant="Debug" if context.buildDebug else "Release"))
-                extraArgs.append('-DCMAKE_TOOLCHAIN_FILE={srcOSDDir}/cmake/iOSToolchain.cmake -DPLATFORM=OS64'
+                extraArgs.append('-DCMAKE_TOOLCHAIN_FILE={srcOSDDir}/cmake/iOSToolchain.cmake -DPLATFORM=\'OS64\''
                                  .format(srcOSDDir=srcOSDDir))
                 extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64')
                 os.environ['SDKROOT'] = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
@@ -1660,6 +1869,8 @@ def InstallOpenSubdiv(context, force, buildArgs):
             os.unsetenv('SDKROOT')
         else:
             os.environ['SDKROOT'] = sdkroot
+        if buildDirmacOS != "":
+            shutil.rmtree(buildDirmacOS)
 
 OPENSUBDIV = Dependency("OpenSubdiv", InstallOpenSubdiv, 
                         "include/opensubdiv/version.h")
@@ -2450,11 +2661,11 @@ class InstallContext:
             return False
         return self.forceBuildAll or dep.name.lower() in self.forceBuild
 
-try:
-    context = InstallContext(args)
-except Exception as e:
-    PrintError(str(e))
-    sys.exit(1)
+#
+context = InstallContext(args)
+#except Exception as e:
+#PrintError(str(e))
+#sys.exit(1)
 
 verbosity = args.verbosity
 

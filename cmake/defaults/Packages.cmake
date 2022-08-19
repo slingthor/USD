@@ -247,7 +247,7 @@ if (PXR_BUILD_IMAGING)
         endif()
     endif()
     # --Opensubdiv
-    set(OPENSUBDIV_USE_GPU ${PXR_ENABLE_GL_SUPPORT})
+    set(OPENSUBDIV_USE_GPU (${PXR_ENABLE_GL_SUPPORT} OR APLLEIOS))
     find_package(OpenSubdiv 3 REQUIRED)
     # --Ptex
     if (PXR_ENABLE_PTEX_SUPPORT)

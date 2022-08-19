@@ -391,8 +391,11 @@ HgiMetalBlitCmds::GenerateMipMaps(HgiTextureHandle const& texture)
 {
     HgiMetalTexture* metalTex = static_cast<HgiMetalTexture*>(texture.Get());
     if (metalTex) {
+        if (!HgiMetalConversions::IsFilterable(
+               metalTex->GetTextureId().pixelFormat)) {
+            return;
+        }
         _CreateEncoder();
-        
         [_blitEncoder generateMipmapsForTexture:metalTex->GetTextureId()];
     }
 }
