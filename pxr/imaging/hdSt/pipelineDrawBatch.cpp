@@ -625,7 +625,12 @@ HdSt_PipelineDrawBatch::_CompileBatch(
     TF_DEBUG(HDST_DRAW).Msg(" - useInstanceCulling: %d\n", _useInstanceCulling);
     TF_DEBUG(HDST_DRAW).Msg(" - num draw items: %zu\n", numDrawItemInstances);
 
-    _drawCommandBuffer.resize(numDrawItemInstances * traits.numUInt32);
+    uint32_t drawCommandBufferPadding = 4 - (traits.numUInt32 % 4);
+    if (drawCommandBufferPadding == 4) {
+        drawCommandBufferPadding = 0;
+    }
+    uint32_t aligned = drawCommandBufferPadding + traits.numUInt32;
+    _drawCommandBuffer.resize(numDrawItemInstances * aligned);
     std::vector<uint32_t>::iterator cmdIt = _drawCommandBuffer.begin();
 
     // Count the number of visible items. We may actually draw fewer
@@ -798,6 +803,11 @@ HdSt_PipelineDrawBatch::_CompileBatch(
             }
             std::cout << std::endl;
         }
+        
+        //add Padding
+        for (uint32_t i = 0; i < drawCommandBufferPadding; i++) {
+            *cmdIt++ = 0;
+        }
 
         _numVisibleItems += instanceCount;
         _numTotalElements += numElements;
@@ -823,7 +833,7 @@ HdSt_PipelineDrawBatch::_CompileBatch(
     _dispatchBuffer =
         resourceRegistry->RegisterDispatchBuffer(_tokens->drawIndirect,
                                                  numDrawItemInstances,
-                                                 traits.numUInt32);
+                                                 traits.numUInt32 + drawCommandBufferPadding);
 
     // add drawing resource views
     _AddDrawResourceViews(_dispatchBuffer, traits);
@@ -840,7 +850,7 @@ HdSt_PipelineDrawBatch::_CompileBatch(
         _dispatchBufferCullInput =
             resourceRegistry->RegisterDispatchBuffer(_tokens->drawIndirectCull,
                                                      numDrawItemInstances,
-                                                     traits.numUInt32);
+                                                     traits.numUInt32 + drawCommandBufferPadding);
 
         // add culling resource views
         if (_useInstanceCulling) {
@@ -1267,37 +1277,37 @@ HdSt_PipelineDrawBatch::ExecuteDraw(
         _indirectCommands.reset();
     }
     else {
-        _DrawingProgram & program = _GetDrawingProgram(renderPassState,
-                                                       resourceRegistry);
-        if (!TF_VERIFY(program.IsValid())) return;
+    _DrawingProgram & program = _GetDrawingProgram(renderPassState,
+                                                   resourceRegistry);
+    if (!TF_VERIFY(program.IsValid())) return;
 
-        _BindingState state(
-                _drawItemInstances.front()->GetDrawItem(),
-                _dispatchBuffer,
-                program.GetBinder(),
-                program.GetGLSLProgram(),
-                program.GetComposedShaders(),
-                program.GetGeometricShader());
+    _BindingState state(
+            _drawItemInstances.front()->GetDrawItem(),
+            _dispatchBuffer,
+            program.GetBinder(),
+            program.GetGLSLProgram(),
+            program.GetComposedShaders(),
+            program.GetGeometricShader());
 
-        HgiGraphicsPipelineSharedPtr pso =
-            _GetDrawPipeline(
-                renderPassState,
-                resourceRegistry,
-                state);
-        
-        HgiGraphicsPipelineHandle psoHandle = *pso.get();
-        gfxCmds->BindPipeline(psoHandle);
+    HgiGraphicsPipelineSharedPtr pso =
+        _GetDrawPipeline(
+            renderPassState,
+            resourceRegistry,
+            state);
+    
+    HgiGraphicsPipelineHandle psoHandle = *pso.get();
+    gfxCmds->BindPipeline(psoHandle);
 
-        HgiResourceBindingsDesc bindingsDesc;
-        state.GetBindingsForDrawing(&bindingsDesc);
+    HgiResourceBindingsDesc bindingsDesc;
+    state.GetBindingsForDrawing(&bindingsDesc);
 
-        HgiResourceBindingsHandle resourceBindings =
-                hgi->CreateResourceBindings(bindingsDesc);
-        gfxCmds->BindResources(resourceBindings);
+    HgiResourceBindingsHandle resourceBindings =
+            hgi->CreateResourceBindings(bindingsDesc);
+    gfxCmds->BindResources(resourceBindings);
 
-        HgiVertexBufferBindingVector bindings;
-        _GetVertexBufferBindingsForDrawing(&bindings, state);
-        gfxCmds->BindVertexBuffers(bindings);
+    HgiVertexBufferBindingVector bindings;
+    _GetVertexBufferBindingsForDrawing(&bindings, state);
+    gfxCmds->BindVertexBuffers(bindings);
         
         // Drawing can be either direct or indirect. For either case,
         // the drawing batch and drawing program are prepared to resolve
@@ -1305,13 +1315,13 @@ HdSt_PipelineDrawBatch::ExecuteDraw(
         bool const drawIndirect =
             capabilities->IsSet(HgiDeviceCapabilitiesBitsMultiDrawIndirect);
 
-        if (drawIndirect) {
-            _ExecuteDrawIndirect(gfxCmds, state.indexBar);
-        } else {
-            _ExecuteDrawImmediate(gfxCmds, state.indexBar);
-        }
+    if (drawIndirect) {
+        _ExecuteDrawIndirect(gfxCmds, state.indexBar);
+    } else {
+        _ExecuteDrawImmediate(gfxCmds, state.indexBar);
+    }
 
-        hgi->DestroyResourceBindings(&resourceBindings);
+    hgi->DestroyResourceBindings(&resourceBindings);
     }
 
     HD_PERF_COUNTER_INCR(HdPerfTokens->drawCalls);

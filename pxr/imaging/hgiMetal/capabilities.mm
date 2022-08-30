@@ -35,6 +35,12 @@ HgiMetalCapabilities::HgiMetalCapabilities(id<MTLDevice> device)
         _SetFlag(HgiDeviceCapabilitiesBitsConcurrentDispatch, true);
     }
 
+    bool hasIntel = [device isLowPower];
+    if (hasIntel) {
+        _SetFlag(HgiDeviceCapabilitiesBitsTessellationBarycentric, true);
+        _SetFlag(HgiDeviceCapabilitiesBitsPrimitiveIdEmulation, true);
+    }
+
     defaultStorageMode = MTLResourceStorageModeShared;
     bool unifiedMemory = false;
     bool barycentrics = false;
@@ -50,8 +56,9 @@ HgiMetalCapabilities::HgiMetalCapabilities(id<MTLDevice> device)
 #endif
         // On macOS 10.15 and 11.0 the AMD drivers reported the wrong value for
         // supportsShaderBarycentricCoordinates so check both flags.
-        barycentrics = [device supportsShaderBarycentricCoordinates]
-                    || [device areBarycentricCoordsSupported];
+        barycentrics = ([device supportsShaderBarycentricCoordinates]
+                    || [device areBarycentricCoordsSupported])
+                    && !hasIntel;
         
         hasAppleSilicon = [device hasUnifiedMemory] && ![device isLowPower];
         
@@ -89,7 +96,7 @@ HgiMetalCapabilities::HgiMetalCapabilities(id<MTLDevice> device)
     // if we are on MacOS 14 or less
     //bool isMacOs13OrLess = NSProcessInfo.processInfo.operatingSystemVersion.majorVersion <= 13
     //bool requireBasePrimitiveOffset = hasAppleSilicon && isMacOs13OrLess;
-    bool requiresBasePrimitiveOffset = hasAppleSilicon;
+    bool requiresBasePrimitiveOffset = hasAppleSilicon || hasIntel;
     _SetFlag(HgiDeviceCapabilitiesBitsBasePrimitiveOffset,
              requiresBasePrimitiveOffset);
 
