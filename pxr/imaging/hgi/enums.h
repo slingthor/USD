@@ -95,7 +95,7 @@ enum HgiDeviceCapabilitiesBits : HgiBits
     HgiDeviceCapabilitiesBitsMetalTessellation       = 1 << 14,
     HgiDeviceCapabilitiesBitsBasePrimitiveOffset     = 1 << 15,
     HgiDeviceCapabilitiesBitsTessellationBarycentric = 1 << 16,
-    HgiDeviceCapabilitiesBitsPrimitiveIdEmulation    = 1 << 17
+    HgiDeviceCapabilitiesBitsPrimitiveIdEmulation    = 1 << 17,
     HgiDeviceCapabilitiesBitsIndirectCommandBuffers  = 1 << 18,
 };
 
