@@ -45,6 +45,7 @@ import sysconfig
 import tarfile
 import zipfile
 import apple_utils
+import platform_utils
 
 if sys.version_info.major >= 3:
     from urllib.request import urlopen
@@ -773,31 +774,13 @@ def InstallBoost_Helper(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(BOOST_URL, context, force,
                                              dontExtract=dontExtract)):
         bootstrap = "bootstrap.bat" if Windows() else "./bootstrap.sh"
-        if context.targetIos:
-            os.environ['SDKROOT'] = GetCommandOutput('xcrun --sdk macosx --show-sdk-path').strip()
+        platform_utils.boost.PrepareB2Environment()
         # For cross-compilation on macOS we need to specify the architecture
         # for both the bootstrap and the b2 phase of building boost.
         bootstrapCmd = '{bootstrap} --prefix="{instDir}"'.format(
             bootstrap=bootstrap, instDir=context.instDir)
 
-        macOSArchitecture = ""
-        macOSArch = ""
-
-        if MacOS():
-            if context.targetX86:
-                macOSArchitecture = "architecture=x86"
-                macOSArch = "-arch x86_64"
-            elif context.targetARM64 or context.targetIos:
-                macOSArchitecture = "architecture=arm"
-                macOSArch = "-arch arm64"
-            elif context.targetUniversal:
-                macOSArchitecture = "architecture=combined"
-                macOSArch="-arch arm64 -arch x86_64"
-
-            if macOSArch:
-                bootstrapCmd += " cxxflags=\"{0}\" cflags=\"{0}\" linkflags=\"{0}\"".format(macOSArch)
-            bootstrapCmd += " --with-toolset=clang"
-
+        bootstrapCmd += platform_utils.boost.AppendBootstrapCmd()
         Run(bootstrapCmd)
 
         # b2 supports at most -j64 and will error if given a higher value.
@@ -823,9 +806,8 @@ def InstallBoost_Helper(context, force, buildArgs):
             '--with-program_options',
             '--with-regex'
         ]
-        if not context.targetIos:
-            b2_settings.append('link=shared')
-            b2_settings.append('runtime-link=shared')
+        platform_utils.boost.AppendB2Settings(b2_settings)
+        platform_utils.boost.PrepareExtraProjects()
 
         if context.buildPython:
             b2_settings.append("--with-python")
@@ -881,78 +863,6 @@ def InstallBoost_Helper(context, force, buildArgs):
 
         if force:
             b2_settings.append("-a")
-
-        if Windows():
-            # toolset parameter for Visual Studio documented here:
-            # https://github.com/boostorg/build/blob/develop/src/tools/msvc.jam
-            if context.cmakeToolset == "v142":
-                b2_settings.append("toolset=msvc-14.2")
-            elif context.cmakeToolset == "v141":
-                b2_settings.append("toolset=msvc-14.1")
-            elif context.cmakeToolset == "v140":
-                b2_settings.append("toolset=msvc-14.0")
-            elif IsVisualStudio2019OrGreater():
-                b2_settings.append("toolset=msvc-14.2")
-            elif IsVisualStudio2017OrGreater():
-                b2_settings.append("toolset=msvc-14.1")
-            else:
-                b2_settings.append("toolset=msvc-14.0")
-
-        if MacOS():
-            # Must specify toolset=clang to ensure install_name for boost
-            # libraries includes @rpath
-            if context.targetIos:
-                sdkPath = ''
-                xcodeRoot = GetCommandOutput('xcode-select --print-path').strip()
-                if not context.targetIos:
-                    sdkPath = GetCommandOutput('xcrun --sdk macosx --show-sdk-path').strip()
-                else:
-                    sdkPath = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
-                b2_settings.append("toolset=darwin-iphone")
-                b2_settings.append("target-os=iphone")
-                b2_settings.append("define=_LITTLE_ENDIAN")
-                b2_settings.append("link=static")
-                iOSVersion = 16.0
-                newLines = [
-                'using darwin : iphone\n',
-                ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++'
-                    .format(XCODE_ROOT=xcodeRoot),
-                ' -arch arm64 -mios-version-min=10.0 -fembed-bitcode -Wno-unused-local-typedef -Wno-nullability-completeness -DBOOST_AC_USE_PTHREADS -DBOOST_SP_USE_PTHREADS -g -DNDEBUG\n',
-                ': <striper> <root>{XCODE_ROOT}/Platforms/iPhoneOS.platform/Developer\n'
-                    .format(XCODE_ROOT=xcodeRoot),
-                ': <architecture>arm <target-os>iphone <address-model>64\n',
-                ';'
-                ]
-                projectPath = 'user-config.jam'
-                b2_settings.append("--user-config=user-config.jam")
-                b2_settings.append("macosx-version=iphone-{IOS_SDK_VERSION}".format(
-                    IOS_SDK_VERSION=iOSVersion))
-                if os.path.exists(projectPath):
-                    os.remove(projectPath)
-                with open(projectPath, 'w') as projectFile:
-                    projectFile.write('\n')
-                    projectFile.writelines(newLines)
-            else:
-                b2_settings.append("toolset=clang")
-
-            # Specify target for macOS cross-compilation.
-            if macOSArchitecture:
-                b2_settings.append(macOSArchitecture)
-
-            if macOSArch:
-                cxxFlags = ""
-                linkFlags = ""
-                if context.targetIos:
-                    cxxFlags = "{0} -std=c++14 -stdlib=libc++".format(macOSArch)
-                    linkFlags = "{0} -stdlib=libc++".format(macOSArch)
-                else:
-                    cxxFlags = "{0}".format(macOSArch)
-                    linkFlags = "{0}".format(macOSArch)
-
-
-                b2_settings.append("cxxflags=\"{0}\"".format(cxxFlags))
-                b2_settings.append("cflags=\"{0}\"".format(macOSArch))
-                b2_settings.append("linkflags=\"{0}\"".format(linkFlags))
 
         if context.buildDebug:
             b2_settings.append("--debug-configuration")
@@ -1778,9 +1688,6 @@ def InstallOpenSubdiv(context, force, buildArgs):
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
-        sdkroot = None
-        if MacOS():
-            sdkroot = os.environ.get('SDKROOT')
 
         # OpenSubdiv seems to error when building on windows w/ Ninja...
         # ...so just use the default generator (ie, Visual Studio on Windows)
@@ -1794,88 +1701,14 @@ def InstallOpenSubdiv(context, force, buildArgs):
         # just 1 job for now. See:
         # https://github.com/PixarAnimationStudios/OpenSubdiv/issues/1194
         oldNumJobs = context.numJobs
-        extraEnv = os.environ.copy()
-        buildDirmacOS = ""
-        if MacOS():
-            context.numJobs = 1
-
-            if apple_utils.GetMacTargetArch(context) != apple_utils.GetMacArch() and not context.targetIOS:
-                # For macOS cross-compilation it is necessary to build stringify
-                # on the host architecture.  This is then passed into the second
-                # phase of building OSD with the STRINGIFY_LOCATION parameter.
-                stringifyDir = srcOSDDir + "_stringify"
-                if os.path.isdir(stringifyDir):
-                    shutil.rmtree(stringifyDir)
-                shutil.copytree(srcOSDDir, stringifyDir)
-
-                stringifyContext = copy.copy(context)
-                stringifyContext.targetArch = apple_utils.GetMacArch()
-
-                with CurrentWorkingDirectory(stringifyDir):
-                    RunCMake(stringifyContext, force, extraArgs)
-
-                buildStringifyDir = os.path.join(stringifyContext.buildDir, os.path.split(srcOSDDir)[1] + "_stringify")
-
-                extraArgs.append('-DSTRINGIFY_LOCATION={buildStringifyDir}/bin/stringify'
-                                .format(buildStringifyDir=buildStringifyDir))
-
-                extraEnv["OSD_CMAKE_CROSSCOMPILE"] = "1"
-
-                # Patch CMakeLists.txt to enable cross-compiling and pick up the stringify location.
-                PatchFile("CMakeLists.txt", 
-                        [("set_property(GLOBAL PROPERTY USE_FOLDERS ON)",
-                          "set_property(GLOBAL PROPERTY USE_FOLDERS ON)\nif(DEFINED ENV{OSD_CMAKE_CROSSCOMPILE})\nset(CMAKE_CROSSCOMPILING 1)\nendif()")])
-            elif context.targetIos:
-                PatchFile(srcOSDDir + "/cmake/iOSToolchain.cmake",
-                          [("set(SDKROOT $ENV{SDKROOT})",
-                            "set(CMAKE_TRY_COMPILE_TARGET_TYPE \"STATIC_LIBRARY\")\n"
-                            "set(SDKROOT $ENV{SDKROOT})"),
-                           ("set(CMAKE_SYSTEM_PROCESSOR arm)",
-                            "set(CMAKE_SYSTEM_PROCESSOR arm64)\n"
-                            "set(NAMED_LANGUAGE_SUPPORT OFF)\n"
-                            "set(PLATFORM \"OS64\")\n"
-                            "set(ENABLE_BITCODE OFF)"),
-                           ])
-                PatchFile(srcOSDDir + "/opensubdiv/CMakeLists.txt",
-                          [("if (BUILD_SHARED_LIBS AND NOT WIN32 AND NOT IOS)",
-                            "if (BUILD_SHARED_LIBS AND NOT WIN32)")])
-
-                # We build for macOS in order to leverage the STRINGIFY binary built
-                srcOSDmacOSDir = srcOSDDir + "_macOS"
-                if os.path.isdir(srcOSDmacOSDir):
-                    shutil.rmtree(srcOSDmacOSDir)
-                shutil.copytree(srcOSDDir, srcOSDmacOSDir)
-
-                # Install macOS dependencies into a temporary directory, to avoid iOS space polution
-                tempContext = copy.copy(context)
-                tempContext.instDir = tempContext.instDir + "/macOS"
-                with CurrentWorkingDirectory(srcOSDmacOSDir):
-                    RunCMake(tempContext, force, extraArgs, hostPlatform=True)
-                shutil.rmtree(tempContext.instDir)
-
-                buildDirmacOS = os.path.join(context.buildDir, os.path.split(srcOSDmacOSDir)[1])
-
-                extraArgs.append('-DNO_CLEW=ON')
-                extraArgs.append('-DNO_OPENGL=ON')
-                extraArgs.append('-DSTRINGIFY_LOCATION={buildDirmacOS}/bin/{variant}/stringify'
-                                 .format(buildDirmacOS=buildDirmacOS,
-                                         variant="Debug" if context.buildDebug else "Release"))
-                extraArgs.append('-DCMAKE_TOOLCHAIN_FILE={srcOSDDir}/cmake/iOSToolchain.cmake -DPLATFORM=\'OS64\''
-                                 .format(srcOSDDir=srcOSDDir))
-                extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64')
-                os.environ['SDKROOT'] = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
-                extraEnv = os.environ.copy()
+        extraEnv = [os.environ.copy()]
+        platform_utils.openSubdiv.HandlePlatformSpecific(srcOSDDir, extraEnv, force, extraArgs)
         try:
-            RunCMake(context, force, extraArgs, extraEnv)
+            RunCMake(context, force, extraArgs, extraEnv[0])
         finally:
             context.cmakeGenerator = oldGenerator
             context.numJobs = oldNumJobs
-        if sdkroot is None:
-            os.unsetenv('SDKROOT')
-        else:
-            os.environ['SDKROOT'] = sdkroot
-        if buildDirmacOS != "":
-            shutil.rmtree(buildDirmacOS)
+        platform_utils.openSubdiv.Cleanup()
 
 OPENSUBDIV = Dependency("OpenSubdiv", InstallOpenSubdiv, 
                         "include/opensubdiv/version.h")
@@ -2597,6 +2430,8 @@ class InstallContext:
         self.targetX86 = (args.build_target == TARGET_X86)
         self.targetARM64 = (args.build_target == TARGET_ARM64)
         self.targetIos = (args.build_target == TARGET_IOS)
+        platform_utils.build_usd = __import__(__name__)
+        platform_utils.apple_utils = apple_utils
         if apple_utils.SupportsMacOSUniversalBinaries():
             self.targetUniversal = (args.build_target == TARGET_UNIVERSAL)
         else:
