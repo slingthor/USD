@@ -158,6 +158,11 @@ bool operator!=(
 ///
 struct HgiShaderFunctionParamDesc
 {
+    enum SamplingFlag: uint32_t {
+        Centroid = 1,
+        Sample = 2
+    };
+    
     HGI_API
     HgiShaderFunctionParamDesc();
 
@@ -166,6 +171,7 @@ struct HgiShaderFunctionParamDesc
     int32_t location;
     int32_t interstageSlot;
     HgiInterpolationType interpolation;
+    SamplingFlag samplingFlag;
     std::string role;
     std::string arraySize;
 };
@@ -283,6 +289,8 @@ bool operator!=(
 /// <ul>
 /// <li>patchType:
 ///   The type of patch</li>
+/// <li>spacing
+///   The spacing mode of tessellation</li>
 /// <li>numVertsInPerPatch:
 ///   The number of vertices in per patch</li>
 /// <li>numVertsOutPerPatch:
@@ -291,11 +299,12 @@ bool operator!=(
 ///
 struct HgiShaderFunctionTessellationDesc
 {
-    enum class PatchType { Quad, Triangle };
+    enum class PatchType { Quad, Triangle, Isoline };
     HGI_API
     HgiShaderFunctionTessellationDesc();
 
     PatchType patchType = PatchType::Triangle;
+    HgiTessellationSpacing spacing;
     uint32_t numVertsPerPatchIn = 3;
     uint32_t numVertsPerPatchOut = 3;
 };

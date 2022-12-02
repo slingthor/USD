@@ -372,13 +372,15 @@ HgiGLShaderGenerator::_WriteInOuts(
         }
 
         CreateShaderSection<HgiGLMemberShaderSection>(
-            paramName,
-            param.type,
-            param.interpolation,
-            attrs,
-            qualifier,
-            std::string(),
-            param.arraySize);
+          paramName,
+          param.type,
+          param.interpolation,
+          attrs,
+          qualifier,
+          std::string(),
+          param.arraySize,
+          std::string(),
+          param.samplingFlag);
     }
 }
 

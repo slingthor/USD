@@ -137,7 +137,8 @@ HgiGLMemberShaderSection::HgiGLMemberShaderSection(
     const std::string &storageQualifier,
     const std::string &defaultValue,
     const std::string &arraySize,
-    const std::string &blockInstanceIdentifier)
+    const std::string &blockInstanceIdentifier,
+    const HgiShaderFunctionParamDesc::SamplingFlag samplingFlags)
     : HgiGLShaderSection(identifier,
                          attributes,
                          storageQualifier,
@@ -146,6 +147,7 @@ HgiGLMemberShaderSection::HgiGLMemberShaderSection(
                          blockInstanceIdentifier)
     , _typeName(typeName)
     , _interpolation(interpolation)
+    , _samplingFlags(samplingFlags)
 {
 }
 
@@ -168,6 +170,15 @@ HgiGLMemberShaderSection::VisitGlobalMemberDeclarations(std::ostream &ss)
         ss << "noperspective ";
         break;
     }
+    
+    if ((_samplingFlags & HgiShaderFunctionParamDesc::Centroid) != 0) {
+        ss << "centroid ";
+    }
+    
+    if ((_samplingFlags & HgiShaderFunctionParamDesc::Sample) != 0) {
+        ss << "sample ";
+    }
+    
     WriteDeclaration(ss);
     return true;
 }
