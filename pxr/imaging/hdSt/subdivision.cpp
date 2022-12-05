@@ -51,6 +51,7 @@
 #include "pxr/base/gf/vec2i.h"
 #include "pxr/base/gf/vec3i.h"
 #include "pxr/base/gf/vec4i.h"
+#include "pxr/base/gf/half.h"
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/tf/stringUtils.h"
 
@@ -137,6 +138,7 @@ private:
     HdBufferSourceSharedPtr _osdTopology;
     HdBufferSourceSharedPtr _primitiveBuffer;
     HdBufferSourceSharedPtr _edgeIndicesBuffer;
+    HdBufferSourceSharedPtr _tessFactorsBuffer;
 };
 
 // ---------------------------------------------------------------------------
@@ -483,6 +485,9 @@ HdSt_OsdIndexComputation::GetBufferSpecs(HdBufferSpecVector *specs) const
                             HdTupleType {HdTypeInt32Vec4, 1});
         specs->emplace_back(HdTokens->edgeIndices,
                             HdTupleType {HdTypeInt32Vec2, 1});
+        specs->emplace_back(HdTokens->tessFactors,
+                            HdTupleType{HdTypeInt32Vec3, 1});
+        
     } else if (_topology->RefinesToBoxSplineTrianglePatches()) {
         // quartic box spline triangle patches
         specs->emplace_back(HdTokens->indices,
@@ -493,6 +498,8 @@ HdSt_OsdIndexComputation::GetBufferSpecs(HdBufferSpecVector *specs) const
         // int will suffice, but this unifies it for all the cases
         specs->emplace_back(HdTokens->edgeIndices,
                             HdTupleType {HdTypeInt32Vec2, 1});
+        specs->emplace_back(HdTokens->tessFactors,
+                            HdTupleType{HdTypeInt32Vec3, 1});
     } else if (HdSt_Subdivision::RefinesToTriangles(_topology->GetScheme())) {
         // triangles (loop)
         specs->emplace_back(HdTokens->indices,
@@ -502,6 +509,8 @@ HdSt_OsdIndexComputation::GetBufferSpecs(HdBufferSpecVector *specs) const
         // int will suffice, but this unifies it for all the cases
         specs->emplace_back(HdTokens->edgeIndices,
                             HdTupleType {HdTypeInt32Vec2, 1});
+        specs->emplace_back(HdTokens->tessFactors,
+                            HdTupleType{HdTypeInt32Vec3, 1});
     } else {
         // quads (catmark, bilinear)
         if (_topology->TriangulateQuads()) {
@@ -515,6 +524,8 @@ HdSt_OsdIndexComputation::GetBufferSpecs(HdBufferSpecVector *specs) const
                             HdTupleType {HdTypeInt32Vec3, 1});
         specs->emplace_back(HdTokens->edgeIndices,
                             HdTupleType {HdTypeInt32Vec2, 1});
+        specs->emplace_back(HdTokens->tessFactors,
+                            HdTupleType{HdTypeInt32Vec3, 1});
     }
 }
 
@@ -529,7 +540,7 @@ HdSt_OsdIndexComputation::HasChainedBuffer() const
 HdBufferSourceSharedPtrVector
 HdSt_OsdIndexComputation::GetChainedBuffers() const
 {
-    return { _primitiveBuffer, _edgeIndicesBuffer };
+    return { _primitiveBuffer, _edgeIndicesBuffer, _tessFactorsBuffer };
 }
 
 /*virtual*/
@@ -1219,7 +1230,7 @@ HdSt_OsdIndexComputation::Resolve()
     } else if (HdSt_Subdivision::RefinesToTriangles(scheme)) {
         // populate refined triangle indices.
         VtArray<GfVec3i> indices(ptableSize/3);
-        memcpy(indices.data(), firstIndex, ptableSize * sizeof(int));
+        std::memcpy(indices.data(), firstIndex, ptableSize * sizeof(int));
 
         HdBufferSourceSharedPtr triIndices =
             std::make_shared<HdVtBufferSource>(
@@ -1342,7 +1353,8 @@ HdSt_OsdIndexComputation::_PopulateUniformPrimitiveBuffer(
         : 0;
     VtVec3iArray primitiveParam(numPatches);
     VtVec2iArray edgeIndices(numPatches);
-
+    VtVec3iArray tessFactors(numPatches);
+    
     for (size_t i = 0; i < numPatches; ++i) {
         OpenSubdiv::Far::PatchParam const &patchParam =
             patchTable->GetPatchParamTable()[i];
@@ -1367,6 +1379,10 @@ HdSt_OsdIndexComputation::_PopulateUniformPrimitiveBuffer(
                            HdTokens->edgeIndices,
                            VtValue(edgeIndices)));
 
+    _tessFactorsBuffer.reset(new HdVtBufferSource(
+                           HdTokens->tessFactors,
+                           VtValue(tessFactors)));
+
 }
 
 void
@@ -1384,6 +1400,7 @@ HdSt_OsdIndexComputation::_PopulatePatchPrimitiveBuffer(
         : 0;
     VtVec4iArray primitiveParam(numPatches);
     VtVec2iArray edgeIndices(numPatches);
+    VtVec3iArray tessFactors(numPatches);
 
     for (size_t i = 0; i < numPatches; ++i) {
         OpenSubdiv::Far::PatchParam const &patchParam =
@@ -1418,6 +1435,10 @@ HdSt_OsdIndexComputation::_PopulatePatchPrimitiveBuffer(
     _edgeIndicesBuffer.reset(new HdVtBufferSource(
                            HdTokens->edgeIndices,
                            VtValue(edgeIndices)));
+
+    _tessFactorsBuffer.reset(new HdVtBufferSource(
+                           HdTokens->tessFactors,
+                           VtValue(tessFactors)));
 }
 
 // ---------------------------------------------------------------------------

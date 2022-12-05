@@ -126,7 +126,8 @@ public:
         const std::string &storageQualifier = std::string(),
         const std::string &defaultValue = std::string(),
         const std::string &arraySize = std::string(),
-        const std::string &blockInstanceIdentifier = std::string());
+        const std::string &blockInstanceIdentifier = std::string(),
+        const HgiShaderFunctionParamDesc::SamplingFlag samplingFlags = static_cast<HgiShaderFunctionParamDesc::SamplingFlag>(0));
 
     HGIGL_API
     ~HgiGLMemberShaderSection() override;
@@ -145,6 +146,7 @@ private:
 
     std::string _typeName;
     HgiInterpolationType _interpolation;
+    HgiShaderFunctionParamDesc::SamplingFlag _samplingFlags;
 };
 
 /// \class HgiGLBlockShaderSection

@@ -1023,21 +1023,37 @@ HdStRenderPassState::GetClipPlanes() const
 }
 
 void
-HdStRenderPassState::_InitPrimitiveState(
+HdStRenderPassState::InitPrimitiveState(
     HgiGraphicsPipelineDesc * pipeDesc,
     HdSt_GeometricShaderSharedPtr const & geometricShader) const
 {
     pipeDesc->primitiveType = geometricShader->GetHgiPrimitiveType();
-
+    pipeDesc->tessellationState.tessFactorMode = HgiTessellationState::None;
     if (pipeDesc->primitiveType == HgiPrimitiveTypePatchList) {
         pipeDesc->tessellationState.primitiveIndexSize =
                             geometricShader->GetPrimitiveIndexSize();
-
         if (geometricShader->GetUseMetalTessellation()) {
             pipeDesc->tessellationState.patchType =
                 geometricShader->IsPrimTypeTriangles()
                     ? HgiTessellationState::PatchType::Triangle
                     : HgiTessellationState::PatchType::Quad;
+            if (geometricShader->GetHgiPrimitiveType() ==
+                HgiPrimitiveTypePointList) {
+                pipeDesc->tessellationState.patchType = HgiTessellationState::Isoline;
+            }
+        }
+        const bool hasVariableTessFactors = geometricShader->IsPrimTypeBasisCurves() ||
+        geometricShader->GetPrimitiveType() == HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BSPLINE ||
+        geometricShader->GetPrimitiveType() == HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BOXSPLINETRIANGLE;
+        pipeDesc->tessellationState.tessFactorMode =
+            hasVariableTessFactors ?
+                HgiTessellationState::TessVertex :
+                HgiTessellationState::Constant;
+    }
+    if (geometricShader->GetUseMetalTessellation()) {
+        if (geometricShader->GetHgiPrimitiveType() ==
+            HgiPrimitiveTypePointList) {
+            pipeDesc->tessellationState.patchType = HgiTessellationState::Isoline;
         }
     }
 }
@@ -1171,7 +1187,7 @@ HdStRenderPassState::InitGraphicsPipelineDesc(
     HgiGraphicsPipelineDesc * pipeDesc,
     HdSt_GeometricShaderSharedPtr const & geometricShader) const
 {
-    _InitPrimitiveState(pipeDesc, geometricShader);
+    InitPrimitiveState(pipeDesc, geometricShader);
     _InitDepthStencilState(&pipeDesc->depthState);
     _InitMultiSampleState(&pipeDesc->multiSampleState);
     _InitRasterizationState(&pipeDesc->rasterizationState, geometricShader);

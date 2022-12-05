@@ -28,6 +28,8 @@
 
 #include "pxr/base/gf/vec2i.h"
 #include "pxr/base/gf/vec4i.h"
+#include "pxr/base/gf/half.h"
+
 
 #include <algorithm>
 
@@ -60,6 +62,8 @@ HdSt_BasisCurvesIndexBuilderComputation::GetBufferSpecs(
     // XXX: we currently create it even when the curve has no uniform primvars
     specs->emplace_back(HdTokens->primitiveParam,
                         HdTupleType{HdTypeInt32, 1});
+    specs->emplace_back(HdTokens->tessFactors,
+                        HdTupleType{HdTypeInt32Vec3, 1});
 }
 
 HdSt_BasisCurvesIndexBuilderComputation::IndexAndPrimIndex
@@ -108,12 +112,15 @@ HdSt_BasisCurvesIndexBuilderComputation::_BuildLinesIndexArray()
         }
     }
 
+    VtVec3iArray finalTessFactors(finalIndices.size());
     VtIntArray finalPrimIndices(primIndices.size());
     std::copy(  primIndices.begin(), 
                 primIndices.end(), 
                 finalPrimIndices.begin());
 
-    return IndexAndPrimIndex(VtValue(finalIndices), VtValue(finalPrimIndices));
+    return IndexAndPrimIndex(VtValue(finalIndices),
+                             VtValue(finalPrimIndices),
+                             VtValue(finalTessFactors));
 }
 
 HdSt_BasisCurvesIndexBuilderComputation::IndexAndPrimIndex
@@ -181,12 +188,15 @@ HdSt_BasisCurvesIndexBuilderComputation::_BuildLineSegmentIndexArray()
         }
     }
 
+    VtVec3iArray finalTessFactors(finalIndices.size());
     VtIntArray finalPrimIndices(primIndices.size());
     std::copy(  primIndices.begin(),
                 primIndices.end(),
                 finalPrimIndices.begin());
 
-    return IndexAndPrimIndex(VtValue(finalIndices), VtValue(finalPrimIndices));
+    return IndexAndPrimIndex(VtValue(finalIndices),
+                             VtValue(finalPrimIndices),
+                             VtValue(finalTessFactors));
 }
 
 HdSt_BasisCurvesIndexBuilderComputation::IndexAndPrimIndex
@@ -391,10 +401,15 @@ HdSt_BasisCurvesIndexBuilderComputation::_BuildCubicIndexArray()
         }
     }
 
+    VtVec3iArray finalTessFactors(finalIndices.size());
     VtIntArray finalPrimIndices(primIndices.size());
-    std::copy(primIndices.begin(), primIndices.end(), finalPrimIndices.begin());    
+    std::copy(primIndices.begin(), primIndices.end(), finalPrimIndices.begin());
 
-    return IndexAndPrimIndex(VtValue(finalIndices), VtValue(finalPrimIndices));
+    return IndexAndPrimIndex(
+            VtValue(finalIndices),
+            VtValue(finalPrimIndices),
+            VtValue(finalTessFactors));
+
 }
 
 bool
@@ -419,6 +434,10 @@ HdSt_BasisCurvesIndexBuilderComputation::Resolve()
     _SetResult(std::make_shared<HdVtBufferSource>(
                                 HdTokens->indices, 
                                 VtValue(result._indices)));
+
+    _tessFactorsParam.reset(new HdVtBufferSource(
+                HdTokens->tessFactors,
+                VtValue(result._tessFactors)));
 
     // the primitive param buffer is used only when the basis curve
     // has uniform primvars.
@@ -446,7 +465,7 @@ HdSt_BasisCurvesIndexBuilderComputation::HasChainedBuffer() const
 HdBufferSourceSharedPtrVector
 HdSt_BasisCurvesIndexBuilderComputation::GetChainedBuffers() const
 {
-    return { _primitiveParam };
+    return { _primitiveParam, _tessFactorsParam };
 }
 
 

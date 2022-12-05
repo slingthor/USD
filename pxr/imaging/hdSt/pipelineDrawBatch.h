@@ -146,9 +146,16 @@ private:
                 HdStBufferArrayRangeSharedPtr const & indexBar);
 
     void _ExecuteFrustumCull(
+                HgiGraphicsCmds * cullGfxCmds,
                 bool updateDispatchBuffer,
                 HdStRenderPassStateSharedPtr const & renderPassState,
                 HdStResourceRegistrySharedPtr const & resourceRegistry);
+
+    void _ExecutePostTesselation(
+            HgiGraphicsCmds *ptcsGfxCmds,
+            bool const updateBufferData,
+            HdStRenderPassStateSharedPtr const & renderPassState,
+            HdStResourceRegistrySharedPtr const & resourceRegistry);
 
     void _BeginGPUCountVisibleInstances(
         HdStResourceRegistrySharedPtr const & resourceRegistry);
@@ -181,7 +188,7 @@ private:
     bool _useGpuCulling;
     bool _useInstanceCulling;
     bool const _allowGpuFrustumCulling;
-    bool const _allowIndirectCommandEncoding;
+    bool _allowIndirectCommandEncoding;
 
     size_t _instanceCountOffset;
     size_t _cullInstanceCountOffset;
