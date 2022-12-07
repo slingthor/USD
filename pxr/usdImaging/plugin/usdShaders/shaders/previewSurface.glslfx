@@ -53,7 +53,6 @@ displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
     return Peye + vec4(Neye*texDisplacement, 0);
 }
 
-
 -- glsl Preview.Surface
 
 vec4

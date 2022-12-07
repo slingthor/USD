@@ -23,6 +23,7 @@
 //
 
 #include "pxr/imaging/hgiMetal/hgi.h"
+#include "pxr/imaging/hgiMetal/buffer.h"
 #include "pxr/imaging/hgiMetal/capabilities.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
@@ -44,8 +45,7 @@ HgiMetalGraphicsPipeline::HgiMetalGraphicsPipeline(
     , _vertexDescriptor(nil)
     , _depthStencilState(nil)
     , _renderPipelineState(nil)
-    , _constantTessFactors(nil)
-{
+    , _constantTessFactors(nil) {
     _CreateVertexDescriptor();
     _CreateDepthStencilState(hgi);
     _CreateRenderPipelineState(hgi);
@@ -133,12 +133,22 @@ HgiMetalGraphicsPipeline::_CreateRenderPipelineState(HgiMetal *hgi)
     stateDesc.inputPrimitiveTopology =
         HgiMetalConversions::GetPrimitiveClass(_descriptor.primitiveType);
 
+
+
     HgiMetalShaderProgram const *metalProgram =
         static_cast<HgiMetalShaderProgram*>(_descriptor.shaderProgram.Get());
-
-    if (_descriptor.primitiveType == HgiPrimitiveTypePatchList) {
-        stateDesc.vertexFunction = metalProgram->GetPostTessVertexFunction();
-
+    auto tessVertexFunc = metalProgram->GetPostTessVertexFunction();
+    const bool usePTVSPath = _descriptor.primitiveType == HgiPrimitiveTypePatchList
+                             || tessVertexFunc != nullptr
+                             || _descriptor.tessellationState.isPostTessControl;
+    if (usePTVSPath) {
+        stateDesc.vertexFunction = _descriptor.tessellationState.isPostTessControl ?
+            metalProgram->GetPostTessControlFunction() :
+            metalProgram->GetPostTessVertexFunction();
+        if (stateDesc.inputPrimitiveTopology
+                == MTLPrimitiveTopologyClassLine) {
+            stateDesc.inputPrimitiveTopology = MTLPrimitiveTopologyClassTriangle;
+        }
         MTLWinding winding = HgiMetalConversions::GetWinding(
             _descriptor.rasterizationState.winding);
         //flip the tess winding
@@ -148,10 +158,53 @@ HgiMetalGraphicsPipeline::_CreateRenderPipelineState(HgiMetal *hgi)
 
         stateDesc.tessellationControlPointIndexType =
             MTLTessellationControlPointIndexTypeUInt32;
+        bool useConstantStepFunction =
+            (static_cast<HgiMetalShaderProgram*>(
+            _descriptor.shaderProgram.Get())
+            ->GetPostTessControlFunction() == nullptr) ||
+        _descriptor.tessellationState.isPostTessControl;
+        stateDesc.tessellationFactorStepFunction =
+            useConstantStepFunction ?
+            MTLTessellationFactorStepFunctionConstant :
+            MTLTessellationFactorStepFunctionPerPatch;
+        stateDesc.tessellationFactorScaleEnabled = NO;
+        HgiShaderFunctionHandle tessFunc =
+            metalProgram->GetShaderFunction(
+                HgiShaderStagePostTessellationVertex);
+        if (tessFunc) {
+            switch (tessFunc->GetDescriptor().tessellationDescriptor.spacing) {
+                 //default to integer
+               case HgiTessellationSpacingNone:
+               case HgiTessellationSpacingEven:
+                   stateDesc.tessellationPartitionMode =
+                       MTLTessellationPartitionModeInteger;
+                   break;
+               case HgiTessellationSpacingFractionalOdd:
+                   stateDesc.tessellationPartitionMode =
+                       MTLTessellationPartitionModeFractionalOdd;
+                 break;
+               case HgiTessellationSpacingFractionalEven:
+                   stateDesc.tessellationPartitionMode =
+                       MTLTessellationPartitionModeFractionalEven;
+                 break;
+               default:
+                   stateDesc.tessellationPartitionMode =
+                       MTLTessellationPartitionModeInteger;
+                 break;
+            }
+        }
+        if (_descriptor.tessellationState.isPostTessControl) {
+            stateDesc.tessellationPartitionMode = MTLTessellationPartitionModePow2;
+        }
+        if (_descriptor.tessellationState.patchType == HgiTessellationState::Isoline) {
+             _descriptor.rasterizationState.polygonMode = HgiPolygonModeLine;
+         }
     } else {
         stateDesc.vertexFunction = metalProgram->GetVertexFunction();
     }
     
+    stateDesc.rasterSampleCount = _descriptor.multiSampleState.sampleCount;
+    stateDesc.sampleCount = _descriptor.multiSampleState.sampleCount;
     id<MTLFunction> fragFunction = metalProgram->GetFragmentFunction();
     if (fragFunction && _descriptor.rasterizationState.rasterizerEnabled) {
         stateDesc.fragmentFunction = fragFunction;
@@ -216,7 +269,6 @@ HgiMetalGraphicsPipeline::_CreateRenderPipelineState(HgiMetal *hgi)
         stateDesc.stencilAttachmentPixelFormat = depthPixelFormat;
     }
 
-    stateDesc.sampleCount = _descriptor.multiSampleState.sampleCount;
     if (_descriptor.multiSampleState.alphaToCoverageEnable) {
         stateDesc.alphaToCoverageEnabled = YES;
     } else {
@@ -243,6 +295,7 @@ HgiMetalGraphicsPipeline::_CreateRenderPipelineState(HgiMetal *hgi)
             [err UTF8String]);
     }
 }
+
 
 static MTLStencilDescriptor *
 _CreateStencilDescriptor(HgiStencilState const & stencilState)
@@ -348,9 +401,11 @@ HgiMetalGraphicsPipeline::BindPipeline(id<MTLRenderCommandEncoder> renderEncoder
                                    options:MTLResourceStorageModeShared];
             }
         }
+
         [renderEncoder setTessellationFactorBuffer:_constantTessFactors
                                             offset: 0
                                     instanceStride: 0];
+
     }
 
     //

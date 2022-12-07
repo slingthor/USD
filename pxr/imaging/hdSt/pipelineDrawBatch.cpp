@@ -39,6 +39,7 @@
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/shaderKey.h"
 #include "pxr/imaging/hdSt/textureBinder.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/debugCodes.h"
@@ -81,6 +82,8 @@ TF_DEFINE_PRIVATE_TOKENS(
 TF_DEFINE_ENV_SETTING(HDST_ENABLE_PIPELINE_DRAW_BATCH_GPU_FRUSTUM_CULLING,false,
                       "Enable pipeline draw batching GPU frustum culling");
 
+using PrimitiveType = HdSt_GeometricShader::PrimitiveType;
+
 HdSt_PipelineDrawBatch::HdSt_PipelineDrawBatch(
     HdStDrawItemInstance * drawItemInstance,
     bool const allowGpuFrustumCulling,
@@ -119,7 +122,15 @@ HdSt_PipelineDrawBatch::_Init(HdStDrawItemInstance * drawItemInstance)
     HdSt_DrawBatch::_Init(drawItemInstance);
     drawItemInstance->SetBatchIndex(0);
     drawItemInstance->SetBatch(this);
-
+    HdSt_GeometricShaderPtr geomShader =
+        _drawItemInstances[0]->GetDrawItem()->GetGeometricShader();
+    
+    if (geomShader->IsPrimTypeBasisCurves() ||
+        geomShader->GetPrimitiveType() == HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BSPLINE ||
+        geomShader->GetPrimitiveType() == HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BOXSPLINETRIANGLE
+        ) {
+        _allowIndirectCommandEncoding = false;
+    }
     // remember buffer arrays version for dispatch buffer updating
     HdStDrawItem const * drawItem = drawItemInstance->GetDrawItem();
     _bufferArraysHash = drawItem->GetBufferArraysHash();
@@ -1005,7 +1016,18 @@ HdSt_PipelineDrawBatch::PrepareDraw(
     if (_useGpuCulling) {
         // Ignore passed in gfxCmds for now since GPU frustum culling
         // may still require multiple command buffer submissions.
-        _ExecuteFrustumCull(updateBufferData,
+        _ExecuteFrustumCull(gfxCmds, updateBufferData,
+                            renderPassState, resourceRegistry);
+    }
+    bool hasPatches = _drawItemInstances[0]->GetDrawItem()->
+        GetGeometricShader()->IsPrimTypePatches();
+    bool const useMetalTessellation =
+    _drawItemInstances[0]->GetDrawItem()->
+        GetGeometricShader()->GetUseMetalTessellation();
+    //TODO check if is using constant tessellation
+    auto tessControlMethod = _drawItemInstances[0]->GetDrawItem()->GetGeometricShader()->GetSource(HdShaderTokens->postTessControlShader);
+    if (hasPatches && useMetalTessellation && !tessControlMethod.empty()) {
+        _ExecutePostTesselation(gfxCmds, updateBufferData,
                             renderPassState, resourceRegistry);
     }
 }
@@ -1041,7 +1063,8 @@ struct _BindingState : public _DrawItemState
 
     // Core resources plus additional resources needed for drawing.
     void GetBindingsForDrawing(
-                HgiResourceBindingsDesc * bindingsDesc) const;
+                HgiResourceBindingsDesc * bindingsDesc,
+                bool includeTessFactors = false) const;
 
     HdStDispatchBufferSharedPtr dispatchBuffer;
     HdSt_ResourceBinder const & binder;
@@ -1072,7 +1095,8 @@ _BindingState::GetBindingsForViewTransformation(
 
 void
 _BindingState::GetBindingsForDrawing(
-    HgiResourceBindingsDesc * bindingsDesc) const
+    HgiResourceBindingsDesc * bindingsDesc,
+    bool includeTessFactors) const
 {
     GetBindingsForViewTransformation(bindingsDesc);
 
@@ -1085,7 +1109,19 @@ _BindingState::GetBindingsForDrawing(
     binder.GetBufferArrayBindingDesc(bindingsDesc, elementBar);
     binder.GetBufferArrayBindingDesc(bindingsDesc, fvarBar);
     binder.GetBufferArrayBindingDesc(bindingsDesc, varyingBar);
-
+    
+    if (includeTessFactors) {
+        binder.GetInterleavedBufferArrayBindingDesc(bindingsDesc,
+                                                    indexBar,
+                                                    HdTokens->tessFactors);
+        HgiBufferBindDesc &tessFactorBuffDesc = bindingsDesc->buffers.back();
+        HdStBufferResourceSharedPtr indexBuffer =
+             indexBar->GetResource(HdTokens->tessFactors);
+        tessFactorBuffDesc.buffers[0] = indexBuffer->GetHandle();
+        tessFactorBuffDesc.offsets[0] = indexBuffer->GetOffset();
+        tessFactorBuffDesc.resourceType = HgiBindResourceTypeTessFactors;
+    }
+    
     for (HdStShaderCodeSharedPtr const & shader : shaders) {
         HdStBufferArrayRangeSharedPtr shaderBar =
                 std::static_pointer_cast<HdStBufferArrayRange>(
@@ -1093,6 +1129,7 @@ _BindingState::GetBindingsForDrawing(
 
         binder.GetInterleavedBufferArrayBindingDesc(
             bindingsDesc, shaderBar, HdTokens->materialParams);
+        
 
         HdBindingRequestVector bindingRequests;
         shader->AddBindings(&bindingRequests);
@@ -1270,6 +1307,61 @@ _GetDrawPipeline(
     return pipelineInstance.GetValue();
 }
 
+////////////////////////////////////////////////////////////
+// GPU Drawing
+////////////////////////////////////////////////////////////
+
+static
+HgiGraphicsPipelineSharedPtr
+_GetTessControlPipeline(
+    HdStRenderPassStateSharedPtr const & renderPassState,
+    HdStResourceRegistrySharedPtr const & resourceRegistry,
+    _BindingState const & state)
+{
+    // Drawing pipeline is compatible as long as the shader and
+    // pipeline state are the same.
+    HgiShaderProgramHandle const & programHandle =
+                                        state.glslProgram->GetProgram();
+
+    uint64_t hash = TfHash::Combine(
+        programHandle.Get(),
+        renderPassState->GetGraphicsPipelineHash());
+    uint64_t tessControl = 5000000;
+    hash = TfHash::Combine(hash, tessControl);
+
+    HdInstance<HgiGraphicsPipelineSharedPtr> pipelineInstance =
+        resourceRegistry->RegisterGraphicsPipeline(hash);
+    if (pipelineInstance.IsFirstInstance()) {
+        HgiGraphicsPipelineDesc pipeDesc;
+        pipeDesc.rasterizationState.rasterizerEnabled = false;
+        pipeDesc.multiSampleState.sampleCount = HgiSampleCount1;
+        pipeDesc.multiSampleState.alphaToCoverageEnable = false;
+        pipeDesc.depthState.depthWriteEnabled = false;
+        pipeDesc.depthState.depthTestEnabled = false;
+        pipeDesc.depthState.stencilTestEnabled = false;
+        pipeDesc.tessellationState.useConstantTessFactors = true;
+        pipeDesc.primitiveType = HgiPrimitiveTypePatchList;
+        pipeDesc.multiSampleState.multiSampleEnable = false;
+        renderPassState->InitPrimitiveState(&pipeDesc, state.geometricShader);
+
+        pipeDesc.shaderProgram = state.glslProgram->GetProgram();
+        pipeDesc.vertexBuffers = _GetVertexBuffersForDrawing(state);
+        pipeDesc.tessellationState.isPostTessControl = true;
+
+        Hgi* hgi = resourceRegistry->GetHgi();
+        HgiGraphicsPipelineHandle pso = hgi->CreateGraphicsPipeline(pipeDesc);
+
+        pipelineInstance.SetValue(
+            std::make_shared<HgiGraphicsPipelineHandle>(pso));
+    }
+
+    return pipelineInstance.GetValue();
+}
+
+////////////////////////////////////////////////////////////
+// GPU Drawing
+////////////////////////////////////////////////////////////
+
 void
 HdSt_PipelineDrawBatch::ExecuteDraw(
     HgiGraphicsCmds * gfxCmds,
@@ -1299,51 +1391,55 @@ HdSt_PipelineDrawBatch::ExecuteDraw(
         _indirectCommands.reset();
     }
     else {
-        _DrawingProgram & program = _GetDrawingProgram(renderPassState,
-                                                       resourceRegistry);
-        if (!TF_VERIFY(program.IsValid())) return;
+    _DrawingProgram & program = _GetDrawingProgram(renderPassState,
+                                                   resourceRegistry);
+    if (!TF_VERIFY(program.IsValid())) return;
 
-        _BindingState state(
-                _drawItemInstances.front()->GetDrawItem(),
-                _dispatchBuffer,
-                program.GetBinder(),
-                program.GetGLSLProgram(),
-                program.GetComposedShaders(),
-                program.GetGeometricShader());
+    _BindingState state(
+            _drawItemInstances.front()->GetDrawItem(),
+            _dispatchBuffer,
+            program.GetBinder(),
+            program.GetGLSLProgram(),
+            program.GetComposedShaders(),
+            program.GetGeometricShader());
 
-        HgiGraphicsPipelineSharedPtr pso =
-            _GetDrawPipeline(
-                renderPassState,
-                resourceRegistry,
-                state);
-        
-        HgiGraphicsPipelineHandle psoHandle = *pso.get();
-        gfxCmds->BindPipeline(psoHandle);
+    HgiGraphicsPipelineSharedPtr pso =
+        _GetDrawPipeline(
+            renderPassState,
+            resourceRegistry,
+            state);
 
-        HgiResourceBindingsDesc bindingsDesc;
-        state.GetBindingsForDrawing(&bindingsDesc);
+    HgiResourceBindingsDesc bindingsDesc;
+    bool hasPatches = _drawItemInstances[0]->GetDrawItem()->
+        GetGeometricShader()->IsPrimTypePatches();
+    bool const useMetalTessellation =
+        _drawItemInstances[0]->GetDrawItem()->
+                GetGeometricShader()->GetUseMetalTessellation();
+    bool usesTessFactors = hasPatches && useMetalTessellation;
+    state.GetBindingsForDrawing(&bindingsDesc, usesTessFactors);
+    HgiResourceBindingsHandle resourceBindings =
+            hgi->CreateResourceBindings(bindingsDesc);
+    HgiGraphicsPipelineHandle psoHandle = *pso.get();
+ 
+    HgiVertexBufferBindingVector bindings;
+    _GetVertexBufferBindingsForDrawing(&bindings, state);
+    gfxCmds->BindVertexBuffers(bindings);
+    gfxCmds->BindPipeline(psoHandle);
+    
+    gfxCmds->BindResources(resourceBindings);
 
-        HgiResourceBindingsHandle resourceBindings =
-                hgi->CreateResourceBindings(bindingsDesc);
-        gfxCmds->BindResources(resourceBindings);
+    // Drawing can be either direct or indirect. For either case,
+    // the drawing batch and drawing program are prepared to resolve
+    // drawing coordinate state indirectly, i.e. from buffer data.
+    bool const drawIndirect =
+        capabilities->IsSet(HgiDeviceCapabilitiesBitsMultiDrawIndirect);
+    if (drawIndirect) {
+        _ExecuteDrawIndirect(gfxCmds, state.indexBar);
+    } else {
+        _ExecuteDrawImmediate(gfxCmds, state.indexBar);
+    }
 
-        HgiVertexBufferBindingVector bindings;
-        _GetVertexBufferBindingsForDrawing(&bindings, state);
-        gfxCmds->BindVertexBuffers(bindings);
-        
-        // Drawing can be either direct or indirect. For either case,
-        // the drawing batch and drawing program are prepared to resolve
-        // drawing coordinate state indirectly, i.e. from buffer data.
-        bool const drawIndirect =
-            capabilities->IsSet(HgiDeviceCapabilitiesBitsMultiDrawIndirect);
-
-        if (drawIndirect) {
-            _ExecuteDrawIndirect(gfxCmds, state.indexBar);
-        } else {
-            _ExecuteDrawImmediate(gfxCmds, state.indexBar);
-        }
-
-        hgi->DestroyResourceBindings(&resourceBindings);
+    hgi->DestroyResourceBindings(&resourceBindings);
     }
 
     HD_PERF_COUNTER_INCR(HdPerfTokens->drawCalls);
@@ -1561,6 +1657,7 @@ HdSt_PipelineDrawBatch::_PrepareIndirectCommandBuffer(
 
 void
 HdSt_PipelineDrawBatch::_ExecuteFrustumCull(
+    HgiGraphicsCmds *cullGfxCmds,
     bool const updateBufferData,
     HdStRenderPassStateSharedPtr const & renderPassState,
     HdStResourceRegistrySharedPtr const & resourceRegistry)
@@ -1623,8 +1720,6 @@ HdSt_PipelineDrawBatch::_ExecuteFrustumCull(
     HgiGraphicsPipelineHandle psoHandle = *pso.get();
 
     // GfxCmds has no attachment since it is a vertex only shader.
-    HgiGraphicsCmdsDesc gfxDesc;
-    HgiGraphicsCmdsUniquePtr cullGfxCmds = hgi->CreateGraphicsCmds(gfxDesc);
     if (_useInstanceCulling) {
         cullGfxCmds->PushDebugGroup("GPU frustum culling (instanced)");
     } else {
@@ -1657,9 +1752,7 @@ HdSt_PipelineDrawBatch::_ExecuteFrustumCull(
             hgi->CreateResourceBindings(bindingsDesc);
     cullGfxCmds->BindResources(resourceBindings);
 
-    HgiVertexBufferBindingVector bindings;
-    _GetVertexBufferBindingsForViewTransformation(&bindings, state);
-    cullGfxCmds->BindVertexBuffers(bindings);
+    //_BindVertexBuffersForViewTransformation(cullGfxCmds, state);
 
     GfMatrix4f const &cullMatrix = GfMatrix4f(renderPassState->GetCullMatrix());
     GfVec2f const &drawRangeNdc = renderPassState->GetDrawingRangeNDC();
@@ -1726,12 +1819,76 @@ HdSt_PipelineDrawBatch::_ExecuteFrustumCull(
     }
 
     cullGfxCmds->PopDebugGroup();
-    hgi->SubmitCmds(cullGfxCmds.get());
+    hgi->SubmitCmds(cullGfxCmds);
 
     if (IsEnabledGPUCountVisibleInstances()) {
         _EndGPUCountVisibleInstances(resourceRegistry, &_numVisibleItems);
     }
 
+    hgi->DestroyResourceBindings(&resourceBindings);
+}
+
+
+void
+HdSt_PipelineDrawBatch::_ExecutePostTesselation(
+        HgiGraphicsCmds *ptcsGfxCmds,
+        bool const updateBufferData,
+        HdStRenderPassStateSharedPtr const & renderPassState,
+        HdStResourceRegistrySharedPtr const & resourceRegistry)
+{
+    TRACE_FUNCTION();
+
+    if (!TF_VERIFY(!_drawItemInstances.empty())) return;
+
+    if (!TF_VERIFY(_dispatchBuffer)) return;
+
+    if (_HasNothingToDraw()) return;
+
+    HgiCapabilities const *capabilities =
+        resourceRegistry->GetHgi()->GetCapabilities();
+
+    // Drawing can be either direct or indirect. For either case,
+    // the drawing batch and drawing program are prepared to resolve
+    // drawing coordinate state indirectly, i.e. from buffer data.
+    bool const drawIndirect =
+            capabilities->IsSet(HgiDeviceCapabilitiesBitsMultiDrawIndirect);
+    _DrawingProgram & program = _GetDrawingProgram(renderPassState,
+                                                   resourceRegistry);
+    if (!TF_VERIFY(program.IsValid())) return;
+
+    _BindingState state(
+            _drawItemInstances.front()->GetDrawItem(),
+            _dispatchBuffer,
+            program.GetBinder(),
+            program.GetGLSLProgram(),
+            program.GetComposedShaders(),
+            program.GetGeometricShader());
+
+    Hgi * hgi = resourceRegistry->GetHgi();
+    
+    //TODO check better if use pso tess
+    HgiGraphicsPipelineSharedPtr psoTess =
+        _GetTessControlPipeline(
+            renderPassState,
+            resourceRegistry,
+            state);
+    
+    HgiResourceBindingsDesc bindingsDesc;
+    state.GetBindingsForDrawing(&bindingsDesc);
+    HgiResourceBindingsHandle resourceBindings =
+            hgi->CreateResourceBindings(bindingsDesc);
+    
+    HgiGraphicsPipelineHandle psoTessHandle = *psoTess.get();
+    ptcsGfxCmds->BindPipeline(psoTessHandle);
+    ptcsGfxCmds->BindResources(resourceBindings);
+    HgiVertexBufferBindingVector bindings;
+    _GetVertexBufferBindingsForDrawing(&bindings, state);
+    ptcsGfxCmds->BindVertexBuffers(bindings);
+    if (drawIndirect) {
+        _ExecuteDrawIndirect(ptcsGfxCmds, state.indexBar);
+    } else {
+        _ExecuteDrawImmediate(ptcsGfxCmds, state.indexBar);
+    }
     hgi->DestroyResourceBindings(&resourceBindings);
 }
 

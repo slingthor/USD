@@ -90,6 +90,7 @@ HgiMetalGraphicsCmds::HgiMetalGraphicsCmds(
     , _scissorRectSet(false)
     , _enableParallelEncoder(false)
     , _primitiveTypeChanged(false)
+    , _bindPTCS(false)
     , _maxNumEncoders(1)
 {
     TF_VERIFY(desc.colorTextures.size() == desc.colorAttachmentDescs.size());
@@ -313,7 +314,6 @@ HgiMetalGraphicsCmds::_SetCachedEncoderState(id<MTLRenderCommandEncoder> encoder
                                                         encoder,
                                                         _CachedEncState.argumentBuffer);
     }
-
     _SetVertexBindings(encoder, _CachedEncState.vertexBindings);
 }
 
@@ -541,7 +541,6 @@ HgiMetalGraphicsCmds::Draw(
     id<MTLRenderCommandEncoder> encoder = GetEncoder();
 
     _stepFunctions.SetVertexBufferOffsets(encoder, baseInstance);
-
     if (_primitiveType == HgiPrimitiveTypePatchList) {
         const NSUInteger controlPointCount = _primitiveIndexSize;
         [encoder drawPatches:controlPointCount
@@ -728,7 +727,7 @@ HgiMetalGraphicsCmds::DrawIndexedIndirect(
                 
                 if (_primitiveType == HgiPrimitiveTypePatchList) {
                     const NSUInteger controlPointCount = _primitiveIndexSize;
-                    
+
                     for (uint32_t offset = encoderOffset;
                          offset < encoderOffset + encoderCount;
                          ++offset) {
