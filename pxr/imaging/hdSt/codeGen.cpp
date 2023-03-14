@@ -2528,6 +2528,14 @@ HdSt_CodeGen::_CompileWithGeneratedHgiResources(
         if (!_geometricShader->IsFrustumCullingPass()) {
             HgiShaderFunctionAddStageOutput(
                 &vsDesc, "gl_Position", "vec4", "position");
+
+            HgiShaderFunctionParamDesc clipParam;
+            clipParam.nameInShader = "gl_ClipDistance";
+            clipParam.type = "float";
+            clipParam.role = "clip_distance";
+            clipParam.arraySize = "HD_NUM_clipPlanes";
+            HgiShaderFunctionAddStageOutput(
+                &vsDesc, clipParam);
             
             // For Metal, only set the role for the point size
             // if the primitive is a point list.

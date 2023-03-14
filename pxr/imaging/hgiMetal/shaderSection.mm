@@ -814,6 +814,9 @@ HgiMetalStructTypeDeclarationShaderSection::WriteDeclaration(
         member->WriteParameter(ss);
         if (!member->HasBlockInstanceIdentifier()) {
             member->WriteAttributesWithIndex(ss);
+            if(!member->GetArraySize().empty()) {
+                ss << "[" << member->GetArraySize() << "]";
+            }
         }
         ss << ";\n";
     }
@@ -1104,16 +1107,37 @@ HgiMetalStageOutputShaderSection::VisitEntryPointFunctionExecutions(
             ss << "\n";
         }
         HgiShaderSection *member = structTypeDeclMembers[i];
-        WriteIdentifier(ss);
-        ss << ".";
-        member->WriteIdentifier(ss);
-        ss << " = " << scopeInstanceName << ".";
-        if (member->HasBlockInstanceIdentifier()) {
-            member->WriteBlockInstanceIdentifier(ss);
+        if(member->GetArraySize().empty()) {
+            WriteIdentifier(ss);
             ss << ".";
+            member->WriteIdentifier(ss);
+            ss << " = " << scopeInstanceName << ".";
+            if (member->HasBlockInstanceIdentifier()) {
+                member->WriteBlockInstanceIdentifier(ss);
+                ss << ".";
+            }
+            member->WriteIdentifier(ss);
+            ss << ";";
+        } else {
+            std::istringstream arrSizeRead(member->GetArraySize());
+            size_t arrEnd;
+            arrSizeRead >> arrEnd;
+            for (size_t i = 0; i < arrEnd; i++) {
+                WriteIdentifier(ss);
+                ss << ".";
+                member->WriteIdentifier(ss);
+                ss << "[" << std::to_string(i) << "]";
+                ss << " = " << scopeInstanceName << ".";
+                if (member->HasBlockInstanceIdentifier()) {
+                    member->WriteBlockInstanceIdentifier(ss);
+                    ss << ".";
+                }
+                member->WriteIdentifier(ss);
+                ss << "[" << std::to_string(i) << "]";
+                ss << ";";
+            }
+            
         }
-        member->WriteIdentifier(ss);
-        ss << ";";
     }
     return true;
 }

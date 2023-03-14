@@ -393,6 +393,8 @@ _ComputeHeader(id<MTLDevice> device, HgiShaderStage stage)
             << "#pragma clang diagnostic ignored \"-Wunused-variable\"\n"
             << "#pragma clang diagnostic ignored \"-Wsign-compare\"\n"
             << "using namespace metal;\n";
+    //clip plane default size
+    header << "#define HD_NUM_clipPlanes 1\n";
 
     // Basic types
     header  << "#define double float\n"
