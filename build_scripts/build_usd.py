@@ -767,6 +767,11 @@ def InstallBoost_Helper(context, force, buildArgs):
 
     with CurrentWorkingDirectory(DownloadURL(BOOST_URL, context, force, 
                                              dontExtract=dontExtract)):
+        #try just to point to headers
+        if context.targetIos:
+            shutil.copytree("boost",
+                            '{instDir}/include/boost'.format(instDir=context.instDir))
+            return
         if Windows():
             bootstrap = "bootstrap.bat"
         else:
