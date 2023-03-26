@@ -35,6 +35,7 @@ import os
 import platform
 import shlex
 import subprocess
+import re
 
 TARGET_NATIVE = "native"
 TARGET_X86 = "x86_64"
@@ -150,25 +151,53 @@ def ExtractFilesRecursive(path, cond):
                 files.append(os.path.join(r, file))
     return files
 
-def CodesignFiles(files):
-    SDKVersion  = subprocess.check_output(
-        ['xcodebuild', '-version']).strip()[6:10]
-    codeSignIDs = subprocess.check_output(
-        ['security', 'find-identity', '-vp', 'codesigning'])
+def _GetCodeSignStringFromTerminal():
+    codeSignIDs = subprocess.check_output(['security',
+                                           'find-identity', '-vp', 'codesigning'])
+    return codeSignIDs
 
+def GetCodeSignID():
+    codeSignIDs = _GetCodeSignStringFromTerminal()
     codeSignID = "-"
     if os.environ.get('CODE_SIGN_ID'):
         codeSignID = os.environ.get('CODE_SIGN_ID')
-    elif float(SDKVersion) >= 11.0 and \
-                codeSignIDs.find(b'Apple Development') != -1:
-        codeSignID = "Apple Development"
-    elif codeSignIDs.find(b'Mac Developer') != -1:
-        codeSignID = "Mac Developer"
+    else:
+        try:
+            codeSignID = codeSignIDs.decode("utf-8").split()[1]
+        except:
+            raise Exception("Unable to parse codesign ID")
+    return codeSignID
+
+def GetCodeSignIDHash():
+    codeSignIDs = _GetCodeSignStringFromTerminal()
+    try:
+        return re.findall(r'\(.*?\)', codeSignIDs.decode("utf-8"))[0][1:-1]
+    except:
+        raise Exception("Unable to parse codesign ID hash")
+
+def GetDevelopmentTeamID():
+    if os.environ.get("DEVELOPMENT_TEAM"):
+        return os.environ.get("DEVELOPMENT_TEAM")
+    codesignID = GetCodeSignIDHash()
+    x509subject = GetCommandOutput('security find-certificate -c {}'
+                                   ' -p | openssl x509 -subject | head -1'.format(codesignID)).strip()
+    # Extract the Organizational Unit (OU field) from the cert
+    try:
+        team = [elm for elm in x509subject.split(
+            '/') if elm.startswith('OU')][0].split('=')[1]
+        if team is not None and team != "":
+            return team
+    except Exception as ex:
+        raise Exception("No development team found with exception " + ex)
+
+def CodesignFiles(files):
+    codeSignID = GetCodeSignID()
 
     for f in files:
         subprocess.call(['codesign', '-f', '-s', '{codesignid}'
-                              .format(codesignid=codeSignID), f],
+                        .format(codesignid=codeSignID), f],
                         stdout=devout, stderr=devout)
+
 
 def Codesign(install_path, verbose_output=False):
     if not MacOS():
