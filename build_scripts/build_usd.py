@@ -1397,7 +1397,8 @@ OPENCOLORIO = Dependency("OpenColorIO", InstallOpenColorIO,
 OPENSUBDIV_URL = "https://github.com/PixarAnimationStudios/OpenSubdiv/archive/v3_5_0.zip"
 
 def InstallOpenSubdiv(context, force, buildArgs):
-    with CurrentWorkingDirectory(DownloadURL(OPENSUBDIV_URL, context, force)):
+    srcOSDDir = DownloadURL(OPENSUBDIV_URL, context, force)
+    with CurrentWorkingDirectory(srcOSDDir):
         extraArgs = [
             '-DNO_EXAMPLES=ON',
             '-DNO_TUTORIALS=ON',
@@ -1428,6 +1429,9 @@ def InstallOpenSubdiv(context, force, buildArgs):
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
+        sdkroot = None
+        if context.targetIos:
+            sdkroot = os.environ.get('SDKROOT')
 
         # OpenSubdiv seems to error when building on windows w/ Ninja...
         # ...so just use the default generator (ie, Visual Studio on Windows)
@@ -1440,15 +1444,41 @@ def InstallOpenSubdiv(context, force, buildArgs):
         # failures with multiple build jobs. Workaround this by using
         # just 1 job for now. See:
         # https://github.com/PixarAnimationStudios/OpenSubdiv/issues/1194
-        oldNumJobs = context.numJobs
-        if MacOS():
-            context.numJobs = 1
+        buildDirmacOS = ""
 
+        if context.targetIos:
+            PatchFile(srcOSDDir + "/cmake/iOSToolchain.cmake",
+                      [("set(SDKROOT $ENV{SDKROOT})",
+                        "set(CMAKE_TRY_COMPILE_TARGET_TYPE \"STATIC_LIBRARY\")\n"
+                        "set(SDKROOT $ENV{SDKROOT})"),
+                       ("set(CMAKE_SYSTEM_PROCESSOR arm)",
+                        "set(CMAKE_SYSTEM_PROCESSOR arm64)\n"
+                        "set(NAMED_LANGUAGE_SUPPORT OFF)\n"
+                        "set(PLATFORM \"OS64\")\n"
+                        "set(ENABLE_BITCODE OFF)"),
+                       ])
+            PatchFile(srcOSDDir + "/opensubdiv/CMakeLists.txt",
+                      [("if (BUILD_SHARED_LIBS AND NOT WIN32 AND NOT IOS)",
+                        "if (BUILD_SHARED_LIBS AND NOT WIN32)")])
+
+            extraArgs.append('-DNO_CLEW=ON')
+            extraArgs.append('-DNO_OPENGL=ON')
+            extraArgs.append(
+                '-DCMAKE_TOOLCHAIN_FILE={srcOSDDir}/cmake/iOSToolchain.cmake -DPLATFORM=\'OS64\''
+                             .format(srcOSDDir=srcOSDDir))
+            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64')
+            os.environ['SDKROOT'] = GetCommandOutput(
+                'xcrun --sdk iphoneos --show-sdk-path').strip()
         try:
             RunCMake(context, force, extraArgs)
         finally:
             context.cmakeGenerator = oldGenerator
-            context.numJobs = oldNumJobs
+        if sdkroot is None:
+            os.unsetenv('SDKROOT')
+        else:
+            os.environ['SDKROOT'] = sdkroot
+        if buildDirmacOS != "":
+            shutil.rmtree(buildDirmacOS)
 
 OPENSUBDIV = Dependency("OpenSubdiv", InstallOpenSubdiv, 
                         "include/opensubdiv/version.h")
