@@ -85,7 +85,7 @@ def GetTargetArch(context):
     else:
         if context.targetX86:
             macTargets = TARGET_X86
-        if context.targetARM64:
+        if context.targetARM64 or context.targetIos:
             macTargets = GetTargetArmArch()
         if context.targetUniversal:
             macTargets = TARGET_X86 + ";" + GetTargetArmArch()
@@ -106,6 +106,8 @@ def GetTargetArchPair(context):
         primaryArch = TARGET_X86
     if context.targetARM64:
         primaryArch = GetTargetArmArch()
+    if context.targetIos:
+        primaryArch = TARGET_IOS
     if context.targetUniversal:
         primaryArch = GetHostArch()
         if (primaryArch == TARGET_X86):
@@ -128,6 +130,17 @@ def SetTarget(context, targetName):
     context.targetX86 = (targetName == TARGET_X86)
     context.targetARM64 = (targetName == GetTargetArmArch())
     context.targetUniversal = (targetName == TARGET_UNIVERSAL)
+    context.targetIos = (targetName == TARGET_IOS)
+    if context.targetIos:
+        sdkStr = GetCommandOutput('xcodebuild -showsdks')
+        sdkStrSpl = sdkStr.split()
+        for s in sdkStrSpl:
+            if s.startswith('iphoneos'):
+                s = s.replace('iphoneos', "")
+                context.iosVersion = s
+                break
+    else:
+        context.iosVersion = None
     if context.targetUniversal and not SupportsMacOSUniversalBinaries():
         self.targetUniversal = False
         raise ValueError(
@@ -138,6 +151,7 @@ def GetTargetName(context):
             TARGET_X86 if context.targetX86 else
             GetTargetArmArch() if context.targetARM64 else
             TARGET_UNIVERSAL if context.targetUniversal else
+            TARGET_IOS if context.targetIos else
             "")
 
 devout = open(os.devnull, 'w')
