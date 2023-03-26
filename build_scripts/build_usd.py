@@ -2008,13 +2008,18 @@ group.add_argument("--build-variant", default=BUILD_RELEASE,
                    help=("Build variant for USD and 3rd-party dependencies. "
                          "(default: {})".format(BUILD_RELEASE)))
 
+BUILD_TARGETS = ["default"]
+DEFAULT_BUILD_TARGET = "default"
 if MacOS():
-    group.add_argument("--build-target",
-                       default=apple_utils.GetBuildTargetDefault(),
-                       choices=apple_utils.GetBuildTargets(),
-                       help=("Build target for macOS cross compilation. "
-                             "(default: {})".format(
-                                apple_utils.GetBuildTargetDefault())))
+    BUILD_TARGETS.extend(apple_utils.GetBuildTargets())
+    DEFAULT_BUILD_TARGET = apple_utils.GetBuildTargetDefault()
+
+group.add_argument("--build-target",
+                    default=DEFAULT_BUILD_TARGET,
+                    choices=BUILD_TARGETS,
+                    help=("Build target for macOS cross compilation. "
+                            "(default: {})".format(
+                            DEFAULT_BUILD_TARGET)))
 
 group.add_argument("--build-args", type=str, nargs="*", default=[],
                    help=("Custom arguments to pass to build system when "
@@ -2305,6 +2310,7 @@ class InstallContext:
                  else False)
         else:
             self.buildTarget = ""
+            self.targetIos = False
 
         self.useCXX11ABI = \
             (args.use_cxx11_abi if hasattr(args, "use_cxx11_abi") else None)
@@ -2318,6 +2324,8 @@ class InstallContext:
         self.buildTests = args.build_tests
         self.buildDocs = args.build_docs
         self.buildPython = args.build_python
+        if MacOS() and args.build_target == apple_utils.TARGET_IOS:
+            self.buildPython = False
         self.buildExamples = args.build_examples
         self.buildTutorials = args.build_tutorials
         self.buildTools = args.build_tools
