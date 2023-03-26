@@ -26,6 +26,7 @@
 #include "pxr/base/tf/iterator.h"
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/tf/stringUtils.h"
+#include <set>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -608,6 +609,25 @@ HgiMetalConversions::GetColorWriteMask(HgiColorMask mask)
             | ((mask & HgiColorMaskAlpha) ? MTLColorWriteMaskAlpha : 0);
     
     return mtlMask;
+}
+
+//
+// HgiIsFilterableFunction
+//
+
+static const std::set<MTLPixelFormat> unfilterableIosFormats =
+{
+    {MTLPixelFormatRGBA32Float}
+};
+
+bool
+HgiMetalConversions::IsFilterable(MTLPixelFormat format)
+{
+#if defined(ARCH_OS_IOS)
+    return unfilterableIosFormats.find(format) == unfilterableIosFormats.end();
+#else
+    return true;
+#endif
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
