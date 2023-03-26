@@ -57,14 +57,52 @@ def GetLocale():
     return sys.stdout.encoding or locale.getdefaultlocale()[1] or "UTF-8"
 
 def GetCommandOutput(command):
-    """Executes the specified command and returns output or None."""
+    """Executes the specified command and returns output or None.
+    If command contains pipes (i.e '|'s), creates a subprocess for
+    each pipe in command, returning the output from the last subcommand
+    or None if any of the subcommands result in a CalledProcessError"""
+
+    result = None
+
+    args = shlex.split(command)
+    commands = []
+    cmd_args = []
+    while args:
+        arg = args.pop(0)
+        if arg == '|':
+            commands.append((cmd_args))
+            cmd_args = []
+        else:
+            cmd_args.append(arg)
+    commands.append((cmd_args))
+
+    pipes = []
+    while len(commands) > 1:
+        # We have some pipes
+        command = commands.pop(0)
+        stdin = pipes[-1].stdout if pipes else None
+        try:
+            pipe = subprocess.Popen(command, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            pipes.append(pipe)
+        except subprocess.CalledProcessError:
+            return None
+
+    # The last command actually returns a result
+    command = commands[0]
     try:
-        return subprocess.check_output(
-            shlex.split(command),
-            stderr=subprocess.STDOUT).decode(GetLocale(), 'replace').strip()
+        stdin = pipes[-1].stdout if pipes else None
+        result = subprocess.check_output(
+            command,
+            stdin = stdin,
+            stderr=subprocess.STDOUT).decode('utf-8').strip()
     except subprocess.CalledProcessError:
         pass
-    return None
+
+    # clean-up
+    for pipe in pipes:
+        pipe.wait()
+
+    return result
 
 def GetTargetArmArch():
     # Allows the arm architecture string to be overridden by
