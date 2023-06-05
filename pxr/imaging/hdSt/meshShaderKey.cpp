@@ -464,7 +464,7 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
 
     // Optimization : See if we can skip the geometry shader.
     bool const canSkipGS =
-            ptvsStageEnabled ||
+            (ptvsStageEnabled || UseMeshShaders()) ||
             // Whether we can skip executing the displacement shading terminal
             (!hasCustomDisplacement
             && (normalsSource != NormalSourceLimit)
@@ -495,7 +495,7 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
     // fragment shader
     uint8_t fsIndex = 0;
     FS[fsIndex++] = _tokens->instancing;
-    /*
+    
     FS[fsIndex++] =
         (normalsSource == NormalSourceFlatScreenSpace)
             ? _tokens->normalsScreenSpaceFS
@@ -504,8 +504,8 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
                 : ((!gsStageEnabled && gsSceneNormals)
                     ? _tokens->normalsScene
                     : _tokens->normalsPass);
-     */
-    FS[fsIndex++] = _tokens->normalsScreenSpaceFS;
+     
+    //FS[fsIndex++] = _tokens->normalsScreenSpaceFS;
 
     FS[fsIndex++] = doubleSided ?
         _tokens->normalsDoubleSidedFS : _tokens->normalsSingleSidedFS;

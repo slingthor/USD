@@ -377,8 +377,7 @@ void main(void)
 ["uint", "drawIndexCount"],
 ["uint", "drawCommandNumUints"],
 ["uint", "drawCoordOffset"]
-],
-["out", "vec4", "gsPatchCoord"]
+]
 ]
 
 --- --------------------------------------------------------------------------
@@ -462,7 +461,8 @@ void main(void) {
 
         vec3 Neye0 = GetNormal(vec3(0),index);
 
-        //point = DisplacementTerminal(0, point, Neye0, GetPatchCoord(0));
+        //point = DisplacementTerminal(globalIndex%3, point, Neye0, GetPatchCoord(globalIndex%3));
+
         MAT4 transform = ApplyInstanceTransform(HdGet_transform());
         vertexOut.Peye = vec4(GetWorldToViewMatrix() * transform * point);
 
@@ -472,7 +472,7 @@ void main(void) {
         vertexOut.drawIndexVS = payload.drawCommandIndexPayload;
         ProcessPrimvarsOut(vertexOut);
         mesh.set_vertex(hd_LocalIndexID, vertexOut);
-        gsPatchCoord = GetPatchCoord(index);
+        //gsPatchCoord = GetPatchCoord(index%3);
         ApplyClipPlanes(vertexOut.Peye);
     }
 
