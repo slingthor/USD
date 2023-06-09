@@ -452,7 +452,11 @@ static bool
 _HgiCanBeFiltered(HgiFormat format)
 {
     HgiFormat const componentFormat = HgiGetComponentBaseFormat(format);
-
+    #if defined(ARCH_OS_IOS)
+    if (componentFormat == MTLPixelFormatRGBA32Float) {
+        return false;
+    }
+    #endif
     switch(componentFormat) {
     case HgiFormatInt16:
     case HgiFormatUInt16:
