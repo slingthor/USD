@@ -48,7 +48,6 @@
 #include "pxr/base/tf/tf.h"
 #include "pxr/base/tf/wrapTypeHelpers.h"
 
-#include <boost/preprocessor/facilities/empty.hpp>
 #include <boost/preprocessor/punctuation/comma_if.hpp>
 #include <boost/preprocessor/repetition/repeat.hpp>
 #include <boost/preprocessor/seq/for_each.hpp>
@@ -426,11 +425,12 @@ VtArray<T> *VtArray__init__2(size_t size, object const &values)
 ARCH_PRAGMA_PUSH
 ARCH_PRAGMA_UNSAFE_USE_OF_BOOL
 ARCH_PRAGMA_UNARY_MINUS_ON_UNSIGNED
-VTOPERATOR_WRAP(+,__add__,__radd__)
-VTOPERATOR_WRAP_NONCOMM(-,__sub__,__rsub__)
-VTOPERATOR_WRAP(*,__mul__,__rmul__)
-VTOPERATOR_WRAP_NONCOMM(/,__div__,__rdiv__)
-VTOPERATOR_WRAP_NONCOMM(%,__mod__,__rmod__)
+
+VTOPERATOR_WRAP(__add__,__radd__)
+VTOPERATOR_WRAP_NONCOMM(__sub__,__rsub__)
+VTOPERATOR_WRAP(__mul__,__rmul__)
+VTOPERATOR_WRAP_NONCOMM(__div__,__rdiv__)
+VTOPERATOR_WRAP_NONCOMM(__mod__,__rmod__)
 
 VTOPERATOR_WRAP_BOOL(Equal,==)
 VTOPERATOR_WRAP_BOOL(NotEqual,!=)

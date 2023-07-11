@@ -471,6 +471,11 @@ pxr_install_test_dir(
 )
 
 pxr_install_test_dir(
+    SRC testenv/testUsdImagingGLMaterialStrengthOrder
+    DEST testUsdImagingGLMaterialStrengthOrder
+)
+
+pxr_install_test_dir(
     SRC testenv/testUsdImagingGLInstancePrimvars
     DEST testUsdImagingGLInstancePrimvars
 )
@@ -3567,6 +3572,22 @@ pxr_register_test(testUsdImagingGLMaterialTag
     TESTENV testUsdImagingGLMaterialTag
 )
 
+pxr_register_test(testUsdImagingGLMaterialStrengthOrder
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -camera /camera -lighting -offscreen -stage bindingStrength.usda -write bindingStrength.png"
+    IMAGE_DIFF_COMPARE
+        bindingStrength.png
+    FAIL 0.1
+    FAIL_PERCENT 0.002
+    WARN 0.01
+    WARN_PERCENT 0.0075
+    PERCEPTUAL
+    EXPECTED_RETURN_CODE 0
+    TESTENV testUsdImagingGLMaterialStrengthOrder
+    # The UsdImagingDelegate did not apply the material override to native instances.
+    ENV
+        USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=true
+)
+
 if (MaterialX_FOUND AND ${PXR_ENABLE_MATERIALX_SUPPORT})
     pxr_install_test_dir(
         SRC testenv/testUsdImagingGLMaterialX
@@ -4435,11 +4456,12 @@ pxr_register_test(testUsdImagingGLFraming_6
 )
 
 pxr_register_test(testUsdImagingGLHWFaceCulling
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -times 0 1 2 -cullStyle backUnlessDoubleSided -shading smooth -frameAll -stage testHWFaceCulling.usda -write testHWFaceCulling.png"
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -times 0 1 2 3 -cullStyle backUnlessDoubleSided -shading smooth -frameAll -stage testHWFaceCulling.usda -write testHWFaceCulling.png"
     IMAGE_DIFF_COMPARE
         testHWFaceCulling_000.png
         testHWFaceCulling_001.png
         testHWFaceCulling_002.png
+        testHWFaceCulling_003.png
     FAIL 0.05
     FAIL_PERCENT 0.001
     WARN 0.05

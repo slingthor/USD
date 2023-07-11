@@ -67,7 +67,14 @@
 // 48 -> 49: Moved HdExtCompCpuComputation, Hd_ExtCompInputSource,
 //           Hd_CompExtCompInputSource, and Hd_SceneExtCompInputSource to hdSt.
 // 49 -> 50: Added HdModelDrawMode struct and getter API to HdSceneDelegate.
-#define HD_API_VERSION 50
+// 50 -> 51: HdMaterialBindingSchema became HdMaterialBindingsSchema which uses
+//           the new HdMaterialBindingSchema.
+// 51 -> 52: Added lens distortion, focus, and split diopter parameters to
+//           HdCamera.
+// 52 -> 53: Changing dirty bits of HdCoordSys.
+// 53 -> 54: Introducing HdFlattenedDataSourceProvider to make
+//           HdFlatteningSceneIndex modular.
+#define HD_API_VERSION 53
 
 // 1  ->  2: SimpleLighting -> FallbackLighting
 #define HD_SHADER_API 2
