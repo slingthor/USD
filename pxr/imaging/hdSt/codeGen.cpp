@@ -1730,7 +1730,7 @@ HdSt_CodeGen::Compile(HdStResourceRegistry*const registry)
     _genGS.str(""); _genFS.str(""); _genCS.str("");
     _genMOS.str(""); _genMS.str("");
     _procVS.str(""); _procTCS.str(""); _procTES.str(""); _procGS.str("");
-    _procMOSDecl.str(""), _procMOS.str(""), _procMSDecl.str(""), _procMSIn.str(""),_procMSOut.str(""),
+    _procMSDecl.str(""), _procMSIn.str(""),_procMSOut.str(""),
     _procPTVSOut.str("");
 
     _genDefines << "\n// //////// Codegen Defines //////// \n";
@@ -2177,7 +2177,6 @@ HdSt_CodeGen::Compile(HdStResourceRegistry*const registry)
     _procGS  << "}\n";
     _procTCS << "}\n";
     _procTES << "}\n";
-    _procMOS << "}\n";
     _procMSIn << "}\n";
     _procMSOut << "}\n";
     _procPTVSOut << "}\n";
@@ -2186,8 +2185,6 @@ HdSt_CodeGen::Compile(HdStResourceRegistry*const registry)
     _genVS  << _procVS.str();
     _genTCS << _procTCS.str();
     _genTES << _procTES.str();
-    //TODO THOR beware of this
-    //_genMOS << _procMOS.str();
     _genMS << _procMSDecl.str() << _procMSIn.str() << _procMSOut.str();
     _genPTVS << _procPTVSOut.str();
     _genGS  << _procGS.str();
@@ -2311,7 +2308,6 @@ HdSt_CodeGen::CompileComputeProgram(HdStResourceRegistry*const registry)
     _genFS << "\n// //////// Codegen FS Source //////// \n";
     _genCS << "\n// //////// Codegen CS Source //////// \n";
     _procVS << "\n// //////// Codegen Proc VS //////// \n";
-    _procMOS << "\n// //////// Codegen Proc MOS //////// \n";
     _procMSIn << "\n// //////// Codegen Proc MS IN //////// \n";
     _procMSOut << "\n// //////// Codegen Proc MS OUT //////// \n";
     _procTCS << "\n// //////// Codegen Proc TCS //////// \n";
