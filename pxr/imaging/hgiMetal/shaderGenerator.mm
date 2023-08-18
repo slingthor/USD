@@ -371,11 +371,17 @@ _ComputeHeader(id<MTLDevice> device, const HgiShaderFunctionDesc &descriptor)
     
     if (stage == HgiShaderStageMeshObject || stage == HgiShaderStageMeshlet) {
         header << "#ifndef MESH_SHADING_CONFIG_H\n"
-               << "#define MESH_SHADING_CONFIG_H\n"
-               << "#define MAX_OBJECT_THREADS         (" << descriptor.meshDescriptor.maxTotalThreadsPerObjectThreadgroup << ")\n"
-               << "#define ACTUAL_OBJECT_THREADS     MAX_OBJECT_THREADS\n"
-               << "#define MAX_INDICES                (" << descriptor.meshDescriptor.maxMeshletVertexCount << ")\n"
-               << "#define MAX_PRIMITIVES            (((MAX_INDICES) + 2) / 3)\n"
+               << "#define MESH_SHADING_CONFIG_H\n";
+        if (stage == HgiShaderStageMeshObject) {
+            header << "#define MAX_OBJECT_THREADS         ("
+                   << descriptor.meshDescriptor.maxTotalThreadsPerObjectThreadgroup << ")\n";
+        }
+        if (stage == HgiShaderStageMeshlet) {
+            header << "#define MAX_MESHLET_THREADS         ("
+                   << descriptor.meshDescriptor.maxTotalThreadsPerMeshletThreadgroup << ")\n";
+        }
+        header << "#define MAX_VERTICES                (" << descriptor.meshDescriptor.maxMeshletVertexCount << ")\n"
+               << "#define MAX_PRIMITIVES            (" << descriptor.meshDescriptor.maxPrimitiveCount << ")\n"
                << "#endif // MESH_SHADING_CONFIG_H\n";
     }
     
