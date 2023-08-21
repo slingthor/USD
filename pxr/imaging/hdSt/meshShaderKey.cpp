@@ -38,6 +38,8 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((normalsScene,                "MeshNormal.Scene"))
     ((normalsScenePatches,         "MeshNormal.Scene.Patches"))
     ((normalsSmooth,               "MeshNormal.Smooth"))
+    ((normalsSmoothUnpackSSBO,     "MeshNormal.Smooth.UnpackSmoothSSBO"))
+    ((normalsSmoothUnpackVBO,      "MeshNormal.Smooth.UnpackSmoothVBO"))
     ((normalsFlat,                 "MeshNormal.Flat"))
     ((normalsPass,                 "MeshNormal.Pass"))
     ((normalsScreenSpaceFS,        "MeshNormal.Fragment.ScreenSpace"))
@@ -262,10 +264,14 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
     // vertex shader
     uint8_t vsIndex = 0;
     VS[vsIndex++] = _tokens->instancing;
-
-    VS[vsIndex++] = (normalsSource == NormalSourceSmooth) ?
-        _tokens->normalsSmooth :
-        (vsSceneNormals ? _tokens->normalsScene : _tokens->normalsPass);
+    if (normalsSource == NormalSourceSmooth) {
+        VS[vsIndex++] = _tokens->normalsSmoothUnpackVBO;
+        VS[vsIndex++] = _tokens->normalsSmooth;
+    } else if (vsSceneNormals) {
+        VS[vsIndex++] = _tokens->normalsScene;
+    } else {
+        VS[vsIndex++] = _tokens->normalsPass;
+    }
 
     if (isPrimTypePoints) {
         // Add mixins that allow for picking and sel highlighting of points.
@@ -316,6 +322,7 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
             MS[msIndex++] = _tokens->normalsFlat;
         }
         else if (normalsSource == NormalSourceSmooth) {
+            MS[msIndex++] = _tokens->normalsSmoothUnpackSSBO;
             MS[msIndex++] = _tokens->normalsSmooth;
         } else if (vsSceneNormals) {
             MS[msIndex++] = _tokens->normalsScene;
@@ -361,6 +368,7 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
             PTVS[ptvsIndex++] = _tokens->normalsFlat;
         }
         else if (normalsSource == NormalSourceSmooth) {
+            PTVS[ptvsIndex++] = _tokens->normalsSmoothUnpackVBO;
             PTVS[ptvsIndex++] = _tokens->normalsSmooth;
         } else if (vsSceneNormals) {
             PTVS[ptvsIndex++] = _tokens->normalsScene;

@@ -343,7 +343,7 @@ HdSt_ResourceBinder::ResolveBindings(
             HdTupleType valueType = it->second->GetTupleType();
             // Special case: VBOs have intrinsic support for packed types,
             // so expand them out to their target type for the shader binding.
-            if (valueType.type == HdTypeInt32_2_10_10_10_REV) {
+            if (valueType.type == HdTypeInt32_2_10_10_10_REV && !useMeshShaders) {
                 valueType.type = HdTypeFloatVec4;
             } else if (valueType.type == HdTypeHalfFloatVec2) {
                 valueType.type = HdTypeFloatVec2;

@@ -1250,8 +1250,7 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
                                   HdStDrawItem *drawItem,
                                   int geomSubsetDescIndex,
                                   HdDirtyBits *dirtyBits,
-                                  bool requireSmoothNormals,
-                                  bool forcePackedSmoothNormalsOff)
+                                  bool requireSmoothNormals)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -1499,8 +1498,7 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
         // we can't use packed normals for refined/quad,
         // let's migrate the buffer to full precision
         bool usePackedSmoothNormals =
-            IsEnabledPackedNormals() && !forcePackedSmoothNormalsOff
-                && !(doRefine || doQuadrangulate);
+            IsEnabledPackedNormals() && !(doRefine || doQuadrangulate);
 
         generatedNormalsName = usePackedSmoothNormals ? 
             HdStTokens->packedSmoothNormals : HdStTokens->smoothNormals;
@@ -2259,10 +2257,6 @@ HdStMesh::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
         std::static_pointer_cast<HdStResourceRegistry>(
         sceneDelegate->GetRenderIndex().GetResourceRegistry());
 
-    bool const hasMeshShaders =
-        resourceRegistry->GetHgi()->GetCapabilities()->
-            IsSet(HgiDeviceCapabilitiesBitsMeshShading);
-
     /* MATERIAL SHADER (may affect subsequent primvar population) */
     if ((*dirtyBits & HdChangeTracker::NewRepr) ||
         HdChangeTracker::IsAnyPrimvarDirty(*dirtyBits, id)) {
@@ -2409,8 +2403,7 @@ HdStMesh::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
                                 drawItem,
                                 geomSubsetDescIndex,
                                 dirtyBits,
-                                requireSmoothNormals,
-                                hasMeshShaders);
+                                requireSmoothNormals);
     }
 
     /* FACEVARYING PRIMVARS */

@@ -72,6 +72,41 @@ vec3 GetNormal(vec3 Neye, int index, vec2 localST)
 }
 
 --- --------------------------------------------------------------------------
+-- glsl MeshNormal.Smooth.UnpackSmoothVBO
+
+vec3 GetUnpackedSmoothNormal(int index) {
+    return vec3(HdGet_packedSmoothNormals(index).xyz);
+}
+
+--- --------------------------------------------------------------------------
+-- glsl MeshNormal.Smooth.UnpackSmoothSSBO
+
+struct vec4f_2_10_10_10 {
+    int x : 10;
+    int y : 10;
+    int z : 10;
+    int w : 2;
+};
+
+inline float HdConvertFixedToFloat(int v, int b)
+{
+    return float(
+        max(-1.0f,
+            (v / (float(1 << (b-1)) - 1.0f))));
+}
+
+vec3 GetUnpackedSmoothNormal(int index) {
+    vec3 unpacked;
+    int packed = HdGet_packedSmoothNormals(index);
+    vec4f_2_10_10_10 v = 
+        reinterpret_cast<thread vec4f_2_10_10_10 &>(packed);
+    unpacked.x = HdConvertFixedToFloat(v.x, 10);
+    unpacked.y = HdConvertFixedToFloat(v.y, 10);
+    unpacked.z = HdConvertFixedToFloat(v.z, 10);
+    return unpacked;
+}
+
+--- --------------------------------------------------------------------------
 -- glsl MeshNormal.Smooth
 
 vec3 GetNormal(vec3 Neye, int index)
@@ -80,7 +115,7 @@ vec3 GetNormal(vec3 Neye, int index)
 #if defined(HD_HAS_smoothNormals)
     normal = vec3(HdGet_smoothNormals(index).xyz);
 #elif defined(HD_HAS_packedSmoothNormals)
-    normal = vec3(HdGet_packedSmoothNormals(index).xyz);
+    normal = GetUnpackedSmoothNormal(index);
 #endif
 
     MAT4 transformInv = ApplyInstanceTransformInverse(HdGet_transformInverse());

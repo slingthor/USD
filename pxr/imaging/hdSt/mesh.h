@@ -197,8 +197,7 @@ protected:
                                  HdStDrawItem *drawItem,
                                  int geomSubsetDescIndex,
                                  HdDirtyBits *dirtyBits,
-                                 bool requireSmoothNormals,
-                                 bool forcePackedSmoothNormalsOff);
+                                 bool requireSmoothNormals);
 
     void _PopulateFaceVaryingPrimvars(HdSceneDelegate *sceneDelegate,
                                       HdRenderParam *renderParam,

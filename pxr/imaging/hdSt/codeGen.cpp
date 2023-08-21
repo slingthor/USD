@@ -5830,7 +5830,7 @@ HdSt_CodeGen::_GenerateVertexAndFaceVaryingPrimvar()
 
         //TODO Thor align
         // PTVS vertex primvar is staged in local arrays.
-        _procMSDecl << dataType << " " << "ms_ms_" << name << ";\n";
+        _procMSDecl << _GetPackedType(dataType, false) << " " << "ms_ms_" << name << ";\n";
 
         // Access PTCS vertex primvar from input attributes.
         _EmitStageAccessor(accessorsPTCS, name,
@@ -5840,7 +5840,7 @@ HdSt_CodeGen::_GenerateVertexAndFaceVaryingPrimvar()
             name.GetString() + "[localIndex]", dataType);
 
         _EmitStageAccessor(accessorsMS, name,
-           "(" +name.GetString() + " + baseVertex)[localIndex]", dataType);
+           "(" +name.GetString() + " + baseVertex)[localIndex]", _GetPackedType(dataType, false));
         //_EmitStageAccessor(accessorsMS, TfToken(name.GetString() + "_raw"),
         //   name.GetString() + "[localIndex + base_vertex]", dataType);
 
