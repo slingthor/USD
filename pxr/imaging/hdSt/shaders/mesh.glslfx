@@ -323,56 +323,37 @@ void main(void)
 int GetDrawingField(uint off, uint drawCommandIndex)
 {
     uint offset = drawCommandIndex * drawCommandNumUints;
-
     offset += off;
-
     return int(drawBuffer[offset]);
 }
 
-const int indexCountOffset = 0;
-const int instanceCountOffset = 1;
-const int baseIndexOffset = 2;
-const int baseVertexOffset = 3;
-const int baseInstanceOffset = 4;
-const int meshletCoordOffset = 5;
-const int numMeshletsOffset = 6;
+static constant constexpr int indexCountOffset = 0;
+static constant constexpr int instanceCountOffset = 1;
+static constant constexpr int baseIndexOffset = 2;
+static constant constexpr int baseVertexOffset = 3;
+static constant constexpr int baseInstanceOffset = 4;
+static constant constexpr int meshletCoordOffset = 5;
+static constant constexpr int numMeshletsOffset = 6;
 
-//TODO possibly remove
-const uint32_t gl_InstanceID = 0;
-const uint32_t gl_BaseInstance = 0;
+static constant constexpr uint32_t gl_InstanceID = 0;
+static constant constexpr uint32_t gl_BaseInstance = 0;
 
 void main(void)
 {   
-    //IDEAS Experimentally tune
-    const uint32_t indicesPerMesh = MAX_INDICES;
-    SetDrawIndex(hd_LocalInvocationID.x, 0);
-    const uint indexCount = GetDrawingField(indexCountOffset, hd_LocalInvocationID.x);
+    if (hd_LocalIndexID == 0) {
+        payload.indexCount = GetDrawingField(indexCountOffset, hd_LocalInvocationID.x);
+        payload.baseIndex = GetDrawingField(baseIndexOffset, hd_LocalInvocationID.x);
+        payload.baseVertex = GetDrawingField(baseVertexOffset, hd_LocalInvocationID.x);
+        payload.meshletCoord = GetDrawingField(meshletCoordOffset, hd_LocalInvocationID.x);
+        payload.numberMeshlets = GetDrawingField(numMeshletsOffset, hd_LocalInvocationID.x);
+        payload.baseInstance = hd_LocalInvocationID.x;
+        payload.drawCommandIndexPayload = hd_LocalInvocationID.x;
+        payload.drawCommandNumUintLocal = drawCommandNumUints;
 
-    //TODO maybe remove this
-
-    uint instanceCount = GetDrawingField(instanceCountOffset, hd_LocalInvocationID.x);
-    uint baseIndex = GetDrawingField(baseIndexOffset, hd_LocalInvocationID.x);
-    uint baseVertex = GetDrawingField(baseVertexOffset, hd_LocalInvocationID.x);
-    //TODO Remove from the draw command
-    uint baseInstance = hd_LocalInvocationID.x;
-    uint meshlCoord = GetDrawingField(meshletCoordOffset, hd_LocalInvocationID.x);
-    uint numMeshlet = GetDrawingField(numMeshletsOffset, hd_LocalInvocationID.x);
-
-    //IDEA Maybe sorting the inputs?
-
-    payload.baseVertex = baseVertex;
-    payload.baseIndex = baseIndex;
-    payload.baseInstance = baseInstance;
-    payload.drawCommandIndexPayload = hd_LocalInvocationID.x;
-    payload.drawCommandNumUintLocal = drawCommandNumUints;
-    payload.indexCount = indexCount;
-    payload.meshletCoord = meshlCoord;
-    payload.numberMeshlets = numMeshlet;
-
-    // Because the mesh shader is only producing one mesh, the threadgroup grid size is 1 x 1 x 1.
-
-    //IDEAS go in scan order
-    meshGridProperties->set_threadgroups_per_grid(uint3(instanceCount, numMeshlet, 1));
+        //IDEAS go in scan order
+        uint instanceCount = GetDrawingField(instanceCountOffset, hd_LocalInvocationID.x);
+        meshGridProperties->set_threadgroups_per_grid(uint3(instanceCount, payload.numberMeshlets, 1));
+    }
 }
 
 --- --------------------------------------------------------------------------
