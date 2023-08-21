@@ -1730,7 +1730,7 @@ HdSt_CodeGen::Compile(HdStResourceRegistry*const registry)
     _genGS.str(""); _genFS.str(""); _genCS.str("");
     _genMOS.str(""); _genMS.str("");
     _procVS.str(""); _procTCS.str(""); _procTES.str(""); _procGS.str("");
-    _procMOSDecl.str(""), _procMOS.str(""), _procMSDecl.str(""), _procMSIn.str(""),_procMSOut.str(""),
+    _procMSDecl.str(""), _procMSIn.str(""),_procMSOut.str(""),
     _procPTVSOut.str("");
 
     _genDefines << "\n// //////// Codegen Defines //////// \n";
@@ -2177,7 +2177,6 @@ HdSt_CodeGen::Compile(HdStResourceRegistry*const registry)
     _procGS  << "}\n";
     _procTCS << "}\n";
     _procTES << "}\n";
-    _procMOS << "}\n";
     _procMSIn << "}\n";
     _procMSOut << "}\n";
     _procPTVSOut << "}\n";
@@ -2186,8 +2185,6 @@ HdSt_CodeGen::Compile(HdStResourceRegistry*const registry)
     _genVS  << _procVS.str();
     _genTCS << _procTCS.str();
     _genTES << _procTES.str();
-    //TODO THOR beware of this
-    //_genMOS << _procMOS.str();
     _genMS << _procMSDecl.str() << _procMSIn.str() << _procMSOut.str();
     _genPTVS << _procPTVSOut.str();
     _genGS  << _procGS.str();
@@ -2311,7 +2308,6 @@ HdSt_CodeGen::CompileComputeProgram(HdStResourceRegistry*const registry)
     _genFS << "\n// //////// Codegen FS Source //////// \n";
     _genCS << "\n// //////// Codegen CS Source //////// \n";
     _procVS << "\n// //////// Codegen Proc VS //////// \n";
-    _procMOS << "\n// //////// Codegen Proc MOS //////// \n";
     _procMSIn << "\n// //////// Codegen Proc MS IN //////// \n";
     _procMSOut << "\n// //////// Codegen Proc MS OUT //////// \n";
     _procTCS << "\n// //////// Codegen Proc TCS //////// \n";
@@ -2597,6 +2593,18 @@ HdSt_CodeGen::_CompileWithGeneratedGLSLResources(
     }
 
     return glslProgram;
+}
+
+//Mesh shaders and object shaders should have same payload members.
+void AddMeshShaderPayload(HgiShaderFunctionDesc *desc) {
+    HgiShaderFunctionAddPayloadMember(desc, "baseVertex", "uint");
+    HgiShaderFunctionAddPayloadMember(desc, "baseIndex", "uint");
+    HgiShaderFunctionAddPayloadMember(desc, "drawCommandIndexPayload", "uint");
+    HgiShaderFunctionAddPayloadMember(desc, "drawCommandNumUintLocal", "uint");
+    HgiShaderFunctionAddPayloadMember(desc, "baseInstance", "uint");
+    HgiShaderFunctionAddPayloadMember(desc, "indexCount", "uint");
+    HgiShaderFunctionAddPayloadMember(desc, "meshletCoord", "uint");
+    HgiShaderFunctionAddPayloadMember(desc, "numberMeshlets", "uint");
 }
 
 HdStGLSLProgramSharedPtr
@@ -2988,15 +2996,8 @@ HdSt_CodeGen::_CompileWithGeneratedHgiResources(
         paramDesc.isPointerToValue = true;
 
         mosDesc.stageInputs.push_back(std::move(paramDesc));
-        
-        HgiShaderFunctionAddPayloadMember(&mosDesc, "baseVertex", "uint");
-        HgiShaderFunctionAddPayloadMember(&mosDesc, "baseIndex", "uint");
-        HgiShaderFunctionAddPayloadMember(&mosDesc, "drawCommandIndexPayload", "uint");
-        HgiShaderFunctionAddPayloadMember(&mosDesc, "drawCommandNumUintLocal", "uint");
-        HgiShaderFunctionAddPayloadMember(&mosDesc, "baseInstance", "uint");
-        HgiShaderFunctionAddPayloadMember(&mosDesc, "indexCount", "uint");
-        HgiShaderFunctionAddPayloadMember(&mosDesc, "meshletCoord", "uint");
-        HgiShaderFunctionAddPayloadMember(&mosDesc, "numberMeshlets", "uint");
+
+        AddMeshShaderPayload(&mosDesc);
         
         HgiShaderFunctionAddStageInput(
             &mosDesc, "hd_GlobalInvocationID", "uvec3",
@@ -3056,14 +3057,7 @@ HdSt_CodeGen::_CompileWithGeneratedHgiResources(
                              true);
         }
 
-        HgiShaderFunctionAddPayloadMember(&msDesc, "baseVertex", "uint");
-        HgiShaderFunctionAddPayloadMember(&msDesc, "baseIndex", "uint");
-        HgiShaderFunctionAddPayloadMember(&msDesc, "drawCommandIndexPayload", "uint");
-        HgiShaderFunctionAddPayloadMember(&msDesc, "drawCommandNumUintLocal", "uint");
-        HgiShaderFunctionAddPayloadMember(&msDesc, "baseInstance", "uint");
-        HgiShaderFunctionAddPayloadMember(&msDesc, "indexCount", "uint");
-        HgiShaderFunctionAddPayloadMember(&msDesc, "meshletCoord", "uint");
-        HgiShaderFunctionAddPayloadMember(&msDesc, "numberMeshlets", "uint");
+        AddMeshShaderPayload(&msDesc);
         resourceGen._GenerateHgiResources(&msDesc,
                                           HdShaderTokens->meshletShader, _resAttrib, _metaData);
         resourceGen._GenerateHgiResources(&msDesc,

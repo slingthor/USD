@@ -180,7 +180,7 @@ private:
     std::stringstream _genPTCS, _genPTVS, _genMOS, _genMS;
     std::stringstream _genGS, _genFS, _genCS;
     std::stringstream _procVS, _procTCS, _procTES, _procGS;
-    std::stringstream _procMOSDecl, _procMOS, _procMSDecl, _procMSIn, _procMSOut;
+    std::stringstream _procMSDecl, _procMSIn, _procMSOut;
     std::stringstream _procPTVSOut;
     std::stringstream _osd;
 

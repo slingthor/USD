@@ -502,7 +502,7 @@ uint32_t baseIndex;
 
 hd_drawingCoord dcMemb;
 void main(void) {
-    if(hd_LocalIndexID == 191){
+    if(hd_LocalIndexID == (MAX_VERTICES-1)){
         atomic_store_explicit(&accumulator,0,memory_order_relaxed);
     }
     const device uint *meshletStart = meshletRemap + payload.meshletCoord;
@@ -519,7 +519,7 @@ void main(void) {
     const device uint *meshletIndicesStart = (thisMeshCoord + 2 + (meshletVertexCount * numUintsPerVertex));
 
     //can be simplified to always use payload.baseVertex
-    const uint endIndex  = meshletPrimitiveCount * 3;
+    const uint endIndex = meshletPrimitiveCount * 3;
     if(endIndex < 1) {
         return;
     }
@@ -538,7 +538,7 @@ void main(void) {
 
     if( hd_LocalIndexID < meshletVertexCount )
     {
-        primitive_id = ((hd_LocalInvocationID.y * 512) + hd_LocalIndexID)/3;
+        primitive_id = ((hd_LocalInvocationID.y * MAX_PRIMITIVES) + hd_LocalIndexID)/3;
         const uint index = *(meshletVerticesStart + hd_LocalIndexID * numUintsPerVertex + 1);
         //todo resolve the index
         //TODO investigate this
