@@ -326,7 +326,7 @@ int GetDrawingField(uint off, uint drawCommandIndex)
 
     offset += off;
 
-    return int(drawBuffer[offset]);return int(drawBuffer[offset]);
+    return int(drawBuffer[offset]);
 }
 
 const int indexCountOffset = 0;
@@ -375,6 +375,43 @@ void main(void)
     meshGridProperties->set_threadgroups_per_grid(uint3(instanceCount, numMeshlet, 1));
 }
 
+--- --------------------------------------------------------------------------
+-- glsl Mesh.Meshlet.Triangle.CullBackface
+
+
+bool testTriangle(vec2 a, vec2 b, vec2 c, float winding)
+{
+  // back face culling
+  
+  vec2 ab = b.xy - a.xy;
+  vec2 ac = c.xy - a.xy;
+  float cross_product = ab.x * ac.y - ab.y * ac.x;
+
+  //possibly needs reversal
+  if (cross_product * winding < 0.0f) {return false;}
+  #ifdef TINY_TRIANGLE_CULL
+  vec2 pixelMin = min(a,min(b,c));
+  vec2 pixelMax = max(a,max(b,c));
+
+  if (pixelBboxCull(pixelMin, pixelMax)) return false;
+  #endif
+  return true;
+}
+
+--- --------------------------------------------------------------------------
+-- glsl Mesh.Meshlet.Triangle.NoCullBackface
+
+bool testTriangle(vec2 a, vec2 b, vec2 c, float winding)
+{
+  #ifdef TINY_TRIANGLE_CULL
+  vec2 pixelMin = min(a,min(b,c));
+  vec2 pixelMax = max(a,max(b,c));
+
+  if (pixelBboxCull(pixelMin, pixelMax)) return false;
+  #endif
+  return true;
+}
+
 
 --- --------------------------------------------------------------------------
 -- layout Mesh.Meshlet.Triangle
@@ -420,26 +457,6 @@ bool pixelBboxCull(vec2 pixelMin, vec2 pixelMax)
   pixelMin = round(pixelMin);
   pixelMax = round(pixelMax);
   return ( ( pixelMin.x == pixelMax.x) || ( pixelMin.y == pixelMax.y));
-}
-
-bool testTriangle(vec2 a, vec2 b, vec2 c, float winding)
-{
-  // back face culling
-  
-  vec2 ab = b.xy - a.xy;
-  vec2 ac = c.xy - a.xy;
-  float cross_product = ab.x * ac.y - ab.y * ac.x;
-
-  //possibly needs reversal
-  cross_product = cross_product;
-  if (cross_product * winding < 0.0f) {return false;}
-
-  vec2 pixelMin = min(a,min(b,c));
-  vec2 pixelMax = max(a,max(b,c));
-
-  if (pixelBboxCull(pixelMin, pixelMax)) return false;
-
-  return true;
 }
 
 vec2 getScreenPos(vec4 hPos)
@@ -1035,8 +1052,8 @@ vec2 GetPatchTessUV()
     OsdGetTessLevelsUniform(tessLevel, patchParam, tessOuterLo, tessOuterHi);
 
     return OsdGetTessParameterization(gl_TessCoord.xy,
-                                         tessOuterLo,
-                                         tessOuterHi);
+                                      tessOuterLo,
+                                      tessOuterHi);
 }
 
 vec4 GetPatchCoord(int index)
@@ -1217,8 +1234,8 @@ vec2 GetPatchTessUV()
     OsdGetTessLevelsUniform(tessLevel, patchParam, tessOuterLo, tessOuterHi);
 
     return OsdGetTessParameterizationTriangle(gl_TessCoord.xyz,
-                                                 tessOuterLo,
-                                                 tessOuterHi);
+                                              tessOuterLo,
+                                              tessOuterHi);
 }
 
 vec4 GetPatchCoord(int index)
@@ -1740,7 +1757,7 @@ vec2 GetPatchCoordLocalST()
 vec4 GetInterpolatedPatchCoord()
 {
     return InterpolatePatchCoordTriangle(
-        GetPatchCoordLocalST(), GetPatchParam());
+                         GetPatchCoordLocalST(), GetPatchParam());
 }
 
 --- --------------------------------------------------------------------------

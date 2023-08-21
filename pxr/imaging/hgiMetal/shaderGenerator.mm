@@ -25,10 +25,14 @@
 #include "pxr/imaging/hgiMetal/shaderGenerator.h"
 #include "pxr/imaging/hgiMetal/resourceBindings.h"
 #include "pxr/imaging/hgi/tokens.h"
+#include "pxr/base/tf/envSetting.h"
 
 #include <unordered_map>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+TF_DEFINE_ENV_SETTING(HGIMETAL_ENABLE_TINY_TRIANGLE_CULLING, false,
+                      "Enable indirect command buffers");
 
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
@@ -377,6 +381,9 @@ _ComputeHeader(id<MTLDevice> device, const HgiShaderFunctionDesc &descriptor)
                << "#define MAX_INDICES                (" << descriptor.meshDescriptor.maxMeshletVertexCount << ")\n"
                << "#define MAX_PRIMITIVES            (((MAX_INDICES) + 2) / 3)\n"
                << "#endif // MESH_SHADING_CONFIG_H\n";
+    }
+    if (TfGetEnvSetting(HGIMETAL_ENABLE_TINY_TRIANGLE_CULLING)) {
+        header << "#define TINY_TRIANGLE_CULL\n";
     }
     
     // Metal feature set defines

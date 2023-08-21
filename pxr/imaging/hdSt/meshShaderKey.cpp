@@ -127,6 +127,8 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((mainVaryingInterpPTVS,       "Mesh.PostTessVertex.VaryingInterpolation"))
     ((mainMOS,                     "Mesh.MeshObject.Main"))
     ((mainTriangleMS,              "Mesh.Meshlet.Triangle"))
+    ((cullBackfaceMS,              "Mesh.Meshlet.Triangle.CullBackface"))
+    ((noCullBackfaceMS,            "Mesh.Meshlet.Triangle.NoCullBackface"))
     ((mainTriangleTessGS,          "Mesh.Geometry.TriangleTess"))
     ((mainTriangleGS,              "Mesh.Geometry.Triangle"))
     ((mainTriQuadGS,               "Mesh.Geometry.TriQuad"))
@@ -336,6 +338,12 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
             MS[msIndex++] = _tokens->customDisplacementGS;
         } else {
             MS[msIndex++] = _tokens->noCustomDisplacementGS;
+        }
+        
+        if (doubleSided) {
+            MS[msIndex++] = _tokens->noCullBackfaceMS;
+        } else {
+            MS[msIndex++] = _tokens->cullBackfaceMS;
         }
         
         MOS[mosIndex++] = _tokens->mainMOS;
