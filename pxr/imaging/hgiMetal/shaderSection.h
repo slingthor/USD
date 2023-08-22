@@ -333,7 +333,8 @@ public:
         const std::string &type,
         const HgiBindingType binding,
         const bool writable,
-        const HgiShaderSectionAttributeVector &attributes);
+        const HgiShaderSectionAttributeVector &attributes,
+        const bool canUseConstantSpace);
 
     // For a dummy padded binding point
     HGIMETAL_API
@@ -365,6 +366,7 @@ private:
     const HgiBindingType _binding;
     const bool _writable;
     const bool _unused;
+    const bool _canUseConstantSpace;
     const std::string _samplerSharedIdentifier;
     const std::string _parentScopeIdentifier;
 };
@@ -606,7 +608,7 @@ private:
     HgiMetalKeywordInputShaderSection() = delete;
     HgiMetalKeywordInputShaderSection & operator=(
         const HgiMetalKeywordInputShaderSection&) = delete;
-    HgiMetalKeywordInputShaderSection(const HgiMetalBufferShaderSection&) = delete;
+    HgiMetalKeywordInputShaderSection(const HgiMetalKeywordInputShaderSection&) = delete;
 
     const std::string _type;
     const bool _isPointerToValue;

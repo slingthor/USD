@@ -845,7 +845,8 @@ HgiMetalBufferShaderSection::HgiMetalBufferShaderSection(
     const std::string &type,
     const HgiBindingType binding,
     const bool writable,
-    const HgiShaderSectionAttributeVector &attributes)
+    const HgiShaderSectionAttributeVector &attributes,
+    const bool canUseConstantSpace)
   : HgiMetalShaderSection(
       samplerSharedIdentifier,
       attributes,
@@ -854,6 +855,7 @@ HgiMetalBufferShaderSection::HgiMetalBufferShaderSection(
   , _binding(binding)
   , _writable(writable)
   , _unused(false)
+  , _canUseConstantSpace(canUseConstantSpace)
   , _samplerSharedIdentifier(samplerSharedIdentifier)
   , _parentScopeIdentifier(parentScopeIdentifier)
 {
@@ -870,6 +872,7 @@ HgiMetalBufferShaderSection::HgiMetalBufferShaderSection(
   , _binding(HgiBindingTypePointer)
   , _writable(false)
   , _unused(true)
+  , _canUseConstantSpace(false)
 {
 }
 
@@ -883,11 +886,11 @@ void
 HgiMetalBufferShaderSection::WriteParameter(std::ostream& ss) const
 {
     //TODO resolve -> meshlet shader buffers can't be declared in constant space
-    //if (!_writable) {
-    //    ss << "constant ";
-    //} else {
+    if (!_writable && _canUseConstantSpace) {
+        ss << "constant ";
+    } else {
         ss << "device ";
-    //}
+    }
     WriteType(ss);
     
     switch (_binding) {
@@ -910,11 +913,11 @@ HgiMetalBufferShaderSection::VisitScopeMemberDeclarations(std::ostream &ss)
 {
     if (_unused) return false;
 
-    //if (!_writable) {
-    //    ss << "constant ";
-    //} else {
+    if (!_writable && _canUseConstantSpace) {
+        ss << "constant ";
+    } else {
         ss << "device ";
-    //}
+    }
     WriteType(ss);
 
     switch (_binding) {
@@ -940,13 +943,12 @@ HgiMetalBufferShaderSection::VisitScopeConstructorDeclarations(
 {
     if (_unused) return false;
     
-    //TODO resolve -> meshlet shader buffers can't be declared in constant space
-    //if (!_writable) {
-    //    ss << "const ";
-    //    ss << "constant ";
-    //} else {
+    if (!_writable && _canUseConstantSpace) {
+        ss << "const ";
+        ss << "constant ";
+    } else {
         ss << "device ";
-    //}
+    }
     WriteType(ss);
     ss << "* _";
     WriteIdentifier(ss);

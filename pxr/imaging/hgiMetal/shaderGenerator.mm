@@ -76,7 +76,8 @@ public:
         HgiShaderStage stage);
     HgiMetalShaderSectionPtrVector AccumulateBufferBindings(
         const HgiShaderFunctionBufferDescVector &buffers,
-        HgiMetalShaderGenerator *generator);
+        HgiMetalShaderGenerator *generator,
+        bool canUseConstantSpace);
     HgiMetalShaderSectionPtrVector AccumulateTextureBindings(
         const HgiShaderFunctionTextureDescVector &textures,
         HgiMetalShaderGenerator *generator);
@@ -676,7 +677,9 @@ ShaderStageData::ShaderStageData(
     , _bufferBindings(
         AccumulateBufferBindings(
             descriptor.buffers,
-            generator))
+            generator,
+            !(descriptor.shaderStage == HgiShaderStageMeshObject ||
+                 descriptor.shaderStage == HgiShaderStageMeshlet)))
 {
     // Also populates _samplerBindings
     _textureBindings = AccumulateTextureBindings(
@@ -857,7 +860,8 @@ ShaderStageData::AccumulatePayload(
 HgiMetalShaderSectionPtrVector
 ShaderStageData::AccumulateBufferBindings(
     const HgiShaderFunctionBufferDescVector &buffers,
-    HgiMetalShaderGenerator *generator)
+    HgiMetalShaderGenerator *generator,
+    bool canUseConstantSpace)
 {
     HgiMetalShaderSectionPtrVector stageShaderSections;
     uint32_t maxBindIndex = 0;
@@ -888,7 +892,8 @@ ShaderStageData::AccumulateBufferBindings(
                         p->type,
                         p->binding,
                         p->writable,
-                        attributes);
+                        attributes,
+                        canUseConstantSpace);
         }
         else {
             // Unused padding entry
