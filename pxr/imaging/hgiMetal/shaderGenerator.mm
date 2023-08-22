@@ -836,24 +836,12 @@ ShaderStageData::AccumulatePayload(
     const HgiShaderSectionAttributeVector attributes;
     HgiMetalShaderSectionPtrVector members;
     for (const HgiShaderFunctionParamDesc &p : params) {
-        //members.push_back(generator->GetShaderSections()->back().get());
         HgiMetalShaderSection *section =
-        generator->CreateShaderSection<HgiMetalRawShaderSection>(p.nameInShader, p.type, attributes, p.arraySize, std::string());
+        generator->CreateShaderSection<HgiMetalRawShaderSection>(
+            p.nameInShader, p.type, attributes,
+            p.arraySize, std::string());
         members.push_back(section);
     }
-    /*
-    HgiMetalStructTypeDeclarationShaderSection * const payloadStruct =
-        generator->CreateShaderSection<
-            HgiMetalStructTypeDeclarationShaderSection>(
-                "Payload",
-                members);
-    
-    HgiMetalStructInstanceShaderSection * const payloadStructInstance =
-    generator->CreateShaderSection<HgiMetalStructInstanceShaderSection>
-        ("hdPayload", attributes, payloadStruct);
-     */
-    
-    //TODO note don't return members
     return members;
 }
 
