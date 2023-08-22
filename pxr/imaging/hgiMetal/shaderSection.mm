@@ -73,6 +73,12 @@ HgiMetalShaderSection::VisitScopeConstructorInitialization(std::ostream &ss)
 }
 
 bool
+HgiMetalShaderSection::VisitPreScopeConstructorInstantiation(std::ostream &ss)
+{
+    return false;
+}
+
+bool
 HgiMetalShaderSection::VisitEntryPointParameterDeclarations(std::ostream &ss)
 {
     return false;
@@ -148,6 +154,7 @@ HgiMetalShaderSection::WriteAttributesOnlyWithoutIndex(std::ostream& ss) const
 HgiMetalMemberShaderSection::HgiMetalMemberShaderSection(
     const std::string &identifier,
     const std::string &type,
+    const bool isThreadGroupGlobal,
     const HgiShaderSectionAttributeVector &attributes,
     const std::string arraySize,
     const std::string &blockInstanceIdentifier)
@@ -155,6 +162,7 @@ HgiMetalMemberShaderSection::HgiMetalMemberShaderSection(
                           std::string(), arraySize,
                           blockInstanceIdentifier)
   , _type{type}
+  , _isThreadGroupGlobal{isThreadGroupGlobal}
 {
 }
 
@@ -170,10 +178,77 @@ bool
 HgiMetalMemberShaderSection::VisitScopeMemberDeclarations(std::ostream &ss)
 {
     if (!HasBlockInstanceIdentifier()) {
-        WriteDeclaration(ss);
+        if (_isThreadGroupGlobal) {
+            ss << "threadgroup ";
+        }
+        WriteType(ss);
+        ss << " ";
+        if (_isThreadGroupGlobal) {
+            ss << "(&";
+        }
+        WriteIdentifier(ss);
+        if (_isThreadGroupGlobal) {
+            ss << ")";
+        }
+        WriteArraySize(ss);
+        ss << ";";
         ss << std::endl;
     }
     return true;
+}
+
+bool
+HgiMetalMemberShaderSection::VisitPreScopeConstructorInstantiation(std::ostream &ss)
+{
+    if (_isThreadGroupGlobal) {
+        ss << "threadgroup ";
+        WriteDeclaration(ss);
+        ss << std::endl;
+        return true;
+    }
+    return false;
+}
+
+bool
+HgiMetalMemberShaderSection::VisitScopeConstructorInstantiation(std::ostream &ss)
+{
+    
+    if (_isThreadGroupGlobal) {
+        ss << "";
+        WriteIdentifier(ss);
+        return true;
+    }
+    return false;
+}
+
+bool
+HgiMetalMemberShaderSection::VisitScopeConstructorDeclarations(
+    std::ostream &ss)
+{
+    if (_isThreadGroupGlobal) {
+        ss << "threadgroup ";
+        WriteType(ss);
+        ss << " (&_";
+        WriteIdentifier(ss);
+        ss << ")";
+        WriteArraySize(ss);
+        return true;
+    }
+    return false;
+}
+
+bool
+HgiMetalMemberShaderSection::VisitScopeConstructorInitialization(
+    std::ostream &ss)
+{
+    if(_isThreadGroupGlobal) {
+        WriteIdentifier(ss);
+        ss << "(_";
+        WriteIdentifier(ss);
+        ss << ")";
+        return true;
+    }
+    return false;
 }
 
 HgiMetalRawShaderSection::HgiMetalRawShaderSection(

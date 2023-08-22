@@ -174,6 +174,7 @@ struct HgiShaderFunctionParamDesc
     HgiStorageType storage;
     std::string role;
     std::string arraySize;
+    bool isThreadGroupParam = false;
     bool isPointerToValue = false;
 };
 
@@ -616,7 +617,8 @@ HgiShaderFunctionAddGlobalVariable(
    HgiShaderFunctionDesc *desc,
    const std::string &nameInShader,
    const std::string &type,
-   const std::string &arraySize);
+   const std::string &arraySize,
+   const bool isThreadGroupParam = false);
 
 /// Adds stage output function param descriptor to given shader function
 /// descriptor.

@@ -3079,6 +3079,9 @@ HdSt_CodeGen::_CompileWithGeneratedHgiResources(
         msDesc.shaderCode = source.c_str();
         msDesc.generatedShaderCodeOut = &_msSource;
 
+        HgiShaderFunctionAddGlobalVariable(&msDesc, "posCache", "vec3", "192", true);
+        HgiShaderFunctionAddGlobalVariable(&msDesc, "accumulator", "atomic_int", std::string(), true);
+        
         // builtins
         
         HgiShaderFunctionAddStageInput(

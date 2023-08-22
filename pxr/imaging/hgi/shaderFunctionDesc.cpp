@@ -395,6 +395,7 @@ HgiShaderFunctionAddConstantParam(
     paramDesc.type = type;
     paramDesc.role = role;
     paramDesc.isPointerToValue = false;
+    paramDesc.isThreadGroupParam = false;
     
     desc->constantParams.push_back(std::move(paramDesc));
 }
@@ -411,6 +412,7 @@ HgiShaderFunctionAddStageInput(
     paramDesc.type = type;
     paramDesc.role = role;
     paramDesc.isPointerToValue = false;
+    paramDesc.isThreadGroupParam = false;
 
     desc->stageInputs.push_back(std::move(paramDesc));
 }
@@ -439,6 +441,7 @@ HgiShaderFunctionAddPayloadMember(
         paramDesc.arraySize = "";
     }
     paramDesc.isPointerToValue = false;
+    paramDesc.isThreadGroupParam = false;
     desc->payloadMembers.push_back(std::move(paramDesc));
 }
 
@@ -447,13 +450,15 @@ HgiShaderFunctionAddGlobalVariable(
    HgiShaderFunctionDesc *desc,
    const std::string &nameInShader,
    const std::string &type,
-   const std::string &arraySize)
+   const std::string &arraySize,
+   const bool isThreadGroupParam)
 {
     HgiShaderFunctionParamDesc paramDesc;
     paramDesc.nameInShader = nameInShader;
     paramDesc.type = type;
     paramDesc.arraySize = arraySize;
     paramDesc.isPointerToValue = false;
+    paramDesc.isThreadGroupParam = isThreadGroupParam;
     desc->stageGlobalMembers.push_back(std::move(paramDesc));
 }
 
@@ -469,6 +474,7 @@ HgiShaderFunctionAddStageOutput(
     paramDesc.type = type;
     paramDesc.role = role;
     paramDesc.isPointerToValue = false;
+    paramDesc.isThreadGroupParam = false;
 
     desc->stageOutputs.push_back(std::move(paramDesc));
 }
@@ -485,6 +491,7 @@ HgiShaderFunctionAddStageOutput(
     paramDesc.type = type;
     paramDesc.location = location;
     paramDesc.isPointerToValue = false;
+    paramDesc.isThreadGroupParam = false;
 
     desc->stageOutputs.push_back(std::move(paramDesc));
 }

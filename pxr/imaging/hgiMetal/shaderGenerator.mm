@@ -743,6 +743,7 @@ ShaderStageData::AccumulateParams(
                     HgiMetalMemberShaderSection>(
                         p.nameInShader,
                         p.type,
+                        false,
                         attributes,
                         p.arraySize);
             stageShaderSections.push_back(section);
@@ -767,6 +768,7 @@ ShaderStageData::AccumulateParams(
                     HgiMetalMemberShaderSection>(
                         p.nameInShader,
                         p.type,
+                        false,
                         attributes,
                         p.arraySize);
             stageShaderSections.push_back(section);
@@ -798,6 +800,7 @@ ShaderStageData::AccumulateParamBlocks(
                         HgiMetalMemberShaderSection>(
                             m.name,
                             m.type,
+                            false,
                             attributes,
                             std::string(),
                             p.instanceName);
@@ -1562,6 +1565,7 @@ HgiMetalShaderGenerator::HgiMetalShaderGenerator(
             HgiMetalMemberShaderSection>(
                 member.nameInShader,
                 member.type,
+                member.isThreadGroupParam,
                 attrs,
                 member.arraySize);
     }
@@ -1629,12 +1633,6 @@ void HgiMetalShaderGenerator::_Execute(std::ostream &ss)
     for (const HgiMetalShaderSectionUniquePtr &section : *shaderSections) {
         section->VisitScopeMemberDeclarations(ss);
     }
-    if (_GetShaderStage() == HgiShaderStageMeshlet) {
-        ss << "threadgroup vec3 (&posCache)[192];\n";
-    }
-    if (_GetShaderStage() == HgiShaderStageMeshlet) {
-        ss << "threadgroup atomic_int &accumulator;\n";
-    }
     ss << "\n// //////// Scope Function Definitions ////////\n";
     for (const HgiMetalShaderSectionUniquePtr &section : *shaderSections) {
         section->VisitScopeFunctionDefinitions(ss);
@@ -1658,14 +1656,6 @@ void HgiMetalShaderGenerator::_Execute(std::ostream &ss)
             hasContructorParams = true;
         }
     }
-    if (_GetShaderStage() == HgiShaderStageMeshlet) {
-        if(!firstParam) {
-            ss << ",\n";
-        }
-        ss << "threadgroup vec3 (&_posCache)[192],\n";
-        ss << "threadgroup atomic_int (&_accumulator)\n";
-        hasContructorParams = true;
-    }
     ss << ")";
     
     if (hasContructorParams) {
@@ -1684,14 +1674,6 @@ void HgiMetalShaderGenerator::_Execute(std::ostream &ss)
                 ss << paramDecl.str();
             }
         }
-    }
-    if (_GetShaderStage() == HgiShaderStageMeshlet) {
-        if(!firstParam) {
-            ss << ",\n";
-        }
-        ss << "posCache(_posCache),\n";
-        ss << "accumulator(_accumulator)\n";
-        hasContructorParams = true;
     }
     ss << "{};\n\n";
     
@@ -1738,11 +1720,9 @@ void HgiMetalShaderGenerator::_Execute(std::ostream &ss)
         }
     }
     ss <<"){\n";
-    if (_GetShaderStage() == HgiShaderStageMeshlet) {
-        ss << "threadgroup vec3 posCache[192];\n";
-    }
-    if (_GetShaderStage() == HgiShaderStageMeshlet) {
-        ss << "threadgroup atomic_int accumulator;\n";
+    
+    for (const HgiMetalShaderSectionUniquePtr &section : *shaderSections) {
+        section->VisitPreScopeConstructorInstantiation(ss);
     }
     ss << _generatorShaderSections->GetScopeTypeName() << " "
        << _generatorShaderSections->GetScopeInstanceName();
@@ -1761,12 +1741,6 @@ void HgiMetalShaderGenerator::_Execute(std::ostream &ss)
                 }
                 ss << paramDecl.str();
             }
-        }
-        if (_GetShaderStage() == HgiShaderStageMeshlet) {
-            if(!firstParam) {
-                ss << ",\n";
-            }
-            ss << "posCache,\n accumulator\n";
         }
         ss << ")";
     }

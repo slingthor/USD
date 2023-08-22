@@ -61,6 +61,8 @@ public:
     HGIMETAL_API
     virtual bool VisitScopeConstructorInitialization(std::ostream &ss);
     HGIMETAL_API
+    virtual bool VisitPreScopeConstructorInstantiation(std::ostream &ss);
+    HGIMETAL_API
     virtual bool VisitScopeConstructorInstantiation(std::ostream &ss);
     HGIMETAL_API
     virtual bool VisitEntryPointParameterDeclarations(std::ostream &ss);
@@ -130,6 +132,7 @@ public:
     HgiMetalMemberShaderSection(
         const std::string &identifier,
         const std::string &type,
+        const bool isThreadGroupGlobal = false,
         const HgiShaderSectionAttributeVector &attributes = {},
         const std::string arraySize = std::string(),
         const std::string &blockInstanceIdentifier = std::string());
@@ -142,9 +145,22 @@ public:
 
     HGIMETAL_API
     bool VisitScopeMemberDeclarations(std::ostream &ss) override;
+    
+    HGIMETAL_API
+    bool VisitPreScopeConstructorInstantiation(std::ostream &ss) override;
+    
+    HGIMETAL_API
+    bool VisitScopeConstructorInstantiation(std::ostream &ss) override;
+    
+    HGIMETAL_API
+    bool VisitScopeConstructorDeclarations(std::ostream &ss) override;
+    
+    HGIMETAL_API
+    bool VisitScopeConstructorInitialization(std::ostream &ss) override;
 
 private:
     const std::string _type;
+    const bool _isThreadGroupGlobal;
 };
 
 /// \class MetalRawShaderSection
