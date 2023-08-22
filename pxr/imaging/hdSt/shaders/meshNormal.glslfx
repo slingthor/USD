@@ -81,28 +81,10 @@ vec3 GetUnpackedSmoothNormal(int index) {
 --- --------------------------------------------------------------------------
 -- glsl MeshNormal.Smooth.UnpackSmoothSSBO
 
-struct vec4f_2_10_10_10 {
-    int x : 10;
-    int y : 10;
-    int z : 10;
-    int w : 2;
-};
-
-inline float HdConvertFixedToFloat(int v, int b)
-{
-    return float(
-        max(-1.0f,
-            (v / (float(1 << (b-1)) - 1.0f))));
-}
-
 vec3 GetUnpackedSmoothNormal(int index) {
-    vec3 unpacked;
-    int packed = HdGet_packedSmoothNormals(index);
-    vec4f_2_10_10_10 v = 
-        reinterpret_cast<thread vec4f_2_10_10_10 &>(packed);
-    unpacked.x = HdConvertFixedToFloat(v.x, 10);
-    unpacked.y = HdConvertFixedToFloat(v.y, 10);
-    unpacked.z = HdConvertFixedToFloat(v.z, 10);
+    uint packed = uint(HdGet_packedSmoothNormals(index));
+    vec3 unpacked = unpack_unorm10a2_to_float(packed).xyz;
+    unpacked = mix(unpacked, -(1.0f - unpacked), float3(unpacked >= 0.5f)) * 2.03f;
     return unpacked;
 }
 

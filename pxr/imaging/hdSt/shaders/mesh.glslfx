@@ -327,19 +327,26 @@ int GetDrawingField(uint off, uint drawCommandIndex)
     return int(drawBuffer[offset]);
 }
 
-static constant constexpr int indexCountOffset = 0;
-static constant constexpr int instanceCountOffset = 1;
-static constant constexpr int baseIndexOffset = 2;
-static constant constexpr int baseVertexOffset = 3;
-static constant constexpr int baseInstanceOffset = 4;
-static constant constexpr int meshletCoordOffset = 5;
-static constant constexpr int numMeshletsOffset = 6;
+static constant constexpr uchar indexCountOffset = 0;
+static constant constexpr uchar instanceCountOffset = 1;
+static constant constexpr uchar baseIndexOffset = 2;
+static constant constexpr uchar baseVertexOffset = 3;
+static constant constexpr uchar baseInstanceOffset = 4;
+static constant constexpr uchar meshletCoordOffset = 5;
+static constant constexpr uchar numMeshletsOffset = 6;
 
-static constant constexpr uint32_t gl_InstanceID = 0;
-static constant constexpr uint32_t gl_BaseInstance = 0;
+static constant constexpr uchar gl_InstanceID = 0;
+static constant constexpr uchar gl_BaseInstance = 0;
+
+template <uint S, uint E> void checkSize()
+{
+    static_assert(S == E);    
+}
 
 void main(void)
 {   
+    //checkSize<sizeof(*this), 0>();
+
     if (hd_LocalIndexID == 0) {
         payload.indexCount = GetDrawingField(indexCountOffset, hd_LocalInvocationID.x);
         payload.baseIndex = GetDrawingField(baseIndexOffset, hd_LocalInvocationID.x);
@@ -510,7 +517,6 @@ void main(void) {
         //TODO can we simply try to not use registers for this
         //TODO probably not needed
         baseVertex = payload.baseVertex;
-        //TODO probably not needed
         baseIndex = payload.baseIndex;
         gl_BaseInstance = payload.baseInstance;
         gl_InstanceID = hd_LocalInvocationID.x + payload.baseInstance + 1;
@@ -554,19 +560,15 @@ void main(void) {
     const uint base2 = hd_LocalIndexID * 6;
     const device uint *indicesOff = meshletIndicesStart + base2;
     const uint currPrim = hd_LocalIndexID * 3;
-    //TODO Thor -> should I maybe be checking this for every one of them?
     threadgroup_barrier(mem_flags::mem_threadgroup);
     if((currPrim ) < (meshletPrimitiveCount)) {
-        //TODO unpack right away into a vec2?
-        uint unpackedIndsA = *(indicesOff);
-        uchar3 indA;
-        indA.x = unpackedIndsA & 0xFF;
-        indA.y = unpackedIndsA >> 8 & 0x000000FF;
-        indA.z = unpackedIndsA >> 16 & 0x000000FF;
+        uchar3 indA = as_type<uchar3>(*(indicesOff));
+        
         vec3 p0A = posCache[indA.x];
         vec3 p1A = posCache[indA.y];
         vec3 p2A = posCache[indA.z];
 
+        //Not use vec3
         uchar3 cullBitsA;
         cullBitsA.x = *((reinterpret_cast<thread uint *>(&p0A))+2);
         cullBitsA.y = *((reinterpret_cast<thread uint *>(&p1A))+2);
@@ -574,11 +576,7 @@ void main(void) {
 
         bool culledA = !testTriangle(p0A.xy, p1A.xy, p2A.xy, 1.0, cullBitsA);
     
-        uint unpackedIndsB = *(indicesOff + 2);
-        uchar3 indB;
-        indB.x = unpackedIndsB & 0xFF;
-        indB.y = unpackedIndsB >> 8 & 0x000000FF;
-        indB.z = unpackedIndsB >> 16 & 0x000000FF;
+        uchar3 indB = as_type<uchar3>(*(indicesOff + 2));
         vec3 p0B = posCache[indB.x];
         vec3 p1B = posCache[indB.y];
         vec3 p2B = posCache[indB.z];
@@ -590,11 +588,7 @@ void main(void) {
 
         bool culledB  = !testTriangle(p0B.xy, p1B.xy, p2B.xy, 1.0, cullBitsB);
     
-        uint unpackedIndsC = *(indicesOff + 4);
-        uchar3 indC;
-        indC.x = unpackedIndsC & 0xFF;
-        indC.y = unpackedIndsC >> 8 & 0x000000FF;
-        indC.z = unpackedIndsC >> 16 & 0x000000FF;
+        uchar3 indC = as_type<uchar3>(*(indicesOff + 4));
         vec3 p0C = posCache[indC.x];
         vec3 p1C = posCache[indC.y];
         vec3 p2C = posCache[indC.z];
@@ -611,12 +605,13 @@ void main(void) {
         //now we know if a triangle got culled or not, we can focus on figuring out
         //how to compact and write it out
         //we compute a local (in clique) scan offset
-        const uint three = 3;
-        uint primsHere = min(meshletPrimitiveCount - currPrim, three);
-        uint nonCulled = 3 - (uint(culledA) + uint(culledB) + uint(culledC));
-        int localIndex = simd_prefix_exclusive_sum(nonCulled);
+        uchar primsHere = uchar(min(meshletPrimitiveCount - currPrim, uint(3)));
+        //TODO Thor, use ushort potentially use less precision here
+        uchar nonCulled = uchar(3) - uchar(culledA) + uchar(culledB) + uchar(culledC);
+        nonCulled = min(nonCulled, primsHere);
+        ushort localIndex = simd_prefix_exclusive_sum(nonCulled);
         //here we also compute how many primitives in the clique pass
-        int passingPrims = simd_sum(nonCulled);
+        ushort passingPrims = simd_sum(nonCulled);
          
         int localOffset = 0;
         //one thread per wave/clique will need to increment the atomic
@@ -628,60 +623,48 @@ void main(void) {
         {
            localOffset = atomic_fetch_add_explicit(&accumulator,passingPrims,memory_order_relaxed);
         }
-        //TODO barrier
         //lets give the value of the local offset to all the threads in the clique
         localOffset = simd_broadcast(localOffset,0);
-        //int passingPrimsLocal = min(passingPrims - currPrim, three);
-        int writePrim = (localIndex + localOffset);
-        int writeIndex = writePrim * 3;
-        uint writeIndexOffset = 0;
+        uint writePrim = (localIndex + localOffset);
+        uint writeIndex = writePrim * 3;
         if(!culledA)
         {
             PrimOut primOutA;
-            //TODO export a smarter primitive ID
             primOutA.primitive_id_ms = *(indicesOff + 1);
-            //TODO fix write prim
             mesh.set_primitive(writePrim, primOutA);
 
             // Set the output indices.
-            //TODO cache base index calc
             mesh.set_index(writeIndex , indA.x);
-            mesh.set_index(writeIndex  + 1, indA.y);
+            mesh.set_index(writeIndex + 1, indA.y);
             mesh.set_index(writeIndex + 2, indA.z);
-            writeIndexOffset += 3;
+            writeIndex +=3;
         }
 
         if(primsHere > 1 && !culledB)
         {
             PrimOut primOutB;
-            //TODO export a smarter primitive ID
             primOutB.primitive_id_ms = *(indicesOff + 3);
             mesh.set_primitive(writePrim + 1, primOutB);
 
             // Set the output indices.
-            //TODO cache base index calc
-            mesh.set_index(writeIndex + writeIndexOffset, indB.x);
-            mesh.set_index(writeIndex + 1 + writeIndexOffset, indB.y);
-            mesh.set_index(writeIndex + 2 + writeIndexOffset, indB.z);
-            writeIndexOffset +=3;
+            mesh.set_index(writeIndex, indB.x);
+            mesh.set_index(writeIndex + 1, indB.y);
+            mesh.set_index(writeIndex + 2, indB.z);
+            writeIndex +=3;
         }
 
         if(primsHere > 2 && !culledC)
         {
-            //TODO only calculate it once
             PrimOut primOutC;
-            //TODO export a smarter primitive ID
             primOutC.primitive_id_ms = *(indicesOff + 5);
             mesh.set_primitive(writePrim + 2, primOutC);
 
             // Set the output indices.
-            //TODO cache base index calc
-            mesh.set_index(writeIndex + writeIndexOffset, indC.x);
-            mesh.set_index(writeIndex + 1 + writeIndexOffset, indC.y);
-            mesh.set_index(writeIndex + 2 + writeIndexOffset, indC.z);
+            mesh.set_index(writeIndex, indC.x);
+            mesh.set_index(writeIndex + 1, indC.y);
+            mesh.set_index(writeIndex + 2, indC.z);
         }
     }
-    //TODO fix this
     threadgroup_barrier(mem_flags::mem_threadgroup);
     if(hd_LocalIndexID == 1){
         int accumulatorValue = (int)atomic_load_explicit(&accumulator,memory_order_relaxed);

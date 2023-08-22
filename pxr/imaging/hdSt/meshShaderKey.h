@@ -57,6 +57,7 @@ struct HdSt_MeshShaderKey : public HdSt_ShaderKey
                        bool doubleSided,
                        bool hasBuiltinBarycentrics,
                        bool hasMetalTessellation,
+                       bool hasMeshShaders,
                        bool hasCustomDisplacement,
                        bool hasPerFaceInterpolation,
                        bool hasTopologicalVisibility,
@@ -88,7 +89,8 @@ struct HdSt_MeshShaderKey : public HdSt_ShaderKey
         return useMetalTessellation;
     }
     bool UseMeshShaders() const override {
-        return true; //hasCustomDisplacement && HdSt_GeometricShader::IsPrimTypeTriangles(primType);
+        return useMeshShaders &&
+            HdSt_GeometricShader::IsPrimTypeTriangles(primType);
     }
 
     HdPolygonMode GetPolygonMode() const override { return polygonMode; }
@@ -107,6 +109,7 @@ struct HdSt_MeshShaderKey : public HdSt_ShaderKey
     bool hasMirroredTransform;
     bool doubleSided;
     bool useMetalTessellation;
+    bool useMeshShaders;
     HdPolygonMode polygonMode;
     float lineWidth;
     HdSt_GeometricShader::FvarPatchType fvarPatchType;

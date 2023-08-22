@@ -193,8 +193,7 @@ public:
     
     bool GetUseMeshShaders() const {
         return _useMeshShaders &&
-            (_primType == PrimitiveType::PRIM_MESH_COARSE_TRIANGLES  ||
-            _primType == PrimitiveType::PRIM_MESH_REFINED_TRIANGLES);
+            IsPrimTypeTriangles(_primType);
     }
 
     float GetLineWidth() const {

@@ -174,6 +174,7 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
     bool doubleSided,
     bool hasBuiltinBarycentrics,
     bool hasMetalTessellation,
+    bool hasMeshShaders,
     bool hasCustomDisplacement,
     bool hasPerFaceInterpolation,
     bool hasTopologicalVisibility,
@@ -188,6 +189,7 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
     , hasMirroredTransform(hasMirroredTransform)
     , doubleSided(doubleSided)
     , useMetalTessellation(false)
+    , useMeshShaders(hasMeshShaders)
     , polygonMode(HdPolygonModeFill)
     , lineWidth(lineWidth)
     , fvarPatchType(fvarPatchType)
