@@ -31,7 +31,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_DEFINE_ENV_SETTING(HGIMETAL_ENABLE_TINY_TRIANGLE_CULLING, false,
+TF_DEFINE_ENV_SETTING(HGIMETAL_DISABLE_TINY_TRIANGLE_CULLING, false,
                       "Enable indirect command buffers");
 
 TF_DEFINE_PRIVATE_TOKENS(
@@ -389,7 +389,9 @@ _ComputeHeader(id<MTLDevice> device, const HgiShaderFunctionDesc &descriptor)
                << "#define MAX_PRIMITIVES            (" << descriptor.meshDescriptor.maxPrimitiveCount << ")\n"
                << "#endif // MESH_SHADING_CONFIG_H\n";
     }
-    if (TfGetEnvSetting(HGIMETAL_ENABLE_TINY_TRIANGLE_CULLING)) {
+    if (TfGetEnvSetting(HGIMETAL_DISABLE_TINY_TRIANGLE_CULLING)) {
+
+    } else {
         header << "#define TINY_TRIANGLE_CULL\n";
     }
     

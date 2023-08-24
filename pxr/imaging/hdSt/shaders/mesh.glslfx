@@ -363,7 +363,7 @@ void main(void)
 bool testTriangle(vec2 a, vec2 b, vec2 c, float winding)
 {
   // back face culling
-  
+
   vec2 ab = b.xy - a.xy;
   vec2 ac = c.xy - a.xy;
   float cross_product = ab.x * ac.y - ab.y * ac.x;
@@ -384,13 +384,21 @@ bool testTriangle(vec2 a, vec2 b, vec2 c, float winding)
 
 bool testTriangle(vec2 a, vec2 b, vec2 c, float winding)
 {
-  #ifdef TINY_TRIANGLE_CULL
-  vec2 pixelMin = min(a,min(b,c));
+// back face culling
+
+    vec2 ab = b.xy - a.xy;
+    vec2 ac = c.xy - a.xy;
+    float cross_product = ab.x * ac.y - ab.y * ac.x;
+
+    //possibly needs reversal
+    if (cross_product * winding < 0.0f) {return false;}
+#ifdef TINY_TRIANGLE_CULL
+    vec2 pixelMin = min(a,min(b,c));
   vec2 pixelMax = max(a,max(b,c));
 
   if (pixelBboxCull(pixelMin, pixelMax)) return false;
-  #endif
-  return true;
+#endif
+    return true;
 }
 
 
@@ -544,10 +552,9 @@ void main(void) {
         ApplyClipPlanes(vertexOut.Peye);
     }
     
-    const uint base = hd_LocalIndexID * 9;
-    const uint base2 = hd_LocalIndexID * 6;
+    const uint base2 = hd_LocalIndexID * 4;
     const device uint *indicesOff = meshletIndicesStart + base2;
-    const uint currPrim = hd_LocalIndexID * 3;
+    const uint currPrim = hd_LocalIndexID * 2;
     threadgroup_barrier(mem_flags::mem_threadgroup);
     if((currPrim ) < (meshletPrimitiveCount)) {
         uchar3 indA = as_type<uchar3>(*(indicesOff));
@@ -574,32 +581,17 @@ void main(void) {
         cullBitsB.y = *((reinterpret_cast<thread uint *>(&p1B))+2);
         cullBitsB.z = *((reinterpret_cast<thread uint *>(&p2B))+2);
 
-        bool culledB  = !testTriangle(p0B.xy, p1B.xy, p2B.xy, 1.0, cullBitsB);
-    
-        uchar3 indC = as_type<uchar3>(*(indicesOff + 4));
-        vec3 p0C = posCache[indC.x];
-        vec3 p1C = posCache[indC.y];
-        vec3 p2C = posCache[indC.z];
-
-        //do frustum culling of the 3 points
-
-        uchar3 cullBitsC;
-        cullBitsC.x = *((reinterpret_cast<thread uint *>(&p0C))+2);
-        cullBitsC.y = *((reinterpret_cast<thread uint *>(&p1C))+2);
-        cullBitsC.z = *((reinterpret_cast<thread uint *>(&p2C))+2);
-
-        bool culledC = !testTriangle(p0C.xy, p1C.xy, p2C.xy, 1.0, cullBitsC);
+        uchar primsHere = uchar(min(meshletPrimitiveCount - currPrim, uint(2)));
+        bool culledB 
+            = !testTriangle(p0B.xy, p1B.xy, p2B.xy, 1.0, cullBitsB) && primsHere > 1;
 
         //now we know if a triangle got culled or not, we can focus on figuring out
         //how to compact and write it out
         //we compute a local (in clique) scan offset
-        uchar primsHere = uchar(min(meshletPrimitiveCount - currPrim, uint(3)));
-
-        uchar nonCulled = uchar(3) - uchar(culledA) + uchar(culledB) + uchar(culledC);
-        nonCulled = min(nonCulled, primsHere);
-        ushort localIndex = simd_prefix_exclusive_sum(nonCulled);
+        ushort total = ushort(!culledB) + ushort(!culledA);
+        ushort localIndex = simd_prefix_exclusive_sum(total);
         //here we also compute how many primitives in the clique pass
-        ushort passingPrims = simd_sum(nonCulled);
+        ushort passingPrims = simd_sum(total);
          
         int localOffset = 0;
         //one thread per wave/clique will need to increment the atomic
@@ -626,32 +618,19 @@ void main(void) {
             mesh.set_index(writeIndex , indA.x);
             mesh.set_index(writeIndex + 1, indA.y);
             mesh.set_index(writeIndex + 2, indA.z);
+            writePrim++;
             writeIndex +=3;
         }
-
-        if(primsHere > 1 && !culledB)
+        if(!culledB)
         {
             PrimOut primOutB;
             primOutB.primitive_id_ms = *(indicesOff + 3);
-            mesh.set_primitive(writePrim + 1, primOutB);
+            mesh.set_primitive(writePrim, primOutB);
 
             // Set the output indices.
             mesh.set_index(writeIndex, indB.x);
             mesh.set_index(writeIndex + 1, indB.y);
             mesh.set_index(writeIndex + 2, indB.z);
-            writeIndex +=3;
-        }
-
-        if(primsHere > 2 && !culledC)
-        {
-            PrimOut primOutC;
-            primOutC.primitive_id_ms = *(indicesOff + 5);
-            mesh.set_primitive(writePrim + 2, primOutC);
-
-            // Set the output indices.
-            mesh.set_index(writeIndex, indC.x);
-            mesh.set_index(writeIndex + 1, indC.y);
-            mesh.set_index(writeIndex + 2, indC.z);
         }
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);

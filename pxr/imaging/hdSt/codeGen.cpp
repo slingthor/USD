@@ -5020,15 +5020,18 @@ HdSt_CodeGen::_GenerateDrawingCoord(
                  << " = r.indices[" << index << "];\n";
         _genCS   << "  dc.instanceIndex[" << index << "]"
                  << " = r.indices[" << index << "];\n";
-            _genMOS   << "  dc.instanceIndex[" << index << "]"
-                     << " = r.indices[" << index << "];\n";
-            _genMS   << "  dc.instanceIndex[" << index << "]"
-                     << " = r.indices[" << index << "];\n";
+        _genMOS   << "  dc.instanceIndex[" << index << "]"
+                 << " = r.indices[" << index << "];\n";
+        _genMS   << "  dc.instanceIndex[" << index << "]"
+                 << " = r.indices[" << index << "];\n";
         if (_hasMS) {
+            /*
             for(int i = 0; i < instanceIndexWidth; ++i) {
                 _genFS << "  dc.instanceIndex[" << index << "]"
                 << " = r.indices[" << index << "];\n";
+             
             }
+            */
             for(int i = 0; i < instanceIndexWidth-1; ++i) {
                 //TODO Thor either pass this one only through VS
                 // Or do this right
