@@ -1039,8 +1039,6 @@ HdSt_PipelineDrawBatch::_CompileBatch(
                     *cmdIt++ = baseInstance;
                     *cmdIt++ = baseVertex;
                 } else {
-                    //TODO Thor compact this when appropriate
-                    //TODO Thor only bind index buffer if needed
                     *cmdIt++ = indexCount;
                     *cmdIt++ = instanceCount;
                     *cmdIt++ = baseIndex;
@@ -1250,7 +1248,6 @@ HdSt_PipelineDrawBatch::PrepareDraw(
     // the flag will be false because the resource registry will have already
     // uploaded the buffer.
     
-    //TODO Thor perhaps also for meshlets
     bool const updateBufferData = _drawCommandBufferDirty;
     if (updateBufferData) {
         _dispatchBuffer->CopyData(_drawCommandBuffer);
@@ -1597,14 +1594,14 @@ _GetDrawPipeline(
 static
 HgiGraphicsPipelineSharedPtr
 _GetPTCSPipeline(
-        HdStRenderPassStateSharedPtr const & renderPassState,
-        HdStResourceRegistrySharedPtr const & resourceRegistry,
-        _BindingState const & state)
+    HdStRenderPassStateSharedPtr const & renderPassState,
+    HdStResourceRegistrySharedPtr const & resourceRegistry,
+    _BindingState const & state)
 {
     // PTCS pipeline is compatible as long as the shader and
     // pipeline state are the same.
     HgiShaderProgramHandle const & programHandle =
-            state.glslProgram->GetProgram();
+        state.glslProgram->GetProgram();
 
     static const uint64_t salt = ArchHash64(__FUNCTION__, sizeof(__FUNCTION__));
     uint64_t hash = salt;
@@ -1612,7 +1609,7 @@ _GetPTCSPipeline(
     hash = TfHash::Combine(hash, renderPassState->GetGraphicsPipelineHash());
 
     HdInstance<HgiGraphicsPipelineSharedPtr> pipelineInstance =
-            resourceRegistry->RegisterGraphicsPipeline(hash);
+        resourceRegistry->RegisterGraphicsPipeline(hash);
 
     if (pipelineInstance.IsFirstInstance()) {
         HgiGraphicsPipelineDesc pipeDesc;
@@ -1638,7 +1635,7 @@ _GetPTCSPipeline(
         HgiGraphicsPipelineHandle pso = hgi->CreateGraphicsPipeline(pipeDesc);
 
         pipelineInstance.SetValue(
-                std::make_shared<HgiGraphicsPipelineHandle>(pso));
+            std::make_shared<HgiGraphicsPipelineHandle>(pso));
     }
 
     return pipelineInstance.GetValue();
@@ -1673,7 +1670,6 @@ HdSt_PipelineDrawBatch::ExecuteDraw(
     // If an indirect command buffer was created in the Prepare phase then
     // execute it here.  Otherwise render with the normal graphicsCmd path.
     //
-
     if (_indirectCommands) {
         HgiIndirectCommandEncoder *encoder = hgi->GetIndirectCommandEncoder();
         encoder->ExecuteDraw(gfxCmds, _indirectCommands.get());
@@ -1734,7 +1730,8 @@ HdSt_PipelineDrawBatch::ExecuteDraw(
         // Drawing can be either direct or indirect. For either case,
         // the drawing batch and drawing program are prepared to resolve
         // drawing coordinate state indirectly, i.e. from buffer data.
-        bool const drawIndirect = true;
+        bool const drawIndirect =
+            capabilities->IsSet(HgiDeviceCapabilitiesBitsMultiDrawIndirect);
 
         if (drawIndirect) {
             _ExecuteDrawIndirect(gfxCmds, state.indexBar, psoHandle, renderPassState);
@@ -1795,12 +1792,7 @@ HdSt_PipelineDrawBatch::_ExecuteDrawIndirect(
             }
             gfxCmds->DrawIndexedMeshIndirect(
                     indexBuffer->GetHandle(),
-                    _dispatchBuffer->GetCount(),
-                    0,
-                    0,
-                    0,
-                    0,
-                    0);
+                    _dispatchBuffer->GetCount());
         } else {
         gfxCmds->DrawIndexedIndirect(
             indexBuffer->GetHandle(),

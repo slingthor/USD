@@ -697,12 +697,7 @@ HgiMetalGraphicsCmds::DrawIndexed(
 void
 HgiMetalGraphicsCmds::DrawIndexedMeshIndirect(
     HgiBufferHandle const& indexBuffer,
-    uint32_t drawCount,
-    uint32_t indexBufferByteOffset,
-    uint32_t baseVertex,
-    uint32_t instanceCount,
-    uint32_t baseInstance,
-    uint32_t drawIndex)
+    uint32_t drawCount)
 {
     _SyncArgumentBuffer();
 
