@@ -338,15 +338,8 @@ static constant constexpr uchar numMeshletsOffset = 6;
 static constant constexpr uchar gl_InstanceID = 0;
 static constant constexpr uchar gl_BaseInstance = 0;
 
-template <uint S, uint E> void checkSize()
-{
-    static_assert(S == E);    
-}
-
 void main(void)
 {   
-    //checkSize<sizeof(*this), 0>();
-
     if (hd_LocalIndexID == 0) {
         payload.indexCount = GetDrawingField(indexCountOffset, hd_LocalInvocationID.x);
         payload.baseIndex = GetDrawingField(baseIndexOffset, hd_LocalInvocationID.x);
@@ -450,7 +443,8 @@ bool pixelBboxCull(vec2 pixelMin, vec2 pixelMax)
 vec2 getScreenPos(vec4 hPos)
 {
     hPos /= hPos.w;
-    return vec2((hPos.xy * 0.5f + 0.5) * (renderPassState.viewport.zw - renderPassState.viewport.xy));
+    return vec2((hPos.xy * 0.5f + 0.5) *
+        (renderPassState.viewport.zw - renderPassState.viewport.xy));
 }
 
 bool testTriangle(const vec2 a, const vec2 b, const vec2 c, const float winding, const uchar3 cullBits)
@@ -468,7 +462,6 @@ uchar getCullBits(vec4 hPos)
     cullBits |= hPos.x >  hPos.w ?  2 : 0;
     cullBits |= hPos.y < -hPos.w ?  4 : 0;
     cullBits |= hPos.y >  hPos.w ?  8 : 0;
-    //cullBits |= hPos.z < -hPos.w ? 16 : 0;
     cullBits |= hPos.z <  0.0f      ? 16 : 0;
     cullBits |= hPos.z >  hPos.w ? 32 : 0;
     cullBits |= hPos.w <= 0.0f      ? 64 : 0;
@@ -490,7 +483,7 @@ uint32_t baseIndex;
 
 hd_drawingCoord dcMemb;
 void main(void) {
-    if(hd_LocalIndexID == (MAX_VERTICES-1)){
+    if(hd_LocalIndexID == 191){
         atomic_store_explicit(&accumulator,0,memory_order_relaxed);
     }
     const device uint *meshletStart = meshletRemap + payload.meshletCoord;
@@ -500,22 +493,18 @@ void main(void) {
     const uint meshletVertexCount = *(thisMeshCoord);
     const uint meshletPrimitiveCount = *(thisMeshCoord + 1);
 
-    //TODO don't need to store this here
     const device uint *meshletVerticesStart = (thisMeshCoord + 2);
 
     const uint numUintsPerVertex = 2;
-    const device uint *meshletIndicesStart = (thisMeshCoord + 2 + (meshletVertexCount * numUintsPerVertex));
-
-    //can be simplified to always use payload.baseVertex
-    const uint endIndex = meshletPrimitiveCount * 3;
+    const device uint *meshletIndicesStart = 
+        (thisMeshCoord + 2 + (meshletVertexCount * numUintsPerVertex));
+    const uint endIndex  = meshletPrimitiveCount * 3;
     if(endIndex < 1) {
         return;
     }
 
     if (hd_LocalIndexID < endIndex)
     {
-        //TODO can we simply try to not use registers for this
-        //TODO probably not needed
         baseVertex = payload.baseVertex;
         baseIndex = payload.baseIndex;
         gl_BaseInstance = payload.baseInstance;
@@ -527,12 +516,10 @@ void main(void) {
     {
         primitive_id = ((hd_LocalInvocationID.y * MAX_PRIMITIVES) + hd_LocalIndexID)/3;
         const uint index = *(meshletVerticesStart + hd_LocalIndexID * numUintsPerVertex + 1);
-        //todo resolve the index
-        //TODO investigate this
-        //this is problematic because of threads
 
         VertexOut vertexOut;
-        const uint vertIndirection = *(meshletVerticesStart + hd_LocalIndexID * numUintsPerVertex);
+        const uint vertIndirection = 
+            *(meshletVerticesStart + hd_LocalIndexID * numUintsPerVertex);
         dcMemb = GetDrawingCoordFull();
         ProcessPrimvarsIn(vertIndirection);
         float4 point = float4(HdGet_points(vertIndirection), 1.0f);
@@ -540,7 +527,8 @@ void main(void) {
         vec3 Neye0 = GetNormal(vec3(0),vertIndirection);
         const MAT4 transform = ApplyInstanceTransform(HdGet_transform());
         vertexOut.Peye = vec4(GetWorldToViewMatrix() * transform * point);
-        vertexOut.Peye = DisplacementTerminal(hd_LocalIndexID%3, vertexOut.Peye, Neye0, GetPatchCoord(hd_LocalIndexID%3));
+        vertexOut.Peye = DisplacementTerminal(
+            hd_LocalIndexID%3, vertexOut.Peye, Neye0, GetPatchCoord(hd_LocalIndexID%3));
 
         vertexOut.Neye = Neye0; // normalized
 
@@ -606,7 +594,7 @@ void main(void) {
         //how to compact and write it out
         //we compute a local (in clique) scan offset
         uchar primsHere = uchar(min(meshletPrimitiveCount - currPrim, uint(3)));
-        //TODO Thor, use ushort potentially use less precision here
+
         uchar nonCulled = uchar(3) - uchar(culledA) + uchar(culledB) + uchar(culledC);
         nonCulled = min(nonCulled, primsHere);
         ushort localIndex = simd_prefix_exclusive_sum(nonCulled);
@@ -621,7 +609,8 @@ void main(void) {
         //clique and we can safely write to it
         if(hd_ThreadLocalIndexID == 0)
         {
-           localOffset = atomic_fetch_add_explicit(&accumulator,passingPrims,memory_order_relaxed);
+           localOffset = 
+               atomic_fetch_add_explicit(&accumulator,passingPrims,memory_order_relaxed);
         }
         //lets give the value of the local offset to all the threads in the clique
         localOffset = simd_broadcast(localOffset,0);
@@ -1815,7 +1804,12 @@ vec4 GetInterpolatedPatchCoord()
 --- --------------------------------------------------------------------------
 -- glsl Mesh.Fragment
 
+//TODO Thor make sure only for specific ones
 hd_drawingCoord dcMemb;
+
+static constant constexpr uint gl_BaseInstance = 0;
+static constant constexpr uint gl_InstanceID = 1;
+
 uint primitive_id_ms;
 
 #ifndef HD_HAS_ptexFaceOffset

@@ -3023,7 +3023,7 @@ HdSt_CodeGen::_CompileWithGeneratedHgiResources(
         mosDesc.meshDescriptor.maxTotalThreadgroupsPerMeshlet = 1024;
         mosDesc.meshDescriptor.maxTotalThreadgroupsPerMeshObject = 128;
         
-        mosDesc.meshDescriptor.maxMeshletVertexCount = 192;
+        mosDesc.meshDescriptor.maxMeshletVertexCount = 256;
         mosDesc.meshDescriptor.maxPrimitiveCount = 512;
         mosDesc.meshDescriptor.meshTopology =
                 HgiShaderFunctionMeshDesc::MeshTopology::Triangle;
@@ -3040,11 +3040,11 @@ HdSt_CodeGen::_CompileWithGeneratedHgiResources(
         msDesc.shaderStage = HgiShaderStageMeshlet;
         
         msDesc.meshDescriptor.maxTotalThreadsPerObjectThreadgroup = 1;
-        msDesc.meshDescriptor.maxTotalThreadsPerMeshletThreadgroup = 192;
+        msDesc.meshDescriptor.maxTotalThreadsPerMeshletThreadgroup = 256;
         msDesc.meshDescriptor.maxTotalThreadgroupsPerMeshlet = 1024;
         msDesc.meshDescriptor.maxTotalThreadgroupsPerMeshObject = 128;
         
-        msDesc.meshDescriptor.maxMeshletVertexCount = 192;
+        msDesc.meshDescriptor.maxMeshletVertexCount = 256;
         msDesc.meshDescriptor.maxPrimitiveCount = 512;
         msDesc.meshDescriptor.meshTopology = HgiShaderFunctionMeshDesc::MeshTopology::Triangle;
 
@@ -3079,7 +3079,7 @@ HdSt_CodeGen::_CompileWithGeneratedHgiResources(
         msDesc.shaderCode = source.c_str();
         msDesc.generatedShaderCodeOut = &_msSource;
 
-        HgiShaderFunctionAddGlobalVariable(&msDesc, "posCache", "vec3", "192", true);
+        HgiShaderFunctionAddGlobalVariable(&msDesc, "posCache", "vec3", "256", true);
         HgiShaderFunctionAddGlobalVariable(&msDesc, "accumulator", "atomic_int", std::string(), true);
         
         // builtins
