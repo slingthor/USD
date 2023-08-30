@@ -4780,21 +4780,6 @@ HdSt_CodeGen::_GenerateDrawingCoord(
                << "  return GetBaseInstanceIndexCoord() + "
                << " GetCurrentInstance() * HD_INSTANCE_INDEX_WIDTH;\n"
                << "}\n";
-        
-        if (_hasMS) {
-            _genFS << "int GetBaseInstanceIndexCoord() {\n"
-                   << "  return GetDrawingCoordField(5);\n"
-                   << "}\n"
-
-                   << "int GetCurrentInstance() {\n"
-                   << "  return gl_InstanceID - gl_BaseInstance -1;\n"
-                   << "}\n"
-
-                   << "int GetInstanceIndexCoord() {\n"
-                   << "  return GetBaseInstanceIndexCoord() + "
-                   << " GetCurrentInstance() * HD_INSTANCE_INDEX_WIDTH;\n"
-                   << "}\n";
-        }
 
         if (_geometricShader->IsFrustumCullingPass()) {
             // for frustum culling:  use instanceIndices.
@@ -4843,12 +4828,6 @@ HdSt_CodeGen::_GenerateDrawingCoord(
                           _metaData.culledInstanceIndexArrayBinding.dataType,
                           _metaData.culledInstanceIndexArrayBinding.binding,
                           "GetInstanceIndexCoord()+localIndex + 1");
-            if(_hasMS) {
-                _EmitAccessor(_genFS, _metaData.culledInstanceIndexArrayBinding.name,
-                              _metaData.culledInstanceIndexArrayBinding.dataType,
-                              _metaData.culledInstanceIndexArrayBinding.binding,
-                              "GetInstanceIndexCoord()+localIndex + 1");
-            }
 
             if (!_hasMS) {
                 genAttr << "hd_instanceIndex GetInstanceIndex() {\n"
@@ -4878,27 +4857,31 @@ HdSt_CodeGen::_GenerateDrawingCoord(
         }
     }
 
-    if (!_hasCS && !_hasMS) {
-        for (std::string const & param : drawingCoordParams) {
-            TfToken const drawingCoordParamName("dc_" + param);
-            _AddInterstageElement(&_resInterstage,
-                                  HdSt_ResourceLayout::InOut::NONE,
-                                  /*name=*/drawingCoordParamName,
-                                  /*dataType=*/_tokens->_int);
+    if (!_hasCS) {
+        if (!_hasMS) {
+            for (std::string const & param : drawingCoordParams) {
+                TfToken const drawingCoordParamName("dc_" + param);
+                _AddInterstageElement(&_resInterstage,
+                                      HdSt_ResourceLayout::InOut::NONE,
+                                      /*name=*/drawingCoordParamName,
+                                      /*dataType=*/_tokens->_int);
+            }
         }
+        TfToken instanceDataType =
+            _hasMS ? TfToken("ushort") : _tokens->_int;
         for (int i = 0; i < instanceIndexWidth; ++i) {
             TfToken const name(TfStringPrintf("dc_instanceIndexI%d", i));
             _AddInterstageElement(&_resInterstage,
                                   HdSt_ResourceLayout::InOut::NONE,
                                   /*name=*/name,
-                                  /*dataType=*/_tokens->_int);
+                                  /*dataType=*/instanceDataType);
         }
         for (int i = 0; i < instanceIndexWidth; ++i) {
             TfToken const name(TfStringPrintf("dc_instanceCoordsI%d", i));
             _AddInterstageElement(&_resInterstage,
                                   HdSt_ResourceLayout::InOut::NONE,
                                   /*name=*/name,
-                                  /*dataType=*/_tokens->_int);
+                                  /*dataType=*/instanceDataType);
         }
     }
 
@@ -4907,9 +4890,6 @@ HdSt_CodeGen::_GenerateDrawingCoord(
     _genPTVS << genAttr.str();
     _genMOS << genAttr.str();
     _genMS << genAttr.str();
-    if (_hasMS) {
-        _genFS << genAttr.str();
-    }
 
     _genVS   << "hd_drawingCoord GetDrawingCoord() { hd_drawingCoord dc;\n"
              << "  dc.modelCoord              = drawingCoord0.x;\n"
@@ -5000,8 +4980,7 @@ HdSt_CodeGen::_GenerateDrawingCoord(
         << "  dc.shaderCoord             = GetDrawingCoordField(6);\n"
         << "  dc.vertexCoord             = GetDrawingCoordField(7);\n"
         << "  dc.topologyVisibilityCoord = GetDrawingCoordField(8);\n"
-        << "  dc.varyingCoord            = GetDrawingCoordField(9);\n"
-        << "  hd_instanceIndex r = GetInstanceIndex();\n";
+        << "  dc.varyingCoord            = GetDrawingCoordField(9);\n";
     } else {
         _genFS   << "// Compute shaders read the drawCommands buffer directly.\n"
         << "hd_drawingCoord GetDrawingCoordFull() {\n"
@@ -5013,38 +4992,31 @@ HdSt_CodeGen::_GenerateDrawingCoord(
     for(int i = 0; i < instanceIndexWidth; ++i) {
         std::string const index = std::to_string(i);
         _genVS   << "  dc.instanceIndex[" << index << "]"
-                 << " = r.indices[" << index << "];\n";
+            << " = r.indices[" << index << "];\n";
         _genPTCS << "  dc.instanceIndex[" << index << "]"
-                 << " = r.indices[" << index << "];\n";
+            << " = r.indices[" << index << "];\n";
         _genPTVS << "  dc.instanceIndex[" << index << "]"
-                 << " = r.indices[" << index << "];\n";
+            << " = r.indices[" << index << "];\n";
         _genCS   << "  dc.instanceIndex[" << index << "]"
-                 << " = r.indices[" << index << "];\n";
+            << " = r.indices[" << index << "];\n";
         _genMOS   << "  dc.instanceIndex[" << index << "]"
-                 << " = r.indices[" << index << "];\n";
+            << " = r.indices[" << index << "];\n";
         _genMS   << "  dc.instanceIndex[" << index << "]"
-                 << " = r.indices[" << index << "];\n";
-        if (_hasMS) {
-            /*
-            for(int i = 0; i < instanceIndexWidth; ++i) {
-                _genFS << "  dc.instanceIndex[" << index << "]"
-                << " = r.indices[" << index << "];\n";
-             
-            }
-            */
-            for(int i = 0; i < instanceIndexWidth-1; ++i) {
-                //TODO Thor either pass this one only through VS
-                // Or do this right
-                /*
-                 _genFS << "  dc.instanceCoords[" << index << "]"
-                 << " = GetDrawingCoordField(10 +" << index <<")"
-                 << " + dc.instanceIndex[" << std::to_string(i+1) << "];\n";
-                 */
-                _genFS << "  dc.instanceCoords[" << index << "]"
-                << " = " << i << ";\n";
-            }
-            
+            << " = r.indices[" << index << "];\n";
+    }
+    if (_hasMS) {
+        for(int i = 0; i < instanceIndexWidth; ++i) {
+            _genFS << "  dc.instanceCoords[" << std::to_string(i) << "]"
+            << " = " << "vs_dc_"
+            << "instanceCoordsI" << std::to_string(i) << ";\n";
         }
+        
+        for(int i = 0; i < instanceIndexWidth-1; ++i) {
+            _genFS << "  dc.instanceCoords[" << std::to_string(i) << "]"
+                << " = " << "vs_dc_"
+                << "instanceCoordsI" << std::to_string(i) << ";\n";
+        }
+
     }
 
     for(int i = 0; i < instanceIndexWidth-1; ++i) {
@@ -5841,8 +5813,9 @@ HdSt_CodeGen::_GenerateVertexAndFaceVaryingPrimvar()
         // to use "component" qualifier to declare offsetted primvars
         // in interleaved buffer.
         _EmitDeclaration(&_resAttrib, name, dataType, binding, false, -1, _hasMOS);
-
-        interstagePrimvar.emplace_back(_GetPackedType(dataType, false), name);
+        if (name.GetString() != "points" && _hasMS) {
+            interstagePrimvar.emplace_back(_GetPackedType(dataType, false), name);
+        }
 
         // primvar accessors
         _EmitAccessor(accessorsVS, name, dataType, binding);
@@ -5853,8 +5826,10 @@ HdSt_CodeGen::_GenerateVertexAndFaceVaryingPrimvar()
                             name, dataType, /*arraySize=*/1, "localIndex");
         _EmitStructAccessor(accessorsGS,  _tokens->inPrimvars,
                             name, dataType, /*arraySize=*/1, "localIndex");
-        _EmitStructAccessor(accessorsFS,  _tokens->inPrimvars,
-                            name, dataType, /*arraySize=*/1);
+        if (name.GetString() != "points" && _hasMS) {
+            _EmitStructAccessor(accessorsFS,  _tokens->inPrimvars,
+                                name, dataType, /*arraySize=*/1);
+        }
 
         //TODO Thor align
         // PTVS vertex primvar is staged in local arrays.
@@ -5873,26 +5848,28 @@ HdSt_CodeGen::_GenerateVertexAndFaceVaryingPrimvar()
         //   name.GetString() + "[localIndex + base_vertex]", dataType);
 
         // interstage plumbing
-        _procVS << "  outPrimvars." << name
-                << " = " << name << ";\n";
-        _procTCS << "  outPrimvars[gl_InvocationID]." << name
-                 << " = inPrimvars[gl_InvocationID]." << name << ";\n";
-        _procTES << "  outPrimvars." << name
-                 << " = basis[0] * inPrimvars[i0]." << name
-                 << " + basis[1] * inPrimvars[i1]." << name
-                 << " + basis[2] * inPrimvars[i2]." << name
-                 << " + basis[3] * inPrimvars[i3]." << name << ";\n";
-        _procGS  << "  outPrimvars." << name
-                 << " = inPrimvars[index]." << name << ";\n";
-        _procMSOut << "  vertexOut." << name
-                  << " = ms_ms_" << name << ";\n";
-        _procPTVSOut << "  outPrimvars." << name
-                     << " = InterpolatePrimvar("
-                     << "HdGet_" << name << "(i0), "
-                     << "HdGet_" << name << "(i1), "
-                     << "HdGet_" << name << "(i2), "
-                     << "HdGet_" << name << "(i3), basis, uv);\n";
-        _procMSIn  << "    ms_ms_" << name << " = HdGet_" << name << "(index);\n";
+        if (name.GetString() != "points" && _hasMS) {
+            _procVS << "  outPrimvars." << name
+            << " = " << name << ";\n";
+            _procTCS << "  outPrimvars[gl_InvocationID]." << name
+            << " = inPrimvars[gl_InvocationID]." << name << ";\n";
+            _procTES << "  outPrimvars." << name
+            << " = basis[0] * inPrimvars[i0]." << name
+            << " + basis[1] * inPrimvars[i1]." << name
+            << " + basis[2] * inPrimvars[i2]." << name
+            << " + basis[3] * inPrimvars[i3]." << name << ";\n";
+            _procGS  << "  outPrimvars." << name
+            << " = inPrimvars[index]." << name << ";\n";
+            _procMSOut << "  vertexOut." << name
+            << " = ms_ms_" << name << ";\n";
+            _procPTVSOut << "  outPrimvars." << name
+            << " = InterpolatePrimvar("
+            << "HdGet_" << name << "(i0), "
+            << "HdGet_" << name << "(i1), "
+            << "HdGet_" << name << "(i2), "
+            << "HdGet_" << name << "(i3), basis, uv);\n";
+            _procMSIn  << "    ms_ms_" << name << " = HdGet_" << name << "(index);\n";
+        }
     }
 
     /*
