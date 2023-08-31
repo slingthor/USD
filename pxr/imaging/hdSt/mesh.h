@@ -189,6 +189,15 @@ protected:
     
     void _PopulateAdjacency(
         HdStResourceRegistrySharedPtr const &resourceRegistry);
+    
+    void _PopulateMeshlets(HdSceneDelegate *sceneDelegate,
+                                 HdRenderParam *renderParam,
+                                 const HdReprSharedPtr &repr,
+                                 const HdMeshReprDesc &desc,
+                                 HdStDrawItem *drawItem,
+                                 int geomSubsetDescIndex,
+                                 HdDirtyBits *dirtyBits,
+                                 bool requireSmoothNormals);
         
     void _PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
                                  HdRenderParam *renderParam,
