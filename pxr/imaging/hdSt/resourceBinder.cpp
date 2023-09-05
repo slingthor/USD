@@ -1083,7 +1083,8 @@ HdSt_ResourceBinder::GetBufferBindingDesc(
         HgiShaderStagePostTessellationControl |
         HgiShaderStagePostTessellationVertex |
         HgiShaderStageTessellationControl | HgiShaderStageTessellationEval |
-        HgiShaderStageGeometry | HgiShaderStageFragment | HgiShaderStageMeshObject | HgiShaderStageMeshlet;
+        HgiShaderStageMeshObject | HgiShaderStageMeshlet |
+        HgiShaderStageGeometry | HgiShaderStageFragment;
     HgiBufferBindDesc desc;
     desc.writable = true;
 

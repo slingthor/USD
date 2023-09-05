@@ -1215,10 +1215,11 @@ HgiMetalShaderStageEntryPoint::_Init(
         /* isPointer = */ true,
         /* members = */ stageConstantBuffers,
         generator);
-    //TODO THOR THIS IS A BIG HACK PLEASE FIX THIS WORKAROUND THIS IS JUST
-    //TO REMOVE STAGE_IN FOR MESH OBJECTS
-    if (generator->_descriptor.shaderStage != HgiShaderStageMeshObject && generator->_descriptor.shaderStage != HgiShaderStageMeshlet) {
-        bool isMeshFragment = generator->_descriptor.meshDescriptor.meshTopology != HgiShaderFunctionMeshDesc::MeshTopology::None;
+    //Removes stage_in for mesh shaders
+    if (generator->_descriptor.shaderStage != HgiShaderStageMeshObject
+        && generator->_descriptor.shaderStage != HgiShaderStageMeshlet) {
+        bool isMeshFragment = generator->_descriptor.meshDescriptor.meshTopology
+            != HgiShaderFunctionMeshDesc::MeshTopology::None;
         if (!isMeshFragment) {
     _inputs =
         _BuildStructInstance<HgiMetalParameterInputShaderSection>(
@@ -1267,7 +1268,8 @@ HgiMetalShaderStageEntryPoint::_Init(
                     "",
                     "",
                     false);
-        generator->CreateShaderSection<HgiMetalStageOutputMeshShaderSection>(structTypeSection);
+        generator->CreateShaderSection<
+            HgiMetalStageOutputMeshShaderSection>(structTypeSection);
     }
     else {
     _outputs =

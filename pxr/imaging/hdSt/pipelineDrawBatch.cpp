@@ -833,7 +833,8 @@ HdSt_PipelineDrawBatch::_CompileBatch(
     bool const useMetalTessellation =
         _drawItemInstances[0]->GetDrawItem()->
                 GetGeometricShader()->GetUseMetalTessellation();
-    bool isMeshShader = _drawItemInstances[0]->GetDrawItem()->GetGeometricShader()->GetUseMeshShaders();
+    bool isMeshShader = _drawItemInstances[0]->GetDrawItem()->
+        GetGeometricShader()->GetUseMeshShaders();
 
     // Align drawing commands to 32 bytes for Metal.
     size_t const uint32Alignment = useMetalTessellation ? 8 : 0;
@@ -1571,11 +1572,17 @@ _GetDrawPipeline(
         if (pipeDesc.meshState.useMeshShader) {
             for (const auto& fun : programHandle->GetDescriptor().shaderFunctions) {
                 if (fun->GetDescriptor().shaderStage == HgiShaderStageMeshlet) {
-                    pipeDesc.meshState.maxTotalThreadsPerMeshThreadgroup = fun->GetDescriptor().meshDescriptor.maxTotalThreadsPerMeshletThreadgroup;
+                    pipeDesc.meshState.maxTotalThreadsPerMeshThreadgroup =
+                        fun->GetDescriptor().meshDescriptor.
+                            maxTotalThreadsPerMeshletThreadgroup;
                 }
                 if (fun->GetDescriptor().shaderStage == HgiShaderStageMeshObject) {
-                    pipeDesc.meshState.maxTotalThreadsPerObjectThreadgroup = fun->GetDescriptor().meshDescriptor.maxTotalThreadsPerObjectThreadgroup;
-                    pipeDesc.meshState.maxTotalThreadGroupsPerObject = fun->GetDescriptor().meshDescriptor.maxTotalThreadgroupsPerMeshObject;
+                    pipeDesc.meshState.maxTotalThreadsPerObjectThreadgroup =
+                        fun->GetDescriptor().meshDescriptor.
+                            maxTotalThreadsPerObjectThreadgroup;
+                    pipeDesc.meshState.maxTotalThreadGroupsPerObject =
+                        fun->GetDescriptor().meshDescriptor.
+                            maxTotalThreadgroupsPerMeshObject;
                 }
             }
         }
@@ -1629,7 +1636,7 @@ _GetPTCSPipeline(
         pipeDesc.shaderProgram = state.glslProgram->GetProgram();
         pipeDesc.vertexBuffers = _GetVertexBuffersForDrawing(state);
         pipeDesc.tessellationState.tessFactorMode =
-                HgiTessellationState::TessControl;
+            HgiTessellationState::TessControl;
 
         Hgi* hgi = resourceRegistry->GetHgi();
         HgiGraphicsPipelineHandle pso = hgi->CreateGraphicsPipeline(pipeDesc);
@@ -1704,15 +1711,11 @@ HdSt_PipelineDrawBatch::ExecuteDraw(
                 _drawItemInstances[0]->GetDrawItem()->
                         GetGeometricShader()->GetUseMeshShaders();
         if (useMeshShaders) {
-            // bind destination buffer
-            // (using entire buffer bind to start from offset=0)
-            //todo improve so only in mesh obj
-            
             state.binder.GetBufferBindingDesc(
-                    &bindingsDesc,
-                    _tokens->drawBuffer,
-                    _dispatchBuffer->GetEntireResource(),
-                    _dispatchBuffer->GetEntireResource()->GetOffset());
+                &bindingsDesc,
+                _tokens->drawBuffer,
+                _dispatchBuffer->GetEntireResource(),
+                _dispatchBuffer->GetEntireResource()->GetOffset());
              
         }
         state.GetBindingsForDrawing(&bindingsDesc,
@@ -1750,8 +1753,8 @@ void
 HdSt_PipelineDrawBatch::_ExecuteDrawIndirect(
     HgiGraphicsCmds * gfxCmds,
     HdStBufferArrayRangeSharedPtr const & indexBar,
-                                             HgiGraphicsPipelineHandle psoHandle,
-                                             HdStRenderPassStateSharedPtr const & renderPassState)
+    HgiGraphicsPipelineHandle psoHandle,
+    HdStRenderPassStateSharedPtr const & renderPassState)
 {
     TRACE_FUNCTION();
 
@@ -1780,16 +1783,14 @@ HdSt_PipelineDrawBatch::_ExecuteDrawIndirect(
                 uint32_t drawCoordOffset;
             };
 
-            if (useMeshShaders) {
-                // set instanced cull parameters
-                Uniforms cullParams;
-                cullParams.drawCommandNumUints = _dispatchBuffer->GetCommandNumUints();
-                cullParams.drawCoordOffset = uint32_t(_drawCoordOffset);
+            // set instanced cull parameters
+            Uniforms cullParams;
+            cullParams.drawCommandNumUints = _dispatchBuffer->GetCommandNumUints();
+            cullParams.drawCoordOffset = uint32_t(_drawCoordOffset);
 
-                gfxCmds->SetConstantValues(
-                        psoHandle, 0, 27,
-                        sizeof(Uniforms), &cullParams);
-            }
+            gfxCmds->SetConstantValues(
+                    psoHandle, 0, 27,
+                    sizeof(Uniforms), &cullParams);
             gfxCmds->DrawIndexedMeshIndirect(
                     indexBuffer->GetHandle(),
                     _dispatchBuffer->GetCount());

@@ -2690,8 +2690,7 @@ HdSt_CodeGen::_CompileWithGeneratedHgiResources(
         if (_hasMS) {
             fsDesc.meshDescriptor.meshUser = true;
             HgiShaderFunctionAddStageInput(
-                                           &fsDesc, "drawIndexVS", "uint",
-                                           "");
+               &fsDesc, "drawIndexVS", "uint", "");
         }
         resourceGen._GenerateHgiResources(&fsDesc,
             HdShaderTokens->fragmentShader, _resCommon, _metaData);
@@ -2969,9 +2968,6 @@ HdSt_CodeGen::_CompileWithGeneratedHgiResources(
         HgiShaderFunctionDesc mosDesc;
         mosDesc.shaderStage = HgiShaderStageMeshObject;
 
-        //ptcsDesc.tessellationDescriptor.numVertsPerPatchIn =
-        //        _geometricShader->GetPrimitiveIndexSize();
-
         resourceGen._GenerateHgiResources(&mosDesc,
                                           HdShaderTokens->meshObjectShader, _resAttrib, _metaData);
         resourceGen._GenerateHgiResources(&mosDesc,
@@ -3046,7 +3042,8 @@ HdSt_CodeGen::_CompileWithGeneratedHgiResources(
         
         msDesc.meshDescriptor.maxMeshletVertexCount = 256;
         msDesc.meshDescriptor.maxPrimitiveCount = 512;
-        msDesc.meshDescriptor.meshTopology = HgiShaderFunctionMeshDesc::MeshTopology::Triangle;
+        msDesc.meshDescriptor.meshTopology =
+            HgiShaderFunctionMeshDesc::MeshTopology::Triangle;
 
         if (_metaData.meshletRemapBinding.binding.IsValid()) {
             HdStBinding binding = _metaData.meshletRemapBinding.binding;
@@ -3059,28 +3056,31 @@ HdSt_CodeGen::_CompileWithGeneratedHgiResources(
 
         AddMeshShaderPayload(&msDesc);
         resourceGen._GenerateHgiResources(&msDesc,
-                                          HdShaderTokens->meshletShader, _resAttrib, _metaData);
+            HdShaderTokens->meshletShader, _resAttrib, _metaData);
         resourceGen._GenerateHgiResources(&msDesc,
-                                          HdShaderTokens->meshletShader, _resCommon, _metaData);
+            HdShaderTokens->meshletShader, _resCommon, _metaData);
         resourceGen._GenerateHgiResources(&msDesc,
-                                          HdShaderTokens->meshletShader, _resMS, _metaData);
+            HdShaderTokens->meshletShader, _resMS, _metaData);
 
         // material in PTVS
         resourceGen._GenerateHgiResources(&msDesc,
-                                          HdShaderTokens->meshletShader, _resMaterial, _metaData);
+            HdShaderTokens->meshletShader, _resMaterial, _metaData);
         resourceGen._GenerateHgiTextureResources(&msDesc,
-                                                 HdShaderTokens->meshletShader, _resTextures, _metaData);
+            HdShaderTokens->meshletShader, _resTextures, _metaData);
 
         std::string const declarations =
-                _genDefines.str() + _genDecl.str() + _osd.str();
-        std::string const source = _osd.str() + _genAccessors.str() + _genMS.str();
+            _genDefines.str() + _genDecl.str() + _osd.str();
+        std::string const source =
+            _osd.str() + _genAccessors.str() + _genMS.str();
 
         msDesc.shaderCodeDeclarations = declarations.c_str();
         msDesc.shaderCode = source.c_str();
         msDesc.generatedShaderCodeOut = &_msSource;
 
-        HgiShaderFunctionAddGlobalVariable(&msDesc, "posCache", "vec3", "256", true);
-        HgiShaderFunctionAddGlobalVariable(&msDesc, "accumulator", "atomic_int", std::string(), true);
+        HgiShaderFunctionAddGlobalVariable(
+            &msDesc, "posCache", "vec3", "256", true);
+        HgiShaderFunctionAddGlobalVariable(
+            &msDesc, "accumulator", "atomic_int", std::string(), true);
         
         // builtins
         
@@ -4387,14 +4387,18 @@ HdSt_CodeGen::_GenerateDrawingCoord(
 
     //TODO Thor -> this should only be relevant to if it's culling or not
     if (!_hasCS) {
-        _EmitDeclaration(&_resAttrib, _metaData.drawingCoord0Binding, -1, _hasMOS);
-        _EmitDeclaration(&_resAttrib, _metaData.drawingCoord1Binding, -1, _hasMOS);
-        _EmitDeclaration(&_resAttrib, _metaData.drawingCoord2Binding, -1, _hasMOS);
+        _EmitDeclaration(
+            &_resAttrib, _metaData.drawingCoord0Binding, -1, _hasMOS);
+        _EmitDeclaration(
+            &_resAttrib, _metaData.drawingCoord1Binding, -1, _hasMOS);
+        _EmitDeclaration(
+            &_resAttrib, _metaData.drawingCoord2Binding, -1, _hasMOS);
 
 
         if (_metaData.drawingCoordIBinding.binding.IsValid()) {
             _EmitDeclaration(&_resAttrib, _metaData.drawingCoordIBinding,
-                /*arraySize=*/std::max(1, _metaData.instancerNumLevels), _hasMOS);
+                /*arraySize=*/std::max(1, _metaData.instancerNumLevels),
+                              _hasMOS);
         }
     }
 
@@ -4465,22 +4469,6 @@ HdSt_CodeGen::_GenerateDrawingCoord(
                         << "  return primitive_id_ms;\n"
                         << "}\n";
         }
-        /*
-        if (HdSt_GeometricShader::IsPrimTypeTriQuads(
-                                    _geometricShader->GetPrimitiveType())) {
-            primitiveID << "int GetPrimitiveID() {\n"
-                        << "  return gl_PrimitiveID / 2;\n"
-                        << "}\n"
-                        << "int GetTriQuadID() {\n"
-                        << "  return gl_PrimitiveID & 1;\n"
-                        << "}\n";
-
-        } else {
-            primitiveID << "int GetPrimitiveID() {\n"
-                        << "  return gl_PrimitiveID;\n"
-                        << "}\n";
-        }
-         */
     } else {
         if (HdSt_GeometricShader::IsPrimTypeTriQuads(
                                     _geometricShader->GetPrimitiveType())) {
@@ -5798,7 +5786,8 @@ HdSt_CodeGen::_GenerateVertexAndFaceVaryingPrimvar()
     */
 
     std::stringstream accessorsVS, accessorsTCS, accessorsTES,
-        accessorsPTCS, accessorsPTVS, accessorsGS, accessorsFS, accessorsMOS, accessorsMS;
+        accessorsPTCS, accessorsPTVS, accessorsGS, accessorsFS,
+        accessorsMOS, accessorsMS;
 
     HdSt_ResourceLayout::MemberVector interstagePrimvar;
 
@@ -5833,7 +5822,8 @@ HdSt_CodeGen::_GenerateVertexAndFaceVaryingPrimvar()
 
         //TODO Thor align
         // PTVS vertex primvar is staged in local arrays.
-        _procMSDecl << _GetPackedType(dataType, false) << " " << "ms_ms_" << name << ";\n";
+        _procMSDecl << _GetPackedType(dataType, false)
+            << " " << "ms_ms_" << name << ";\n";
 
         // Access PTCS vertex primvar from input attributes.
         _EmitStageAccessor(accessorsPTCS, name,
@@ -5843,9 +5833,8 @@ HdSt_CodeGen::_GenerateVertexAndFaceVaryingPrimvar()
             name.GetString() + "[localIndex]", dataType);
 
         _EmitStageAccessor(accessorsMS, name,
-           "(" +name.GetString() + " + baseVertex)[localIndex]", _GetPackedType(dataType, false));
-        //_EmitStageAccessor(accessorsMS, TfToken(name.GetString() + "_raw"),
-        //   name.GetString() + "[localIndex + base_vertex]", dataType);
+           "(" +name.GetString() + " + baseVertex)[localIndex]",
+           _GetPackedType(dataType, false));
 
         // interstage plumbing
         if (name.GetString() != "points" && _hasMS) {
@@ -7110,7 +7099,6 @@ HdSt_CodeGen::_GenerateShaderParameters(bool bindlessTextureEnabled)
     _genPTCS << accessors.str();
     _genPTVS << accessors.str();
     _genMS << accessors.str();
-    //TODO Thor add this if displacement
 }
 
 void

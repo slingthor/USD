@@ -132,6 +132,7 @@ public:
         return _mosSource;
     }
 
+    /// Return the generated meshlet shader source
     const std::string &GetMeshletShaderSource() const {
         return _msSource;
     }
