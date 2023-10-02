@@ -653,7 +653,7 @@ _AllocateMeshletDispatchBuffer(
 } // annonymous namespace
 
 constexpr uint32_t max_primitives = 512;
-constexpr uint32_t max_vertices = 192;
+constexpr uint32_t max_vertices = 256;
 
 struct VertexInfo {
     uint32_t vertexId;
