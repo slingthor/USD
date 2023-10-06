@@ -363,13 +363,14 @@ void main(void)
 bool testTriangle(vec2 a, vec2 b, vec2 c, float winding)
 {
   // back face culling
-
+  /*
   vec2 ab = b.xy - a.xy;
   vec2 ac = c.xy - a.xy;
   float cross_product = ab.x * ac.y - ab.y * ac.x;
 
   //possibly needs reversal
   if (cross_product * winding < 0.0f) {return false;}
+  */
   #ifdef TINY_TRIANGLE_CULL
   vec2 pixelMin = min(a,min(b,c));
   vec2 pixelMax = max(a,max(b,c));
@@ -385,13 +386,14 @@ bool testTriangle(vec2 a, vec2 b, vec2 c, float winding)
 bool testTriangle(vec2 a, vec2 b, vec2 c, float winding)
 {
 // back face culling
-
+    /*
     vec2 ab = b.xy - a.xy;
     vec2 ac = c.xy - a.xy;
     float cross_product = ab.x * ac.y - ab.y * ac.x;
 
     //possibly needs reversal
     if (cross_product * winding < 0.0f) {return false;}
+    */
 #ifdef TINY_TRIANGLE_CULL
     vec2 pixelMin = min(a,min(b,c));
   vec2 pixelMax = max(a,max(b,c));
