@@ -1671,8 +1671,17 @@ HdSt_PipelineDrawBatch::ExecuteDraw(
     // execute it here.  Otherwise render with the normal graphicsCmd path.
     //
     if (_indirectCommands) {
+        const std::function<void (HgiGraphicsCmds*)> dynamicStateCallback =
+            [this, &renderPassState](HgiGraphicsCmds* cmd) {
+                renderPassState->UpdateDynamicState(
+                        cmd,
+                        _drawItemInstances.front()->GetDrawItem()->
+                                GetGeometricShader());
+        };
         HgiIndirectCommandEncoder *encoder = hgi->GetIndirectCommandEncoder();
-        encoder->ExecuteDraw(gfxCmds, _indirectCommands.get());
+        encoder->ExecuteDraw(gfxCmds,
+                             _indirectCommands.get(),
+                             &dynamicStateCallback);
 
         hgi->DestroyResourceBindings(&(_indirectCommands->resourceBindings));
         _indirectCommands.reset();
@@ -1698,6 +1707,9 @@ HdSt_PipelineDrawBatch::ExecuteDraw(
         
         HgiGraphicsPipelineHandle psoHandle = *pso.get();
         gfxCmds->BindPipeline(psoHandle);
+        renderPassState->UpdateDynamicState(
+                gfxCmds,
+                state.geometricShader);
 
         HgiResourceBindingsDesc bindingsDesc;
         bool const useMeshShaders =
