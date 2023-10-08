@@ -169,6 +169,37 @@ vec3 GetNormal(vec3 Neye, int index, vec2 localST)
 }
 
 --- --------------------------------------------------------------------------
+-- glsl MeshNormal.Geometry.FlatMesh
+
+vec3 GetTriGeometryNormal(vec3 Neye, const device uint * meshletVerticesStart, uint hd_LocalIndexID, MAT4 transform)
+{
+    const uint numUintsPerVertex = 2;
+    // ignore vertex normal and compute flat facing normal
+    uint indexId0 = hd_LocalIndexID - (hd_LocalIndexID%3);
+    uint indexId1 = indexId0 + 1;
+    uint indexId2 = indexId0 + 2;
+    const uint vertIndirection0 = 
+        *(meshletVerticesStart + indexId0 * numUintsPerVertex);
+    const uint vertIndirection1 = 
+    *(meshletVerticesStart + indexId1 * numUintsPerVertex);
+    const uint vertIndirection2 = 
+    *(meshletVerticesStart + indexId2 * numUintsPerVertex);
+    float4 Peye0 = GetWorldToViewMatrix() * transform * float4(HdGet_points(vertIndirection0), 1.0f);
+    float4 Peye1 = GetWorldToViewMatrix() * transform * float4(HdGet_points(vertIndirection1), 1.0f);
+    float4 Peye2 = GetWorldToViewMatrix() * transform * float4(HdGet_points(vertIndirection2), 1.0f);
+    vec3 n = normalize(cross(Peye1.xyz - Peye0.xyz, Peye2.xyz - Peye0.xyz));
+    return n;
+}
+
+--- --------------------------------------------------------------------------
+-- glsl MeshNormal.Geometry.NoFlatMesh
+
+vec3 GetTriGeometryNormal(vec3 Neye, const device uint * meshletVerticesStart, uint hd_LocalIndexID, MAT4 transform)
+{
+    return Neye;
+}
+
+--- --------------------------------------------------------------------------
 -- glsl MeshNormal.Geometry.Flat
 
 vec3 GetTriGeometryNormal(vec3 Neye, vec4 Peye0, vec4 Peye1, vec4 Peye2,

@@ -46,6 +46,8 @@ TF_DEFINE_PRIVATE_TOKENS(
 
     ((normalsGeometryFlat,         "MeshNormal.Geometry.Flat"))
     ((normalsGeometryNoFlat,       "MeshNormal.Geometry.NoFlat"))
+    ((normalsGeometryFlatMesh,     "MeshNormal.Geometry.FlatMesh"))
+    ((normalsGeometryNoFlatMesh,    "MeshNormal.Geometry.NoFlatMesh"))
 
     ((normalsDoubleSidedFS,        "MeshNormal.Fragment.DoubleSided"))
     ((normalsSingleSidedFS,        "MeshNormal.Fragment.SingleSided"))
@@ -264,6 +266,10 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
         (normalsSource == NormalSourceScene && !vsSceneNormals);
     bool const ptvsGeometricNormals =
         (normalsSource == NormalSourceFlatGeometric);
+    
+    if (ptvsGeometricNormals) {
+        //useMeshShaders = false;
+    }
 
     // vertex shader
     uint8_t vsIndex = 0;
@@ -291,7 +297,7 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
     VS[vsIndex] = TfToken();
 
     // Determine if PTVS should be used for Metal.
-    bool const usePTVSTechniques =
+    bool usePTVSTechniques =
             isPrimTypePatches ||
             hasCustomDisplacement ||
             ptvsSceneNormals ||
@@ -302,9 +308,11 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
     useMetalTessellation =
         hasMetalTessellation && !isPrimTypePoints && usePTVSTechniques;
 
+    bool useMeshShading = UseMeshShaders();
     useMetalTessellation = false;
-
-    bool useMeshShading = UseMeshShaders() && !ptvsGeometricNormals;
+    if (useMeshShading) {
+        useMetalTessellation = false;
+    }
 
     // PTVS shaders can provide barycentric coords w/o GS.
     bool const hasFragmentShaderBarycentrics =
@@ -316,9 +324,9 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
     if (useMeshShading) {
         MS[msIndex++] = _tokens->instancing;
         if (ptvsGeometricNormals) {
-            MS[msIndex++] = _tokens->normalsGeometryFlat;
+            MS[msIndex++] = _tokens->normalsGeometryFlatMesh;
         } else {
-            MS[msIndex++] = _tokens->normalsGeometryNoFlat;
+            MS[msIndex++] = _tokens->normalsGeometryNoFlatMesh;
         }
 
         // Now handle the vs style normals
@@ -486,7 +494,7 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
 
     // Optimization : See if we can skip the geometry shader.
     bool const canSkipGS =
-            ptvsStageEnabled || UseMeshShaders() ||
+            ptvsStageEnabled || useMeshShading ||
             // Whether we can skip executing the displacement shading terminal
             (!hasCustomDisplacement
             && (normalsSource != NormalSourceLimit)

@@ -1178,11 +1178,8 @@ HdStRenderPassState::UpdateDynamicState(
         gfxCmds->SetPolygonMode(HgiPolygonModeFill);
     }
     gfxCmds->SetCullMode(
-       _ResolveCullMode(_cullStyle, geometricShader));
+                         geometricShader->ResolveCullMode(_cullStyle));
 }
-
-    rasterizationState->cullMode =
-        _ResolveCullMode(_cullStyle, geometricShader);
 
 void
 HdStRenderPassState::_InitRasterizationState(

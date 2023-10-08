@@ -2687,6 +2687,7 @@ HdSt_CodeGen::_CompileWithGeneratedHgiResources(
         if (_hasMS) {
             fsDesc.meshDescriptor.meshTopology = HgiShaderFunctionMeshDesc::MeshTopology::Triangle;
         }
+        
         if (_hasMS) {
             fsDesc.meshDescriptor.meshUser = true;
             HgiShaderFunctionAddStageInput(
@@ -5840,7 +5841,12 @@ HdSt_CodeGen::_GenerateVertexAndFaceVaryingPrimvar()
         // with ARB_enhanced_layouts extention, it's possible
         // to use "component" qualifier to declare offsetted primvars
         // in interleaved buffer.
-        _EmitDeclaration(&_resAttrib, name, dataType, binding, false, -1, _hasMOS);
+        if (_hasMOS) {
+            _EmitDeclaration(&_resAttrib, name, dataType, binding, false, -1, _hasMOS);
+        } else {
+            _EmitDeclaration(&_resAttrib, name, dataType, binding);
+        }
+        
 
         interstagePrimvar.emplace_back(_GetPackedType(dataType, false), name);
 
