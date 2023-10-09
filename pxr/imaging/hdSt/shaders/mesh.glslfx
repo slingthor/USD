@@ -1821,8 +1821,8 @@ vec3 ComputeScreenSpacePeye()
 vec3 ComputeScreenSpaceNeye()
 {
     vec3 Peye = ComputeScreenSpacePeye();
-    vec3 Neye = normalize(cross(-dFdx(Peye), dFdy(Peye)));
-    return -Neye(gl_FrontFacing ? Neye : -Neye);
+    vec3 Neye = normalize(cross(-dFdx(Peye), -dFdy(Peye)));
+    return (gl_FrontFacing ? Neye : -Neye);
 }
 
 void main(void)
