@@ -1179,6 +1179,7 @@ HdStRenderPassState::UpdateDynamicState(
     }
     gfxCmds->SetCullMode(
                          geometricShader->ResolveCullMode(_cullStyle));
+
 }
 
 void

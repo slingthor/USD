@@ -202,6 +202,10 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
         geomStyle == HdMeshGeomStyleHullEdgeOnly) {
         polygonMode = HdPolygonModeLine;
     }
+    
+    if (normalsSource == NormalSourceFlatGeometric) {
+        normalsSource = NormalSourceFlatScreenSpace;
+    }
 
     // XXX: Unfortunately instanced meshes can't use h/w culling. This is due to
     // the possibility that they have instanceTransform/instanceScale primvars.
@@ -323,11 +327,7 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
 
     if (useMeshShading) {
         MS[msIndex++] = _tokens->instancing;
-        if (ptvsGeometricNormals) {
-            MS[msIndex++] = _tokens->normalsGeometryFlatMesh;
-        } else {
-            MS[msIndex++] = _tokens->normalsGeometryNoFlatMesh;
-        }
+        MS[msIndex++] = _tokens->normalsGeometryNoFlatMesh;
 
         // Now handle the vs style normals
         if (normalsSource == NormalSourceFlat) {
