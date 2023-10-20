@@ -5801,8 +5801,12 @@ HdSt_CodeGen::_GenerateVertexAndFaceVaryingPrimvar()
         // with ARB_enhanced_layouts extention, it's possible
         // to use "component" qualifier to declare offsetted primvars
         // in interleaved buffer.
-        _EmitDeclaration(&_resAttrib, name, dataType, binding, false, -1, _hasMOS);
-        if (name.GetString() != "points" && _hasMS) {
+        if (_hasMS) {
+            _EmitDeclaration(&_resAttrib, name, dataType, binding, false, -1, _hasMS);
+        } else {
+            _EmitDeclaration(&_resAttrib, name, dataType, binding);
+        }
+        if (!(name.GetString() == "points" && _hasMS)) {
             interstagePrimvar.emplace_back(_GetPackedType(dataType, false), name);
         }
 
@@ -5815,7 +5819,7 @@ HdSt_CodeGen::_GenerateVertexAndFaceVaryingPrimvar()
                             name, dataType, /*arraySize=*/1, "localIndex");
         _EmitStructAccessor(accessorsGS,  _tokens->inPrimvars,
                             name, dataType, /*arraySize=*/1, "localIndex");
-        if (name.GetString() != "points" && _hasMS) {
+        if (!(name.GetString() == "points" && _hasMS)) {
             _EmitStructAccessor(accessorsFS,  _tokens->inPrimvars,
                                 name, dataType, /*arraySize=*/1);
         }
@@ -5837,26 +5841,25 @@ HdSt_CodeGen::_GenerateVertexAndFaceVaryingPrimvar()
            _GetPackedType(dataType, false));
 
         // interstage plumbing
+        _procVS << "  outPrimvars." << name
+        << " = " << name << ";\n";
+        _procTCS << "  outPrimvars[gl_InvocationID]." << name
+        << " = inPrimvars[gl_InvocationID]." << name << ";\n";
+        _procTES << "  outPrimvars." << name
+        << " = basis[0] * inPrimvars[i0]." << name
+        << " + basis[1] * inPrimvars[i1]." << name
+        << " + basis[2] * inPrimvars[i2]." << name
+        << " + basis[3] * inPrimvars[i3]." << name << ";\n";
+        _procGS  << "  outPrimvars." << name
+        << " = inPrimvars[index]." << name << ";\n";
+        _procPTVSOut << "  outPrimvars." << name
+        << " = InterpolatePrimvar("
+        << "HdGet_" << name << "(i0), "
+        << "HdGet_" << name << "(i1), "
+        << "HdGet_" << name << "(i2), "
+        << "HdGet_" << name << "(i3), basis, uv);\n";
         if (name.GetString() != "points" && _hasMS) {
-            _procVS << "  outPrimvars." << name
-            << " = " << name << ";\n";
-            _procTCS << "  outPrimvars[gl_InvocationID]." << name
-            << " = inPrimvars[gl_InvocationID]." << name << ";\n";
-            _procTES << "  outPrimvars." << name
-            << " = basis[0] * inPrimvars[i0]." << name
-            << " + basis[1] * inPrimvars[i1]." << name
-            << " + basis[2] * inPrimvars[i2]." << name
-            << " + basis[3] * inPrimvars[i3]." << name << ";\n";
-            _procGS  << "  outPrimvars." << name
-            << " = inPrimvars[index]." << name << ";\n";
-            _procMSOut << "  vertexOut." << name
-            << " = ms_ms_" << name << ";\n";
-            _procPTVSOut << "  outPrimvars." << name
-            << " = InterpolatePrimvar("
-            << "HdGet_" << name << "(i0), "
-            << "HdGet_" << name << "(i1), "
-            << "HdGet_" << name << "(i2), "
-            << "HdGet_" << name << "(i3), basis, uv);\n";
+            _procMSOut << "  vertexOut." << name << " = ms_ms_" << name << ";\n";
             _procMSIn  << "    ms_ms_" << name << " = HdGet_" << name << "(index);\n";
         }
     }

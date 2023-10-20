@@ -1001,12 +1001,14 @@ HgiMetalStructTypeDeclarationShaderSection::HgiMetalStructTypeDeclarationShaderS
     const HgiMetalShaderSectionPtrVector &members,
     const std::string &templateWrapper,
     const std::string &templateWrapperParameters,
-    const bool useAttributes)
+    const bool useAttributes,
+    const bool useArrayInDeclaration)
   : HgiMetalShaderSection(identifier)
   , _members(members)
   , _templateWrapper(templateWrapper)
   , _templateWrapperParameters(templateWrapperParameters)
   , _useAttributes(useAttributes)
+  , _useArrayInDeclaration(useArrayInDeclaration)
 {
 }
 
@@ -1033,7 +1035,9 @@ HgiMetalStructTypeDeclarationShaderSection::WriteDeclaration(
                 member->WriteAttributesOnlyWithoutIndex(ss);
             }
         }
-        member->WriteArraySize(ss);
+        if (_useArrayInDeclaration) {
+            member->WriteArraySize(ss);
+        }
         ss << ";\n";
     }
     ss << "};\n";

@@ -125,6 +125,9 @@ HdSt_GeometricShader::ResolveCullMode(
         case HdCullStyleFront:
             if (_hasMirroredTransform) {
                 resolvedCullMode = HgiCullModeBack;
+                if (_useMeshShaders) {
+                    resolvedCullMode = HgiCullModeNone;
+                }
             } else {
                 resolvedCullMode = HgiCullModeFront;
             }
@@ -133,6 +136,9 @@ HdSt_GeometricShader::ResolveCullMode(
             if (!_doubleSided) {
                 if (_hasMirroredTransform) {
                     resolvedCullMode = HgiCullModeBack;
+                    if (_useMeshShaders) {
+                        resolvedCullMode = HgiCullModeNone;
+                    }
                 } else {
                     resolvedCullMode = HgiCullModeFront;
                 }
@@ -143,6 +149,9 @@ HdSt_GeometricShader::ResolveCullMode(
                 resolvedCullMode = HgiCullModeFront;
             } else {
                 resolvedCullMode = HgiCullModeBack;
+                if (_useMeshShaders) {
+                    resolvedCullMode = HgiCullModeNone;
+                }
             }
             break;
         case HdCullStyleBackUnlessDoubleSided:
@@ -151,6 +160,9 @@ HdSt_GeometricShader::ResolveCullMode(
                     resolvedCullMode = HgiCullModeFront;
                 } else {
                     resolvedCullMode = HgiCullModeBack;
+                    if (_useMeshShaders) {
+                        resolvedCullMode = HgiCullModeNone;
+                    }
                 }
             }
             break;

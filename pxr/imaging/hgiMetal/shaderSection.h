@@ -386,7 +386,8 @@ public:
         const std::string &templateWrapper = std::string(),
         const std::string &templateWrapperParameters
                             = std::string(),
-        const bool useAttributes = true);
+        const bool useAttributes = true,
+        const bool useArrayInDeclaration = true);
 
     HGIMETAL_API
     void WriteType(std::ostream &ss) const override;
@@ -411,6 +412,7 @@ private:
     const std::string _templateWrapper;
     const std::string _templateWrapperParameters;
     const bool _useAttributes;
+    const bool _useArrayInDeclaration;
 };
 
 /// \class HgiMetalStructInstanceShaderSection

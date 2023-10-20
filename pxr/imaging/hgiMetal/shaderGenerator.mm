@@ -122,19 +122,23 @@ T* _BuildStructInstance(
     const bool isPointer,
     const HgiMetalShaderSectionPtrVector &members,
     HgiMetalShaderGenerator *generator,
-    const std::string templateWrapper = std::string())
+    const std::string templateWrapper = std::string(),
+    const bool writeArrayInDeclaration = true)
 {
     //If it doesn't have any members, don't declare an empty struct instance
     if(typeName.empty() || members.empty()) {
         return nullptr;
     }
-
     HgiMetalStructTypeDeclarationShaderSection * const section =
         generator->CreateShaderSection<
             HgiMetalStructTypeDeclarationShaderSection>(
                 typeName,
                 members,
-                templateWrapper);
+                templateWrapper,
+                std::string(),
+                true,
+                writeArrayInDeclaration
+                );
 
     const HgiShaderSectionAttributeVector attributes = {
         HgiShaderSectionAttribute{attribute, ""}};
@@ -1230,7 +1234,9 @@ HgiMetalShaderStageEntryPoint::_Init(
         /* isPointer = */ false,
         /* members = */ stageInputs,
         generator,
-        _inputsGenericWrapper);
+        _inputsGenericWrapper,
+        generator->_descriptor.shaderStage != HgiShaderStagePostTessellationVertex
+            && generator->_descriptor.shaderStage != HgiShaderStagePostTessellationVertex);
         } else {
             _inputs =
             _BuildStructInstance<HgiMetalParameterMeshInputShaderSection>(

@@ -127,6 +127,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((mainVaryingInterpPTVS,       "Mesh.PostTessVertex.VaryingInterpolation"))
     ((mainMOS,                     "Mesh.MeshObject.Main"))
     ((mainTriangleMS,              "Mesh.Meshlet.Triangle"))
+    ((noCullmainTriangleMS,        "Mesh.Meshlet.TriangleNoCull"))
     ((cullBackfaceMS,              "Mesh.Meshlet.Triangle.CullBackface"))
     ((noCullBackfaceMS,            "Mesh.Meshlet.Triangle.NoCullBackface"))
     ((mainTriangleTessGS,          "Mesh.Geometry.TriangleTess"))
@@ -264,7 +265,10 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
         (normalsSource == NormalSourceScene && !vsSceneNormals);
     bool const ptvsGeometricNormals =
         (normalsSource == NormalSourceFlatGeometric);
-
+    
+    if (ptvsGeometricNormals) {
+        useMeshShaders = false;
+    }
     // vertex shader
     uint8_t vsIndex = 0;
     VS[vsIndex++] = _tokens->instancing;
@@ -291,18 +295,20 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
     VS[vsIndex] = TfToken();
 
     // Determine if PTVS should be used for Metal.
-    bool const usePTVSTechniques =
+    bool usePTVSTechniques =
             isPrimTypePatches ||
             hasCustomDisplacement ||
             ptvsSceneNormals ||
             ptvsGeometricNormals ||
             !hasBuiltinBarycentrics;
+    
+    if (useMeshShaders && !isPrimTypePatches) {
+        usePTVSTechniques = false;
+    }
 
     // Determine if using actually using Metal PTVS.
     useMetalTessellation =
         hasMetalTessellation && !isPrimTypePoints && usePTVSTechniques;
-
-    useMetalTessellation = false;
 
     bool useMeshShading = UseMeshShaders();
 
@@ -312,7 +318,17 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
 
     uint8_t mosIndex = 0;
     uint8_t msIndex = 0;
-
+    
+    bool const faceCullFrontFacing =
+        !useHardwareFaceCulling &&
+            (cullStyle == HdCullStyleFront ||
+             (cullStyle == HdCullStyleFrontUnlessDoubleSided && !doubleSided));
+    bool const faceCullBackFacingMS =
+            (cullStyle == HdCullStyleBack ||
+             (cullStyle == HdCullStyleBackUnlessDoubleSided && !doubleSided));
+    bool const faceCullBackFacing =
+        !useHardwareFaceCulling && faceCullBackFacingMS;
+    
     if (useMeshShading) {
         MS[msIndex++] = _tokens->instancing;
         if (ptvsGeometricNormals) {
@@ -342,7 +358,7 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
             MS[msIndex++] = _tokens->noCustomDisplacementGS;
         }
         
-        if (doubleSided) {
+        if (faceCullBackFacingMS) {
             MS[msIndex++] = _tokens->noCullBackfaceMS;
         } else {
             MS[msIndex++] = _tokens->cullBackfaceMS;
@@ -352,7 +368,11 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
         if (isPrimTypeQuads || isPrimTypeTriQuads) {
             TF_CODING_ERROR("Quad prims not supported yet");
         } else if (isPrimTypeTris) {
-            MS[msIndex++] = _tokens->mainTriangleMS;
+            if (faceCullBackFacingMS) {
+                MS[msIndex++] = _tokens->mainTriangleMS;
+            } else {
+                MS[msIndex++] = _tokens->noCullmainTriangleMS;
+            }
         } else {
             TF_CODING_ERROR("Unsupported meshlet primitive type");
         }
@@ -530,20 +550,21 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
     FS[fsIndex++] = doubleSided ?
         _tokens->normalsDoubleSidedFS : _tokens->normalsSingleSidedFS;
 
-    bool const faceCullFrontFacing =
-        !useHardwareFaceCulling &&
-            (cullStyle == HdCullStyleFront ||
-             (cullStyle == HdCullStyleFrontUnlessDoubleSided && !doubleSided));
-    bool const faceCullBackFacing =
-        !useHardwareFaceCulling &&
-            (cullStyle == HdCullStyleBack ||
-             (cullStyle == HdCullStyleBackUnlessDoubleSided && !doubleSided));
-    FS[fsIndex++] =
-        faceCullFrontFacing
-            ? _tokens->faceCullFrontFacingFS
-            : faceCullBackFacing
-                ? _tokens->faceCullBackFacingFS
-                : _tokens->faceCullNoneFS; // DontCare, Nothing, HW
+    if (!useMeshShading) {
+        FS[fsIndex++] =
+            faceCullFrontFacing
+                ? _tokens->faceCullFrontFacingFS
+                : faceCullBackFacing
+                    ? _tokens->faceCullBackFacingFS
+                    : _tokens->faceCullNoneFS; // DontCare, Nothing, HW
+    } else {
+        FS[fsIndex++] =
+            faceCullFrontFacing
+                ? _tokens->faceCullFrontFacingFS
+                    : _tokens->faceCullNoneFS; // DontCare, Nothing, HW
+    }
+    
+        
 
     // Wire (edge) related mixins
     if (renderWireframe || renderEdges) {
