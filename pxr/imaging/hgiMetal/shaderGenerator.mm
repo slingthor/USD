@@ -393,9 +393,7 @@ _ComputeHeader(id<MTLDevice> device, const HgiShaderFunctionDesc &descriptor)
                << "#define MAX_PRIMITIVES            (" << descriptor.meshDescriptor.maxPrimitiveCount << ")\n"
                << "#endif // MESH_SHADING_CONFIG_H\n";
     }
-    if (TfGetEnvSetting(HGIMETAL_ENABLE_TINY_TRIANGLE_CULLING)) {
-        header << "#define TINY_TRIANGLE_CULL\n";
-    }
+    header << "#define TINY_TRIANGLE_CULL\n";
     
     // Metal feature set defines
     // Define all macOS 10.13 feature set enums onwards

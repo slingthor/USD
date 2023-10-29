@@ -689,7 +689,7 @@ std::vector<Meshlet> processIndices(uint32_t* indices, int indexCount, uint32_t 
     uint primId = 0;
     for(uint32_t i = meshStartLocation; i < meshEndLocation + 1; i += 3) {
         if (maxVertsReached || maxPrimsReached || i >= meshEndLocation) {
-            endPrimitive = ((i)/3);
+            endPrimitive = numPrimsProcessed + startPrimitive;
             int count = 0;
             meshlet.vertexInfo.resize(m.size());
             for(auto it = m.begin(); it != m.end(); ++it) {
@@ -702,7 +702,6 @@ std::vector<Meshlet> processIndices(uint32_t* indices, int indexCount, uint32_t 
             }
             
             for(uint32_t n = startPrimitive; n < (endPrimitive); n++) {
-                //We know that indices don't go over 256, we can pack them in a byte
                 uint ind0 = globalToLocalVertex[indices[n*3]];
                 uint ind1 = globalToLocalVertex[indices[n*3+1]];
                 uint ind2 = globalToLocalVertex[indices[n*3+2]];
@@ -714,7 +713,7 @@ std::vector<Meshlet> processIndices(uint32_t* indices, int indexCount, uint32_t 
                 primId++;
             }
             meshlet.vertexCount = meshlet.vertexInfo.size();
-            meshlet.primitiveCount = (endPrimitive - startPrimitive);
+            meshlet.primitiveCount = numPrimsProcessed;
 
             maxVertsReached = false;
             maxPrimsReached = false;
@@ -766,7 +765,7 @@ std::vector<Meshlet> processIndices(uint32_t* indices, int indexCount, uint32_t 
             it3->second.push_back(i+2);
         }
         numPrimsProcessed++;
-        if(numPrimsProcessed >= max_primitives) {
+        if(numPrimsProcessed >= (max_primitives)) {
             maxPrimsReached = true;
             continue;
         }
