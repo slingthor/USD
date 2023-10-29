@@ -727,18 +727,26 @@ std::vector<Meshlet> processIndices(uint32_t* indices, int indexCount, uint32_t 
                 continue;
             }
             meshlet = Meshlet();
-            startPrimitive = ((i+1)/3);
+            startPrimitive = endPrimitive;
         }
         
         //TODO see if we can be smarter
-        if((m.size() + 4) > max_vertices) {
-            maxVertsReached = true;
-        }
-        
         auto it1 = m.find(i);
         auto it2 = m.find(i+1);
         auto it3 = m.find(i+2);
-
+        if((m.size() + 4) > max_vertices) {
+            int space = max_vertices - m.size();
+            int wantedSpace = 0;
+            wantedSpace += it1 == m.end();
+            wantedSpace += it2 == m.end();
+            wantedSpace += it3 == m.end();
+            if (space < wantedSpace) {
+                maxVertsReached = true;
+                i = i-3;
+                continue;
+            }
+        }
+        
         if (it1 == m.end()) {
             m[indices[i]] = {i};
             numVerticesProcessed++;
