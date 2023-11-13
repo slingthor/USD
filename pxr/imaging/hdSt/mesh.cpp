@@ -1243,6 +1243,521 @@ _GetDoubleSupport(
 }
 
 void
+HdStMesh::_PopulateMeshlets(HdSceneDelegate *sceneDelegate,
+                                  HdRenderParam *renderParam,
+                                  const HdReprSharedPtr &repr,
+                                  const HdMeshReprDesc &desc,
+                                  HdStDrawItem *drawItem,
+                                  int geomSubsetDescIndex,
+                                  HdDirtyBits *dirtyBits,
+                                  bool requireSmoothNormals)
+{
+    return;
+    HD_TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
+
+    SdfPath const& id = GetId();
+    HdRenderIndex &renderIndex = sceneDelegate->GetRenderIndex();
+
+    HdStResourceRegistrySharedPtr const &resourceRegistry =
+        std::static_pointer_cast<HdStResourceRegistry>(
+        renderIndex.GetResourceRegistry());
+
+    // The "points" attribute is expected to be in this list.
+    HdPrimvarDescriptorVector primvars =
+        HdStGetPrimvarDescriptors(this, drawItem, sceneDelegate,
+            HdInterpolationVertex, repr, desc.geomStyle, geomSubsetDescIndex,
+                _topology->GetGeomSubsets().size());
+
+    // Track the last vertex index to distinguish between vertex and varying
+    // while processing.
+    const int vertexPartitionIndex = int(primvars.size()-1);
+
+    // Add varying primvars so we can process them all together, below.
+    HdPrimvarDescriptorVector varyingPvs =
+        HdStGetPrimvarDescriptors(this, drawItem, sceneDelegate,
+            HdInterpolationVarying, repr, desc.geomStyle, geomSubsetDescIndex,
+                _topology->GetGeomSubsets().size());
+    primvars.insert(primvars.end(), varyingPvs.begin(), varyingPvs.end());
+
+    HdExtComputationPrimvarDescriptorVector compPrimvars =
+        sceneDelegate->GetExtComputationPrimvarDescriptors(id,
+            HdInterpolationVertex);
+
+    HdBufferSourceSharedPtrVector sources;
+    HdBufferSourceSharedPtrVector reserveOnlySources;
+    HdBufferSourceSharedPtrVector separateComputationSources;
+    HdStComputationComputeQueuePairVector computations;
+    sources.reserve(primvars.size());
+
+    int numPoints = _topology ? _topology->GetNumPoints() : 0;
+    int refineLevel = _topology ? _topology->GetRefineLevel() : 0;
+
+    // Don't call _GetRefineLevelForDesc(desc) instead of GetRefineLevel(). Why?
+    //
+    // We share the vertex BAR from both refined and hull topologies so that
+    // the change tracker doesn't have to keep track the refined primvars.
+    //
+    // The hull topology refers coarse vertices that are placed on the beginning
+    // of the vertex bar (this is a nature of OpenSubdiv adaptive/uniform
+    // refinement). The refined topology refers entire vertex bar.
+    //
+    // If we only update the coarse vertices for the hull repr, and if we also
+    // have a refined repr which stucks in an old state, DirtyPoints gets
+    // cleared/ just updating coarse vertices and we lost a chance of updating
+    // refined primvars. This state discrepancy could happen over frame, so
+    // somebody has to maintain the versioning of each buffers.
+    //
+    // For topology, _indicesValid and _hullIndicesValid are used for that
+    // purpose and it's possible because mesh topology is cached and shared in
+    // the instance registry. We don't need to ask sceneDelegate, thus
+    // individual (hull and refined) change trackings aren't needed.
+    //
+    // For vertex primvars, here we simply force to update all vertices at the
+    // prim's authored refine level. Then both hull and refined topology can
+    // safely access all valid data without having separate change tracking.
+    //
+    // This could be a performance concern, where a prim has higher refine level
+    // and a Storm client keeps drawing only hull repr for some reason.
+    // Currently we assume it's not likely a use-case, but we may revisit later
+    // and optimize if necessary.
+    //
+
+    HdSt_GetExtComputationPrimvarsComputations(
+        id,
+        sceneDelegate,
+        compPrimvars,
+        *dirtyBits,
+        &sources,
+        &reserveOnlySources,
+        &separateComputationSources,
+        &computations);
+    
+    bool isPointsComputedPrimvar = false;
+    {
+        // Update tracked state for points and normals that are computed.
+        for (HdBufferSourceSharedPtrVector const& computedSources :
+             {reserveOnlySources, sources}) {
+            for (HdBufferSourceSharedPtr const& source: computedSources) {
+                if (source->GetName() == HdTokens->points) {
+                    isPointsComputedPrimvar = true;
+                    _pointsDataType = source->GetTupleType().type;
+                }
+                if (source->GetName() == HdTokens->normals) {
+                    _sceneNormalsInterpolation = HdInterpolationVertex;
+                    _sceneNormals = true;
+                }
+            }
+        }
+    }
+    
+    const bool doRefine = (refineLevel > 0);
+    const bool doQuadrangulate = _UseQuadIndices(renderIndex, _topology);
+
+    {
+        for (HdBufferSourceSharedPtr const & source : reserveOnlySources) {
+            _RefineOrQuadrangulateVertexAndVaryingPrimvar(
+                source, _topology, id,  doRefine, doQuadrangulate,
+                resourceRegistry,
+                &computations, HdSt_MeshTopology::INTERPOLATE_VERTEX);
+        }
+
+        for (HdBufferSourceSharedPtr const & source : sources) {
+            _RefineOrQuadrangulateVertexAndVaryingPrimvar(
+                source, _topology, id,  doRefine, doQuadrangulate,
+                resourceRegistry,
+                &computations, HdSt_MeshTopology::INTERPOLATE_VERTEX);
+        }
+    }
+
+    // Track primvars that are skipped because they have zero elements
+    HdPrimvarDescriptorVector zeroElementPrimvars;
+
+    // If any primvars use doubles, we need to know if the Hgi backend supports
+    // these, or if they need to be converted to floats.
+    const bool doublesSupported = _GetDoubleSupport(resourceRegistry);
+
+    // Track index to identify varying primvars.
+    int i = 0;
+    for (HdPrimvarDescriptor const& primvar: primvars) {
+        // If the index is greater than the last vertex index, isVarying=true.
+        bool isVarying = i++ > vertexPartitionIndex;
+
+        if (!HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, primvar.name)) {
+            continue;
+        }
+
+        // TODO: We don't need to pull primvar metadata every time a
+        // value changes, but we need support from the delegate.
+
+        VtValue value =  GetPrimvar(sceneDelegate, primvar.name);
+
+        if (!value.IsEmpty()) {
+            HdBufferSourceSharedPtr source =
+                std::make_shared<HdVtBufferSource>(primvar.name, value, 1,
+                                                   doublesSupported);
+
+            if (source->GetNumElements() == 0 &&
+                source->GetName() != HdTokens->points) {
+                // zero elements for primvars other than points will be treated
+                // as if the primvar doesn't exist, so no warning is necessary
+                zeroElementPrimvars.push_back(primvar);
+                continue;
+            }
+
+            // verify primvar length -- it is alright to have more data than we
+            // index into; the inverse is when we issue a warning and skip
+            // update.
+            if ((int)source->GetNumElements() < numPoints) {
+                HF_VALIDATION_WARN(id,
+                    "Vertex primvar %s has only %d elements, while"
+                    " its topology expects at least %d elements. Skipping "
+                    " primvar update.",
+                    primvar.name.GetText(),
+                    (int)source->GetNumElements(), numPoints);
+
+                if (primvar.name == HdTokens->points) {
+                    // If points data is invalid, it pretty much invalidates
+                    // the whole prim.  Drop the Bar, to invalidate the prim and
+                    // stop further processing.
+                    _sharedData.barContainer.Set(
+                           drawItem->GetDrawingCoord()->GetVertexPrimvarIndex(),
+                           HdBufferArrayRangeSharedPtr());
+
+                    HF_VALIDATION_WARN(id,
+                      "Skipping prim because its points data is insufficient.");
+
+                    return;
+                }
+
+                continue;
+
+            } else if ((int)source->GetNumElements() > numPoints) {
+                HF_VALIDATION_WARN(id,
+                    "Vertex primvar %s has %d elements, while"
+                    " its topology references only upto element index %d.",
+                    primvar.name.GetText(),
+                    (int)source->GetNumElements(), numPoints);
+
+                // If the primvar has more data than needed, we issue a warning,
+                // but don't skip the primvar update. Truncate the buffer to
+                // the expected length.
+                std::static_pointer_cast<HdVtBufferSource>(source)
+                    ->Truncate(numPoints);
+            }
+
+            if (source->GetName() == HdTokens->normals) {
+                _sceneNormalsInterpolation =
+                    isVarying ? HdInterpolationVarying : HdInterpolationVertex;
+                _sceneNormals = true;
+            } else if (source->GetName() == HdTokens->displayOpacity) {
+                _displayOpacity = true;
+            }
+
+            // Special handling of points primvar.
+            // We need to capture state about the points primvar
+            // for use with smooth normal computation.
+            if (primvar.name == HdTokens->points) {
+                if (!TF_VERIFY(!isPointsComputedPrimvar)) {
+                    HF_VALIDATION_WARN(id,
+                        "'points' specified as both computed and authored "
+                        "primvar. Skipping authored value.");
+                    continue;
+                }
+                _pointsDataType = source->GetTupleType().type;
+            }
+
+            _RefineOrQuadrangulateVertexAndVaryingPrimvar(
+                source, _topology, id,  doRefine, doQuadrangulate,
+                resourceRegistry,
+                &computations, isVarying ?
+                    HdSt_MeshTopology::INTERPOLATE_VARYING :
+                    HdSt_MeshTopology::INTERPOLATE_VERTEX);
+
+            sources.push_back(source);
+        }
+    }
+
+    // remove the primvars with zero elements from further processing
+    for (HdPrimvarDescriptor const& primvar: zeroElementPrimvars) {
+        auto pos = std::find(primvars.begin(), primvars.end(), primvar);
+        if (pos != primvars.end()) {
+            primvars.erase(pos);
+        }
+    }
+
+    TfToken generatedNormalsName;
+    if (requireSmoothNormals && (*dirtyBits & DirtySmoothNormals)) {
+        // note: normals gets dirty when points are marked as dirty,
+        // at changetracker.
+
+        // clear DirtySmoothNormals (this is not a scene dirtybit)
+        *dirtyBits &= ~DirtySmoothNormals;
+
+        TF_VERIFY(_vertexAdjacencyBuilder);
+
+        // we can't use packed normals for refined/quad,
+        // let's migrate the buffer to full precision
+        bool usePackedSmoothNormals =
+            IsEnabledPackedNormals() && !(doRefine || doQuadrangulate);
+
+        generatedNormalsName = usePackedSmoothNormals ?
+            HdStTokens->packedSmoothNormals : HdStTokens->smoothNormals;
+        
+        if (_pointsDataType != HdTypeInvalid) {
+            // Smooth normals will compute normals as the same datatype
+            // as points, unless we ask for packed normals.
+            // This is unfortunate; can we force them to be float?
+            HdStComputationSharedPtr smoothNormalsComputation =
+                std::make_shared<HdSt_SmoothNormalsComputationGPU>(
+                    _vertexAdjacencyBuilder.get(),
+                    HdTokens->points,
+                    generatedNormalsName,
+                    _pointsDataType,
+                    usePackedSmoothNormals);
+            computations.emplace_back(
+                smoothNormalsComputation, _NormalsCompQueue);
+
+            // note: we haven't had explicit dependency for GPU
+            // computations just yet. Currently they are executed
+            // sequentially, so the dependency is expressed by
+            // registering order.
+            //
+            // note: we can use "pointsDataType" as the normals data type
+            // because, if we decided to refine/quadrangulate, we will have
+            // forced unpacked normals.
+            if (doRefine) {
+                HdStComputationSharedPtr computation =
+                    _topology->GetOsdRefineComputationGPU(
+                        HdStTokens->smoothNormals, _pointsDataType,
+                        resourceRegistry.get(),
+                        HdSt_MeshTopology::INTERPOLATE_VERTEX);
+
+                // computation can be null for empty mesh
+                if (computation) {
+                    computations.emplace_back(
+                        computation, _RefineNormalsCompQueue);
+                }
+            } else if (doQuadrangulate) {
+                HdStComputationSharedPtr computation =
+                    _topology->GetQuadrangulateComputationGPU(
+                        HdStTokens->smoothNormals,
+                        _pointsDataType, GetId());
+
+                // computation can be null for all-quad mesh
+                if (computation) {
+                    computations.emplace_back(
+                        computation, _RefineNormalsCompQueue);
+                }
+            }
+        }
+    }
+
+    HdBufferArrayRangeSharedPtr const &bar = drawItem->GetVertexPrimvarRange();
+    
+    if (HdStCanSkipBARAllocationOrUpdate(
+            sources, computations, bar,*dirtyBits)) {
+        return;
+    }
+
+    // XXX: This should be based off the DirtyPrimvarDesc bit.
+    bool hasDirtyPrimvarDesc = (*dirtyBits & HdChangeTracker::DirtyPrimvar);
+    HdBufferSpecVector removedSpecs;
+    if (hasDirtyPrimvarDesc) {
+        // If we've just generated normals then make sure those
+        // are preserved, otherwise allow either previously existing
+        // packed or non-packed normals to remain.
+        TfTokenVector internallyGeneratedPrimvars;
+        if (! generatedNormalsName.IsEmpty()) {
+            internallyGeneratedPrimvars = { generatedNormalsName };
+        } else {
+            internallyGeneratedPrimvars =
+                { HdStTokens->packedSmoothNormals, HdStTokens->smoothNormals };
+        }
+
+        removedSpecs = HdStGetRemovedPrimvarBufferSpecs(bar, primvars,
+            compPrimvars, internallyGeneratedPrimvars, id);
+    }
+
+    HdBufferSpecVector bufferSpecs;
+    HdBufferSpec::GetBufferSpecs(sources, &bufferSpecs);
+    HdBufferSpec::GetBufferSpecs(reserveOnlySources, &bufferSpecs);
+    HdStGetBufferSpecsFromCompuations(computations, &bufferSpecs);
+
+    HdBufferSourceSharedPtrVector allSources(sources);
+    for (HdBufferSourceSharedPtr& src : reserveOnlySources) {
+        allSources.emplace_back(src);
+    }
+
+    HdBufferArrayRangeSharedPtr range;
+
+    if (HdStIsEnabledSharedVertexPrimvar()) {
+        // When primvar sharing is enabled, we have the following scenarios:
+        // (a) BAR hasn't been allocated,
+        //    - See if an existing immutable BAR may be shared.
+        //    - If one cannot be found, allocate an immutable BAR and register
+        //      it, so other prims may benefit from sharing it.
+        //
+        // (b) BAR has been allocated and is immutable
+        //    (b1) If the topology is varying OR data in the existing buffers is
+        //      changing (e.g. points are being updated) OR if primvar(s) were
+        //      removed, it is expensive to recompute a hash over the contents
+        //      to check if an existing immutable BAR may be shared.
+        //          - Transition to a mutable BAR by migrating existing contents
+        //
+        //    (b2) Else if we have new sources (e.g smoothNormals), follow
+        //      the same steps as in (a) to use/allocate an immutable BAR.
+        //          - This is done to avoid transitioning to a mutable BAR (and
+        //            thus prevent sharing) when changing reprs. This also
+        //            handles authored primvars that were added, which may not
+        //            be something we want.
+        //
+        //    (b3) No new sources: Use the existing BAR.
+        //
+        // (c) BAR has been allocated and is mutable
+        //    - This means we transitioned to a mutable BAR (b1) earlier, and
+        //      can handle it as though primvar sharing wasn't enabled.
+
+        // (a)
+        if (!HdStIsValidBAR(bar)) {
+            // see if we can share an immutable primvar range
+            // include topology and other topological computations
+            // in the sharing id so that we can take into account
+            // sharing of computed primvar data.
+            _vertexPrimvarId = HdStComputeSharedPrimvarId(
+                _topologyId, allSources, computations);
+            
+            bool isFirstInstance = true;
+            range = _GetSharedPrimvarRange(_vertexPrimvarId,
+                                           /*updatedOrAddedSpecs*/bufferSpecs,
+                                           /*removedSpecs*/removedSpecs,
+                                           /*curRange*/bar,
+                                           &isFirstInstance,
+                                           resourceRegistry);
+            if (!isFirstInstance) {
+                TF_DEBUG(HD_RPRIM_UPDATED).Msg(
+                    "%s: Found an immutable BAR (%p) for sharing.\n",
+                    id.GetText(), (void*)range.get());
+
+                // this is not the first instance, skip redundant
+                // sources and computations.
+                sources.clear();
+                computations.clear();
+            } else {
+                TF_DEBUG(HD_RPRIM_UPDATED).Msg(
+                    "%s: Allocated an immutable BAR (%p).\n",
+                    id.GetText(), (void*)range.get());
+            }
+        } else {
+            if (bar->IsImmutable()) {
+                HdBufferSpecVector barSpecs;
+                bar->GetBufferSpecs(&barSpecs);
+
+                bool updatingExistingBuffers =
+                    !bufferSpecs.empty() &&
+                    HdBufferSpec::IsSubset(bufferSpecs, /*superSet*/barSpecs);
+                bool notNewRepr = !(*dirtyBits & HdChangeTracker::NewRepr);
+
+                bool transitionToMutableBAR =
+                    _hasVaryingTopology ||
+                    (updatingExistingBuffers && notNewRepr) ||
+                    !removedSpecs.empty();
+                
+                if (transitionToMutableBAR) {
+                    // (b1)
+                    HdBufferArrayUsageHint newUsageHint = bar->GetUsageHint();
+                    newUsageHint.bits.immutable = 0;
+                    _vertexPrimvarId = 0;
+
+                    range = resourceRegistry->UpdateNonUniformBufferArrayRange(
+                        HdTokens->primvar, bar, bufferSpecs, removedSpecs,
+                        newUsageHint);
+                    
+                    TF_DEBUG(HD_RPRIM_UPDATED).Msg(
+                        "Transitioning from immutable to mutable BAR\n");
+
+                } else if (!bufferSpecs.empty()) {
+                    // (b2) Continue to use an immutable BAR (even if it means
+                    // allocating a new one)
+
+                    // See if we can share an immutable buffer primvar range
+                    // include our existing sharing id so that we can take
+                    // into account previously committed sources along
+                    // with our new sources and computations.
+                    _vertexPrimvarId = HdStComputeSharedPrimvarId(
+                        _vertexPrimvarId, allSources, computations);
+
+                    bool isFirstInstance = true;
+                    range = _GetSharedPrimvarRange(_vertexPrimvarId,
+                                           /*updatedOrAddedSpecs*/bufferSpecs,
+                                           /*removedSpecs*/removedSpecs,
+                                           /*curRange*/bar,
+                                           &isFirstInstance,
+                                           resourceRegistry);
+                    
+                    if (!isFirstInstance) {
+                        sources.clear();
+                        computations.clear();
+                    }
+
+                    TF_DEBUG(HD_RPRIM_UPDATED).Msg(
+                        "Migrating from immutable to another immutable BAR\n");
+                } else {
+                    // No changes are being made to the existing immutable BAR.
+                    range = bar;
+                }
+
+            } else {
+                // (c) Exiting BAR is a mutable one.
+                range = resourceRegistry->UpdateNonUniformBufferArrayRange(
+                    HdTokens->primvar, bar, bufferSpecs, removedSpecs,
+                    HdBufferArrayUsageHint());
+            }
+        }
+    } else {
+        // When primvar sharing is disabled, a mutable BAR is allocated/updated/
+        // migrated as necessary.
+        range = resourceRegistry->UpdateNonUniformBufferArrayRange(
+                HdTokens->primvar, bar, bufferSpecs, removedSpecs,
+                HdBufferArrayUsageHint());
+    }
+
+    HdStUpdateDrawItemBAR(
+        range,
+        drawItem->GetDrawingCoord()->GetVertexPrimvarIndex(),
+        &_sharedData,
+        renderParam,
+        &(renderIndex.GetChangeTracker()));
+
+    if (!sources.empty() || !computations.empty()) {
+        // If sources or computations are to be queued against the resulting
+        // BAR, we expect it to be valid.
+        if (!TF_VERIFY(drawItem->GetVertexPrimvarRange()->IsValid())) {
+            return;
+        }
+    }
+
+    // schedule buffer sources
+    if (!sources.empty()) {
+        // add sources to update queue
+        resourceRegistry->AddSources(drawItem->GetVertexPrimvarRange(),
+                                     std::move(sources));
+    }
+    // add gpu computations to queue.
+    for (auto const& compQueuePair : computations) {
+        HdStComputationSharedPtr const& comp = compQueuePair.first;
+        HdStComputeQueue queue = compQueuePair.second;
+        resourceRegistry->AddComputation(
+            drawItem->GetVertexPrimvarRange(), comp, queue);
+    }
+    if (!separateComputationSources.empty()) {
+        for (auto const& src : separateComputationSources) {
+            resourceRegistry->AddSource(src);
+        }
+    }
+}
+
+void
 HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
                                   HdRenderParam *renderParam,
                                   const HdReprSharedPtr &repr,
@@ -2301,6 +2816,15 @@ HdStMesh::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
                           repr,
                           desc,
                           geomSubsetDescIndex);
+        
+        _PopulateMeshlets(sceneDelegate,
+                          renderParam,
+                          repr,
+                          desc,
+                          drawItem,
+                          geomSubsetDescIndex,
+                          dirtyBits,
+                          requireSmoothNormals);
     }
 
     if (*dirtyBits & HdChangeTracker::DirtyDoubleSided) {
